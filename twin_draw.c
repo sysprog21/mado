@@ -280,9 +280,6 @@ twin_composite (twin_pixmap_t	*dst,
 	twin_src_msk_op	op;
 	twin_source_u   s, m;
 	int		sdx, sdy, mdx, mdy;
-	twin_argb32_t	*src_tmp;
-	twin_argb32_t	*msk_tmp;
-	twin_argb32_t	*dst_tmp;
 	
 	sdx = src_x - dst_x;
 	sdy = src_y - dst_y;

@@ -83,7 +83,7 @@ twin_screen_resize (twin_screen_t *screen, int width, int height)
     twin_screen_damage (screen, 0, 0, screen->width, screen->height);
 }
 
-twin_bool
+twin_bool_t
 twin_screen_damaged (twin_screen_t *screen)
 {
     return (screen->damage.left < screen->damage.right &&

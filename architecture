@@ -52,3 +52,9 @@ all of the windows the screen is white.
 Geometry can be displayed by computing an appropriate A8 pixmap and
 compositing the result to a pixmap.
 
+7. Paths
+
+To draw the A8 pixmap mentioned above, use a combination of move, draw
+and curve primitives to construct a path and then fill it.  To outline a
+path, use the convolution operator to convolve a pen with the path to
+construct a closed path surrounding the stroke.

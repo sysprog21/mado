@@ -28,6 +28,9 @@
 #include "twin.h"
 #include <string.h>
 
+/*
+ * Compositing stuff
+ */
 #define twin_int_mult(a,b,t)	((t) = (a) * (b) + 0x80, \
 				 ((((t)>>8 ) + (t))>>8 ))
 #define twin_int_div(a,b)	(((uint16_t) (a) * 255) / (b))
@@ -79,6 +82,9 @@ typedef void twin_op_func (twin_pointer_t	dst,
 			   twin_source_u	src,
 			   int			width);
 
+/*
+ * This needs to be refactored to reduce the number of functions...
+ */
 twin_in_op_func _twin_argb32_in_argb32_over_argb32;
 twin_in_op_func _twin_argb32_in_rgb16_over_argb32;
 twin_in_op_func _twin_argb32_in_a8_over_argb32;
@@ -209,5 +215,58 @@ _twin_fetch_rgb16 (twin_pixmap_t *pixmap, int x, int y, int w, twin_argb32_t *sp
 
 twin_argb32_t *
 _twin_fetch_argb32 (twin_pixmap_t *pixmap, int x, int y, int w, twin_argb32_t *span);
+
+/*
+ * Geometry helper functions
+ */
+
+twin_dfixed_t
+_twin_distance_to_point_squared (twin_point_t *a, twin_point_t *b);
+
+twin_dfixed_t
+_twin_distance_to_line_squared (twin_point_t *p, twin_point_t *p1, twin_point_t *p2);
+
+
+/*
+ * Polygon stuff
+ */
+
+typedef struct _twin_edge {
+    struct _twin_edge	*next;
+    twin_fixed_t	top, bot;
+    twin_fixed_t	x;
+    twin_fixed_t	e;
+    twin_fixed_t	dx, dy;
+    twin_fixed_t	inc_x;
+    twin_fixed_t	step_x;
+    int			winding;
+} twin_edge_t;
+
+/*
+ * Pixmap must be in a8 format.
+ */
+
+int
+_twin_edge_build (twin_point_t *vertices, int nvertices, twin_edge_t *edges);
+
+void
+_twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges);
+
+/*
+ * Path stuff
+ */
+
+/*
+ * A (fixed point) path
+ */
+
+struct _twin_path {
+    twin_point_t    *points;
+    int		    size_points;
+    int		    npoints;
+    int		    *sublen;
+    int		    size_sublen;
+    int		    nsublen;
+};
 
 #endif /* _TWININT_H_ */

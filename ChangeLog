@@ -1,0 +1,61 @@
+2004-09-21  Keith Packard  <keithp@keithp.com>
+
+	* Makefile.am:
+	* twin.h:
+	* twin_convolve.c: (_twin_path_leftmost), (_twin_path_step),
+	(_clockwise), (twin_path_convolve):
+	Add convolution.  Pen starting position needs work.
+	
+	* twin_geom.c: (_twin_distance_to_point_squared),
+	(_twin_distance_to_line_squared):
+	* twin_spline.c: (_twin_spline_error_squared), (twin_path_curve):
+	* twinint.h:
+	Move shared geometric functions to new file
+	
+	* twin_path.c: (_sin), (_cos), (twin_path_circle),
+	(twin_path_fill):
+	Add twin_path_circle to generate pens.
+	Fix path edge generator to handle last subpath right.
+
+	* twin_poly.c: (_twin_edge_build):
+	Skip vertices which don't span a sample row
+	
+	* xtwin.c: (main):
+	test convolutions
+
+2004-09-20  Keith Packard  <keithp@keithp.com>
+
+	* .cvsignore:
+	Add .cvsignore file
+	
+	* architecture:
+	Mention path primitives
+	* Makefile.am:
+	* twin.h:
+	* twinint.h:
+	Add paths
+	
+	* twin_draw.c: (twin_composite):
+	Eliminate some unused variables.
+	
+	* twin_path.c: (twin_path_move), (twin_path_draw),
+	(twin_path_close), (twin_path_fill), (twin_path_empty),
+	(twin_path_create), (twin_path_destroy):
+	Simple path construction
+	
+	* twin_poly.c: (_edge_compare_y), (_edge_step_by), (_dump_edge),
+	(_twin_edge_build), (_span_fill), (_twin_edge_fill),
+	(twin_polygon):
+	Anti-aliased polygon fill code
+	
+	* twin_screen.c:
+	Change twin_bool to twin_bool_t
+	
+	* twin_spline.c: (_lerp_half), (_de_casteljau),
+	(_distance_squared_to_point), (_distance_squared_to_segment),
+	(_twin_spline_error_squared), (_twin_spline_decompose),
+	(twin_path_curve):
+	Append cubic Bézier splines to paths
+
+	* xtwin.c: (main):
+	Test paths

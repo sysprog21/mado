@@ -29,9 +29,21 @@
 #include <stdint.h>
 
 typedef uint8_t	    twin_a8_t;
+typedef uint16_t    twin_a16_t;
 typedef uint16_t    twin_rgb16_t;
 typedef uint32_t    twin_argb32_t;
-typedef int	    twin_bool;
+typedef int	    twin_bool_t;
+typedef int16_t	    twin_fixed_t;   /* 12.4 format */
+typedef int32_t	    twin_dfixed_t;
+
+#define twin_fixed_floor(f) ((((f) < 0) ? ((f) + 0xf) : (f)) >> 4)
+#define twin_fixed_trunc(f) ((f) >> 4)
+
+#define twin_double_to_fixed(d)	((twin_fixed_t) ((d) * 16.0))
+#define twin_fixed_to_double(f)	((double) (f) / 16.0)
+
+#define TWIN_FIXED_ONE		(0x10)
+#define TWIN_FIXED_TOLERANCE	(TWIN_FIXED_ONE >> 1)
 
 #define TWIN_FALSE  0
 #define TWIN_TRUE   1
@@ -133,6 +145,24 @@ typedef struct _twin_operand {
 typedef enum { TWIN_OVER, TWIN_SOURCE } twin_operator_t;
 
 /*
+ * A (fixed point) point
+ */
+
+typedef struct _twin_point {
+    twin_fixed_t    x, y;
+} twin_point_t;
+
+typedef struct _twin_path twin_path_t;
+
+/*
+ * twin_convolve.c
+ */
+void
+twin_path_convolve (twin_path_t	*dest,
+		    twin_path_t	*stroke,
+		    twin_path_t	*pen);
+
+/*
  * twin_draw.c
  */
 
@@ -158,6 +188,34 @@ twin_fill (twin_pixmap_t    *dst,
 	   int		    y,
 	   int		    width,
 	   int		    height);
+
+/*
+ * twin_path.c
+ */
+
+void 
+twin_path_move (twin_path_t *path, twin_fixed_t x, twin_fixed_t y);
+
+void
+twin_path_draw (twin_path_t *path, twin_fixed_t x, twin_fixed_t y);
+
+void
+twin_path_circle(twin_path_t *path, twin_fixed_t radius);
+
+void
+twin_path_close (twin_path_t *path);
+
+void
+twin_path_fill (twin_pixmap_t *pixmap, twin_path_t *path);
+
+void
+twin_path_empty (twin_path_t *path);
+
+twin_path_t *
+twin_path_create (void);
+
+void
+twin_path_destroy (twin_path_t *path);
 
 /*
  * twin_pixmap.c
@@ -188,6 +246,12 @@ twin_pointer_t
 twin_pixmap_pointer (twin_pixmap_t *pixmap, int x, int y);
 
 /*
+ * twin_poly.c
+ */
+void
+twin_polygon (twin_pixmap_t *pixmap, twin_point_t *vertices, int nvertices);
+
+/*
  * twin_screen.c
  */
 
@@ -207,13 +271,25 @@ twin_screen_damage (twin_screen_t *screen,
 void
 twin_screen_resize (twin_screen_t *screen, int width, int height);
 
-twin_bool
+twin_bool_t
 twin_screen_damaged (twin_screen_t *screen);
 
 void
 twin_screen_update (twin_screen_t *screen);
 
-/* twin_x11.c */
+/*
+ * twin_spline.c
+ */
+
+void
+twin_path_curve (twin_path_t	*path,
+		 twin_fixed_t	x1, twin_fixed_t y1,
+		 twin_fixed_t	x2, twin_fixed_t y2,
+		 twin_fixed_t	x3, twin_fixed_t y3);
+
+/*
+ * twin_x11.c 
+ */
 
 #include <X11/Xlib.h>
 

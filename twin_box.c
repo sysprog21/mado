@@ -196,7 +196,8 @@ _twin_box_dispatch (twin_widget_t *widget, twin_event_t *event)
     twin_event_t    ev;
     twin_widget_t   *child;
 
-    if (_twin_widget_dispatch (widget, event) == TwinDispatchDone)
+    if (event->kind != TwinEventPaint &&
+	_twin_widget_dispatch (widget, event) == TwinDispatchDone)
 	return TwinDispatchDone;
     switch (event->kind) {
     case TwinEventQueryGeometry:

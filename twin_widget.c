@@ -27,14 +27,11 @@
 static void
 _twin_widget_paint (twin_widget_t *widget)
 {
-    if (widget->background)
-    {
-	twin_pixmap_t	*pixmap = widget->window->pixmap;
-	twin_coord_t	w = widget->extents.right - widget->extents.left;
-	twin_coord_t	h = widget->extents.bottom - widget->extents.top;
-	
-	twin_fill (pixmap, widget->background, TWIN_SOURCE, 0, 0, w, h);
-    }
+    twin_pixmap_t	*pixmap = widget->window->pixmap;
+    twin_coord_t	w = widget->extents.right - widget->extents.left;
+    twin_coord_t	h = widget->extents.bottom - widget->extents.top;
+    
+    twin_fill (pixmap, widget->background, TWIN_SOURCE, 0, 0, w, h);
 }
 
 twin_dispatch_result_t

@@ -1,5 +1,23 @@
 2004-10-27  Keith Packard  <keithp@keithp.com>
 
+	* twin_box.c: (_twin_box_dispatch):
+	Boxes have no paint
+	
+	* twin_clock.c: (twin_clock_set_transform), (twin_clock_hand),
+	(_twin_clock_face), (_twin_clock_interval), (_twin_clock_paint),
+	(_twin_clock_timeout), (_twin_clock_dispatch), (_twin_clock_init),
+	(twin_clock_create), (twin_clock_start):
+	* twin_clock.h:
+	Convert to a widget
+	
+	* twin_widget.c: (_twin_widget_paint):
+	Always paint background, even if transparent
+	
+	* xtwin.c: (main):
+	show clock widget
+
+2004-10-27  Keith Packard  <keithp@keithp.com>
+
 	* Makefile.am:
 	Add calculator and missing header files
 	

@@ -47,12 +47,12 @@ main (int argc, char **argv)
     twin_screen_set_background (x11->screen, twin_make_pattern ());
 #if 0
     twin_demo_start (x11->screen, "Demo", 100, 100, 400, 400);
-    twin_clock_start (x11->screen, "Clock", 10, 10, 200, 200);
     twin_text_start (x11->screen,  "Gettysburg Address",
 		     0, 0, 300, 300);
     twin_hello_start (x11->screen, "Hello, World",
 		      0, 0, 200, 200);
 #endif
+    twin_clock_start (x11->screen, "Clock", 10, 10, 200, 200);
     twin_calc_start (x11->screen, "Calculator",
 		     100, 100, 200, 200);
     twin_dispatch ();

@@ -1,5 +1,16 @@
 2004-10-26  Keith Packard  <keithp@keithp.com>
 
+	* twin_button.c: (_twin_button_paint):
+	Paint polygons instead of stroked lines for button edges
+	
+	* twin_font.c: (_twin_text_compute_info):
+	Snap origin to pixel grid
+	
+	* twin_hello.c: (_twin_hello_timeout):
+	Strip newline from ctime output
+
+2004-10-26  Keith Packard  <keithp@keithp.com>
+
 	* Makefile.am:
 	* twin_button.c: (_twin_button_paint),
 	(_twin_button_set_label_offset), (_twin_button_dispatch),

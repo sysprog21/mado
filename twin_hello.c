@@ -24,14 +24,17 @@
 
 #include "twin_hello.h"
 #include <time.h>
+#include <string.h>
 
 static twin_time_t
 _twin_hello_timeout (twin_time_t now, void *closure)
 {
     twin_label_t    *labelb = closure;
     time_t	    secs = time (0);
+    char	    *t = ctime(&secs);
 
-    twin_label_set (labelb, ctime (&secs), 
+    *strchr(t, '\n') = '\0';
+    twin_label_set (labelb, t,
 		    0xff008000,
 		    twin_int_to_fixed (12),
 		    TWIN_TEXT_OBLIQUE);

@@ -79,8 +79,8 @@ _twin_text_compute_info (twin_path_t *path, twin_text_info_t *info)
 	info->matrix.m[xi][1] = 0;
 	info->matrix.m[yi][0] = 0;
 	info->matrix.m[yi][1] = TWIN_FIXED_ONE;
-	info->matrix.m[2][0] = twin_sfixed_to_fixed (origin.x);
-	info->matrix.m[2][1] = twin_sfixed_to_fixed (origin.y);
+	info->matrix.m[2][0] = SNAPI(twin_sfixed_to_fixed (origin.x));
+	info->matrix.m[2][1] = SNAPI(twin_sfixed_to_fixed (origin.y));
 	info->scale.x = twin_fixed_mul (path->state.font_size, 
 					path->state.matrix.m[0][xi]);
 	info->reverse_scale.x = twin_fixed_div (TWIN_FIXED_ONE,

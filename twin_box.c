@@ -28,58 +28,74 @@ void
 _twin_box_init (twin_box_t		*box,
 		twin_box_t		*parent,
 		twin_window_t		*window,
-		twin_layout_t		layout,
+		twin_box_dir_t		dir,
 		twin_dispatch_proc_t	dispatch)
 {
-    static twin_rect_t	preferred = { 0, 0, 0, 0 };
-    _twin_widget_init (&box->widget, parent, window, preferred, 0, 0, dispatch);
-    box->layout = layout;
-    box->children = 0;
+    static twin_widget_layout_t	preferred = { 0, 0, 0, 0 };
+    _twin_widget_init (&box->widget, parent, window, preferred, dispatch);
+    box->dir = dir;
+    box->children = NULL;
+    box->button_down = NULL;
+    box->focus = NULL;
 }
 
 static twin_dispatch_result_t
 _twin_box_query_geometry (twin_box_t *box)
 {
-    twin_widget_t   *widget;
-    twin_event_t    ev;
-    twin_coord_t    w, h;
-    twin_coord_t    c_w, c_h;
+    twin_widget_t	    *child;
+    twin_event_t	    ev;
+    twin_widget_layout_t    preferred;
 
-    w = 0; h = 0;
+    preferred.width = 0;
+    preferred.height = 0;
+    if (box->dir == TwinBoxHorz)
+    {
+	preferred.stretch_width = 0;
+	preferred.stretch_height = 10000;
+    }
+    else
+    {
+	preferred.stretch_width = 10000;
+	preferred.stretch_height = 0;
+    }
     /*
      * Find preferred geometry
      */
-    for (widget = box->children; widget; widget = widget->next)
+    for (child = box->children; child; child = child->next)
     {
-	ev.kind = TwinEventQueryGeometry;
-	(*widget->dispatch) (widget, &ev);
-	c_w = widget->preferred.right - widget->preferred.left;
-	c_h = widget->preferred.bottom - widget->preferred.top;
-	if (box->layout == TwinLayoutHorz)
+	if (child->layout)
 	{
-	    w += c_w;
-	    if (c_h > h)
-		h = c_h;
+	    ev.kind = TwinEventQueryGeometry;
+	    (*child->dispatch) (child, &ev);
+	}
+	if (box->dir == TwinBoxHorz)
+	{
+	    preferred.width += child->preferred.width;
+	    preferred.stretch_width += child->preferred.stretch_width;
+	    if (child->preferred.height > preferred.height)
+		preferred.height = child->preferred.height;
+	    if (child->preferred.stretch_height < preferred.stretch_height)
+		preferred.stretch_height = child->preferred.stretch_height;
 	}
 	else
 	{
-	    h += c_h;
-	    if (c_w > w)
-		w = c_w;
+	    preferred.height += child->preferred.height;
+	    preferred.stretch_height += child->preferred.stretch_height;
+	    if (child->preferred.width > preferred.width)
+		preferred.width = child->preferred.width;
+	    if (child->preferred.stretch_width < preferred.stretch_width)
+		preferred.stretch_width = child->preferred.stretch_width;
 	}
     }
-    box->widget.preferred.left = 0;
-    box->widget.preferred.top = 0;
-    box->widget.preferred.right = w;
-    box->widget.preferred.bottom = h;
-    return TwinDispatchNone;
+    box->widget.preferred = preferred;
+    return TwinDispatchContinue;
 }
 
 static twin_dispatch_result_t
 _twin_box_configure (twin_box_t *box)
 {
-    twin_coord_t    w = box->widget.extents.right - box->widget.extents.left;
-    twin_coord_t    h = box->widget.extents.bottom - box->widget.extents.top;
+    twin_coord_t    width = _twin_widget_width (box);
+    twin_coord_t    height = _twin_widget_height (box);
     twin_coord_t    actual;
     twin_coord_t    pref;
     twin_coord_t    delta;
@@ -87,21 +103,18 @@ _twin_box_configure (twin_box_t *box)
     twin_coord_t    stretch = 0;
     twin_coord_t    pos = 0;
     twin_widget_t   *child;
-    twin_dispatch_result_t  result = TwinDispatchNone;
     
-    if (box->layout == TwinLayoutHorz)
+    if (box->dir == TwinBoxHorz)
     {
-	for (child = box->children; child; child = child->next)
-	    stretch += child->hstretch;
-	actual = w;
-	pref = box->widget.preferred.right - box->widget.preferred.left;
+	stretch = box->widget.preferred.stretch_width;
+	actual = width;
+	pref = box->widget.preferred.width;
     }
     else
     {
-	for (child = box->children; child; child = child->next)
-	    stretch += child->vstretch;
-	actual = h;
-	pref = box->widget.preferred.bottom - box->widget.preferred.top;
+	stretch = box->widget.preferred.stretch_height;
+	actual = height;
+	pref = box->widget.preferred.height;
     }
     if (!stretch) stretch = 1;
     delta = delta_remain = actual - pref;
@@ -116,10 +129,10 @@ _twin_box_configure (twin_box_t *box)
 	    delta_this = delta_remain;
 	else
 	{
-	    if (box->layout == TwinLayoutHorz)
-		stretch_this = child->hstretch;
+	    if (box->dir == TwinBoxHorz)
+		stretch_this = child->preferred.stretch_width;
 	    else
-		stretch_this = child->vstretch;
+		stretch_this = child->preferred.stretch_height;
 	    delta_this = delta * stretch_this / stretch;
 	}
 	if (delta_remain < 0)
@@ -133,30 +146,33 @@ _twin_box_configure (twin_box_t *box)
 		delta_this = delta_remain;
 	}
 	delta_remain -= delta_this;
-	if (box->layout == TwinLayoutHorz)
+	if (box->dir == TwinBoxHorz)
 	{
-	    twin_coord_t    child_w = (child->preferred.right -
-				       child->preferred.left);
+	    twin_coord_t    child_w = child->preferred.width;
 	    extents.top = 0;
-	    extents.bottom = h;
+	    extents.bottom = height;
 	    extents.left = pos;
 	    pos = extents.right = pos + child_w + delta_this;
 	}
 	else
 	{
-	    twin_coord_t    child_h = (child->preferred.bottom -
-				       child->preferred.top);
+	    twin_coord_t    child_h = child->preferred.height;
 	    extents.left = 0;
-	    extents.right = w;
+	    extents.right = width;
 	    extents.top = pos;
 	    pos = extents.bottom = pos + child_h + delta_this;
 	}
-	ev.kind = TwinEventConfigure;
-	ev.u.configure.extents = extents;
-	(*child->dispatch) (child, &ev);
-	result = TwinDispatchPaint;
+	if (extents.left != ev.u.configure.extents.left ||
+	    extents.top != ev.u.configure.extents.top ||
+	    extents.right != ev.u.configure.extents.right ||
+	    extents.bottom != ev.u.configure.extents.bottom)
+	{
+	    ev.kind = TwinEventConfigure;
+	    ev.u.configure.extents = extents;
+	    (*child->dispatch) (child, &ev);
+	}
     }
-    return result;
+    return TwinDispatchContinue;
 }
 
 static twin_widget_t *
@@ -180,11 +196,12 @@ _twin_box_dispatch (twin_widget_t *widget, twin_event_t *event)
     twin_event_t    ev;
     twin_widget_t   *child;
 
+    if (_twin_widget_dispatch (widget, event) == TwinDispatchDone)
+	return TwinDispatchDone;
     switch (event->kind) {
     case TwinEventQueryGeometry:
 	return _twin_box_query_geometry (box);
     case TwinEventConfigure:
-	_twin_widget_dispatch (widget, event);
 	return _twin_box_configure (box);
     case TwinEventButtonDown:
 	box->button_down = _twin_box_xy_to_widget (box, 
@@ -227,17 +244,17 @@ _twin_box_dispatch (twin_widget_t *widget, twin_event_t *event)
     default:
 	break;
     }
-    return TwinDispatchNone;
+    return TwinDispatchContinue;
 }
 
 twin_box_t *
 twin_box_create (twin_box_t	*parent,
-		 twin_layout_t	layout)
+		 twin_box_dir_t	dir)
 {
     twin_box_t	*box = malloc (sizeof (twin_box_t));
     if (!box)
 	return 0;
-    _twin_box_init (box, parent, 0, layout, _twin_box_dispatch);
+    _twin_box_init (box, parent, 0, dir, _twin_box_dispatch);
     return box;
 }
 

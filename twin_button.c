@@ -52,16 +52,19 @@ _twin_button_dispatch (twin_widget_t *widget, twin_event_t *event)
 {
     twin_button_t    *button = (twin_button_t *) widget;
 
-    _twin_label_dispatch (widget, event);
+    if (_twin_label_dispatch (widget, event) == TwinDispatchDone)
+	return TwinDispatchDone;
     switch (event->kind) {
     case TwinEventPaint:
 	_twin_button_paint (button);
-	return TWIN_TRUE;
+	break;
     case TwinEventButtonDown:
 	button->pressed = TWIN_TRUE;
 	button->active = TWIN_TRUE;
 	_twin_button_set_label_offset (button);
-	return TWIN_TRUE;
+	if (button->signal)
+	    (*button->signal) (button, TwinButtonSignalDown, button->closure);
+	break;
     case TwinEventMotion:
 	if (button->pressed)
 	{
@@ -74,21 +77,21 @@ _twin_button_dispatch (twin_widget_t *widget, twin_event_t *event)
 		_twin_button_set_label_offset (button);
 	    }
 	}
-	return TWIN_TRUE;
+	break;
     case TwinEventButtonUp:
 	button->pressed = TWIN_FALSE;
 	if (button->active)
 	{
-	    if (button->callback)
-		(*button->callback) (&button->label.widget, button->closure);
 	    button->active = TWIN_FALSE;
 	    _twin_button_set_label_offset (button);
+	    if (button->signal)
+		(*button->signal) (button, TwinButtonSignalUp, button->closure);
 	}
-	return TWIN_TRUE;
+	break;
     default:
 	break;
     }
-    return TwinDispatchNone;
+    return TwinDispatchContinue;
 }
 
 void
@@ -103,6 +106,9 @@ _twin_button_init (twin_button_t	*button,
     _twin_label_init (&button->label, parent, value,
 		      foreground, font_size, font_style, dispatch);
     button->pressed = TWIN_FALSE;
+    button->active = TWIN_FALSE;
+    button->signal = NULL;
+    button->closure = NULL;
     _twin_button_set_label_offset (button);
 }
 

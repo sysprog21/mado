@@ -22,39 +22,14 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "twin_x11.h"
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/time.h>
-#include <time.h>
-#include <assert.h>
-#include <twin_clock.h>
-#include <twin_text.h>
-#include <twin_demo.h>
-#include <twin_hello.h>
-#include <twin_calc.h>
+#include <twin.h>
 
-#define WIDTH	512
-#define HEIGHT	512
+#ifndef _TWIN_CALC_H_
+#define _TWIN_CALC_H_
 
-int
-main (int argc, char **argv)
-{
-    Display	    *dpy = XOpenDisplay (0);
-    twin_x11_t	    *x11 = twin_x11_create (dpy, WIDTH, HEIGHT);
+#include <twin.h>
 
-    twin_screen_set_background (x11->screen, twin_make_pattern ());
-#if 0
-    twin_demo_start (x11->screen, "Demo", 100, 100, 400, 400);
-    twin_clock_start (x11->screen, "Clock", 10, 10, 200, 200);
-    twin_text_start (x11->screen,  "Gettysburg Address",
-		     0, 0, 300, 300);
-    twin_hello_start (x11->screen, "Hello, World",
-		      0, 0, 200, 200);
-#endif
-    twin_calc_start (x11->screen, "Calculator",
-		     100, 100, 200, 200);
-    twin_dispatch ();
-    return 0;
-}
+void
+twin_calc_start (twin_screen_t *screen, const char *name, int x, int y, int w, int h);
+
+#endif /* _TWIN_CALC_H_ */

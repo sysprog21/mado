@@ -372,37 +372,42 @@ typedef struct _twin_box    twin_box_t;
 #define _twin_widget_height(w)	(((twin_widget_t *)(w))->extents.bottom - \
 				 ((twin_widget_t *)(w))->extents.top)
 
-typedef enum _twin_dispatch_result {
-    TwinDispatchNone,
-    TwinDispatchPaint,
-    TwinDispatchConfigure,
-} twin_dispatch_result_t;
+typedef enum _twin_box_dir {
+    TwinBoxHorz, TwinBoxVert
+} twin_box_dir_t;
 
-typedef enum _twin_layout {
-    TwinLayoutHorz, TwinLayoutVert
-} twin_layout_t;
+typedef enum _twin_dispatch_result {
+    TwinDispatchDone,
+    TwinDispatchContinue
+} twin_dispatch_result_t;
 
 typedef twin_dispatch_result_t (*twin_dispatch_proc_t) (twin_widget_t *widget,
 							twin_event_t *event);
 		       
+typedef struct _twin_widget_layout {
+    twin_coord_t	    width;
+    twin_coord_t	    height;
+    twin_stretch_t	    stretch_width;
+    twin_stretch_t	    stretch_height;
+} twin_widget_layout_t;
+
 struct _twin_widget {
     twin_window_t	    *window;
     twin_widget_t	    *next;
     twin_box_t		    *parent;
+    twin_widget_t	    *copy_geom;
     twin_bool_t		    paint;
     twin_bool_t		    layout;
     twin_bool_t		    want_focus;
     twin_argb32_t	    background;
     twin_rect_t		    extents;	/* current geometry */
-    twin_rect_t		    preferred;	/* desired geometry */
-    twin_stretch_t    	    hstretch;	/* stretch ratio in horizontal dir */
-    twin_stretch_t    	    vstretch;	/* stretch ratio in vertical dir */
+    twin_widget_layout_t    preferred;
     twin_dispatch_proc_t    dispatch;
 };
 
 struct _twin_box {
     twin_widget_t	widget;
-    twin_layout_t	layout;
+    twin_box_dir_t	dir;
     twin_widget_t	*children;
     twin_widget_t	*button_down;
     twin_widget_t	*focus;
@@ -421,15 +426,42 @@ typedef struct _twin_label {
     twin_point_t	offset;
 } twin_label_t;
 
-typedef void	(*twin_callback_t) (twin_widget_t *widget, void *closure);
+typedef enum _twin_button_signal {
+    TwinButtonSignalDown,   /* sent when button pressed */
+    TwinButtonSignalUp,	    /* send when button released inside widget */
+} twin_button_signal_t;
 
-typedef struct _twin_button {
-    twin_label_t	label;
-    twin_bool_t		pressed;
-    twin_bool_t		active;
-    twin_callback_t	callback;
-    void		*closure;
-} twin_button_t;
+typedef struct _twin_button twin_button_t;
+
+typedef void	(*twin_button_signal_proc_t) (twin_button_t	    *button,
+					      twin_button_signal_t  signal,
+					      void		    *closure);
+
+struct _twin_button {
+    twin_label_t		label;
+    twin_bool_t			pressed;
+    twin_bool_t			active;
+    twin_button_signal_proc_t	signal;
+    void			*closure;
+};
+
+typedef enum _twin_scroll_signal {
+    TwinScrollSignalUpArrow,
+    TwinScrollSignalDownArrow,
+    TwinScrollSignalThumb,
+    TwinScrollSignalAboveThumb,
+    TwinScrollSignalBelowThumb,
+} twin_scroll_signal_t;
+
+typedef struct _twin_scroll twin_scroll_t;
+
+typedef void	(*twin_scroll_signal_proc_t) (twin_scroll_t	    *scroll,
+					      twin_scroll_signal_t  signal,
+					      void		    *closure);
+
+struct _twin_scroll {
+    twin_widget_t		widget;
+};
 
 /*
  * twin_box.c
@@ -437,7 +469,7 @@ typedef struct _twin_button {
 
 twin_box_t *
 twin_box_create (twin_box_t	*parent,
-		 twin_layout_t	layout);
+		 twin_box_dir_t	dir);
 
 /*
  * twin_button.c

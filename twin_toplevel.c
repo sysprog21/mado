@@ -91,7 +91,7 @@ _twin_toplevel_init (twin_toplevel_t	    *toplevel,
     window->destroy = _twin_toplevel_destroy;
     window->event = _twin_toplevel_event;
     window->client_data = toplevel;
-    _twin_box_init (&toplevel->box, 0, window, TwinLayoutVert, dispatch);
+    _twin_box_init (&toplevel->box, 0, window, TwinBoxVert, dispatch);
 }
 
 twin_toplevel_t *

@@ -44,11 +44,18 @@ xtwin_SOURCES = \
 	twin_window.c \
 	twin_work.c \
 	twin_x11.c \
+	twin_x11.h \
 	twinint.h \
 	twin_clock.c \
+	twin_clock.h \
+	twin_calc.c \
+	twin_calc.h \
 	twin_text.c \
+	twin_text.h \
 	twin_demo.c \
+	twin_demo.h \
 	twin_hello.c \
+	twin_hello.h \
 	xtwin.c
 
 xtwin_LDADD = @X_LIBS@ -lm

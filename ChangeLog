@@ -1,3 +1,31 @@
+2004-10-27  Keith Packard  <keithp@keithp.com>
+
+	* Makefile.am:
+	Add calculator and missing header files
+	
+	* twin.h:
+	* twin_box.c: (_twin_box_init), (_twin_box_query_geometry),
+	(_twin_box_configure), (_twin_box_dispatch), (twin_box_create):
+	* twin_button.c: (_twin_button_dispatch), (_twin_button_init):
+	* twin_toplevel.c: (_twin_toplevel_init):
+	* twin_widget.c: (_twin_widget_dispatch), (_twin_widget_init),
+	* twin_label.c: (_twin_label_query_geometry),
+	(_twin_label_dispatch), (_twin_label_init):
+	* twinint.h:
+	(twin_widget_create):
+	Change type name from twin_layout_t to twin_box_dir_t
+	Create new twin_widget_layout_t holding layout preferences.
+	Add copy_geom field to widget to make widgets look the same
+	Add button signals and signal proc.
+	Fix box layout to sum stretch along axis and minimize normal
+	
+	* twin_calc.c: (_twin_calc_button_to_id),
+	(_twin_calc_update_value), (_twin_calc_push), (_twin_calc_pop),
+	(_twin_calc_digit), (_twin_calc_button_signal), (twin_calc_start):
+	* twin_calc.h:
+	* xtwin.c: (main):
+	Add calculator demo
+
 2004-10-26  Keith Packard  <keithp@keithp.com>
 
 	* twin_button.c: (_twin_button_paint):

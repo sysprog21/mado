@@ -41,9 +41,19 @@ twin_dispatch_result_t
 _twin_widget_dispatch (twin_widget_t *widget, twin_event_t *event)
 {
     switch (event->kind) {
+    case TwinEventQueryGeometry:
+	widget->layout = TWIN_FALSE;
+	if (widget->copy_geom)
+	{
+	    twin_widget_t   *copy = widget->copy_geom;
+	    if (copy->layout)
+		(*copy->dispatch) (copy, event);
+	    widget->preferred = copy->preferred;
+	    return TwinDispatchDone;
+	}
+	break;
     case TwinEventConfigure:
 	widget->extents = event->u.configure.extents;
-	widget->layout = TWIN_FALSE;
 	break;
     case TwinEventPaint:
 	_twin_widget_paint (widget);
@@ -52,16 +62,14 @@ _twin_widget_dispatch (twin_widget_t *widget, twin_event_t *event)
     default:
 	break;
     }
-    return TwinDispatchNone;
+    return TwinDispatchContinue;
 }
 
 void
 _twin_widget_init (twin_widget_t	*widget,
 		   twin_box_t		*parent,
 		   twin_window_t	*window,
-		   twin_rect_t		preferred,
-		   twin_stretch_t	hstretch,
-		   twin_stretch_t	vstretch,
+		   twin_widget_layout_t	preferred,
 		   twin_dispatch_proc_t	dispatch)
 {
     if (parent)
@@ -77,13 +85,15 @@ _twin_widget_init (twin_widget_t	*widget,
 	widget->next = NULL;
     widget->window = window;
     widget->parent = parent;
+    widget->copy_geom = NULL;
     widget->paint = TWIN_TRUE;
-    widget->preferred = preferred;
-    widget->extents = preferred;
-    widget->hstretch = hstretch;
-    widget->vstretch = vstretch;
-    widget->dispatch = dispatch;
+    widget->layout = TWIN_TRUE;
+    widget->want_focus = TWIN_FALSE;
     widget->background = 0x00000000;
+    widget->extents.left = widget->extents.top = 0;
+    widget->extents.right = widget->extents.bottom = 0;
+    widget->preferred = preferred;
+    widget->dispatch = dispatch;
 }
 
 void
@@ -171,20 +181,19 @@ twin_widget_create (twin_box_t	    *parent,
 		    twin_argb32_t   background,
 		    twin_coord_t    width,
 		    twin_coord_t    height,
-		    twin_stretch_t  hstretch,
-		    twin_stretch_t  vstretch)
+		    twin_stretch_t  stretch_width,
+		    twin_stretch_t  stretch_height)
 {
-    twin_widget_t   *widget = malloc (sizeof (twin_widget_t));
-    twin_rect_t	    extents;
+    twin_widget_t	    *widget = malloc (sizeof (twin_widget_t));
+    twin_widget_layout_t    preferred;
 
     if (!widget)
 	return NULL;
-    extents.left = 0;
-    extents.top = 0;
-    extents.right = width;
-    extents.bottom = height;
-    _twin_widget_init (widget, parent, 0, extents, hstretch, vstretch, 
-		       _twin_widget_dispatch);
+    preferred.width = width;
+    preferred.height = height;
+    preferred.stretch_width = stretch_width;
+    preferred.stretch_height = stretch_height;
+    _twin_widget_init (widget, parent, 0, preferred, _twin_widget_dispatch);
     widget->background = background;
     return widget;
 }

@@ -455,7 +455,7 @@ void
 _twin_box_init (twin_box_t		*box,
 		twin_box_t		*parent,
 		twin_window_t		*window,
-		twin_layout_t		layout,
+		twin_box_dir_t		dir,
 		twin_dispatch_proc_t	dispatch);
 
 twin_dispatch_result_t
@@ -465,9 +465,7 @@ void
 _twin_widget_init (twin_widget_t	*widget,
 		   twin_box_t		*parent,
 		   twin_window_t	*window,
-		   twin_rect_t		preferred,
-		   twin_stretch_t	hstretch,
-		   twin_stretch_t	vstretch,
+		   twin_widget_layout_t	preferred,
 		   twin_dispatch_proc_t	dispatch);
 
 twin_dispatch_result_t

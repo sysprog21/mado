@@ -30,16 +30,14 @@ _twin_label_query_geometry (twin_label_t *label)
     twin_path_t		*path = twin_path_create ();
     twin_text_metrics_t	m;
     
-    label->widget.preferred.left = 0;
-    label->widget.preferred.top = 0;
-    label->widget.preferred.right = twin_fixed_to_int (label->font_size);
-    label->widget.preferred.bottom = twin_fixed_to_int (label->font_size) * 2;
+    label->widget.preferred.width = twin_fixed_to_int (label->font_size) * 2;
+    label->widget.preferred.height = twin_fixed_to_int (label->font_size) * 2;
     if (path)
     {
 	twin_path_set_font_size (path, label->font_size);
 	twin_path_set_font_style (path, label->font_style);
 	twin_text_metrics_utf8 (path, label->label, &m);
-	label->widget.preferred.right += twin_fixed_to_int (m.width);
+	label->widget.preferred.width += twin_fixed_to_int (m.width);
 	twin_path_destroy (path);
     }
 }
@@ -74,18 +72,19 @@ _twin_label_dispatch (twin_widget_t *widget, twin_event_t *event)
 {
     twin_label_t    *label = (twin_label_t *) widget;
 
-    _twin_widget_dispatch (widget, event);
+    if (_twin_widget_dispatch (widget, event) == TwinDispatchDone)
+	return TwinDispatchDone;
     switch (event->kind) {
     case TwinEventPaint:
 	_twin_label_paint (label);
-	return TwinDispatchNone;
+	break;
     case TwinEventQueryGeometry:
 	_twin_label_query_geometry (label);
 	break;
     default:
 	break;
     }
-    return TwinDispatchNone;
+    return TwinDispatchContinue;
 }
 
 void
@@ -122,9 +121,8 @@ _twin_label_init (twin_label_t		*label,
 		  twin_style_t		font_style,
 		  twin_dispatch_proc_t	dispatch)
 {
-    static const twin_rect_t	empty = { 0, 0, 0, 0 };
-    _twin_widget_init (&label->widget, parent, 0, 
-		       empty, 1, 1, dispatch);
+    static const twin_widget_layout_t	preferred = { 0, 0, 1, 1 };
+    _twin_widget_init (&label->widget, parent, 0, preferred, dispatch);
     label->label = NULL;
     label->offset.x = 0;
     label->offset.y = 0;

@@ -1,5 +1,37 @@
 2004-10-05  Keith Packard  <keithp@keithp.com>
 
+	* Makefile.am:
+	* twin.h:
+	* twin_draw.c: (twin_fill):
+	* twin_path.c: (twin_composite_path):
+	* twin_pixmap.c: (twin_pixmap_create), (twin_pixmap_show),
+	(twin_pixmap_hide), (_twin_pixmap_fetch),
+	(twin_pixmap_transparent), (twin_pixmap_move),
+	(twin_pixmap_dispatch):
+	* twin_screen.c: (twin_screen_create), (twin_screen_lock),
+	(twin_screen_unlock), (twin_screen_update),
+	(twin_screen_set_active), (twin_screen_get_active),
+	(twin_screen_dispatch):
+	* twin_thread.c: (twin_mutex_init), (twin_mutex_lock),
+	(twin_mutex_unlock), (twin_cond_init), (twin_cond_broadcast),
+	(twin_cond_wait), (twin_thread_create):
+	* twin_window.c: (twin_window_create), (twin_window_destroy),
+	(twin_window_show), (twin_window_hide), (twin_window_configure),
+	(twin_window_style_size), (twin_window_set_name),
+	(twin_window_frame), (twin_window_draw), (twin_window_dispatch):
+	* twin_x11.c: (_twin_x11_put_begin), (_twin_x11_put_span),
+	(twin_x11_damage_thread), (twin_x11_event_thread),
+	(twin_x11_screen_damaged), (twin_x11_create), (twin_x11_destroy):
+	* twin_x11.h:
+	* xtwin.c: (twin_clock_set_transform), (twin_clock_hand),
+	(twin_clock_face), (twin_clock), (twin_app_thread),
+	(twin_start_app), (twin_start_clock), (main):
+	Add the beginings of event dispatch and a bit of
+	window management including titles.  Default event dispatcher
+	does restacking and motion.
+
+2004-10-05  Keith Packard  <keithp@keithp.com>
+
 	* twin.h:
 	* twin_draw.c: (twin_composite), (twin_fill):
 	* twin_matrix.c: (twin_matrix_multiply), (twin_matrix_translate),

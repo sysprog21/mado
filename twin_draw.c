@@ -370,32 +370,28 @@ void
 twin_fill (twin_pixmap_t    *dst,
 	   twin_argb32_t    pixel,
 	   twin_operator_t  operator,
-	   twin_coord_t	    x,
-	   twin_coord_t	    y,
-	   twin_coord_t	    width,
-	   twin_coord_t	    height)
+	   twin_coord_t	    left,
+	   twin_coord_t	    top,
+	   twin_coord_t	    right,
+	   twin_coord_t	    bottom)
 {
     twin_src_op	    op;
     twin_source_u   src;
     twin_coord_t    iy;
-    twin_coord_t    left, right, top, bottom;
     
     twin_pixmap_lock (dst);
     src.c = pixel;
-    left = x;
-    right = x + width;
-    top = y;
-    bottom = y + height;
     if (left < 0)
 	left = 0;
     if (right > dst->width)
 	right = dst->width;
     if (top < 0)
 	top = 0;
-    if (top > dst->height)
-	top = dst->height;
+    if (bottom > dst->height)
+	bottom = dst->height;
     op = fill[operator][dst->format];
     for (iy = top; iy < bottom; iy++)
 	(*op) (twin_pixmap_pointer (dst, left, iy), src, right - left);
+    twin_pixmap_damage (dst, left, right, top, bottom);
     twin_pixmap_unlock (dst);
 }

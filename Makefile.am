@@ -30,7 +30,9 @@ xtwin_SOURCES = \
 	twin_primitive.c \
 	twin_screen.c \
 	twin_spline.c \
+	twin_thread.c \
 	twin_trig.c \
+	twin_window.c \
 	twin_x11.c \
 	twinint.h \
 	xtwin.c

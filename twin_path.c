@@ -443,7 +443,6 @@ twin_composite_path (twin_pixmap_t	*dst,
 			       
     if (!mask)
 	return;
-    twin_fill (mask, 0x00000000, TWIN_SOURCE, 0, 0, width, height);
     twin_fill_path (mask, path, -bounds.left, -bounds.top);
     msk.source_kind = TWIN_PIXMAP;
     msk.u.pixmap = mask;

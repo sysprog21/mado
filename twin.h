@@ -44,6 +44,19 @@ typedef int16_t	    twin_count_t;
 typedef int16_t	    twin_keysym_t;
 typedef int32_t	    twin_area_t;
 
+/*
+ * Mutexes
+ */
+#if HAVE_PTHREAD_H
+typedef pthread_mutex_t	twin_mutex_t;
+typedef pthread_cond_t	twin_cond_t;
+typedef pthread_t	twin_thread_t;
+#else
+typedef int		twin_mutext_t;
+typedef int		twin_cond_t;
+typedef int		twin_thread_t;
+#endif
+
 #define TWIN_FALSE  0
 #define TWIN_TRUE   1
 
@@ -80,6 +93,8 @@ typedef union _twin_pointer {
     twin_argb32_t   *argb32;
 } twin_pointer_t;
 
+typedef struct _twin_window twin_window_t;
+
 /*
  * A rectangular array of pixels
  */
@@ -92,7 +107,7 @@ typedef struct _twin_pixmap {
     /*
      * List of displayed pixmaps
      */
-    struct _twin_pixmap		*higher;
+    struct _twin_pixmap		*down, *up;
     /*
      * Screen position
      */
@@ -108,20 +123,25 @@ typedef struct _twin_pixmap {
      * Pixels
      */
     twin_pointer_t		p;
+    /*
+     * When representing a window, this point
+     * refers to the window object
+     */
+    twin_window_t		*window;
 } twin_pixmap_t;
 
 /*
  * twin_put_begin_t: called before data are drawn to the screen
  * twin_put_span_t: called for each scanline drawn
  */
-typedef void	(*twin_put_begin_t) (twin_coord_t x,
-				     twin_coord_t y,
-				     twin_coord_t width,
-				     twin_coord_t height,
+typedef void	(*twin_put_begin_t) (twin_coord_t left,
+				     twin_coord_t top,
+				     twin_coord_t right,
+				     twin_coord_t bottom,
 				     void *closure);
-typedef void	(*twin_put_span_t) (twin_coord_t x,
-				    twin_coord_t y,
-				    twin_coord_t width,
+typedef void	(*twin_put_span_t) (twin_coord_t left,
+				    twin_coord_t top,
+				    twin_coord_t right,
 				    twin_argb32_t *pixels,
 				    void *closure);
 
@@ -132,7 +152,15 @@ typedef struct _twin_screen {
     /*
      * List of displayed pixmaps
      */
-    twin_pixmap_t	*bottom;
+    twin_pixmap_t	*top, *bottom;
+    /*
+     * One of them receives all key events
+     */
+    twin_pixmap_t	*active;
+    /*
+     * pointer down for this window
+     */
+    twin_pixmap_t	*pointer;
     /*
      * Output size
      */
@@ -144,15 +172,17 @@ typedef struct _twin_screen {
     void		(*damaged) (void *);
     void		*damaged_closure;
     twin_count_t	disable;
-#if HAVE_PTHREAD_H
-    pthread_mutex_t	screen_mutex;
-#endif
+    twin_mutex_t	screen_mutex;
     /*
      * Repaint function
      */
     twin_put_begin_t	put_begin;
     twin_put_span_t	put_span;
     void		*closure;
+    /*
+     * Window manager stuff
+     */
+    twin_coord_t	button_x, button_y;
 } twin_screen_t;
 
 /*
@@ -226,7 +256,8 @@ typedef struct _twin_text_metrics {
 
 typedef enum _twin_event_kind {
     EventButtonDown, EventButtonUp, EventMotion,
-    EventKeyDown, EventKeyUp, EventUcs4
+    EventKeyDown, EventKeyUp, EventUcs4,
+    EventActivate, EventDeactivate,
 } twin_event_kind_t;
 
 typedef struct _twin_event {
@@ -234,11 +265,9 @@ typedef struct _twin_event {
     union {
 	struct {
 	    twin_coord_t    x, y;
+	    twin_coord_t    screen_x, screen_y;
 	    twin_count_t    button;
-	} button;
-	struct {
-	    twin_coord_t    x, y;
-	} motion;
+	} pointer;
 	struct {
 	    twin_keysym_t   key;
 	} key;
@@ -247,6 +276,53 @@ typedef struct _twin_event {
 	} ucs4;
     } u;
 } twin_event_t;
+
+typedef struct _twin_event_queue {
+    struct _twin_event_queue	*next;
+    twin_event_t		event;
+} twin_event_queue_t;
+
+/*
+ * Windows
+ */
+
+typedef enum _twin_window_style {
+    WindowPlain,
+    WindowApplication,
+} twin_window_style_t;
+
+typedef void	    (*twin_draw_func_t) (twin_window_t	    *window);
+
+typedef twin_bool_t (*twin_event_func_t) (twin_window_t	    *window,
+					  twin_event_t	    *event);
+
+typedef void	    (*twin_destroy_func_t) (twin_window_t   *window);
+
+struct _twin_window {
+    twin_screen_t	*screen;
+    twin_pixmap_t	*pixmap;
+    twin_window_style_t	style;
+    twin_rect_t		client;
+    twin_rect_t		damage;
+    void		*client_data;
+    char		*name;
+    
+    twin_draw_func_t	draw;
+    twin_event_func_t	event;
+    twin_destroy_func_t	destroy;
+};
+
+/*
+ * Widgets
+ */
+
+typedef struct {
+    twin_rect_t		geometry;
+} twin_widget_t;
+
+typedef struct {
+    twin_widget_t	core;
+} twin_button_t;
 
 /*
  * twin_convolve.c
@@ -278,10 +354,17 @@ void
 twin_fill (twin_pixmap_t    *dst,
 	   twin_argb32_t    pixel,
 	   twin_operator_t  operator,
-	   twin_coord_t	    x,
-	   twin_coord_t	    y,
-	   twin_coord_t	    width,
-	   twin_coord_t	    height);
+	   twin_coord_t	    left,
+	   twin_coord_t	    top,
+	   twin_coord_t	    right,
+	   twin_coord_t	    bottom);
+
+/*
+ * twin_event.c
+ */
+
+void
+twin_event_enqueue (const twin_event_t *event);
 
 /*
  * twin_fixed.c
@@ -515,6 +598,12 @@ twin_pixmap_move (twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y);
 twin_pointer_t
 twin_pixmap_pointer (twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y);
 
+twin_bool_t
+twin_pixmap_transparent (twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y);
+
+twin_bool_t
+twin_pixmap_dispatch (twin_pixmap_t *pixmap, twin_event_t *event);
+
 /*
  * twin_poly.c
  */
@@ -563,6 +652,16 @@ void
 twin_screen_update (twin_screen_t *screen);
 
 void
+twin_screen_set_active (twin_screen_t *screen, twin_pixmap_t *pixmap);
+
+twin_pixmap_t *
+twin_screen_get_active (twin_screen_t *screen);
+
+twin_bool_t
+twin_screen_dispatch (twin_screen_t *screen,
+		      twin_event_t  *event);
+
+void
 twin_screen_lock (twin_screen_t *screen);
 
 void
@@ -580,6 +679,33 @@ twin_path_curve (twin_path_t	*path,
 		 twin_fixed_t	x3, twin_fixed_t y3);
 
 /*
+ * twin_thread.c
+ */
+
+void
+twin_mutex_init (twin_mutex_t *mutex);
+		 
+void
+twin_mutex_lock (twin_mutex_t *mutex);
+
+void
+twin_mutex_unlock (twin_mutex_t *mutex);
+
+void
+twin_cond_init (twin_cond_t *cond);
+
+void
+twin_cond_broadcast (twin_cond_t *cond);
+
+void
+twin_cond_wait (twin_cond_t *cond, twin_mutex_t *mutex);
+
+typedef void * (*twin_thread_func_t) (void *arg);
+
+int
+twin_thread_create (twin_thread_t *thread, twin_thread_func_t func, void *arg);
+
+/*
  * twin_trig.c
  */
 
@@ -592,4 +718,49 @@ twin_cos (twin_angle_t a);
 twin_fixed_t
 twin_tan (twin_angle_t a);
 
+/*
+ * twin_window.c
+ */
+
+twin_window_t *
+twin_window_create (twin_screen_t	*screen,
+		    twin_format_t	format,
+		    twin_window_style_t style,
+		    twin_coord_t	x,
+		    twin_coord_t	y,
+		    twin_coord_t	width,
+		    twin_coord_t	height);
+
+void
+twin_window_destroy (twin_window_t *window);
+
+void
+twin_window_show (twin_window_t *window);
+
+void
+twin_window_hide (twin_window_t *window);
+
+void
+twin_window_configure (twin_window_t	    *window,
+		       twin_window_style_t  style,
+		       twin_coord_t	    x,
+		       twin_coord_t	    y,
+		       twin_coord_t	    width,
+		       twin_coord_t	    height);
+
+void
+twin_window_set_name (twin_window_t	*window,
+		      const char	*name);
+
+void
+twin_window_style_size (twin_window_style_t style,
+			twin_rect_t	    *size);
+
+void
+twin_window_draw (twin_window_t *window);
+
+twin_bool_t
+twin_window_dispatch (twin_window_t *window, twin_event_t *event);
+
+    
 #endif /* _TWIN_H_ */

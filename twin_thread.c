@@ -21,46 +21,63 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
-#ifndef _TWIN_X11_H_
-#define _TWIN_X11_H_
 
-#include "twin.h"
-
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xatom.h>
-
-typedef struct _twin_x11 {
-    twin_screen_t   *screen;
-    Display	    *dpy;
-    Window	    win;
-    GC		    gc;
-    Visual	    *visual;
-    int		    depth;
-    twin_thread_t   damage_thread;
-    twin_cond_t	    damage_cond;
-    twin_thread_t   event_thread;
-    XImage	    *image;
-    int		    image_y;
-} twin_x11_t;
-
-/*
- * twin_x11.c 
- */
-
-twin_x11_t *
-twin_x11_create (Display *dpy, int width, int height);
+#include "twinint.h"
 
 void
-twin_x11_destroy (twin_x11_t *tx);
+twin_mutex_init (twin_mutex_t *mutex)
+{
+#if HAVE_PTHREAD_H
+    pthread_mutex_init (mutex, NULL);
+#endif
+}
 
 void
-twin_x11_damage (twin_x11_t *tx, XExposeEvent *ev);
+twin_mutex_lock (twin_mutex_t *mutex)
+{
+#if HAVE_PTHREAD_H
+    pthread_mutex_lock (mutex);
+#endif
+}
 
 void
-twin_x11_configure (twin_x11_t *tx, XConfigureEvent *ev);
+twin_mutex_unlock (twin_mutex_t *mutex)
+{
+#if HAVE_PTHREAD_H
+    pthread_mutex_unlock (mutex);
+#endif
+}
 
 void
-twin_x11_update (twin_x11_t *tx);
+twin_cond_init (twin_cond_t *cond)
+{
+#if HAVE_PTHREAD_H
+    pthread_cond_init (cond, NULL);
+#endif
+}
 
-#endif /* _TWIN_X11_H_ */
+void
+twin_cond_broadcast (twin_cond_t *cond)
+{
+#if HAVE_PTHREAD_H
+    pthread_cond_broadcast (cond);
+#else
+    OOPS - need some synchronization mechanism
+#endif
+}
+
+void
+twin_cond_wait (twin_cond_t *cond, twin_mutex_t *mutex)
+{
+#if HAVE_PTHREAD_H
+    pthread_cond_wait (cond, mutex);
+#else
+    OOPS - need some synchronization mechanism
+#endif
+}
+
+int
+twin_thread_create (twin_thread_t *thread, twin_thread_func_t func, void *arg)
+{
+    return pthread_create (thread, NULL, func, arg);
+}

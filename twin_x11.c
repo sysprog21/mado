@@ -26,15 +26,17 @@
 #include "twinint.h"
 
 static void
-_twin_x11_put_begin (twin_coord_t   x,
-		     twin_coord_t   y,
-		     twin_coord_t   width,
-		     twin_coord_t   height,
+_twin_x11_put_begin (twin_coord_t   left,
+		     twin_coord_t   top,
+		     twin_coord_t   right,
+		     twin_coord_t   bottom,
 		     void	    *closure)
 {
-    twin_x11_t	*tx = closure;
+    twin_x11_t	    *tx = closure;
+    twin_coord_t    width = right - left;
+    twin_coord_t    height = bottom - top;
 
-    tx->iy = 0;
+    tx->image_y = top;
     tx->image = XCreateImage (tx->dpy, tx->visual, tx->depth, ZPixmap,
 			      0, 0, width, height, 32, 0);
     if (tx->image)
@@ -49,33 +51,32 @@ _twin_x11_put_begin (twin_coord_t   x,
 }
 
 static void
-_twin_x11_put_span (twin_coord_t	    x,
-		    twin_coord_t	    y,
-		    twin_coord_t	    width,
+_twin_x11_put_span (twin_coord_t    left,
+		    twin_coord_t    top,
+		    twin_coord_t    right,
 		    twin_argb32_t   *pixels,
 		    void	    *closure)
 {
-    twin_x11_t	*tx = closure;
-    twin_coord_t	ix = 0;
-    twin_coord_t	iw = width;
+    twin_x11_t	    *tx = closure;
+    twin_coord_t    width = right - left;
+    twin_coord_t    ix;
+    twin_coord_t    iy = top - tx->image_y;
 
     if (!tx->image)
 	return;
 
-    while (iw--)
+    for (ix = 0; ix < width; ix++)
     {
 	twin_argb32_t	pixel = *pixels++;
 	
 	if (tx->depth == 16)
 	    pixel = twin_argb32_to_rgb16 (pixel);
-	XPutPixel (tx->image, ix, tx->iy, pixel);
-	ix++;
+	XPutPixel (tx->image, ix, iy, pixel);
     }
-    tx->iy++;
-    if (tx->iy == tx->image->height)
+    if ((top + 1 - tx->image_y) == tx->image->height)
     {
 	XPutImage (tx->dpy, tx->win, tx->gc, tx->image, 0, 0, 
-		   x, (y + 1) - tx->iy, width, tx->image->height);
+		   left, tx->image_y, tx->image->width, tx->image->height);
 	XDestroyImage (tx->image);
 	tx->image = 0;
     }
@@ -86,10 +87,10 @@ twin_x11_damage_thread (void *arg)
 {
     twin_x11_t	*tx = arg;
 
-    pthread_mutex_lock (&tx->screen->screen_mutex);
+    twin_mutex_lock (&tx->screen->screen_mutex);
     for (;;)
     {
-	pthread_cond_wait (&tx->damage_cond, &tx->screen->screen_mutex);
+	twin_cond_wait (&tx->damage_cond, &tx->screen->screen_mutex);
 	if (!tx->win)
 	    break;
 	if (twin_screen_damaged (tx->screen))
@@ -98,15 +99,16 @@ twin_x11_damage_thread (void *arg)
 	    XFlush (tx->dpy);
 	}
     }
-    pthread_mutex_unlock (&tx->screen->screen_mutex);
+    twin_mutex_unlock (&tx->screen->screen_mutex);
     return 0;
 }
 
 static void *
 twin_x11_event_thread (void *arg)
 {
-    twin_x11_t	*tx = arg;
-    XEvent	ev;
+    twin_x11_t	    *tx = arg;
+    XEvent	    ev;
+    twin_event_t    tev;
 
     for (;;)
     {
@@ -117,6 +119,21 @@ twin_x11_event_thread (void *arg)
 	    break;
 	case DestroyNotify:
 	    return 0;
+	case ButtonPress:
+	case ButtonRelease:
+	    tev.u.pointer.screen_x = ev.xbutton.x;
+	    tev.u.pointer.screen_y = ev.xbutton.y;
+	    tev.kind = ((ev.type == ButtonPress) ? 
+			EventButtonDown : EventButtonUp);
+	    twin_screen_dispatch (tx->screen, &tev);
+	    break;
+	case MotionNotify:
+	    tev.u.pointer.screen_x = ev.xmotion.x;
+	    tev.u.pointer.screen_y = ev.xmotion.y;
+	    tev.kind = EventMotion;
+	    tev.u.pointer.button = ev.xmotion.state;
+	    twin_screen_dispatch (tx->screen, &tev);
+	    break;
 	}
     }
 }
@@ -126,7 +143,7 @@ twin_x11_screen_damaged (void *closure)
 {
     twin_x11_t	*tx = closure;
 
-    pthread_cond_broadcast (&tx->damage_cond);
+    twin_cond_broadcast (&tx->damage_cond);
 }
 
 twin_x11_t *
@@ -187,11 +204,11 @@ twin_x11_create (Display *dpy, int width, int height)
 
     XMapWindow (dpy, tx->win);
 
-    pthread_cond_init (&tx->damage_cond, NULL);
+    twin_cond_init (&tx->damage_cond);
 
-    pthread_create (&tx->damage_thread, NULL, twin_x11_damage_thread, tx);
+    twin_thread_create (&tx->damage_thread, twin_x11_damage_thread, tx);
 
-    pthread_create (&tx->event_thread, NULL, twin_x11_event_thread, tx);
+    twin_thread_create (&tx->event_thread, twin_x11_event_thread, tx);
     
     return tx;
 }
@@ -201,7 +218,7 @@ twin_x11_destroy (twin_x11_t *tx)
 {
     XDestroyWindow (tx->dpy, tx->win);
     tx->win = 0;
-    pthread_cond_broadcast (&tx->damage_cond);
+    twin_cond_broadcast (&tx->damage_cond);
     twin_screen_destroy (tx->screen);
 }
 

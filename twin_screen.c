@@ -43,6 +43,7 @@ twin_screen_create (twin_coord_t	width,
     screen->damaged = NULL;
     screen->damaged_closure = NULL;
     screen->disable = 0;
+    screen->background = 0;
     twin_mutex_init (&screen->screen_mutex);
     screen->put_begin = put_begin;
     screen->put_span = put_span;
@@ -172,7 +173,30 @@ twin_screen_update (twin_screen_t *screen)
 	    (*screen->put_begin) (left, top, right, bottom, screen->closure);
 	for (y = top; y < bottom; y++)
 	{
-	    memset (span, 0xff, width * sizeof (twin_argb32_t));
+	    if (screen->background)
+	    {
+		twin_pointer_t  dst;
+		twin_source_u	src;
+		twin_coord_t	p_left;
+		twin_coord_t	m_left;
+		twin_coord_t	p_this;
+		twin_coord_t	p_width = screen->background->width;
+		twin_coord_t	p_y = y % screen->background->height;
+		
+		for (p_left = left; p_left < right; p_left += p_this)
+		{
+		    dst.argb32 = span + (p_left - left);
+		    m_left = p_left % p_width;
+		    p_this = p_width - m_left;
+		    if (p_left + p_this > right)
+			p_this = right - p_left;
+		    src.p = twin_pixmap_pointer (screen->background,
+						 m_left, p_y);
+		    _twin_argb32_source_argb32 (dst, src, p_this);
+		}
+	    }
+	    else
+		memset (span, 0xff, width * sizeof (twin_argb32_t));
 	    for (p = screen->bottom; p; p = p->up)
 	    {
 		twin_pointer_t  dst;
@@ -228,6 +252,21 @@ twin_pixmap_t *
 twin_screen_get_active (twin_screen_t *screen)
 {
     return screen->active;
+}
+
+void
+twin_screen_set_background (twin_screen_t *screen, twin_pixmap_t *pixmap)
+{
+    if (screen->background)
+	twin_pixmap_destroy (screen->background);
+    screen->background = pixmap;
+    twin_screen_damage (screen, 0, 0, screen->width, screen->height);
+}
+
+twin_pixmap_t *
+twin_screen_get_background (twin_screen_t *screen)
+{
+    return screen->background;
 }
 
 twin_bool_t

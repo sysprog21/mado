@@ -166,6 +166,10 @@ typedef struct _twin_screen {
      */
     twin_coord_t	width, height;
     /*
+     * Background pattern
+     */
+    twin_pixmap_t	*background;
+    /*
      * Damage
      */
     twin_rect_t		damage;
@@ -289,6 +293,9 @@ typedef struct _twin_event_queue {
 typedef enum _twin_window_style {
     WindowPlain,
     WindowApplication,
+    WindowFullScreen,
+    WindowDialog,
+    WindowAlert,
 } twin_window_style_t;
 
 typedef void	    (*twin_draw_func_t) (twin_window_t	    *window);
@@ -311,6 +318,17 @@ struct _twin_window {
     twin_event_func_t	event;
     twin_destroy_func_t	destroy;
 };
+
+/*
+ * Icons
+ */
+
+typedef enum _twin_icon {
+    TwinIconMenu,
+    TwinIconMinimize,
+    TwinIconMaximize,
+    TwinIconClose,
+} twin_icon_t;
 
 /*
  * Widgets
@@ -429,6 +447,13 @@ twin_text_metrics_utf8 (twin_path_t	    *path,
 
 twin_path_t *
 twin_path_convex_hull (twin_path_t *path);
+
+/*
+ * twin_icon.c
+ */
+
+void
+twin_icon_draw (twin_pixmap_t *pixmap, twin_icon_t icon, twin_matrix_t matrix);
 
 /*
  * twin_matrix.c
@@ -556,6 +581,12 @@ twin_paint_stroke (twin_pixmap_t    *dst,
 		   twin_fixed_t	    pen_width);
 
 /*
+ * twin_pattern.c
+ */
+twin_pixmap_t *
+twin_make_pattern (void);
+
+/*
  * twin_pixmap.c
  */
 
@@ -563,6 +594,13 @@ twin_pixmap_t *
 twin_pixmap_create (twin_format_t   format,
 		    twin_coord_t    width,
 		    twin_coord_t    height);
+
+twin_pixmap_t *
+twin_pixmap_create_const (twin_format_t	    format,
+			  twin_coord_t	    width,
+			  twin_coord_t	    height,
+			  twin_coord_t	    stride,
+			  twin_pointer_t    pixels);
 
 void
 twin_pixmap_destroy (twin_pixmap_t *pixmap);
@@ -656,6 +694,12 @@ twin_screen_set_active (twin_screen_t *screen, twin_pixmap_t *pixmap);
 
 twin_pixmap_t *
 twin_screen_get_active (twin_screen_t *screen);
+
+void
+twin_screen_set_background (twin_screen_t *screen, twin_pixmap_t *pixmap);
+
+twin_pixmap_t *
+twin_screen_get_background (twin_screen_t *screen);
 
 twin_bool_t
 twin_screen_dispatch (twin_screen_t *screen,

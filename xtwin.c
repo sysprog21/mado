@@ -186,7 +186,7 @@ twin_clock_face (twin_window_t *clock)
     twin_path_destroy (path);
 }
 
-int nclock;
+int napp;
 
 static void
 twin_clock (twin_screen_t *screen, const char *name, int x, int y, int w, int h)
@@ -234,7 +234,67 @@ twin_clock (twin_screen_t *screen, const char *name, int x, int y, int w, int h)
 	
 	usleep (INTERVAL - (tv.tv_usec % INTERVAL));
     }
-    nclock--;
+    napp--;
+}
+
+static void
+twin_text_app (twin_screen_t *screen, const char *name, int x, int y, int w, int h)
+{
+    twin_window_t   *text = twin_window_create (screen, TWIN_ARGB32,
+						WindowApplication,
+						x,y,w,h);
+    twin_fixed_t    fx, fy;
+    static const char	*lines[] = {
+	"Fourscore and seven years ago our fathers brought forth on",
+	"this continent a new nation, conceived in liberty and",
+	"dedicated to the proposition that all men are created equal.",
+	"",
+	"Now we are engaged in a great civil war, testing whether that",
+	"nation or any nation so conceived and so dedicated can long",
+	"endure. We are met on a great battlefield of that war. We",
+	"have come to dedicate a portion of it as a final resting",
+	"place for those who died here that the nation might live.",
+	"This we may, in all propriety do. But in a larger sense, we",
+	"cannot dedicate, we cannot consecrate, we cannot hallow this",
+	"ground. The brave men, living and dead who struggled here",
+	"have hallowed it far above our poor power to add or detract.",
+	"The world will little note nor long remember what we say here,",
+	"but it can never forget what they did here.",
+	"",
+	"It is rather for us the living, we here be dedicated to the",
+	"great task remaining before us--that from these honored",
+	"dead we take increased devotion to that cause for which they",
+	"here gave the last full measure of devotion--that we here",
+	"highly resolve that these dead shall not have died in vain, that",
+	"this nation shall have a new birth of freedom, and that",
+	"government of the people, by the people, for the people shall",
+	"not perish from the earth.",
+	0
+    };
+    const char **l;
+    twin_path_t	*path;
+    
+    twin_window_set_name(text, name);
+    path = twin_path_create ();
+    twin_path_translate (path, 
+			 twin_int_to_fixed (text->client.left),
+			 twin_int_to_fixed (text->client.top));
+#define TEXT_SIZE   10
+    twin_path_set_font_size (path, D(TEXT_SIZE));
+    fx = D(3);
+    fy = D(10);
+    twin_fill (text->pixmap, 0xc0c0c0c0, TWIN_SOURCE,
+	       text->client.left, text->client.top,
+	       text->client.right, text->client.bottom);
+    for (l = lines; *l; l++) 
+    {
+	twin_path_move (path, fx, fy);
+	twin_path_utf8 (path, *l);
+	twin_paint_path (text->pixmap, 0xff000000, path);
+	twin_path_empty (path);
+	fy += D(TEXT_SIZE);
+    }
+    twin_window_show (text);
 }
 
 typedef void (*twin_app_func_t) (twin_screen_t *screen, const char *name,
@@ -280,7 +340,7 @@ twin_start_app (twin_app_func_t func,
 static void
 twin_start_clock (twin_screen_t *screen, const char *name, int x, int y, int w, int h)
 {
-    ++nclock;
+    ++napp;
     twin_start_app (twin_clock, screen, name, x, y, w, h);
 }
 
@@ -315,6 +375,7 @@ main (int argc, char **argv)
     twin_fixed_t    fx, fy;
     int		    g;
 
+    twin_screen_set_background (x11->screen, twin_make_pattern ());
     (void) ev;
     (void) motion;
     (void) had_motion;
@@ -640,20 +701,24 @@ main (int argc, char **argv)
     twin_pixmap_move (blue, 100, 100);
     twin_pixmap_show (red, x11->screen, 0);
     twin_pixmap_show (blue, x11->screen, 0);
-    ++nclock;
+    ++napp;
 #endif
 
-    if (!nclock)
-	twin_start_clock (x11->screen, "small clock", 10, 10, 200, 200);
+    if (!napp)
+	twin_start_clock (x11->screen, "Clock", 10, 10, 200, 200);
+#if 0
+    twin_start_clock (x11->screen, "Large clock", 0, 100, 256, 256);
+#endif
 #if 1
-    twin_start_clock (x11->screen, "ul clock", 0, 0, 256, 256);
+    twin_start_app (twin_text_app, x11->screen, "Gettysburg Address",
+		    100, 100, 318, 250);
 #endif
 #if 0
     twin_start_clock (x11->screen, "ur clock", 256, 0, 256, 256);
     twin_start_clock (x11->screen, "ll clock", 0, 256, 256, 256);
     twin_start_clock (x11->screen, "lr clock", 256, 256, 256, 256);
 #endif
-    while (nclock)
+    while (napp)
 	sleep (1);
     return 0;
 }

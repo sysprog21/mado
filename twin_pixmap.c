@@ -49,6 +49,29 @@ twin_pixmap_create (twin_format_t   format,
     return pixmap;
 }
 
+twin_pixmap_t *
+twin_pixmap_create_const (twin_format_t	    format,
+			  twin_coord_t	    width,
+			  twin_coord_t	    height,
+			  twin_coord_t	    stride,
+			  twin_pointer_t    pixels)
+{
+    twin_pixmap_t   *pixmap = malloc (sizeof (twin_pixmap_t));
+    if (!pixmap)
+	return 0;
+    pixmap->screen = 0;
+    pixmap->up = 0;
+    pixmap->down = 0;
+    pixmap->x = pixmap->y = 0;
+    pixmap->format = format;
+    pixmap->width = width;
+    pixmap->height = height;
+    pixmap->stride = stride;
+    pixmap->disable = 0;
+    pixmap->p = pixels;
+    return pixmap;
+}
+
 void
 twin_pixmap_destroy (twin_pixmap_t *pixmap)
 {

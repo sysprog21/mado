@@ -2,6 +2,26 @@
 
 	* Makefile.am:
 	* twin.h:
+	* twin_pattern.c: (twin_make_pattern):
+	* twin_pixmap.c: (twin_pixmap_create_const):
+	Add patterns.
+	
+	* twin_screen.c: (twin_screen_create), (twin_screen_update),
+	(twin_screen_set_background), (twin_screen_get_background):
+	Add screen backgrounds
+	
+	* twin_window.c: (twin_window_create), (twin_window_style_size),
+	(twin_window_frame), (twin_window_draw):
+	Eliminate spurious border bits
+	
+	* xtwin.c: (twin_clock), (twin_text_app), (twin_start_clock),
+	(main):
+	Add text display applet
+
+2004-10-05  Keith Packard  <keithp@keithp.com>
+
+	* Makefile.am:
+	* twin.h:
 	* twin_draw.c: (twin_fill):
 	* twin_path.c: (twin_composite_path):
 	* twin_pixmap.c: (twin_pixmap_create), (twin_pixmap_show),

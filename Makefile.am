@@ -25,6 +25,7 @@ xtwin_SOURCES = \
 	twin_geom.c \
 	twin_matrix.c \
 	twin_path.c \
+	twin_pattern.c \
 	twin_pixmap.c \
 	twin_poly.c \
 	twin_primitive.c \

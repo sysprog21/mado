@@ -172,3 +172,15 @@ _twin_matrix_dy (twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y)
     return twin_fixed_to_sfixed (twin_fixed_mul (m->m[0][1], x) +
 				 twin_fixed_mul (m->m[1][1], y));
 }
+
+twin_sfixed_t
+_twin_matrix_len (twin_matrix_t *m, twin_fixed_t dx, twin_fixed_t dy)
+{
+    twin_fixed_t    xs = (twin_fixed_mul (m->m[0][0], dx) +
+			  twin_fixed_mul (m->m[1][0], dy));
+    twin_fixed_t    ys = (twin_fixed_mul (m->m[0][1], dx) +
+			  twin_fixed_mul (m->m[1][1], dy));
+    twin_fixed_t    ds = (twin_fixed_mul (xs, xs) +
+			  twin_fixed_mul (ys, ys));
+    return (twin_fixed_to_sfixed (twin_fixed_sqrt (ds)));
+}

@@ -120,6 +120,8 @@ main (int argc, char **argv)
 #endif
     
 #if 1
+    {
+	twin_state_t	state = twin_path_save (path);
     twin_path_translate (path, D(300), D(300));
     twin_path_set_font_size (path, D(15));
     for (s = 0; s < 41; s++)
@@ -130,28 +132,30 @@ main (int argc, char **argv)
 	twin_path_utf8 (path, "Hello, world!");
 	twin_path_restore (path, &state);
     }
+	twin_path_restore (path, &state);
+    }
 #endif
-#if 0
+#if 1
     fx = D(3);
     fy = 0;
     for (g = 8; g < 30; g += 4)
     {
         twin_path_set_font_size (path, D(g));
-#if 0
+#if 1
         fy += D(g+2);
 	twin_path_move (path, fx, fy);
-	twin_path_string (path, D(g), D(g), TWIN_TEXT_ROMAN,
+	twin_path_utf8 (path,
 			  " !\"#$%&'()*+,-./0123456789:;<=>?");
         fy += D(g+2);
 	twin_path_move (path, fx, fy);
-	twin_path_string (path, D(g), D(g), TWIN_TEXT_ROMAN,
+	twin_path_utf8 (path,
 			  "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_");
         fy += D(g+2);
 	twin_path_move (path, fx, fy);
-	twin_path_string (path, D(g), D(g), TWIN_TEXT_ROMAN,
+	twin_path_utf8 (path,
 			  "`abcdefghijklmnopqrstuvwxyz{|}~");
 #endif
-#if 1
+#if 0
 	for (s = 0; s < 4; s++)
 	{
 	    fy += D(g+2);
@@ -176,9 +180,10 @@ main (int argc, char **argv)
     for (g = 6; g < 36; g++)
     {
 	twin_path_move (path, fx, fy);
-	twin_path_utf8 (path, D(g), D(g),
+	twin_path_set_font_size (path, D(g));
+	twin_path_utf8 (path,
 			"the quick brown fox jumps over the lazy dog.");
-	twin_path_utf8 (path, D(g), D(g),
+	twin_path_utf8 (path,
 			"THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG.");
 	fy += D(g);
     }

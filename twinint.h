@@ -45,6 +45,8 @@ typedef int32_t	    twin_dfixed_t;  /* 24.8 format (12.4 * 12.4) */
 #define twin_sfixed_to_fixed(s)	    (((twin_fixed_t) (s)) << 12)
 #define twin_fixed_to_sfixed(f)	    ((twin_sfixed_t) ((f) >> 12))
 
+#define twin_sfixed_to_dfixed(s)    (((twin_dfixed_t) (s)) << 4)
+
 /* 
  * 'double' is a no-no in any shipping code, but useful during
  * development
@@ -305,6 +307,12 @@ void
 _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges);
 
 /*
+ * Fixed point helper functions
+ */
+twin_sfixed_t
+_twin_sfixed_sqrt (twin_sfixed_t as);
+    
+/*
  * Matrix stuff
  */
 
@@ -315,13 +323,16 @@ twin_sfixed_t
 _twin_matrix_y (twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y);
 
 twin_sfixed_t
-_twin_matrix_dx (twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y);
+_twin_matrix_dx (twin_matrix_t *m, twin_fixed_t dx, twin_fixed_t dy);
 
 twin_sfixed_t
-_twin_matrix_dy (twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y);
+_twin_matrix_dy (twin_matrix_t *m, twin_fixed_t dx, twin_fixed_t dy);
 
 twin_fixed_t
 _twin_matrix_determinant (twin_matrix_t *matrix);
+
+twin_sfixed_t
+_twin_matrix_len (twin_matrix_t *m, twin_fixed_t dx, twin_fixed_t dy);
 
 /*
  * Path stuff

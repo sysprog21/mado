@@ -44,7 +44,6 @@ twin_has_ucs4 (twin_ucs4_t ucs4)
     return ucs4 <= TWIN_FONT_MAX && _twin_glyph_offsets[ucs4] != 0;
 }
 
-#if 0
 static int
 compare_snap (const void *av, const void *bv)
 {
@@ -54,22 +53,22 @@ compare_snap (const void *av, const void *bv)
     return (int) (*a - *b);
 }
 
-#define SNAPI(p)	(((p) + 0x7) & ~0xf)
-#define SNAPH(p)	(((p) + 0x3) & ~0x7)
+#define SNAPI(p)	(((p) + 0x7fff) & ~0xffff)
+#define SNAPH(p)	(((p) + 0x3fff) & ~0x7fff)
 
 static twin_fixed_t
-_snap (twin_gfixed_t g, twin_fixed_t scale, twin_gfixed_t *snap, int nsnap)
+_snap (twin_path_t *path, twin_gfixed_t g, twin_gfixed_t *snap, int nsnap)
 {
     int		    s;
     twin_fixed_t    v;
 
-    v = S(g, scale);
+    v = Scale(g);
     for (s = 0; s < nsnap - 1; s++)
     {
 	if (snap[s] <= g && g <= snap[s+1])
 	{
-	    twin_fixed_t    before = S(snap[s],scale);
-	    twin_fixed_t    after = S(snap[s+1],scale);
+	    twin_fixed_t    before = Scale(snap[s]);
+	    twin_fixed_t    after = Scale(snap[s+1]);
 	    twin_fixed_t    dist = after - before;
 	    twin_fixed_t    snap_before = SNAPI(before);
 	    twin_fixed_t    snap_after = SNAPI(after);
@@ -77,23 +76,23 @@ _snap (twin_gfixed_t g, twin_fixed_t scale, twin_gfixed_t *snap, int nsnap)
 	    twin_fixed_t    move_after = snap_after - after;
 	    twin_fixed_t    dist_before = v - before;
 	    twin_fixed_t    dist_after = after - v;
-	    twin_fixed_t    move = ((twin_dfixed_t) dist_before * move_after + 
-				    (twin_dfixed_t) dist_after * move_before) / dist;
-	    DBGOUT (("%d <= %d <= %d\n", snap[s], g, snap[s+1]));
-	    DBGOUT (("%9.4f <= %9.4f <= %9.4f\n", F(before), F(v), F(after)));
-	    DBGOUT (("before: %9.4f -> %9.4f\n", F(before), F(snap_before)));
-	    DBGOUT (("after: %9.4f -> %9.4f\n", F(after), F(snap_after)));
-	    DBGOUT (("v: %9.4f -> %9.4f\n", F(v), F(v+move)));
+	    twin_fixed_t    move = ((int64_t) dist_before * move_after + 
+				    (int64_t) dist_after * move_before) / dist;
+	    DBGMSG (("%d <= %d <= %d\n", snap[s], g, snap[s+1]));
+	    DBGMSG (("%9.4f <= %9.4f <= %9.4f\n", F(before), F(v), F(after)));
+	    DBGMSG (("before: %9.4f -> %9.4f\n", F(before), F(snap_before)));
+	    DBGMSG (("after: %9.4f -> %9.4f\n", F(after), F(snap_after)));
+	    DBGMSG (("v: %9.4f -> %9.4f\n", F(v), F(v+move)));
 	    v += move;
 	    break;
 	}
     }
-    DBGOUT (("_snap: %d => %9.4f\n", g, F(v)));
+    DBGMSG (("_snap: %d => %9.4f\n", g, F(v)));
     return v;
 }
 
-#define SNAPX(p)	_snap (p, path->state.font_size, snap_x, nsnap_x)
-#define SNAPY(p)	_snap (p, path->state.font_size, snap_y, nsnap_y)
+#define SNAPX(p)	_snap (path, p, snap_x, nsnap_x)
+#define SNAPY(p)	_snap (path, p, snap_y, nsnap_y)
 
 static int
 _add_snap (twin_gfixed_t *snaps, int nsnap, twin_fixed_t snap)
@@ -106,7 +105,6 @@ _add_snap (twin_gfixed_t *snaps, int nsnap, twin_fixed_t snap)
     snaps[nsnap++] = snap;
     return nsnap;
 }
-#endif
 
 static const twin_gpoint_t *
 _twin_ucs4_base(twin_ucs4_t ucs4)
@@ -118,10 +116,111 @@ _twin_ucs4_base(twin_ucs4_t ucs4)
 
 #define TWIN_FONT_BASELINE  9
 
+static twin_fixed_t
+_twin_pen_size (twin_path_t *path)
+{
+    twin_fixed_t    pen_size;
+    
+    pen_size = SNAPH(path->state.font_size / 24);
+    if (pen_size < TWIN_FIXED_HALF)
+	pen_size = TWIN_FIXED_HALF;
+    
+    if (path->state.font_style & TWIN_TEXT_BOLD)
+    {
+	twin_fixed_t	pen_add = SNAPH(pen_size >> 1);
+	if (pen_add == 0) 
+	    pen_add = TWIN_FIXED_HALF;
+	pen_size += pen_add;
+    }
+    return pen_size;
+}
+
+void
+twin_text_metrics_ucs4 (twin_path_t	    *path, 
+			twin_ucs4_t	    ucs4, 
+			twin_text_metrics_t *m)
+{
+    const twin_gpoint_t	*p = _twin_ucs4_base (ucs4);
+    twin_fixed_t	x, y;
+    twin_fixed_t	left, right;
+    twin_fixed_t	top, bottom;
+    twin_fixed_t	pen_size = _twin_pen_size (path);
+    twin_fixed_t	baseline = SNAPI(Scale(TWIN_FONT_BASELINE));
+    int			i;
+    int			skip_xi;
+    int			skip_yi;
+    int			next_xi;
+    int			next_yi;
+    
+    left = TWIN_FIXED_MAX;
+    top = TWIN_FIXED_MAX;
+    right = TWIN_FIXED_MIN;
+    bottom = TWIN_FIXED_MIN;
+    /*
+     * Locate horizontal and vertical segments
+     */
+    skip_xi = 0;
+    skip_yi = 0;
+    for (i = 1; p[i].y != -64; i++)
+    {
+	if (p[i].x == -64)
+	    continue;
+	x = Scale (p[i].x);
+	y = Scale (p[i].y);
+	next_xi = skip_xi;
+	next_yi = skip_yi;
+	if (p[i+1].y != -64 && p[i+1].x != -64)
+	{
+	    if (p[i].x == p[i+1].x)
+	    {
+		x = SNAPI(x);
+		skip_xi = i + 2;
+	    }
+	    if (p[i].y == p[i+1].y)
+	    {
+		y = SNAPI(y);
+		skip_yi = i + 2;
+	    }
+	}
+	if (i >= next_xi)
+	{
+	    if (x < left)
+		left = x;
+	    if (x > right)
+		right = x;
+	}
+	if (i >= next_yi)
+	{
+	    if (y < top)
+		top = y;
+	    if (y > bottom)
+		bottom = y;
+	}
+    }
+    
+    left -= pen_size * 2;
+    right += pen_size * 2;
+
+    if (i == 1)
+    {
+	left = Scale(p[0].x);
+	top = bottom = baseline;
+	right = Scale(p[0].y);
+    }
+
+    m->left_side_bearing = SNAPI(-left);
+    m->right_side_bearing = SNAPI(right);
+    m->width = m->left_side_bearing + m->right_side_bearing;
+    m->ascent = baseline - SNAPI(top);
+    m->descent = SNAPI(bottom) - baseline;
+    m->font_descent = SNAPI(path->state.font_size / 3);
+    m->font_ascent = SNAPI(path->state.font_size) - m->font_descent;
+}
+
 void
 twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
 {
-    const twin_gpoint_t	*p = 0;
+    const twin_gpoint_t	*p = _twin_ucs4_base (ucs4);
     int			i;
     twin_spoint_t	origin;
     twin_fixed_t	xc, yc;
@@ -132,18 +231,16 @@ twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
     twin_fixed_t	x, y;
     twin_fixed_t	pen_size;
     twin_matrix_t	pen_matrix;
-#if 0
     twin_fixed_t	pen_adjust;
     twin_gfixed_t    	*snap_x, *snap_y;
+    twin_text_metrics_t	metrics;
     int			nsnap_x, nsnap_y;
     int			npoints;
-#endif
     
-    p = _twin_ucs4_base (ucs4);
+    twin_text_metrics_ucs4 (path, ucs4, &metrics);
     
     origin = _twin_path_current_spoint (path);
     
-#if 0
     for (i = 1; p[i].y != -64; i++)
 	;
 
@@ -180,42 +277,23 @@ twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
 
     qsort (snap_x, nsnap_x, sizeof (twin_gfixed_t), compare_snap);
     qsort (snap_y, nsnap_y, sizeof (twin_gfixed_t), compare_snap);
-#endif
 
-#if 0
-    DBGOUT (("snap_x:"));
+    DBGMSG (("snap_x:"));
     for (i = 0; i < nsnap_x; i++)
-	DBGOUT ((" %d", snap_x[i])); 
-    DBGOUT (("\n"));
+	DBGMSG ((" %d", snap_x[i])); 
+    DBGMSG (("\n"));
     
-    DBGOUT (("snap_y:"));
+    DBGMSG (("snap_y:"));
     for (i = 0; i < nsnap_y; i++)
-	DBGOUT ((" %d", snap_y[i])); 
-    DBGOUT (("\n"));
-#endif
+	DBGMSG ((" %d", snap_y[i])); 
+    DBGMSG (("\n"));
 
     stroke = twin_path_create ();
     twin_path_set_matrix (stroke, twin_path_current_matrix (path));
     
-#if 0
-    /* snap pen size to half integer value */
-    sx = _twin_matrix_dx (&path->state.matrix, 
-			  path->state.font_size, path->state.font_size);
-    
-    pen_size = SNAPH(sx / 24);
-    if (pen_size < TWIN_SFIXED_HALF)
-	pen_size = TWIN_SFIXED_HALF;
-    
-    if (path->state.font_style & TWIN_TEXT_BOLD)
-    {
-	twin_fixed_t	pen_add = SNAPH(pen_size >> 1);
-	if (pen_add == 0) 
-	    pen_add = TWIN_SFIXED_HALF;
-	pen_size += pen_add;
-    }
-    
-    pen_adjust = pen_size & TWIN_SFIXED_HALF;
-#endif
+    pen_size = _twin_pen_size (path);
+
+    pen_adjust = pen_size & TWIN_FIXED_HALF;
     
     pen = twin_path_create ();
     pen_matrix = twin_path_current_matrix (path);
@@ -223,22 +301,19 @@ twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
     pen_matrix.m[2][0] = 0;
     pen_matrix.m[2][1] = 0;
     twin_path_set_matrix (pen, pen_matrix);
-    pen_size = path->state.font_size / 24;
-    if (path->state.font_style & TWIN_TEXT_BOLD)
-	pen_size += pen_size / 2;
 
     twin_path_circle (pen, pen_size);
 
-    xc = -ScaleX(p[0].x);
-    yc = ScaleY(TWIN_FONT_BASELINE);
+    xc = metrics.left_side_bearing + pen_adjust;
+    yc = SNAPY(TWIN_FONT_BASELINE) + pen_adjust;
     
     for (i = 1; p[i].y != -64; i++)
 	if (p[i].x == -64)
 	    twin_path_close (stroke);
 	else
 	{
-	    x = xc + ScaleX(p[i].x);
-	    y = yc + ScaleY(p[i].y);
+	    x = xc + SNAPX(p[i].x);
+	    y = yc + SNAPY(p[i].y);
 
 	    if (path->state.font_style & TWIN_TEXT_OBLIQUE)
 		x -= y / 4;
@@ -253,11 +328,10 @@ twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
     twin_path_destroy (stroke);
     twin_path_destroy (pen);
     
-#if 0
     free (snap_x);
-#endif
 
-    w = twin_width_ucs4 (path, ucs4);
+    w = metrics.width;
+
     _twin_path_smove (path, 
 		      origin.x + _twin_matrix_dx (&path->state.matrix, w, 0),
 		      origin.y + _twin_matrix_dy (&path->state.matrix, w, 0));
@@ -266,13 +340,10 @@ twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
 int
 twin_width_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
 {
-    const twin_gpoint_t	*p = _twin_ucs4_base (ucs4);
-    twin_fixed_t	left, right;
+    twin_text_metrics_t	metrics;
     
-    left = ScaleX (p[0].x);
-    right = ScaleX (p[0].y);
-    
-    return right - left;
+    twin_text_metrics_ucs4 (path, ucs4, &metrics);
+    return metrics.width;
 }
 
 static int

@@ -125,17 +125,12 @@ twin_path_draw (twin_path_t *path, twin_fixed_t x, twin_fixed_t y)
 void
 twin_path_close (twin_path_t *path)
 {
-    twin_spoint_t   first;
-    
     switch (_twin_current_subpath_len(path)) {
     case 1:
 	path->npoints--;
     case 0:
 	return;
     }
-    
-    first = _twin_path_subpath_first_spoint (path);
-    _twin_path_sdraw (path, first.x, first.y);
     
     if (path->nsublen == path->size_sublen)
     {
@@ -189,7 +184,7 @@ twin_path_circle (twin_path_t *path, twin_fixed_t radius)
     while ((1 << n) < sides)
 	n++;
 
-    for (i = 0; i < (1 << n); i++)
+    for (i = 0; i <= (1 << n); i++)
     {
 	twin_angle_t	a = (i * TWIN_ANGLE_360) >> n;
 	twin_fixed_t	x = twin_cos (a);

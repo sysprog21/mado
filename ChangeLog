@@ -1,5 +1,27 @@
 2004-09-27  Keith Packard  <keithp@keithp.com>
 
+	* twin.h:
+	* twin_fixed.c: (twin_fixed_div), (twin_fixed_sqrt),
+	(_twin_sfixed_sqrt):
+	Add some more fixed point functions
+	
+	* twin_font.c: (_snap), (_add_snap), (_twin_pen_size),
+	(twin_text_metrics_ucs4), (twin_path_ucs4), (twin_width_ucs4):
+	Reimplement text snapping.  Note that things are snapped to
+	user units, not pixels.  Snapping to pixels requires some
+	thought about rotating transformations.
+	
+	* twin_matrix.c: (_twin_matrix_len):
+	* twin_path.c: (twin_path_close), (twin_path_circle):
+	Oops.  Closed paths don't necessarily need to join ends,
+	but circles do.
+	
+	* twinint.h:
+	* xtwin.c: (main):
+	Random new tests.
+
+2004-09-27  Keith Packard  <keithp@keithp.com>
+
 	* Makefile.am:
 	* twin.h:
 	* twin_convolve.c: (_twin_path_leftpoint), (_around_order),

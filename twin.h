@@ -178,6 +178,20 @@ typedef struct _twin_state {
 } twin_state_t;
 
 /*
+ * Text metrics
+ */
+
+typedef struct _twin_text_metrics {
+    twin_fixed_t    left_side_bearing;
+    twin_fixed_t    right_side_bearing;
+    twin_fixed_t    ascent;
+    twin_fixed_t    descent;
+    twin_fixed_t    width;
+    twin_fixed_t    font_ascent;
+    twin_fixed_t    font_descent;
+} twin_text_metrics_t;
+
+/*
  * twin_convolve.c
  */
 void
@@ -219,6 +233,12 @@ twin_fill (twin_pixmap_t    *dst,
 twin_fixed_t
 twin_fixed_mul (twin_fixed_t af, twin_fixed_t bf);
 
+twin_fixed_t
+twin_fixed_sqrt (twin_fixed_t a);
+
+twin_fixed_t
+twin_fixed_div (twin_fixed_t a, twin_fixed_t b);
+
 /*
  * twin_font.c
  */
@@ -245,6 +265,11 @@ twin_width_ucs4 (twin_path_t *path, twin_ucs4_t ucs4);
  
 twin_fixed_t
 twin_width_utf8 (twin_path_t *path, const char *string);
+
+void
+twin_text_metrics_ucs4 (twin_path_t	    *path, 
+			twin_ucs4_t	    ucs4, 
+			twin_text_metrics_t *m);
 
 /*
  * twin_hull.c

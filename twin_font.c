@@ -24,9 +24,13 @@
 
 #include "twinint.h"
 
+#if 0
 #include <stdio.h>
-
 #define F(x) twin_fixed_to_double(x)
+#define DBGOUT(x)	printf x
+#else
+#define DBGOUT(x)
+#endif
 
 #define S(f,s)	((twin_fixed_t) ((((twin_dfixed_t) (f) * (s)) >> 5)))
 #define SX(x) (((x) * scale_x) >> 5)
@@ -72,20 +76,16 @@ _snap (twin_gfixed_t g, twin_fixed_t scale, twin_gfixed_t *snap, int nsnap)
 	    twin_fixed_t    dist_after = after - v;
 	    twin_fixed_t    move = ((twin_dfixed_t) dist_before * move_after + 
 				    (twin_dfixed_t) dist_after * move_before) / dist;
-#if 0
-	    printf ("%d <= %d <= %d\n", snap[s], g, snap[s+1]);
-	    printf ("%9.4f <= %9.4f <= %9.4f\n", F(before), F(v), F(after));
-	    printf ("before: %9.4f -> %9.4f\n", F(before), F(snap_before));
-	    printf ("after: %9.4f -> %9.4f\n", F(after), F(snap_after));
-	    printf ("v: %9.4f -> %9.4f\n", F(v), F(v+move));
-#endif
+	    DBGOUT (("%d <= %d <= %d\n", snap[s], g, snap[s+1]));
+	    DBGOUT (("%9.4f <= %9.4f <= %9.4f\n", F(before), F(v), F(after)));
+	    DBGOUT (("before: %9.4f -> %9.4f\n", F(before), F(snap_before)));
+	    DBGOUT (("after: %9.4f -> %9.4f\n", F(after), F(snap_after)));
+	    DBGOUT (("v: %9.4f -> %9.4f\n", F(v), F(v+move)));
 	    v += move;
 	    break;
 	}
     }
-#if 0
-    printf ("_snap: %d => %9.4f\n", g, F(v));
-#endif
+    DBGOUT (("_snap: %d => %9.4f\n", g, F(v)));
     return v;
 }
 
@@ -112,21 +112,6 @@ _twin_ucs4_base(twin_ucs4_t ucs4)
     return _twin_glyphs + _twin_glyph_offsets[ucs4];
 }
 
-#if 0
-static int
-_twin_ucs4_points (twin_ucs4_t	ucs4)
-{
-    const twin_gpoint_t	*p;
-    int	    i;
-
-    if (ucs4 > 0x7f || (p = _twin_font[ucs4]) == NULL)
-	p = _twin_default_char;
-    
-    for (i = 0; p[i].y != -64; i++);
-    return i + 1;
-}
-#endif
-
 void
 twin_path_ucs4 (twin_path_t	*path, 
 		twin_fixed_t	scale_x,
@@ -146,39 +131,6 @@ twin_path_ucs4 (twin_path_t	*path,
     int			nsnap_x, nsnap_y;
     int			npoints;
     
-    static int		been_here = 0;
-
-#if 0
-    if (!been_here)
-    {
-	int off = _twin_ucs4_points (0);
-	int this;
-	been_here = 1;
-	for (i = 0; i <= 0x7f; i++)
-	{
-	    if ((i & 7) == 0)
-	    {
-		printf ("/* 0x%02x */\n", i);
-		printf ("    ");
-	    }
-	    if (twin_has_ucs4 (i))
-	    {
-		this = _twin_ucs4_points (i);
-		printf ("%4d,", off);
-		off += this;
-	    }
-	    else
-	    {
-		printf ("%4d,", 0);
-	    }
-	    if ((i&7) == 7)
-		printf ("\n");
-	    else
-		printf (" ");
-	}
-    }
-#endif
-
     p = _twin_ucs4_base (ucs4);
     
     twin_path_cur_point (path, &xo, &yo);
@@ -221,27 +173,31 @@ twin_path_ucs4 (twin_path_t	*path,
     qsort (snap_y, nsnap_y, sizeof (twin_gfixed_t), compare_snap);
     
 #if 0
-    printf ("snap_x:");
+    DBGOUT (("snap_x:"));
     for (i = 0; i < nsnap_x; i++)
-	printf (" %d", snap_x[i]); 
-    printf ("\n");
+	DBGOUT ((" %d", snap_x[i])); 
+    DBGOUT (("\n"));
     
-    printf ("snap_y:");
+    DBGOUT (("snap_y:");
     for (i = 0; i < nsnap_y; i++)
-	printf (" %d", snap_y[i]); 
-    printf ("\n");
+	DBGOUT ((" %d", snap_y[i])); 
+    DBGOUT (("\n"));
 #endif
 
     stroke = twin_path_create ();
     
     /* snap pen size to half integer value */
-    if (style & TWIN_TEXT_BOLD)
-	pen_size = SNAPH(scale_y / 12);
-    else
-	pen_size = SNAPH(scale_y / 24);
-    
+    pen_size = SNAPH(scale_y / 24);
     if (pen_size < TWIN_FIXED_HALF)
 	pen_size = TWIN_FIXED_HALF;
+    
+    if (style & TWIN_TEXT_BOLD)
+    {
+	twin_fixed_t	pen_add = SNAPH(pen_size >> 1);
+	if (pen_add == 0) 
+	    pen_add = TWIN_FIXED_HALF;
+	pen_size += pen_add;
+    }
     
     pen_adjust = pen_size & TWIN_FIXED_HALF;
     
@@ -277,11 +233,13 @@ twin_path_ucs4 (twin_path_t	*path,
 int
 twin_ucs4_width (twin_ucs4_t ucs4, twin_fixed_t scale_x)
 {
-    const twin_gpoint_t	*p;
+    const twin_gpoint_t	*p = _twin_ucs4_base (ucs4);
+    twin_fixed_t	left, right;
     
-    p = _twin_ucs4_base (ucs4);
+    left = SNAPI(SX (p[0].x));
+    right = SNAPI(SX (p[0].y));
     
-    return twin_fixed_ceil (SX (p[0].y) - SX (p[0].x));
+    return right - left;
 }
 
 static int
@@ -368,3 +326,4 @@ twin_path_string (twin_path_t	*path,
 	string += len;
     }
 }
+)

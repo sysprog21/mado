@@ -1,3 +1,13 @@
+2004-09-25  Keith Packard  <keithp@keithp.com>
+
+	* twin_font.c: (_snap), (twin_path_ucs4):
+	Reduce emboldening to +50% stroke thickness.
+	Clean up debug code.
+	Eliminate some dead code.
+	Try to adjust width computations a bit.  Still not right.
+	* xtwin.c: (main):
+	draw in more colors
+
 2004-09-24  Keith Packard  <keithp@keithp.com>
 
 	* Makefile.am:

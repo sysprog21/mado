@@ -75,10 +75,10 @@ _around_order (twin_spoint_t    *a1,
     return 0;
 }
 
+#define F(x)	twin_sfixed_to_double(x)
 #if 0
 #include <stdio.h>
 #include <math.h>
-#define F(x)	twin_sfixed_to_double(x)
 #define DBGOUT(x...)	printf(x)
 
 static double
@@ -95,6 +95,8 @@ _angle (twin_spoint_t *a, twin_spoint_t *b)
 #define DBGOUT(x...)
 #endif
 
+#define A(a)  ((a) < 0 ? -(a) : (a))
+
 /*
  * Convolve one subpath with a convex pen.  The result is
  * a closed path.
@@ -104,21 +106,22 @@ _twin_subpath_convolve (twin_path_t	*path,
 			twin_path_t	*stroke,
 			twin_path_t	*pen)
 {
-    twin_spoint_t    *sp   = stroke->points;
-    twin_spoint_t    *pp   = pen->points;
+    twin_spoint_t   *sp   = stroke->points;
+    twin_spoint_t   *pp   = pen->points;
     int		    ns    = stroke->npoints;
     int		    np    = pen->npoints;
-    twin_spoint_t    *sp0  = &sp[0];
-    twin_spoint_t    *sp1  = &sp[1];
+    twin_spoint_t   *sp0  = &sp[0];
+    twin_spoint_t   *sp1  = &sp[1];
     int		    start = _twin_path_leftpoint (pen, sp0, sp1);
-    twin_spoint_t    *spn1 = &sp[ns-1];
-    twin_spoint_t    *spn2 = &sp[ns-2];
+    twin_spoint_t   *spn1 = &sp[ns-1];
+    twin_spoint_t   *spn2 = &sp[ns-2];
     int		    ret   = _twin_path_leftpoint (pen, spn1, spn2);
     int		    p;
     int		    s;
     int		    starget;
     int		    ptarget;
     int		    inc;
+    int		    first;
 
     DBGOUT ("convolve stroke:\n");
     for (s = 0; s < ns; s++)
@@ -135,6 +138,7 @@ _twin_subpath_convolve (twin_path_t	*path,
 	    p, F(pp[p].x), F(pp[p].y),
 	    F(sp[s].x + pp[p].x), F(sp[s].y + pp[p].y));
     _twin_path_smove (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
+    first = path->npoints - 1;
     
     /* step along the path first */
     inc = 1;
@@ -186,15 +190,67 @@ _twin_subpath_convolve (twin_path_t	*path,
 	 */
 	
 	/* draw a cap */
-	while (p != ptarget)
-	{
-	    if (++p == np) p = 0;
-	    DBGOUT("cap:    ");
-	    DBGOUT ("s%02d (%9.4f, %9.4f), p%02d (%9.4f, %9.4f): %9.4f, %9.4f\n",
-		    s, F(sp[s].x), F(sp[s].y),
-		    p, F(pp[p].x), F(pp[p].y),
-		    F(sp[s].x + pp[p].x), F(sp[s].y + pp[p].y));
-	    _twin_path_sdraw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
+	switch (path->state.cap_style) {
+	    int		pm;
+	case TwinCapProjecting:
+	    /*
+	     * This draws a rough projecting cap using the
+	     * pen.
+	     *
+	     * First, project the line forward one pen radius
+	     * by finding the pen location halfway between the
+	     * two normals.
+	     *
+	     * Then, just add that to the normals themselves to
+	     * find the corners of the projecting cap.  
+	     * 
+	     * The result may have significant error, so overwrite
+	     * the existing corners with the new coordinates to
+	     * avoid a kink.
+	     */
+	    if (p <= ptarget)
+		pm = (ptarget + p) >> 1;
+	    else
+	    {
+		pm = (ptarget + np + p) >> 1;
+		if (pm >= np) pm -= np;
+	    }
+	    
+	    /* replace last point with corner of cap */
+	    path->npoints--;
+	    _twin_path_sdraw (path,
+			      sp[s].x + pp[pm].x + pp[p].x,
+			      sp[s].y + pp[pm].y + pp[p].y);
+	    p = ptarget;
+	    if (inc == 1)
+	    {
+		/* start next line at cap corner */
+		_twin_path_sdraw (path,
+				  sp[s].x + pp[pm].x + pp[p].x,
+				  sp[s].y + pp[pm].y + pp[p].y);
+	    }
+	    else
+	    {
+		/* overwrite initial point */
+		path->points[first].x = sp[s].x + pp[pm].x + pp[p].x;
+		path->points[first].y = sp[s].y + pp[pm].y + pp[p].y;
+	    }
+	    break;
+	case TwinCapButt:
+	    p = ptarget-1;
+	    /* fall through … */
+	case TwinCapRound:
+	    while (p != ptarget)
+	    {
+		if (++p == np) p = 0;
+		DBGOUT("cap:    ");
+		DBGOUT ("s%02d (%9.4f, %9.4f), p%02d (%9.4f, %9.4f): %9.4f, %9.4f\n",
+			s, F(sp[s].x), F(sp[s].y),
+			p, F(pp[p].x), F(pp[p].y),
+			F(sp[s].x + pp[p].x), F(sp[s].y + pp[p].y));
+		_twin_path_sdraw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
+	    }
+	    break;
 	}
 	
 	if (inc == -1)
@@ -205,6 +261,7 @@ _twin_subpath_convolve (twin_path_t	*path,
 	ptarget = start;
 	starget = 0;
     }
+    twin_path_close (path);
 }
 
 void

@@ -78,45 +78,24 @@ twin_line_start (twin_screen_t *screen, int x, int y, int w, int h)
     twin_window_t   *window = twin_window_create (screen, TWIN_ARGB32,
 						  TwinWindowApplication,
 						  x, y, w, h);
-    int		    wid = window->client.right - window->client.left;
-    int		    hei = window->client.bottom - window->client.top;
     twin_pixmap_t   *pixmap = window->pixmap;
-    twin_path_t	    *path = twin_path_create ();
-    twin_path_t	    *pen = twin_path_create ();
     twin_path_t	    *stroke = twin_path_create ();
-    twin_pixmap_t   *alpha = twin_pixmap_create (TWIN_A8, w, h);
-    twin_operand_t  source, mask;
+    twin_fixed_t    fy;
     
+    twin_path_translate (stroke, D(200), D(200));
     twin_fill (pixmap, 0xffffffff, TWIN_SOURCE, 
-	       0, 0, wid, hei);
+	       0, 0, w, h);
 
     twin_window_set_name (window, "line");
     
-    twin_path_circle (pen, D (1));
-    
-    stroke = twin_path_create ();
-    pen = twin_path_create ();
-    twin_path_translate (stroke, D(100), D(100));
-    
-/*    twin_path_rotate (stroke, twin_degrees_to_angle (270)); */
-    twin_path_rotate (stroke, twin_degrees_to_angle (270));
-    twin_path_move (stroke, D(0), D(0));
-    twin_path_draw (stroke, D(100), D(0));
-    twin_path_set_matrix (pen, twin_path_current_matrix (stroke));
-    twin_path_circle (pen, D(20));
-    twin_path_convolve (path, stroke, pen);
-
-    twin_fill_path (alpha, path, 0, 0);
-    twin_path_destroy (path);
-    twin_path_destroy (pen);
+    for (fy = 0; fy < 150; fy += 40)
+    {
+	twin_path_move (stroke, D(-150), -D(fy));
+	twin_path_draw (stroke, D(150), D(fy));
+    }
+    twin_path_set_cap_style (stroke, TwinCapProjecting);
+    twin_paint_stroke (pixmap, 0xff000000, stroke, D(10));
     twin_path_destroy (stroke);
-    source.source_kind = TWIN_SOLID;
-    source.u.argb = 0xff000000;
-    mask.source_kind = TWIN_PIXMAP;
-    mask.u.pixmap = alpha;
-    twin_composite (pixmap, 0, 0,
-		    &source, 0, 0, &mask, 0, 0, TWIN_OVER, wid, hei);
-    twin_pixmap_destroy (alpha);
     twin_window_show (window);
 }
 
@@ -140,7 +119,7 @@ twin_circletext_start (twin_screen_t *screen, int x, int y, int w, int h)
     twin_window_set_name (window, "circletext");
     
     twin_path_set_font_style (path, TWIN_TEXT_UNHINTED);
-    twin_path_circle (pen, D (1));
+    twin_path_circle (pen, 0, 0, D (1));
     
     twin_path_translate (path, D(200), D(200));
     twin_path_set_font_size (path, D(15));
@@ -186,7 +165,7 @@ twin_quickbrown_start (twin_screen_t *screen, int x, int y, int w, int h)
     twin_fill (pixmap, 0xffffffff, TWIN_SOURCE, 
 	       0, 0, wid, hei);
     
-    twin_path_circle (pen, D (1));
+    twin_path_circle (pen, 0, 0, D (1));
     
     fx = D(3);
     fy = D(8);
@@ -233,7 +212,7 @@ twin_ascii_start (twin_screen_t *screen, int x, int y, int w, int h)
     twin_window_set_name (window, "ASCII");
     
     twin_fill (pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, wid, hei);
-    twin_path_circle (pen, D (1));
+    twin_path_circle (pen, 0, 0, D (1));
     
     fx = D(3);
     fy = D(8);
@@ -328,11 +307,15 @@ twin_jelly_start (twin_screen_t *screen, int x, int y, int w, int h)
 void
 twin_demo_start (twin_screen_t *screen, const char *name, int x, int y, int w, int h)
 {
+#if 0
     twin_circletext_start (screen, x, y, w, h);
+#endif
     twin_line_start (screen, x += 20, y += 20, w, h);
+#if 0
     twin_quickbrown_start (screen, x += 20, y += 20, w, h);
     twin_ascii_start (screen, x += 20, y += 20, w, h);
     twin_jelly_start (screen, x += 20, y += 20, w, h);
+#endif
 #if 0
 
 #if 0

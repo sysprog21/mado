@@ -1,3 +1,65 @@
+2004-10-29  Keith Packard  <keithp@keithp.com>
+
+	* Makefile.am:
+	add demoline + demospline
+	
+	* twin.h:
+	* twin_box.c: (_twin_box_dispatch):
+	* twin_clock.c: (twin_clock_hand), (_twin_clock_face):
+	* twin_convolve.c: (_twin_subpath_convolve):
+	* twin_demo.c: (twin_line_start), (twin_circletext_start),
+	* twin_draw.c: (twin_composite):
+	* twin_font.c: (_twin_text_compute_pen):
+	* twin_label.c: (_twin_label_paint), (_twin_label_init):
+	* twin_path.c: (twin_path_circle), (twin_path_ellipse),
+	(twin_path_arc), (twin_path_rectangle),
+	(twin_path_rounded_rectangle), (twin_path_lozenge),
+	(twin_path_tab), (twin_path_set_cap_style),
+	(twin_path_current_cap_style), (twin_path_create),
+	(twin_composite_stroke):
+	(twin_quickbrown_start), (twin_ascii_start), (twin_demo_start):
+	* twin_widget.c: (_twin_path_shape), (_twin_widget_paint_shape),
+	(_twin_widget_paint), (_twin_widget_init),
+	(_twin_path_bevel_shape):
+	* twinint.h:
+	Add cap styles, widget shapes, text alignment and arcs
+	Change circle/ellipse API.
+	
+	* twin_button.c: (_twin_button_dispatch):
+	Capture button events.
+	
+	* twin_calc.c: (twin_calc_start):
+	Use Lozenge shape for output
+	
+	* twin_demoline.c: (_twin_demoline_paint),
+	(_twin_demoline_update_pos), (_twin_demoline_hit),
+	(_twin_demoline_dispatch), (_twin_demoline_init),
+	(twin_demoline_create), (twin_demoline_start):
+	* twin_demoline.h:
+	Drag lines with the mouse
+	
+	* twin_demospline.c: (_twin_demospline_paint),
+	(_twin_demospline_update_pos), (_twin_demospline_hit),
+	(_twin_demospline_dispatch), (_twin_demospline_init),
+	(twin_demospline_create), (twin_demospline_start):
+	* twin_demospline.h:
+	drag splines with the mouse
+	
+	* twin_glyphs.c:
+	move '1' right a bit
+	
+	* twin_toplevel.c: (_twin_toplevel_event):
+	Convert dispatch result to boool
+	
+	* twin_window.c: (twin_window_create), (twin_window_dispatch):
+	was mis-computing delegate and crashing when window->event was NULL
+	
+	* twin_x11.c: (twin_x11_read_events):
+	Map X button info to twin mask
+	
+	* xtwin.c: (main):
+	draw different stuff.
+
 2004-10-27  Keith Packard  <keithp@keithp.com>
 
 	* twin_box.c: (_twin_box_dispatch):

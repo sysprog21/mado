@@ -105,6 +105,8 @@ twin_x11_read_events (int		file,
 	case ButtonRelease:
 	    tev.u.pointer.screen_x = ev.xbutton.x;
 	    tev.u.pointer.screen_y = ev.xbutton.y;
+	    tev.u.pointer.button = ((ev.xbutton.state >> 8) |
+				    (1 << (ev.xbutton.button-1)));
 	    tev.kind = ((ev.type == ButtonPress) ? 
 			TwinEventButtonDown : TwinEventButtonUp);
 	    twin_screen_dispatch (tx->screen, &tev);
@@ -113,7 +115,7 @@ twin_x11_read_events (int		file,
 	    tev.u.pointer.screen_x = ev.xmotion.x;
 	    tev.u.pointer.screen_y = ev.xmotion.y;
 	    tev.kind = TwinEventMotion;
-	    tev.u.pointer.button = ev.xmotion.state;
+	    tev.u.pointer.button = ev.xbutton.state >> 8;
 	    twin_screen_dispatch (tx->screen, &tev);
 	    break;
 	}

@@ -89,7 +89,7 @@ twin_clock_hand (twin_clock_t	*clock,
     m.m[2][1] = 0;
     twin_path_set_matrix (pen, m);
     twin_path_set_matrix (path, m);
-    twin_path_circle (pen, fill_width);
+    twin_path_circle (pen, 0, 0, fill_width);
     twin_path_convolve (path, stroke, pen);
 
     twin_paint_path (_twin_clock_pixmap(clock), fill_pixel, path);
@@ -115,8 +115,7 @@ _twin_clock_face (twin_clock_t *clock)
 
     twin_clock_set_transform (clock, path);
 
-    twin_path_move (path, 0, 0);
-    twin_path_circle (path, TWIN_FIXED_ONE);
+    twin_path_circle (path, 0, 0, TWIN_FIXED_ONE);
     
     twin_paint_path (_twin_clock_pixmap(clock), TWIN_CLOCK_BACKGROUND, path);
 

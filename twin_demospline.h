@@ -22,52 +22,36 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "twin_x11.h"
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/time.h>
-#include <time.h>
-#include <assert.h>
-#include <twin_clock.h>
-#include <twin_text.h>
-#include <twin_demo.h>
-#include <twin_hello.h>
-#include <twin_calc.h>
-#include <twin_demoline.h>
-#include <twin_demospline.h>
+#ifndef _TWIN_DEMOSPLINE_H_
+#define _TWIN_DEMOSPLINE_H_
 
-#define WIDTH	512
-#define HEIGHT	512
+#include <twin.h>
 
-int
-main (int argc, char **argv)
-{
-    Display	    *dpy = XOpenDisplay (0);
-    twin_x11_t	    *x11 = twin_x11_create (dpy, WIDTH, HEIGHT);
+#define NPT 4
 
-    twin_screen_set_background (x11->screen, twin_make_pattern ());
-#if 0
-    twin_demo_start (x11->screen, "Demo", 100, 100, 400, 400);
-#endif
-#if 0
-    twin_text_start (x11->screen,  "Gettysburg Address", 0, 0, 300, 300);
-#endif
-#if 0
-    twin_hello_start (x11->screen, "Hello, World", 0, 0, 200, 200);
-#endif
-#if 1
-    twin_clock_start (x11->screen, "Clock", 10, 10, 200, 200);
-#endif
-#if 1
-    twin_calc_start (x11->screen, "Calculator", 100, 100, 200, 200);
-#endif
-#if 1
-    twin_demoline_start (x11->screen, "Demo Line", 0, 0, 400, 400);
-#endif
-#if 1
-    twin_demospline_start (x11->screen, "Demo Spline", 20, 20, 400, 400);
-#endif
-    twin_dispatch ();
-    return 0;
-}
+typedef struct _twin_demospline {
+    twin_widget_t   widget;
+    twin_point_t    points[NPT];
+    int		    which;
+    twin_fixed_t    line_width;
+    twin_cap_t	    cap_style;
+} twin_demospline_t;
+
+void
+_twin_demospline_paint (twin_demospline_t *demospline);
+
+twin_dispatch_result_t
+_twin_demospline_dispatch (twin_widget_t *widget, twin_event_t *event);
+    
+void
+_twin_demospline_init (twin_demospline_t	*demospline, 
+		       twin_box_t		*parent,
+		       twin_dispatch_proc_t	dispatch);
+
+twin_demospline_t *
+twin_demospline_create (twin_box_t *parent);
+
+void
+twin_demospline_start (twin_screen_t *screen, const char *name, int x, int y, int w, int h);
+
+#endif /* _TWIN_DEMOLINE_H_ */

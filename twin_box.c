@@ -236,6 +236,11 @@ _twin_box_dispatch (twin_widget_t *widget, twin_event_t *event)
 		twin_pixmap_t	*pixmap = box->widget.window->pixmap;
 		twin_rect_t	clip = twin_pixmap_current_clip (pixmap);
 
+		if (child->shape != TwinShapeRectangle)
+		    twin_fill (child->window->pixmap,
+			       widget->background, TWIN_SOURCE,
+			       child->extents.left, child->extents.top,
+			       child->extents.right, child->extents.bottom);
 		twin_pixmap_set_clip (pixmap, child->extents);
 		child->paint = TWIN_FALSE;
 		(*child->dispatch) (child, event);

@@ -196,7 +196,7 @@ _twin_text_compute_pen (twin_text_info_t *info)
     twin_path_t	*pen = twin_path_create ();
 
     twin_path_set_matrix (pen, info->pen_matrix);
-    twin_path_circle (pen, TWIN_FIXED_ONE);
+    twin_path_circle (pen, 0, 0, TWIN_FIXED_ONE);
     return pen;
 }
 

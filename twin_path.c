@@ -192,6 +192,27 @@ twin_path_close (twin_path_t *path)
     }
 }
 
+void
+twin_path_circle (twin_path_t	*path, 
+		  twin_fixed_t	x,
+		  twin_fixed_t	y,
+		  twin_fixed_t radius)
+{
+    twin_path_ellipse (path, x, y, radius, radius);
+}
+
+void
+twin_path_ellipse (twin_path_t *path, 
+		   twin_fixed_t x, 
+		   twin_fixed_t	y,
+		   twin_fixed_t x_radius, 
+		   twin_fixed_t	y_radius)
+{
+    twin_path_move (path, x + x_radius, y);
+    twin_path_arc (path, x, y, x_radius, y_radius, 0, TWIN_ANGLE_360);
+    twin_path_close (path);
+}
+
 #define twin_fixed_abs(f)   ((f) < 0 ? -(f) : (f))
 
 static twin_fixed_t
@@ -202,90 +223,146 @@ _twin_matrix_max_radius (twin_matrix_t *m)
 }
 
 void
-twin_path_circle (twin_path_t *path, twin_fixed_t radius)
+twin_path_arc (twin_path_t  *path,
+	       twin_fixed_t x,
+	       twin_fixed_t y,
+	       twin_fixed_t x_radius,
+	       twin_fixed_t y_radius,
+	       twin_angle_t start,
+	       twin_angle_t extent)
 {
-    int		    sides;
-    int		    n;
-    twin_spoint_t   center;
-    int		    i;
-    twin_matrix_t   save;
+    twin_matrix_t   save = twin_path_current_matrix (path);
     twin_fixed_t    max_radius;
+    int32_t    	    sides;
+    int32_t    	    n;
+    twin_angle_t    a;
+    twin_angle_t    first, last, step, inc;
+    twin_angle_t    epsilon;
 
-    save = twin_path_current_matrix (path);
+    twin_path_translate (path, x, y);
+    twin_path_scale (path, x_radius, y_radius);
 
-    twin_path_scale (path, radius, radius);
-
-    center = _twin_path_current_spoint (path);
-
-    _twin_path_sfinish (path);
-    
     max_radius = _twin_matrix_max_radius (&path->state.matrix);
-    
     sides = max_radius / twin_sfixed_to_fixed (TWIN_SFIXED_TOLERANCE);
-    
     if (sides > 1024) sides = 1024;
 
     n = 2;
     while ((1 << n) < sides)
 	n++;
 
-    for (i = 0; i <= (1 << n); i++)
-    {
-	twin_angle_t	a = (i * TWIN_ANGLE_360) >> n;
-	twin_fixed_t	x = twin_cos (a);
-	twin_fixed_t	y = twin_sin (a);
+    sides = (1 << n);
 
-	_twin_path_sdraw (path, 
-			  center.x + _twin_matrix_dx (&path->state.matrix, x, y),
-			  center.y + _twin_matrix_dy (&path->state.matrix, x, y));
+    step = TWIN_ANGLE_360 >> n;
+    inc = step;
+    epsilon = 1;
+    if (extent < 0)
+    {
+	inc = -inc;
+	epsilon = -1;
     }
     
-    _twin_path_sfinish (path);
+    first = (start + inc - epsilon) & ~(step - 1);
+    last = (start + extent - inc + epsilon) & ~(step - 1);
+
+    if (first != start)
+	twin_path_draw (path, twin_cos(start), twin_sin(start));
+    
+    for (a = first; a != last; a += inc)
+	twin_path_draw (path, twin_cos (a), twin_sin (a));
+    
+    if (last != start + extent)
+	twin_path_draw (path, twin_cos (start+extent), twin_sin(start+extent));
+
     twin_path_set_matrix (path, save);
 }
 
 void
-twin_path_ellipse (twin_path_t *path, 
-		   twin_fixed_t x_radius, 
-		   twin_fixed_t	y_radius)
+twin_path_rectangle (twin_path_t    *path,
+		     twin_fixed_t   x,
+		     twin_fixed_t   y,
+		     twin_fixed_t   w,
+		     twin_fixed_t   h)
 {
-    int		    sides;
-    int		    n;
-    twin_spoint_t   center;
-    int		    i;
-    twin_matrix_t   save;
-    twin_fixed_t    max_radius;
+    twin_path_move (path, x, y);
+    twin_path_draw (path, x+w, y);
+    twin_path_draw (path, x+w, y+h);
+    twin_path_draw (path, x, y+h);
+    twin_path_close (path);
+}
+		     
+void
+twin_path_rounded_rectangle (twin_path_t	*path,
+			     twin_fixed_t	x,
+			     twin_fixed_t	y,
+			     twin_fixed_t	w,
+			     twin_fixed_t	h,
+			     twin_fixed_t	x_radius,
+			     twin_fixed_t	y_radius)
+{
+    twin_matrix_t   save = twin_path_current_matrix (path);
 
-    save = twin_path_current_matrix (path);
+    twin_path_translate (path, x, y);
+    twin_path_move  (path,
+		     0, y_radius);
+    twin_path_arc (path, x_radius, y_radius, x_radius, y_radius,
+		   TWIN_ANGLE_180, TWIN_ANGLE_90);
+    twin_path_draw  (path, 
+		     w - x_radius, 0);
+    twin_path_arc (path, w - x_radius, y_radius, x_radius, y_radius,
+		   TWIN_ANGLE_270, TWIN_ANGLE_90);
+    twin_path_draw  (path,
+		     w, h - y_radius);
+    twin_path_arc (path, w - x_radius, h - y_radius, x_radius, y_radius,
+		   TWIN_ANGLE_0, TWIN_ANGLE_90);
+    twin_path_draw  (path,
+		     x_radius, h);
+    twin_path_arc (path, x_radius, h - y_radius, x_radius, y_radius,
+		   TWIN_ANGLE_90, TWIN_ANGLE_90);
+    twin_path_close (path);
+    twin_path_set_matrix (path, save);
+}
+			
+void
+twin_path_lozenge (twin_path_t	*path,
+		   twin_fixed_t	x,
+		   twin_fixed_t	y,
+		   twin_fixed_t	w,
+		   twin_fixed_t	h)
+{
+    twin_fixed_t    radius;
 
-    twin_path_scale (path, x_radius, y_radius);
+    if (w > h)
+	radius = h / 2;
+    else
+	radius = w / 2;
+    twin_path_rounded_rectangle (path, x, y, w, h, radius, radius);
+}
 
-    center = _twin_path_current_spoint (path);
+void
+twin_path_tab (twin_path_t	*path,
+	       twin_fixed_t	x,
+	       twin_fixed_t	y,
+	       twin_fixed_t	w,
+	       twin_fixed_t	h,
+	       twin_fixed_t	x_radius,
+	       twin_fixed_t	y_radius)
+{
+    twin_matrix_t   save = twin_path_current_matrix (path);
 
-    _twin_path_sfinish (path);
-    
-    max_radius = _twin_matrix_max_radius (&path->state.matrix);
-    
-    sides = max_radius / twin_sfixed_to_fixed (TWIN_SFIXED_TOLERANCE);
-    
-    if (sides > 1024) sides = 1024;
-
-    n = 2;
-    while ((1 << n) < sides)
-	n++;
-
-    for (i = 0; i <= (1 << n); i++)
-    {
-	twin_angle_t	a = (i * TWIN_ANGLE_360) >> n;
-	twin_fixed_t	x = twin_cos (a);
-	twin_fixed_t	y = twin_sin (a);
-
-	_twin_path_sdraw (path, 
-			  center.x + _twin_matrix_dx (&path->state.matrix, x, y),
-			  center.y + _twin_matrix_dy (&path->state.matrix, x, y));
-    }
-    
-    _twin_path_sfinish (path);
+    twin_path_translate (path, x, y);
+    twin_path_move  (path,
+		     0, y_radius);
+    twin_path_arc (path, x_radius, y_radius, x_radius, y_radius,
+		   TWIN_ANGLE_180, TWIN_ANGLE_90);
+    twin_path_draw  (path, 
+		     w - x_radius, 0);
+    twin_path_arc (path, w - x_radius, y_radius, x_radius, y_radius,
+		   TWIN_ANGLE_270, TWIN_ANGLE_90);
+    twin_path_draw  (path,
+		     w, h);
+    twin_path_draw  (path,
+		     0, h);
+    twin_path_close (path);
     twin_path_set_matrix (path, save);
 }
 
@@ -347,6 +424,18 @@ twin_style_t
 twin_path_current_font_style (twin_path_t *path)
 {
     return path->state.font_style;
+}
+
+void
+twin_path_set_cap_style (twin_path_t *path, twin_cap_t cap_style)
+{
+    path->state.cap_style = cap_style;
+}
+
+twin_cap_t
+twin_path_current_cap_style (twin_path_t *path)
+{
+    return path->state.cap_style;
 }
 
 void
@@ -424,6 +513,7 @@ twin_path_create (void)
     twin_matrix_identity (&path->state.matrix);
     path->state.font_size = TWIN_FIXED_ONE * 15;
     path->state.font_style = TWIN_TEXT_ROMAN;
+    path->state.cap_style = TwinCapRound;
     return path;
 }
 
@@ -496,7 +586,8 @@ twin_composite_stroke (twin_pixmap_t	*dst,
     m.m[2][0] = 0;
     m.m[2][1] = 0;
     twin_path_set_matrix (pen, m);
-    twin_path_circle (pen, pen_width / 2);
+    twin_path_set_cap_style (path, twin_path_current_cap_style (stroke));
+    twin_path_circle (pen, 0, 0, pen_width / 2);
     twin_path_convolve (path, stroke, pen);
     twin_composite_path (dst, src, src_x, src_y, path, operator);
     twin_path_destroy (path);

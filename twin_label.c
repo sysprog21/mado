@@ -54,13 +54,25 @@ _twin_label_paint (twin_label_t *label)
     {
 	twin_fixed_t	wf = twin_int_to_fixed (w);
 	twin_fixed_t	hf = twin_int_to_fixed (h);
+	twin_fixed_t	x, y;
 
 	twin_path_set_font_size (path, label->font_size);
 	twin_path_set_font_style (path, label->font_style);
 	twin_text_metrics_utf8 (path, label->label, &m);
-	twin_path_move (path, (wf - m.width) / 2 + label->offset.x,
-			(hf - (m.ascent + m.descent)) / 2 + m.ascent + label->offset.y);
-
+	y = (hf - (m.ascent + m.descent)) / 2 + m.ascent + label->offset.y;
+	switch (label->align) {
+	case TwinAlignLeft:
+	    x = label->font_size / 2;
+	    break;
+	case TwinAlignCenter:
+	    x = (wf - m.width) / 2;
+	    break;
+	case TwinAlignRight:
+	    x = wf - label->font_size / 2 - m.width;
+	    break;
+	}
+	x += label->offset.x;
+	twin_path_move (path, x, y);
 	twin_path_utf8 (path, label->label);
 	twin_paint_path (label->widget.window->pixmap, label->foreground, path);
 	twin_path_destroy (path);
@@ -126,6 +138,7 @@ _twin_label_init (twin_label_t		*label,
     label->label = NULL;
     label->offset.x = 0;
     label->offset.y = 0;
+    label->align = TwinAlignCenter;
     twin_label_set (label, value, foreground, font_size, font_style);
 }
 

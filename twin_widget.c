@@ -24,14 +24,74 @@
 
 #include "twinint.h"
 
+static twin_path_t *
+_twin_path_shape (twin_shape_t	shape,
+		  twin_coord_t	left,
+		  twin_coord_t	top,
+		  twin_coord_t	right,
+		  twin_coord_t	bottom,
+		  twin_fixed_t	radius)
+{
+    twin_path_t	    *path = twin_path_create ();
+    twin_fixed_t    x = twin_int_to_fixed (left);
+    twin_fixed_t    y = twin_int_to_fixed (top);
+    twin_fixed_t    w = twin_int_to_fixed (right - left);
+    twin_fixed_t    h = twin_int_to_fixed (bottom - top);
+
+    if (!path)
+	return 0;
+    switch (shape) {
+    case TwinShapeRectangle:
+	twin_path_rectangle (path, x, y, w, h);
+	break;
+    case TwinShapeRoundedRectangle:
+	twin_path_rounded_rectangle (path, x, h, w, y, radius, radius);
+	break;
+    case TwinShapeLozenge:
+	twin_path_lozenge  (path, x, y, w, h);
+	break;
+    case TwinShapeTab:
+	twin_path_tab (path, x, y, w, h, radius, radius);
+	break;
+    case TwinShapeEllipse:
+	twin_path_ellipse (path, x + w/2, y + h/2, w/2, h/2);
+	break;
+    }
+    return path;
+}
+
+void
+_twin_widget_paint_shape (twin_widget_t *widget,
+			  twin_shape_t	shape,
+			  twin_coord_t	left,
+			  twin_coord_t	top,
+			  twin_coord_t	right,
+			  twin_coord_t	bottom,
+			  twin_fixed_t	radius)
+{
+    twin_pixmap_t	*pixmap = widget->window->pixmap;
+    
+    if (shape == TwinShapeRectangle)
+	twin_fill (pixmap, widget->background, TWIN_SOURCE, 
+		   left, top, right, bottom);
+    else
+    {
+	twin_path_t	*path = _twin_path_shape (shape, left, top,
+						  right, bottom, radius);
+	if (path)
+	{
+	    twin_paint_path (pixmap, widget->background, path);
+	    twin_path_destroy (path);
+	}
+    }
+}
+
 static void
 _twin_widget_paint (twin_widget_t *widget)
 {
-    twin_pixmap_t	*pixmap = widget->window->pixmap;
-    twin_coord_t	w = widget->extents.right - widget->extents.left;
-    twin_coord_t	h = widget->extents.bottom - widget->extents.top;
-    
-    twin_fill (pixmap, widget->background, TWIN_SOURCE, 0, 0, w, h);
+    _twin_widget_paint_shape (widget, widget->shape, 0, 0, 
+			      _twin_widget_width (widget), 
+			      _twin_widget_height (widget), widget->radius);
 }
 
 twin_dispatch_result_t
@@ -91,6 +151,8 @@ _twin_widget_init (twin_widget_t	*widget,
     widget->extents.right = widget->extents.bottom = 0;
     widget->preferred = preferred;
     widget->dispatch = dispatch;
+    widget->shape = TwinShapeRectangle;
+    widget->radius = twin_int_to_fixed (12);
 }
 
 void
@@ -127,6 +189,19 @@ _twin_widget_contains (twin_widget_t	*widget,
 {
     return (0 <= x && x < _twin_widget_width(widget) && 
 	    0 <= y && y < _twin_widget_height(widget)); 
+}
+
+static twin_path_t *
+_twin_path_bevel_shape (twin_shape_t	shape,
+			twin_bool_t	upper,
+			twin_coord_t	left,
+			twin_coord_t	top,
+			twin_coord_t	right,
+			twin_coord_t	bottom,
+			twin_fixed_t	radius,
+			twin_fixed_t	bw)
+{
+    return 0;
 }
 
 void

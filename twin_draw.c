@@ -274,23 +274,23 @@ twin_composite (twin_pixmap_t	*dst,
 		twin_coord_t	height)
 {
     twin_coord_t    iy;
-    twin_coord_t    left, right, top, bottom;
+    twin_coord_t    left, top, right, bottom;
     twin_coord_t    sdx, sdy;
     twin_source_u   s;
 
     dst_x += dst->clip.left;
     dst_y += dst->clip.top;
     left = dst_x;
-    right = dst_x + width;
     top = dst_y;
+    right = dst_x + width;
     bottom = dst_y + height;
     /* clip */
     if (left < dst->clip.left)
 	left = dst->clip.left;
-    if (right > dst->clip.right)
-	right = dst->clip.right;
     if (top < dst->clip.top)
 	top = dst->clip.top;
+    if (right > dst->clip.right)
+	right = dst->clip.right;
     if (bottom > dst->clip.bottom)
 	bottom = dst->clip.bottom;
 

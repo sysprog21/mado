@@ -64,6 +64,7 @@ _twin_button_dispatch (twin_widget_t *widget, twin_event_t *event)
 	_twin_button_set_label_offset (button);
 	if (button->signal)
 	    (*button->signal) (button, TwinButtonSignalDown, button->closure);
+	return TwinDispatchDone;
 	break;
     case TwinEventMotion:
 	if (button->pressed)
@@ -77,6 +78,7 @@ _twin_button_dispatch (twin_widget_t *widget, twin_event_t *event)
 		_twin_button_set_label_offset (button);
 	    }
 	}
+	return TwinDispatchDone;
 	break;
     case TwinEventButtonUp:
 	button->pressed = TWIN_FALSE;
@@ -87,6 +89,7 @@ _twin_button_dispatch (twin_widget_t *widget, twin_event_t *event)
 	    if (button->signal)
 		(*button->signal) (button, TwinButtonSignalUp, button->closure);
 	}
+	return TwinDispatchDone;
 	break;
     default:
 	break;

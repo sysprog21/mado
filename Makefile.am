@@ -56,6 +56,10 @@ xtwin_SOURCES = \
 	twin_demo.h \
 	twin_hello.c \
 	twin_hello.h \
+	twin_demoline.c \
+	twin_demoline.h \
+	twin_demospline.c \
+	twin_demospline.h \
 	xtwin.c
 
 xtwin_LDADD = @X_LIBS@ -lm

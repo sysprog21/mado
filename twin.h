@@ -62,6 +62,9 @@ typedef int16_t	    twin_angle_t;   /* -2048 .. 2048 for -180 .. 180 */
 #define TWIN_ANGLE_22_5	    (TWIN_ANGLE_360 >> 4)
 #define TWIN_ANGLE_11_25    (TWIN_ANGLE_360 >> 5)
 
+#define TWIN_ANGLE_270	    (TWIN_ANGLE_180 + TWIN_ANGLE_90)
+#define TWIN_ANGLE_0	    (0)
+
 #define twin_degrees_to_angle(d)    ((twin_angle_t) ((((int32_t) (d)) * TWIN_ANGLE_360 / 360)))
 
 /*
@@ -227,10 +230,17 @@ typedef struct _twin_matrix {
 
 typedef struct _twin_path twin_path_t;
 
+typedef enum _twin_cap {
+    TwinCapRound,
+    TwinCapButt,
+    TwinCapProjecting,
+} twin_cap_t;
+
 typedef struct _twin_state {
     twin_matrix_t   matrix;
     twin_fixed_t    font_size;
     twin_style_t    font_style;
+    twin_cap_t	    cap_style;
 } twin_state_t;
 
 /*
@@ -391,18 +401,28 @@ typedef struct _twin_widget_layout {
     twin_stretch_t	    stretch_height;
 } twin_widget_layout_t;
 
+typedef enum _twin_shape {
+    TwinShapeRectangle,
+    TwinShapeRoundedRectangle,
+    TwinShapeLozenge,
+    TwinShapeTab,
+    TwinShapeEllipse,
+} twin_shape_t;
+
 struct _twin_widget {
     twin_window_t	    *window;
     twin_widget_t	    *next;
     twin_box_t		    *parent;
+    twin_dispatch_proc_t    dispatch;
+    twin_rect_t		    extents;	/* current geometry */
     twin_widget_t	    *copy_geom;
     twin_bool_t		    paint;
     twin_bool_t		    layout;
     twin_bool_t		    want_focus;
     twin_argb32_t	    background;
-    twin_rect_t		    extents;	/* current geometry */
     twin_widget_layout_t    preferred;
-    twin_dispatch_proc_t    dispatch;
+    twin_shape_t	    shape;
+    twin_fixed_t	    radius;
 };
 
 struct _twin_box {
@@ -417,6 +437,10 @@ typedef struct _twin_toplevel {
     twin_box_t		box;
 } twin_toplevel_t;
 
+typedef enum _twin_align {
+    TwinAlignLeft, TwinAlignCenter, TwinAlignRight
+} twin_align_t;
+
 typedef struct _twin_label {
     twin_widget_t	widget;
     char		*label;
@@ -424,6 +448,7 @@ typedef struct _twin_label {
     twin_fixed_t	font_size;
     twin_style_t	font_style;
     twin_point_t	offset;
+    twin_align_t	align;
 } twin_label_t;
 
 typedef enum _twin_button_signal {
@@ -670,12 +695,59 @@ void
 twin_path_rdraw (twin_path_t *path, twin_fixed_t x, twin_fixed_t y);
 
 void
-twin_path_circle(twin_path_t *path, twin_fixed_t radius);
+twin_path_circle(twin_path_t	*path, 
+		 twin_fixed_t	x,
+		 twin_fixed_t	y,
+		 twin_fixed_t	radius);
 
 void
-twin_path_ellipse (twin_path_t *path, 
+twin_path_ellipse (twin_path_t	*path,
+		   twin_fixed_t	x,
+		   twin_fixed_t	y,
 		   twin_fixed_t x_radius, 
 		   twin_fixed_t	y_radius);
+void
+twin_path_arc (twin_path_t  *path,
+	       twin_fixed_t x,
+	       twin_fixed_t y,
+	       twin_fixed_t x_radius,
+	       twin_fixed_t y_radius,
+	       twin_angle_t start,
+	       twin_angle_t extent);
+
+void
+twin_path_rectangle (twin_path_t    *path,
+		     twin_fixed_t   x,
+		     twin_fixed_t   y,
+		     twin_fixed_t   w,
+		     twin_fixed_t   h);
+
+void
+twin_path_rounded_rectangle (twin_path_t	*path,
+			     twin_fixed_t	x,
+			     twin_fixed_t	y,
+			     twin_fixed_t	w,
+			     twin_fixed_t	h,
+			     twin_fixed_t	x_radius,
+			     twin_fixed_t	y_radius);
+
+void
+twin_path_lozenge (twin_path_t	*path,
+		   twin_fixed_t	x,
+		   twin_fixed_t	y,
+		   twin_fixed_t	w,
+		   twin_fixed_t	h);
+
+void
+twin_path_tab (twin_path_t	*path,
+	       twin_fixed_t	x,
+	       twin_fixed_t	y,
+	       twin_fixed_t	w,
+	       twin_fixed_t	h,
+	       twin_fixed_t	x_radius,
+	       twin_fixed_t	y_radius);
+
+
 void
 twin_path_close (twin_path_t *path);
 
@@ -723,6 +795,12 @@ twin_path_current_font_style (twin_path_t *path);
 
 void
 twin_path_set_font_style (twin_path_t *path, twin_style_t font_style);
+
+void
+twin_path_set_cap_style (twin_path_t *path, twin_cap_t cap_style);
+
+twin_cap_t
+twin_path_current_cap_style (twin_path_t *path);
 
 twin_state_t
 twin_path_save (twin_path_t *path);

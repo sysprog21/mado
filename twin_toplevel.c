@@ -51,7 +51,7 @@ _twin_toplevel_event (twin_window_t   *window,
 {
     twin_toplevel_t   *toplevel = window->client_data;
 
-    return (*toplevel->box.widget.dispatch) (&toplevel->box.widget, event);
+    return (*toplevel->box.widget.dispatch) (&toplevel->box.widget, event) == TwinDispatchDone;
 }
 
 static void

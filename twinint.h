@@ -468,6 +468,15 @@ _twin_widget_init (twin_widget_t	*widget,
 		   twin_widget_layout_t	preferred,
 		   twin_dispatch_proc_t	dispatch);
 
+void
+_twin_widget_paint_shape (twin_widget_t *widget,
+			  twin_shape_t	shape,
+			  twin_coord_t	left,
+			  twin_coord_t	top,
+			  twin_coord_t	right,
+			  twin_coord_t	bottom,
+			  twin_fixed_t	radius);
+
 twin_dispatch_result_t
 _twin_widget_dispatch (twin_widget_t *widget, twin_event_t *event);
 

@@ -43,7 +43,7 @@ twin_window_create (twin_screen_t	*screen,
 		    twin_coord_t	height)
 {
     twin_window_t   *window = malloc (sizeof (twin_window_t));
-    twin_coord_t    left, right, top, bottom;
+    twin_coord_t    left, top, right, bottom;
 
     if (!window) return NULL;
     window->screen = screen;
@@ -66,8 +66,8 @@ twin_window_create (twin_screen_t	*screen,
     width += left + right;
     height += top + bottom;
     window->client.left = left;
-    window->client.right = width - right;
     window->client.top = top;
+    window->client.right = width - right;
     window->client.bottom = height - bottom;
     window->pixmap = twin_pixmap_create (format, width, height);
     twin_pixmap_clip (window->pixmap,
@@ -334,9 +334,6 @@ twin_window_dispatch (twin_window_t *window, twin_event_t *event)
     twin_event_t    ev = *event;
     twin_bool_t	    delegate = TWIN_TRUE;
 
-    if (!window->event)
-	delegate = TWIN_FALSE;
-    
     switch (ev.kind) {
     case TwinEventButtonDown:
 	if (window->client.left <= ev.u.pointer.x &&
@@ -380,6 +377,9 @@ twin_window_dispatch (twin_window_t *window, twin_event_t *event)
     default:
 	break;
     }
+    if (!window->event)
+	delegate = TWIN_FALSE;
+    
     if (delegate && (*window->event) (window, &ev))
 	return TWIN_TRUE;
     

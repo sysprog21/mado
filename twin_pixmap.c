@@ -196,6 +196,16 @@ twin_pixmap_clip (twin_pixmap_t *pixmap,
 	pixmap->clip.bottom = pixmap->clip.top = 0;
 }
 
+void
+twin_pixmap_set_clip (twin_pixmap_t *pixmap, twin_rect_t clip)
+{
+    twin_pixmap_clip (pixmap, 
+		      clip.left  + pixmap->clip.left,
+		      clip.top   + pixmap->clip.top,
+		      clip.right + pixmap->clip.left,
+		      clip.bottom+ pixmap->clip.top);
+}
+
 twin_rect_t
 twin_pixmap_current_clip (twin_pixmap_t *pixmap)
 {

@@ -106,13 +106,13 @@ twin_x11_read_events (int		file,
 	    tev.u.pointer.screen_x = ev.xbutton.x;
 	    tev.u.pointer.screen_y = ev.xbutton.y;
 	    tev.kind = ((ev.type == ButtonPress) ? 
-			EventButtonDown : EventButtonUp);
+			TwinEventButtonDown : TwinEventButtonUp);
 	    twin_screen_dispatch (tx->screen, &tev);
 	    break;
 	case MotionNotify:
 	    tev.u.pointer.screen_x = ev.xmotion.x;
 	    tev.u.pointer.screen_y = ev.xmotion.y;
-	    tev.kind = EventMotion;
+	    tev.kind = TwinEventMotion;
 	    tev.u.pointer.button = ev.xmotion.state;
 	    twin_screen_dispatch (tx->screen, &tev);
 	    break;

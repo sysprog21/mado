@@ -225,12 +225,12 @@ twin_screen_set_active (twin_screen_t *screen, twin_pixmap_t *pixmap)
     screen->active = pixmap;
     if (old)
     {
-	ev.kind = EventDeactivate;
+	ev.kind = TwinEventDeactivate;
 	twin_pixmap_dispatch (old, &ev);
     }
     if (pixmap)
     {
-	ev.kind = EventActivate;
+	ev.kind = TwinEventActivate;
 	twin_pixmap_dispatch (pixmap, &ev);
     }
 }
@@ -263,9 +263,9 @@ twin_screen_dispatch (twin_screen_t *screen,
     twin_pixmap_t   *pixmap;
     
     switch (event->kind) {
-    case EventMotion:
-    case EventButtonDown:
-    case EventButtonUp:
+    case TwinEventMotion:
+    case TwinEventButtonDown:
+    case TwinEventButtonUp:
 	pixmap = screen->pointer;
 	if (!pixmap)
 	{
@@ -276,10 +276,10 @@ twin_screen_dispatch (twin_screen_t *screen,
 		{
 		    break;
 		}
-	    if (event->kind == EventButtonDown)
+	    if (event->kind == TwinEventButtonDown)
 		screen->pointer = pixmap;
 	}
-	if (event->kind == EventButtonUp)
+	if (event->kind == TwinEventButtonUp)
 	    screen->pointer = NULL;
 	if (pixmap)
 	{
@@ -287,9 +287,9 @@ twin_screen_dispatch (twin_screen_t *screen,
 	    event->u.pointer.y = event->u.pointer.screen_y - pixmap->y;
 	}
 	break;
-    case EventKeyDown:
-    case EventKeyUp:
-    case EventUcs4:
+    case TwinEventKeyDown:
+    case TwinEventKeyUp:
+    case TwinEventUcs4:
 	pixmap = screen->active;
 	break;
     default:

@@ -49,13 +49,13 @@ twin_window_create (twin_screen_t	*screen,
     window->screen = screen;
     window->style = style;
     switch (window->style) {
-    case WindowApplication:
+    case TwinWindowApplication:
 	left = TWIN_BW;
 	top = TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW;
 	right = TWIN_BW + TWIN_RESIZE_SIZE;
 	bottom = TWIN_BW + TWIN_RESIZE_SIZE;
 	break;
-    case WindowPlain:
+    case TwinWindowPlain:
     default:
 	left = 0;
 	top = 0;
@@ -153,11 +153,11 @@ twin_window_style_size (twin_window_style_t style,
 			twin_rect_t	    *size)
 {
     switch (style) {
-    case WindowPlain:
+    case TwinWindowPlain:
     default:
 	size->left = size->right = size->top = size->bottom = 0;
 	break;
-    case WindowApplication:
+    case TwinWindowApplication:
 	size->left = TWIN_BW;
 	size->right = TWIN_BW;
 	size->top = TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW;
@@ -315,10 +315,10 @@ void
 twin_window_draw (twin_window_t *window)
 {
     switch (window->style) {
-    case WindowPlain:
+    case TwinWindowPlain:
     default:
 	break;
-    case WindowApplication:
+    case TwinWindowApplication:
 	twin_window_frame (window);
 	break;
     }
@@ -329,18 +329,47 @@ twin_window_draw (twin_window_t *window)
 twin_bool_t
 twin_window_dispatch (twin_window_t *window, twin_event_t *event)
 {
-    if (window->event && (*window->event) (window, event))
+    twin_event_t    ev = *event;
+    twin_bool_t	    delegate = TWIN_TRUE;
+
+    if (!window->event)
+	delegate = TWIN_FALSE;
+    
+    switch (ev.kind) {
+    case TwinEventButtonDown:
+	if (ev.u.pointer.x < window->client.left ||
+	    window->client.right <= ev.u.pointer.x ||
+	    ev.u.pointer.y < window->client.top ||
+	    window->client.bottom <= ev.u.pointer.y)
+	{
+	    delegate = TWIN_FALSE;
+	    break;
+	}
+	/* fall through... */
+    case TwinEventButtonUp:
+    case TwinEventMotion:
+	ev.u.pointer.x -= window->client.left;
+	ev.u.pointer.y -= window->client.top;
+	break;
+    default:
+	break;
+    }
+    if (delegate && (*window->event) (window, &ev))
 	return TWIN_TRUE;
+    
+    /*
+     * simple window management
+     */
     switch (event->kind) {
-    case EventButtonDown:
+    case TwinEventButtonDown:
 	twin_window_show (window);
 	window->screen->button_x = event->u.pointer.x;
 	window->screen->button_y = event->u.pointer.y;
 	return TWIN_TRUE;
-    case EventButtonUp:
+    case TwinEventButtonUp:
 	window->screen->button_x = -1;
 	window->screen->button_y = -1;
-    case EventMotion:
+    case TwinEventMotion:
 	if (window->screen->button_x >= 0)
 	{
 	    twin_coord_t    x, y;

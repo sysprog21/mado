@@ -26,18 +26,21 @@
 
 #define D(x) twin_double_to_fixed(x)
 
+#if 0
 static int styles[] = {
     TWIN_TEXT_ROMAN,
     TWIN_TEXT_OBLIQUE,
     TWIN_TEXT_BOLD,
     TWIN_TEXT_BOLD|TWIN_TEXT_OBLIQUE
 };
+#endif
 
+#if 0
 static void
 twin_example_start (twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t   *window = twin_window_create (screen, TWIN_ARGB32,
-						  WindowApplication,
+						  TwinWindowApplication,
 						  x, y, w, h);
     int		    wid = window->client.right - window->client.left;
     int		    hei = window->client.bottom - window->client.top;
@@ -67,12 +70,13 @@ twin_example_start (twin_screen_t *screen, int x, int y, int w, int h)
     twin_pixmap_destroy (alpha);
     twin_window_show (window);
 }
+#endif
 
 static void
 twin_line_start (twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t   *window = twin_window_create (screen, TWIN_ARGB32,
-						  WindowApplication,
+						  TwinWindowApplication,
 						  x, y, w, h);
     int		    wid = window->client.right - window->client.left;
     int		    hei = window->client.bottom - window->client.top;
@@ -120,7 +124,7 @@ static void
 twin_circletext_start (twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t   *window = twin_window_create (screen, TWIN_ARGB32,
-						  WindowApplication,
+						  TwinWindowApplication,
 						  x, y, w, h);
     int		    wid = window->client.right - window->client.left;
     int		    hei = window->client.bottom - window->client.top;
@@ -165,7 +169,7 @@ static void
 twin_quickbrown_start (twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t   *window = twin_window_create (screen, TWIN_ARGB32,
-						  WindowApplication,
+						  TwinWindowApplication,
 						  x, y, w, h);
     int		    wid = window->client.right - window->client.left;
     int		    hei = window->client.bottom - window->client.top;
@@ -214,7 +218,7 @@ static void
 twin_ascii_start (twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t   *window = twin_window_create (screen, TWIN_ARGB32,
-						  WindowApplication,
+						  TwinWindowApplication,
 						  x, y, w, h);
     int		    wid = window->client.right - window->client.left;
     int		    hei = window->client.bottom - window->client.top;
@@ -268,7 +272,7 @@ static void
 twin_jelly_start (twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t   *window = twin_window_create (screen, TWIN_ARGB32,
-						  WindowApplication,
+						  TwinWindowApplication,
 						  x, y, w, h);
     int		    wid = window->client.right - window->client.left;
     int		    hei = window->client.bottom - window->client.top;
@@ -319,11 +323,6 @@ twin_jelly_start (twin_screen_t *screen, int x, int y, int w, int h)
 	}
     }
     twin_window_show (window);
-}
-
-static void
-twin_extents_start (twin_screen_t *screen, const char *name, int x, int y, int w, int h)
-{
 }
 
 void

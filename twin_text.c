@@ -30,7 +30,7 @@ void
 twin_text_start (twin_screen_t *screen, const char *name, int x, int y, int w, int h)
 {
     twin_window_t   *text = twin_window_create (screen, TWIN_ARGB32,
-						WindowApplication,
+						TwinWindowApplication,
 						x,y,w,h);
     twin_fixed_t    fx, fy;
     static const char	*lines[] = {

@@ -223,7 +223,7 @@ twin_clock_start (twin_screen_t *screen, const char *name, int x, int y, int w, 
     struct timeval  tv;
     twin_time_t  to;
     twin_window_t   *clock = twin_window_create (screen, TWIN_ARGB32,
-						 WindowApplication,
+						 TwinWindowApplication,
 						 x, y, w, h);
     twin_window_set_name (clock, name);
     twin_clock_timeout (0, clock);

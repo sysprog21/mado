@@ -41,6 +41,7 @@ typedef int16_t	    twin_count_t;
 typedef int16_t	    twin_keysym_t;
 typedef int32_t	    twin_area_t;
 typedef int32_t	    twin_time_t;
+typedef int16_t	    twin_stretch_t;
 
 #define TWIN_FALSE  0
 #define TWIN_TRUE   1
@@ -251,9 +252,14 @@ typedef struct _twin_text_metrics {
  */
 
 typedef enum _twin_event_kind {
-    EventButtonDown, EventButtonUp, EventMotion,
-    EventKeyDown, EventKeyUp, EventUcs4,
-    EventActivate, EventDeactivate,
+    TwinEventButtonDown, TwinEventButtonUp, TwinEventMotion,
+    TwinEventKeyDown, TwinEventKeyUp, TwinEventUcs4,
+    TwinEventActivate, TwinEventDeactivate,
+    TwinEventPaint,
+    TwinEventShow,
+    TwinEventQueryGeometry,
+    TwinEventConfigure,
+    TwinEventDestroy,
 } twin_event_kind_t;
 
 typedef struct _twin_event {
@@ -270,6 +276,9 @@ typedef struct _twin_event {
 	struct {
 	    twin_ucs4_t	    ucs4;
 	} ucs4;
+	struct {
+	    twin_rect_t	    extents;
+	} configure;
     } u;
 } twin_event_t;
 
@@ -283,11 +292,11 @@ typedef struct _twin_event_queue {
  */
 
 typedef enum _twin_window_style {
-    WindowPlain,
-    WindowApplication,
-    WindowFullScreen,
-    WindowDialog,
-    WindowAlert,
+    TwinWindowPlain,
+    TwinWindowApplication,
+    TwinWindowFullScreen,
+    TwinWindowDialog,
+    TwinWindowAlert,
 } twin_window_style_t;
 
 typedef void	    (*twin_draw_func_t) (twin_window_t	    *window);
@@ -324,28 +333,6 @@ typedef enum _twin_icon {
 } twin_icon_t;
 
 /*
- * Widgets
- */
-
-typedef enum _twin_box_layout {
-    TwinLayoutHorz, TwinLayoutVert
-} twin_box_layout_t;
-
-typedef struct _twin_box {
-    twin_box_layout_t	layout;
-    twin_rect_t		geometry;
-    
-} twin_box_t;
-
-typedef struct {
-    twin_rect_t		geometry;
-} twin_widget_t;
-
-typedef struct {
-    twin_widget_t	core;
-} twin_button_t;
-
-/*
  * Timeout and work procs return TWIN_TRUE to remain in the queue,
  * timeout procs are called every 'delay' ms
  */
@@ -364,16 +351,85 @@ typedef twin_bool_t (*twin_file_proc_t) (int		file,
 					 twin_file_op_t	ops,
 					 void		*closure);
 					    
-typedef void	    (*twin_block_proc_t) (void *closure);
-typedef void	    (*twin_wakeup_proc_t) (void *closure);
-
 #define twin_time_compare(a,op,b)	(((a) - (b)) op 0)
 
 typedef struct _twin_timeout	twin_timeout_t;
 typedef struct _twin_work	twin_work_t;
 typedef struct _twin_file	twin_file_t;
-typedef struct _twin_block	twin_block_t;
-typedef struct _twin_wakeup	twin_wakeup_t;
+
+/*
+ * Widgets
+ */
+
+typedef struct _twin_widget twin_widget_t;
+typedef struct _twin_box    twin_box_t;
+
+typedef enum _twin_widget_kind_t {
+    TwinWidgetToplevel,
+    TwinWidgetBox,
+    TwinWidgetLabel,
+    TwinWidgetGlue,
+} twin_widget_kind_t;
+
+typedef enum _twin_dispatch_result {
+    TwinDispatchNone,
+    TwinDispatchPaint,
+    TwinDispatchConfigure,
+} twin_dispatch_result_t;
+
+typedef enum _twin_layout {
+    TwinLayoutHorz, TwinLayoutVert
+} twin_layout_t;
+
+typedef twin_dispatch_result_t (*twin_dispatch_proc_t) (twin_widget_t *widget,
+							twin_event_t *event);
+		       
+struct _twin_widget {
+    twin_window_t	    *window;
+    twin_widget_t	    *next;
+    twin_box_t		    *parent;
+    twin_bool_t		    paint;
+    twin_bool_t		    layout;
+    twin_bool_t		    want_focus;
+    twin_argb32_t	    background;
+    twin_rect_t		    extents;	/* current geometry */
+    twin_rect_t		    preferred;	/* desired geometry */
+    twin_stretch_t    	    hstretch;	/* stretch ratio in horizontal dir */
+    twin_stretch_t    	    vstretch;	/* stretch ratio in vertical dir */
+    twin_dispatch_proc_t    dispatch;
+};
+
+struct _twin_box {
+    twin_widget_t	widget;
+    twin_layout_t	layout;
+    twin_widget_t	*children;
+    twin_widget_t	*button_down;
+    twin_widget_t	*focus;
+};
+
+typedef struct _twin_toplevel {
+    twin_box_t		box;
+} twin_toplevel_t;
+
+typedef struct _twin_label {
+    twin_widget_t	widget;
+    char		*label;
+    twin_argb32_t	foreground;
+    twin_fixed_t	font_size;
+    twin_style_t	font_style;
+} twin_label_t;
+
+typedef struct _twin_glue {
+    twin_widget_t	widget;
+} twin_glue_t;
+
+/*
+ * twin_box.c
+ */
+
+twin_box_t *
+twin_box_create (twin_box_t	*parent,
+		 twin_layout_t	layout);
 
 /*
  * twin_convolve.c
@@ -506,6 +562,24 @@ twin_path_convex_hull (twin_path_t *path);
 
 void
 twin_icon_draw (twin_pixmap_t *pixmap, twin_icon_t icon, twin_matrix_t matrix);
+
+/*
+ * twin_label.c
+ */
+
+twin_label_t *
+twin_label_create (twin_box_t	    *parent,
+		   const char	    *value,
+		   twin_argb32_t    foreground,
+		   twin_fixed_t	    font_size,
+		   twin_style_t	    font_style);
+
+void
+twin_label_set (twin_label_t	*label,
+		const char	*value,
+		twin_argb32_t	foreground,
+		twin_fixed_t	font_size,
+		twin_style_t	font_style);
 
 /*
  * twin_matrix.c
@@ -676,6 +750,9 @@ twin_pixmap_clip (twin_pixmap_t *pixmap,
 		  twin_coord_t	left,	twin_coord_t top,
 		  twin_coord_t	right,	twin_coord_t bottom);
 
+void
+twin_pixmap_set_clip (twin_pixmap_t *pixmap, twin_rect_t clip);
+
 twin_rect_t
 twin_pixmap_current_clip (twin_pixmap_t *pixmap);
 
@@ -795,15 +872,31 @@ twin_path_curve (twin_path_t	*path,
 #define twin_time_compare(a,op,b)	(((a) - (b)) op 0)
 
 twin_timeout_t *
-twin_set_timeout (twin_timeout_proc_t timeout_proc,
-		     twin_time_t	    delay,
-		     void		    *closure);
+twin_set_timeout (twin_timeout_proc_t	timeout_proc,
+		  twin_time_t		delay,
+		  void			*closure);
 
 void
 twin_clear_timeout (twin_timeout_t *timeout);
 
 twin_time_t
 twin_now (void);
+
+/*
+ * twin_toplevel.c
+ */
+twin_toplevel_t *
+twin_toplevel_create (twin_screen_t	    *screen,
+		      twin_format_t	    format,
+		      twin_window_style_t   style,
+		      twin_coord_t	    x,
+		      twin_coord_t	    y,
+		      twin_coord_t	    width,
+		      twin_coord_t	    height,
+		      const char	    *name);
+
+void
+twin_toplevel_show (twin_toplevel_t *toplevel);
 
 /*
  * twin_trig.c
@@ -817,6 +910,21 @@ twin_cos (twin_angle_t a);
 
 twin_fixed_t
 twin_tan (twin_angle_t a);
+
+/*
+ * twin_widget.c
+ */
+
+twin_widget_t *
+twin_widget_create (twin_box_t	    *parent,
+		    twin_argb32_t   background,
+		    twin_coord_t    width,
+		    twin_coord_t    height,
+		    twin_stretch_t  hstretch,
+		    twin_stretch_t  vstretch);
+
+void
+twin_widget_set (twin_widget_t *widget, twin_argb32_t background);
 
 /*
  * twin_window.c
@@ -866,12 +974,14 @@ twin_window_dispatch (twin_window_t *window, twin_event_t *event);
  * twin_work.c
  */
 
-#define TWIN_WORK_REDISPLAY  0
+#define TWIN_WORK_REDISPLAY	0
+#define TWIN_WORK_PAINT		1
+#define TWIN_WORK_LAYOUT	2
 
 twin_work_t *
-twin_set_work (twin_work_proc_t	    work_proc,
-		  int			    priority,
-		  void			    *closure);
+twin_set_work (twin_work_proc_t	work_proc,
+	       int		priority,
+	       void		*closure);
 
 void
 twin_clear_work (twin_work_t *work);

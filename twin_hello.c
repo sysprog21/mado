@@ -22,35 +22,44 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "twin_x11.h"
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/time.h>
+#include <twin.h>
 #include <time.h>
-#include <assert.h>
-#include <twin_clock.h>
-#include <twin_text.h>
-#include <twin_demo.h>
 
-#define WIDTH	512
-#define HEIGHT	512
-
-int
-main (int argc, char **argv)
+static twin_time_t
+_twin_hello_timeout (twin_time_t now, void *closure)
 {
-    Display	    *dpy = XOpenDisplay (0);
-    twin_x11_t	    *x11 = twin_x11_create (dpy, WIDTH, HEIGHT);
+    twin_label_t    *labelb = closure;
+    time_t	    secs = time (0);
 
-    twin_screen_set_background (x11->screen, twin_make_pattern ());
-#if 0
-    twin_demo_start (x11->screen, "Demo", 100, 100, 400, 400);
-    twin_clock_start (x11->screen, "Clock", 10, 10, 200, 200);
-    twin_text_start (x11->screen,  "Gettysburg Address",
-		     0, 0, 300, 300);
-#endif
-    twin_hello_start (x11->screen, "Hello, World",
-		      0, 0, 100, 100);
-    twin_dispatch ();
-    return 0;
+    twin_label_set (labelb, ctime (&secs), 
+		    0xff008000,
+		    twin_int_to_fixed (12),
+		    TWIN_TEXT_OBLIQUE);
+    return 1000;
+}
+
+void
+twin_hello_start (twin_screen_t *screen, const char *name, int x, int y, int w, int h)
+{
+    twin_toplevel_t *top = twin_toplevel_create (screen,
+						 TWIN_ARGB32,
+						 TwinWindowApplication,
+						 x, y, w, h, name);
+    twin_label_t    *labela = twin_label_create (&top->box,
+						name,
+						0xff000080,
+						twin_int_to_fixed (12),
+						TWIN_TEXT_ROMAN);
+    twin_widget_t   *widget = twin_widget_create (&top->box,
+						  0xff800000,
+						  1, 2, 0, 0);
+    twin_label_t    *labelb = twin_label_create (&top->box,
+						 name,
+						 0xff008000,
+						 twin_int_to_fixed (12),
+						 TWIN_TEXT_OBLIQUE);
+    twin_widget_set (&labela->widget, 0xc0c0c0c0);
+    twin_widget_set (&labelb->widget, 0xc0c0c0c0);
+    twin_toplevel_show (top);
+    twin_set_timeout (_twin_hello_timeout, 1000, labelb);
 }

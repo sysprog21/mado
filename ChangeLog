@@ -1,6 +1,52 @@
 2004-10-25  Keith Packard  <keithp@keithp.com>
 
 	* Makefile.am:
+	* twin.h:
+	* twin_box.c: (_twin_box_init), (_twin_box_query_geometry),
+	(_twin_box_configure), (_twin_box_xy_to_widget),
+	(_twin_box_dispatch), (twin_box_create):
+	* twin_label.c: (_twin_label_query_geometry), (_twin_label_paint),
+	(_twin_label_dispatch), (twin_label_set), (_twin_label_init),
+	(twin_label_create):
+	* twin_toplevel.c: (_twin_toplevel_dispatch),
+	(_twin_toplevel_event), (_twin_toplevel_draw),
+	(_twin_toplevel_destroy), (_twin_toplevel_init),
+	(twin_toplevel_create), (_twin_toplevel_paint),
+	(_twin_toplevel_queue_paint), (_twin_toplevel_layout),
+	(_twin_toplevel_queue_layout), (twin_toplevel_show):
+	* twin_widget.c: (_twin_widget_paint), (_twin_widget_dispatch),
+	(_twin_widget_init), (_twin_widget_queue_paint),
+	(_twin_widget_queue_layout), (twin_widget_create),
+	(twin_widget_set):
+	* twinint.h:
+	Add initial widget implementation.
+	
+	* twin_glyphs.c:
+	Fix numbers to have the same width.
+
+	* twin_pixmap.c: (twin_pixmap_set_clip):
+	Add new relative-origin clip setting function
+	
+	* twin_screen.c: (twin_screen_set_active), (twin_screen_dispatch):
+	* twin_window.c: (twin_window_create), (twin_window_style_size),
+	(twin_window_draw), (twin_window_dispatch):
+	* twin_x11.c: (twin_x11_read_events):
+	* twin_clock.c: (twin_clock_start):
+	* twin_demo.c: (twin_example_start), (twin_line_start),
+	(twin_circletext_start), (twin_quickbrown_start),
+	(twin_ascii_start), (twin_jelly_start):
+	* twin_text.c: (twin_text_start):
+	Change enumerated constants to include Twin prefix
+	
+	* twin_hello.c: (_twin_hello_timeout), (twin_hello_start):
+	Add new widget-based demo
+	
+	* xtwin.c: (main):
+	Start widget based demo
+
+2004-10-25  Keith Packard  <keithp@keithp.com>
+
+	* Makefile.am:
 	* configure.ac:
 	* twin_dispatch.c: (twin_dispatch):
 	* twin_file.c: (_twin_file_order), (_twin_run_file),

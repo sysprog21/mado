@@ -298,8 +298,8 @@ twin_composite (twin_pixmap_t	*dst,
 	    right = dst->width;
 	if (top < 0)
 	    top = 0;
-	if (top > dst->height)
-	    top = dst->height;
+	if (bottom > dst->height)
+	    bottom = dst->height;
 
 	op = comp3[operator][operand_index(src)][operand_index(msk)][dst->format];
 	if (op)

@@ -119,6 +119,21 @@ _twin_matrix_determinant (twin_matrix_t *matrix)
     return det;
 }
 
+twin_point_t
+_twin_matrix_expand (twin_matrix_t *matrix)
+{
+    twin_fixed_t    a = matrix->m[0][0];
+    twin_fixed_t    d = matrix->m[1][1];
+    twin_fixed_t    aa = twin_fixed_mul (a,a);
+    twin_fixed_t    dd = twin_fixed_mul (d,d);
+    twin_point_t    expand;
+
+    expand.x = twin_fixed_sqrt (aa + dd);
+    expand.y = twin_fixed_div (_twin_matrix_determinant (matrix),
+			       expand.x);
+    return expand;
+}
+
 void
 twin_matrix_rotate (twin_matrix_t *m, twin_angle_t a)
 {

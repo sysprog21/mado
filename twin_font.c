@@ -34,9 +34,7 @@
 #define DBGMSG(x)
 #endif
 
-#define Scale(f)	(((twin_fixed_t) (f) * path->state.font_size) >> 5)
-#define ScaleX(x)	Scale(x)
-#define ScaleY(y)	Scale(y)
+#define Scale(f)	(((twin_fixed_t) (f) * path->state.font_size) >> 6)
 
 #define Hint(p)		(((p)->state.font_style & TWIN_TEXT_UNHINTED) == 0)
 
@@ -46,18 +44,10 @@ twin_has_ucs4 (twin_ucs4_t ucs4)
     return ucs4 <= TWIN_FONT_MAX && _twin_glyph_offsets[ucs4] != 0;
 }
 
-static int
-compare_snap (const void *av, const void *bv)
-{
-    const twin_gfixed_t   *a = av;
-    const twin_gfixed_t   *b = bv;
+#define SNAPI(p)	(((p) + 0x7fff) & ~0xffff)
+#define SNAPH(p)	(((p) + 0x3fff) & ~0x7fff)
 
-    return (int) (*a - *b);
-}
-
-#define SNAPI(path,p)	(Hint(path) ? (((p) + 0x7fff) & ~0xffff) : (p))
-#define SNAPH(path,p)	(Hint(path) ? (((p) + 0x3fff) & ~0x7fff) : (p))
-
+#if 0
 static twin_fixed_t
 _snap (twin_path_t *path, twin_gfixed_t g, twin_gfixed_t *snap, int nsnap)
 {
@@ -72,8 +62,8 @@ _snap (twin_path_t *path, twin_gfixed_t g, twin_gfixed_t *snap, int nsnap)
 	    twin_fixed_t    before = Scale(snap[s]);
 	    twin_fixed_t    after = Scale(snap[s+1]);
 	    twin_fixed_t    dist = after - before;
-	    twin_fixed_t    snap_before = SNAPI(path, before);
-	    twin_fixed_t    snap_after = SNAPI(path, after);
+	    twin_fixed_t    snap_before = SNAPI(before);
+	    twin_fixed_t    snap_after = SNAPI(after);
 	    twin_fixed_t    move_before = snap_before - before;
 	    twin_fixed_t    move_after = snap_after - after;
 	    twin_fixed_t    dist_before = v - before;
@@ -92,21 +82,10 @@ _snap (twin_path_t *path, twin_gfixed_t g, twin_gfixed_t *snap, int nsnap)
     DBGMSG (("_snap: %d => %9.4f\n", g, F(v)));
     return v;
 }
+#endif
 
 #define SNAPX(p)	_snap (path, p, snap_x, nsnap_x)
 #define SNAPY(p)	_snap (path, p, snap_y, nsnap_y)
-
-static int
-_add_snap (twin_gfixed_t *snaps, int nsnap, twin_fixed_t snap)
-{
-    int s;
-
-    for (s = 0; s < nsnap; s++)
-	if (snaps[s] == snap)
-	    return nsnap;
-    snaps[nsnap++] = snap;
-    return nsnap;
-}
 
 static const twin_gpoint_t *
 _twin_ucs4_base(twin_ucs4_t ucs4)
@@ -116,183 +95,409 @@ _twin_ucs4_base(twin_ucs4_t ucs4)
     return _twin_glyphs + _twin_glyph_offsets[ucs4];
 }
 
-#define TWIN_FONT_BASELINE  9
+static const signed char *
+_twin_g_base (twin_ucs4_t ucs4)
+{
+    if (ucs4 > TWIN_FONT_MAX) ucs4 = 0;
+
+    return _twin_gtable + _twin_g_offsets[ucs4];
+}
 
 static twin_fixed_t
 _twin_pen_size (twin_path_t *path)
 {
     twin_fixed_t    pen_size;
     
-    pen_size = SNAPH(path, path->state.font_size / 24);
-    if (Hint (path) && pen_size < TWIN_FIXED_HALF)
+    pen_size = path->state.font_size / 24;
+    
+    if (Hint (path))
+    {
+	pen_size = SNAPH(pen_size);
+	if( pen_size < TWIN_FIXED_HALF)
 	pen_size = TWIN_FIXED_HALF;
+    }
     
     if (path->state.font_style & TWIN_TEXT_BOLD)
     {
-	twin_fixed_t	pen_add = SNAPH(path, pen_size >> 1);
-	if (Hint (path) && pen_add == 0) 
-	    pen_add = TWIN_FIXED_HALF;
+	twin_fixed_t	pen_add = pen_size >> 1;
+
+	if (Hint (path))
+	{
+	    pen_add = SNAPH (pen_add);
+	    if (pen_add == 0) 
+		pen_add = TWIN_FIXED_HALF;
+	}
 	pen_size += pen_add;
     }
     return pen_size;
 }
+
+#define Margin(pen_size)    ((pen_size) * 2)
 
 void
 twin_text_metrics_ucs4 (twin_path_t	    *path, 
 			twin_ucs4_t	    ucs4, 
 			twin_text_metrics_t *m)
 {
-    const twin_gpoint_t	*p = _twin_ucs4_base (ucs4);
-    twin_fixed_t	x, y;
-    twin_fixed_t	left, right;
-    twin_fixed_t	top, bottom;
+    const signed char	*g = _twin_g_base (ucs4);
     twin_fixed_t	pen_size = _twin_pen_size (path);
-    twin_fixed_t	baseline = SNAPI(path, Scale(TWIN_FONT_BASELINE));
-    int			i;
-    int			skip_xi;
-    int			skip_yi;
-    int			next_xi;
-    int			next_yi;
-    
-    left = TWIN_FIXED_MAX;
-    top = TWIN_FIXED_MAX;
-    right = TWIN_FIXED_MIN;
-    bottom = TWIN_FIXED_MIN;
-    /*
-     * Locate horizontal and vertical segments
-     */
-    skip_xi = 0;
-    skip_yi = 0;
-    for (i = 1; p[i].y != -64; i++)
-    {
-	if (p[i].x == -64)
-	    continue;
-	x = Scale (p[i].x);
-	y = Scale (p[i].y);
-	next_xi = skip_xi;
-	next_yi = skip_yi;
-	if (Hint (path) && p[i+1].y != -64 && p[i+1].x != -64)
-	{
-	    if (p[i].x == p[i+1].x)
-	    {
-		x = SNAPI(path, x);
-		skip_xi = i + 2;
-	    }
-	    if (p[i].y == p[i+1].y)
-	    {
-		y = SNAPI(path, y);
-		skip_yi = i + 2;
-	    }
-	}
-	if (i >= next_xi)
-	{
-	    if (x < left)
-		left = x;
-	    if (x > right)
-		right = x;
-	}
-	if (i >= next_yi)
-	{
-	    if (y < top)
-		top = y;
-	    if (y > bottom)
-		bottom = y;
-	}
-    }
-    
-    left -= pen_size * 2;
-    right += pen_size * 2;
+    twin_fixed_t	left = Scale(twin_glyph_left(g));
+    twin_fixed_t	right = Scale (twin_glyph_right(g)) + pen_size * 2;
+    twin_fixed_t	ascent = Scale (twin_glyph_ascent(g)) + pen_size * 2;
+    twin_fixed_t	descent = Scale (twin_glyph_descent(g));
+    twin_fixed_t	font_spacing = path->state.font_size;
+    twin_fixed_t	font_descent = font_spacing / 3;
+    twin_fixed_t	font_ascent = font_spacing - font_descent;
 
-    if (i == 1)
+    if (Hint(path))
     {
-	left = Scale(p[0].x);
-	top = bottom = baseline;
-	right = Scale(p[0].y);
+	left = SNAPI(left);
+	right = SNAPI(right);
+	ascent = SNAPI(ascent);
+	descent = SNAPI(descent);
+	font_descent = SNAPI(font_descent);
+	font_ascent = SNAPI(font_ascent);
     }
-    m->left_side_bearing = SNAPI(path, -left);
-    m->right_side_bearing = SNAPI(path,right);
-    m->width = m->left_side_bearing + m->right_side_bearing;
-    m->ascent = baseline - SNAPI(path, top);
-    m->descent = SNAPI(path, bottom) - baseline;
-    m->font_descent = SNAPI(path, path->state.font_size / 3);
-    m->font_ascent = SNAPI(path,path->state.font_size) - m->font_descent;
+    m->left_side_bearing = left + Margin(pen_size);
+    m->right_side_bearing = right + Margin(pen_size);
+    m->ascent = ascent;
+    m->descent = descent;
+    m->width = m->right_side_bearing + Margin(pen_size);
+    m->font_ascent = font_ascent + Margin(pen_size);
+    m->font_descent = font_ascent + Margin(pen_size);
+}
+
+#include <stdio.h>
+
+#define TWIN_MAX_POINTS	    50
+#define TWIN_MAX_STROKE	    50
+
+typedef enum { twin_gmove, twin_gline, twin_gcurve } twin_gcmd_t;
+
+typedef struct _twin_gop {
+    twin_gcmd_t	    cmd;
+    twin_gpoint_t   p[3];
+} twin_gop_t;
+    
+typedef struct _twin_stroke {
+    int		    n;
+    twin_gpoint_t   p[TWIN_MAX_STROKE];
+} twin_stroke_t;
+
+typedef struct _twin_snap {
+    int		    n;
+    twin_gfixed_t   s[TWIN_MAX_POINTS];
+} twin_snap_t;
+
+typedef struct _twin_glyph {
+    twin_ucs4_t	    ucs4;
+    int		    offset;
+    twin_bool_t	    exists;
+    twin_gfixed_t   left, right, top, bottom;
+    int		    n;
+    twin_stroke_t   s[TWIN_MAX_STROKE];
+    int		    nop;
+    twin_gop_t	    op[TWIN_MAX_STROKE];
+    twin_snap_t	    snap_x;
+    twin_snap_t	    snap_y;
+} twin_glyph_t;
+
+static twin_glyph_t glyphs[0x80];
+
+static void
+twin_add_snap (twin_snap_t *snap, twin_gfixed_t v)
+{
+    int	    n;
+
+    for (n = 0; n < snap->n; n++)
+    {
+	if (snap->s[n] == v)
+	    return;
+	if (snap->s[n] > v)
+	    break;
+    }
+    memmove (&snap->s[n+1], &snap->s[n], snap->n - n);
+    snap->s[n] = v;
+    snap->n++;
+}
+
+static int
+twin_n_in_spline (twin_gpoint_t *p, int n)
+{
+    return 0;
+}
+
+static void
+twin_spline_fit (twin_gpoint_t *p, int n, twin_gpoint_t *c1, twin_gpoint_t *c2)
+{
+}
+
+static char *
+_ucs4_string (twin_ucs4_t ucs4)
+{
+    static char	buf[10];
+    if (ucs4 < ' ' || ucs4 > '~')
+    {
+	if (!ucs4)
+	    return "\\0";
+	sprintf (buf, "\\0%o", ucs4);
+	return buf;
+    }
+    sprintf (buf, "%c", ucs4);
+    return buf;
+}
+
+static twin_gfixed_t
+px (const twin_gpoint_t *p, int i)
+{
+    return p[i].x << 1;
+}
+
+static twin_gfixed_t
+py (const twin_gpoint_t *p, int i)
+{
+    return p[i].y << 1;
+}
+
+static void
+twin_dump_glyphs (void)
+{
+    twin_ucs4_t	ucs4;
+    int		offset = 0;
+    int		i, j;
+    twin_gop_t	*gop;
+
+    for (ucs4 = 0; ucs4 < 0x80; ucs4++)
+    {
+	const twin_gpoint_t	*p = _twin_ucs4_base (ucs4);
+	twin_glyph_t		*g = &glyphs[ucs4];
+	twin_stroke_t		*s;
+	twin_gfixed_t		origin;
+	twin_gfixed_t		left, right, top, bottom;
+	twin_gfixed_t		baseline;
+	twin_gfixed_t		x, y;
+	twin_bool_t		move;
+	
+	g->ucs4 = ucs4;
+	g->n = 0;
+
+	if (ucs4 && p == _twin_glyphs) continue;
+	
+	if (p[1].y == -64)
+	{
+	    origin = 0;
+	    left = 0;
+	    right = 4;
+	    top = 18;
+	    bottom = 18;
+	    baseline = 18;
+	}
+	else
+	{
+	    origin = 64;
+	    left = 64;
+	    right = -64;
+	    top = 64;
+	    bottom = -64;
+	    baseline = 18;
+	    for (i = 1, move = TWIN_TRUE; p[i].y != -64; i++)
+	    {
+		if (p[i].x == -64) { move = TWIN_TRUE; continue; }
+		if (py(p,i) <= baseline && px(p,i) < origin) origin = px(p,i);
+		if (px(p,i) < left) left = px(p,i);
+		if (px(p,i) > right) right = px(p,i);
+		if (py(p,i) < top) top = py(p,i);
+		if (py(p,i) > bottom) bottom = py(p,i); 
+		move = TWIN_FALSE;
+	    }
+	}
+	left -= origin;
+	right -= origin;;
+	bottom -= baseline;
+	top -= baseline;
+
+	/*
+	 * Convert from hershey format to internal format
+	 */
+	for (i = 1, move = TWIN_TRUE; p[i].y != -64; i++)
+	{
+	    if (p[i].x == -64) { move = TWIN_TRUE; continue; }
+
+	    x = px(p,i) - origin;
+	    y = py(p,i) - baseline;
+	    if (move)
+		if (g->s[g->n].n)
+		    ++g->n;
+	    s = &g->s[g->n];
+	    s->p[s->n].x = x;
+	    s->p[s->n].y = y;
+	    s->n++;
+	    
+	    move = TWIN_FALSE;
+	}
+    	if (g->s[g->n].n)
+    	    ++g->n;
+
+	g->left = left;
+	g->right = right;
+	g->top = top;
+	g->bottom = bottom;
+
+	/*
+	 * Find snap points
+	 */
+	twin_add_snap (&g->snap_x, 0);	    /* origin */
+	twin_add_snap (&g->snap_x, right);  /* right */
+	
+	twin_add_snap (&g->snap_y, 0);	    /* baseline */
+	twin_add_snap (&g->snap_y, -15);    /* x height */
+	twin_add_snap (&g->snap_y, -21);    /* cap height */
+	
+	for (i = 0; i < g->n; i++)
+	{
+	    s = &g->s[i];
+	    for (j = 0; j < s->n - 1; j++)
+	    {
+		if (s->p[j].x == s->p[j+1].x)
+		    twin_add_snap (&g->snap_x, s->p[j].x);
+		if (s->p[j].y == s->p[j+1].y)
+		    twin_add_snap (&g->snap_y, s->p[j].y);
+	    }
+	}
+
+	/*
+	 * Now convert to gops and try to locate splines
+	 */
+	
+	gop = &g->op[0];
+	for (i = 0; i < g->n; i++)
+	{
+	    s = &g->s[i];
+	    gop->cmd = twin_gmove;
+	    gop->p[0] = s->p[0];
+	    gop++;
+	    for (j = 0; j < s->n - 1;)
+	    {
+		int ns = twin_n_in_spline (s->p + j, s->n - j);
+
+		if (ns)
+		{
+		    twin_spline_fit (s->p + j, ns,
+				     &gop->p[0], &gop->p[1]);
+		    gop->cmd = twin_gcurve;
+		    gop->p[2] = s->p[j + ns - 1];
+		    gop++;
+		    j += ns;
+		}
+		else
+		{
+		    gop->cmd = twin_gline;
+		    gop->p[0] = s->p[j+1];
+		    gop++;
+		    j++;
+		}
+	    }
+	}
+	g->nop = gop - &g->op[0];
+	g->exists = TWIN_TRUE;
+    }
+
+    printf ("const signed char _twin_gtable[] = {\n");
+    for (ucs4 = 0; ucs4 < 0x80; ucs4++)
+    {
+	twin_glyph_t		*g = &glyphs[ucs4];
+	
+	if (!g->exists) continue;
+	
+	g->offset = offset;
+
+	printf ("/* 0x%x '%s' */\n", g->ucs4, _ucs4_string (g->ucs4));
+	printf ("    %d, %d, %d, %d, %d, %d,\n",
+		g->left, g->right, -g->top, g->bottom, g->snap_x.n, g->snap_y.n);
+
+	offset += 6;
+
+	printf ("   ");
+	for (i = 0; i < g->snap_x.n; i++)
+	    printf (" %d,", g->snap_x.s[i]);
+	printf (" /* snap_x */\n");
+
+	offset += g->snap_x.n;
+	
+	printf ("   ");
+	for (i = 0; i < g->snap_y.n; i++)
+	    printf (" %d,", g->snap_y.s[i]);
+	printf (" /* snap_y */\n");
+	
+	offset += g->snap_y.n;
+
+#define CO(n)	gop->p[n].x, gop->p[n].y
+	for (i = 0; i < g->nop; i++)
+	{
+	    gop = &g->op[i];
+	    switch (gop->cmd) {
+	    case twin_gmove:
+		printf ("    'm', %d, %d,\n", CO(0));
+		offset += 3;
+		break;
+	    case twin_gline:
+		printf ("    'l', %d, %d,\n", CO(0));
+		offset += 3;
+		break;
+	    case twin_gcurve:
+		printf ("    'c', %d, %d, %d, %d, %d, %d,\n",
+			CO(0), CO(1), CO(2));
+		offset += 7;
+		break;
+	    }
+	}
+	printf ("    'e',\n");
+	offset++;
+    }
+    printf ("};\n\n");
+    printf ("const uint16_t _twin_g_offsets[] = {");
+    for (ucs4 = 0; ucs4 < 0x80; ucs4++)
+    {
+	twin_glyph_t		*g = &glyphs[ucs4];
+	
+	if ((ucs4 & 7) == 0)
+	    printf ("\n    ");
+	else
+	    printf (" ");
+	printf ("%4d,", g->offset);
+    }
+    printf ("\n};\n");
+    fflush (stdout);
+    exit (0);
 }
 
 void
 twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
 {
-    const twin_gpoint_t	*p = _twin_ucs4_base (ucs4);
-    int			i;
+    const signed char	*b = _twin_g_base (ucs4);
+    const signed char	*g = twin_glyph_draw(b);
     twin_spoint_t	origin;
-    twin_fixed_t	xc, yc;
-    twin_sfixed_t	sx, sy;
+    twin_fixed_t	x1, y1, x2, y2, x3, y3;
+    twin_fixed_t	xo, yo;
     twin_path_t		*stroke;
     twin_path_t		*pen;
-    twin_fixed_t	w;
-    twin_fixed_t	x, y;
-    twin_fixed_t	pen_size;
+    twin_fixed_t	pen_size = _twin_pen_size (path);
     twin_matrix_t	pen_matrix;
-    twin_fixed_t	pen_adjust;
-    twin_gfixed_t    	snap_x[TWIN_GLYPH_MAX_POINTS];
-    twin_gfixed_t    	snap_y[TWIN_GLYPH_MAX_POINTS];
     twin_text_metrics_t	metrics;
-    int			nsnap_x = 0, nsnap_y = 0;
     
+    if (0)
+    {
+	static int been_here = 0;
+	if (!been_here) { been_here = 1; twin_dump_glyphs (); }
+    }
+
     twin_text_metrics_ucs4 (path, ucs4, &metrics);
     
     origin = _twin_path_current_spoint (path);
     
-    if (Hint (path))
-    {
-	nsnap_x = 0;
-	nsnap_y = 0;
-    
-	/* snap left and right boundaries */
-	
-	nsnap_x = _add_snap (snap_x, nsnap_x, p[0].x);
-	nsnap_x = _add_snap (snap_x, nsnap_x, p[0].y);
-	
-	/* snap baseline, x height and cap height  */
-	nsnap_y = _add_snap (snap_y, nsnap_y, 9);
-	nsnap_y = _add_snap (snap_y, nsnap_y, -5);
-	nsnap_y = _add_snap (snap_y, nsnap_y, -12);
-	
-	/*
-	 * Locate horizontal and vertical segments
-	 */
-	for (i = 1; p[i].y != -64 && p[i+1].y != -64; i++)
-	{
-	    if (p[i].x == -64 || p[i+1].x == -64)
-		continue;
-	    if (p[i].x == p[i+1].x)
-		nsnap_x = _add_snap (snap_x, nsnap_x, p[i].x);
-	    if (p[i].y == p[i+1].y)
-		nsnap_y = _add_snap (snap_y, nsnap_y, p[i].y);
-	}
-    
-	qsort (snap_x, nsnap_x, sizeof (twin_gfixed_t), compare_snap);
-	qsort (snap_y, nsnap_y, sizeof (twin_gfixed_t), compare_snap);
-    
-	DBGMSG (("snap_x:"));
-	for (i = 0; i < nsnap_x; i++)
-	    DBGMSG ((" %d", snap_x[i])); 
-	DBGMSG (("\n"));
-	
-	DBGMSG (("snap_y:"));
-	for (i = 0; i < nsnap_y; i++)
-	    DBGMSG ((" %d", snap_y[i])); 
-	DBGMSG (("\n"));
-    }
-
     stroke = twin_path_create ();
-    twin_path_set_matrix (stroke, twin_path_current_matrix (path));
     
-    pen_size = _twin_pen_size (path);
-
-    if (Hint (path))
-	pen_adjust = pen_size & TWIN_FIXED_HALF;
-    else
-	pen_adjust = 0;
+    twin_path_set_matrix (stroke, twin_path_current_matrix (path));
     
     pen = twin_path_create ();
     pen_matrix = twin_path_current_matrix (path);
@@ -303,35 +508,55 @@ twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
 
     twin_path_circle (pen, pen_size);
 
-    xc = metrics.left_side_bearing + pen_adjust;
-    yc = SNAPY(TWIN_FONT_BASELINE) + pen_adjust;
+#define PX(_x,_y)   (origin.x + _twin_matrix_dx (&path->state.matrix, _x, _y))
+#define PY(_x,_y)   (origin.y + _twin_matrix_dy (&path->state.matrix, _x, _y))
     
-    for (i = 1; p[i].y != -64; i++)
-	if (p[i].x == -64)
-	    twin_path_close (stroke);
-	else
-	{
-	    x = xc + SNAPX(p[i].x);
-	    y = yc + SNAPY(p[i].y);
-
+    xo = pen_size * 3;
+    yo = -pen_size;
+    
+    for (;;) {
+	switch (*g++) {
+	case 'm':
+	    x1 = Scale (*g++) + xo;
+	    y1 = Scale (*g++) + yo;
 	    if (path->state.font_style & TWIN_TEXT_OBLIQUE)
-		x -= y / 4;
-	    sx = origin.x + _twin_matrix_dx (&path->state.matrix, x, y);
-	    sy = origin.y + _twin_matrix_dy (&path->state.matrix, x, y);
-	    DBGMSG(("x: %9.4f, y: %9.4f -> sx: %9.4f, sy: %9.4f\n",
-		    F(x), F(y), S(sx), S(sy)));
-	    _twin_path_sdraw (stroke, sx, sy);
+		x1 -= y1 >> 2;
+	    _twin_path_smove (stroke, PX(x1,y1), PY(x1,y1));
+	    continue;
+	case 'l':
+	    x1 = Scale (*g++) + xo;
+	    y1 = Scale (*g++) + yo;
+	    if (path->state.font_style & TWIN_TEXT_OBLIQUE)
+		x1 -= y1 >> 2;
+	    _twin_path_sdraw (stroke, PX(x1,y1), PY(x1,y1));
+	    continue;
+	case 'c':
+	    x1 = Scale (*g++) + xo;
+	    y1 = Scale (*g++) + yo;
+	    x2 = Scale (*g++) + xo;
+	    y2 = Scale (*g++) + yo;
+	    x3 = Scale (*g++) + xo;
+	    y3 = Scale (*g++) + yo;
+	    if (path->state.font_style & TWIN_TEXT_OBLIQUE)
+	    {
+		x1 -= y1 >> 2;
+		x2 -= y2 >> 2;
+		x3 -= y3 >> 2;
+	    }
+	    _twin_path_scurve (stroke, PX(x1,y1), PY(x1,y1),
+			       PX(x2,y2), PY(x2,y2), PX(x3,y3), PY(x3,y3));
+	    continue;
+	case 'e':
+	    break;
 	}
+	break;
+    }
 
     twin_path_convolve (path, stroke, pen);
     twin_path_destroy (stroke);
     twin_path_destroy (pen);
     
-    w = metrics.width;
-
-    _twin_path_smove (path, 
-		      origin.x + _twin_matrix_dx (&path->state.matrix, w, 0),
-		      origin.y + _twin_matrix_dy (&path->state.matrix, w, 0));
+    _twin_path_smove (path, PX(metrics.width, 0), PY(metrics.width,0));
 }
 
 twin_fixed_t
@@ -454,20 +679,23 @@ twin_text_metrics_utf8 (twin_path_t	    *path,
     {
 	twin_text_metrics_ucs4 (path, ucs4, &c);
 	if (first)
+	{
 	    *m = c;
+	    first = TWIN_FALSE;
+	}
 	else
 	{
 	    c.left_side_bearing += w;
 	    c.right_side_bearing += w;
 	    c.width += w;
 
-	    if (c.left_side_bearing > m->left_side_bearing)
+	    if (c.left_side_bearing < m->left_side_bearing)
 		m->left_side_bearing = c.left_side_bearing;
 	    if (c.right_side_bearing > m->right_side_bearing)
 		m->right_side_bearing = c.right_side_bearing;
 	    if (c.width > m->width)
 		m->width = c.width;
-	    if (c.ascent < m->ascent)
+	    if (c.ascent > m->ascent)
 		m->ascent = c.ascent;
 	    if (c.descent > m->descent)
 		m->descent = c.descent;

@@ -102,7 +102,7 @@ _twin_spline_decompose (twin_path_t	*path,
     }
 }
 
-static void
+void
 _twin_path_scurve (twin_path_t	    *path,
 		   twin_sfixed_t    x1, twin_sfixed_t y1,
 		   twin_sfixed_t    x2, twin_sfixed_t y2,

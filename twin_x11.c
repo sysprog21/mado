@@ -75,7 +75,7 @@ _twin_x11_put_span (int		    x,
     if (tx->iy == tx->image->height)
     {
 	XPutImage (tx->dpy, tx->win, tx->gc, tx->image, 0, 0, 
-		   x, y - tx->iy, width, tx->image->height);
+		   x, (y + 1) - tx->iy, width, tx->image->height);
 	XDestroyImage (tx->image);
 	tx->image = 0;
     }
@@ -126,9 +126,7 @@ twin_x11_screen_damaged (void *closure)
 {
     twin_x11_t	*tx = closure;
 
-    pthread_mutex_unlock (&tx->screen->screen_mutex);
     pthread_cond_broadcast (&tx->damage_cond);
-    pthread_mutex_unlock (&tx->screen->screen_mutex);
 }
 
 twin_x11_t *
@@ -210,8 +208,10 @@ twin_x11_destroy (twin_x11_t *tx)
 void
 twin_x11_damage (twin_x11_t *tx, XExposeEvent *ev)
 {
+    twin_screen_lock (tx->screen);
     twin_screen_damage (tx->screen, 
 			ev->x, ev->y, ev->x + ev->width, ev->y + ev->height);
+    twin_screen_unlock (tx->screen);
 }
 
 void

@@ -118,7 +118,7 @@ typedef void twin_op_func (twin_pointer_t	dst,
 
 /* Geometrical objects */
 
-typedef struct _twin_point {
+typedef struct _twin_spoint {
     twin_sfixed_t    x, y;
 } twin_spoint_t;
 
@@ -311,6 +311,8 @@ _twin_matrix_determinant (twin_matrix_t *matrix);
 twin_sfixed_t
 _twin_matrix_len (twin_matrix_t *m, twin_fixed_t dx, twin_fixed_t dy);
 
+twin_point_t
+_twin_matrix_expand (twin_matrix_t *matrix);
 /*
  * Path stuff
  */
@@ -331,6 +333,12 @@ _twin_path_smove (twin_path_t *path, twin_sfixed_t x, twin_sfixed_t y);
 void
 _twin_path_sdraw (twin_path_t *path, twin_sfixed_t x, twin_sfixed_t y);
 
+void
+_twin_path_scurve (twin_path_t	    *path,
+		   twin_sfixed_t    x1, twin_sfixed_t y1,
+		   twin_sfixed_t    x2, twin_sfixed_t y2,
+		   twin_sfixed_t    x3, twin_sfixed_t y3);
+
 /*
  * Glyph stuff.  Coordinates are stored in 2.6 fixed point format
  */
@@ -341,5 +349,18 @@ extern const twin_gpoint_t	_twin_glyphs[];
 extern const uint16_t		_twin_glyph_offsets[];
 
 #define TWIN_GLYPH_MAX_POINTS	56
+
+extern const signed char _twin_gtable[];
+extern const uint16_t _twin_g_offsets[];
+
+#define twin_glyph_left(g)	((g)[0])
+#define twin_glyph_right(g)	((g)[1])
+#define twin_glyph_ascent(g)	((g)[2])
+#define twin_glyph_descent(g)	((g)[3])
+#define twin_glyph_n_snap_x(g)	((g)[4])
+#define twin_glyph_n_snap_y(g)	((g)[5])
+#define twin_glyph_snap_x(g)	(&g[6])
+#define twin_glyph_snap_y(g)	(twin_glyph_snap_x(g) + twin_glyph_n_snap_x(g))
+#define twin_glyph_draw(g)	(twin_glyph_snap_y(g) + twin_glyph_n_snap_y(g))
 
 #endif /* _TWININT_H_ */

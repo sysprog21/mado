@@ -115,11 +115,33 @@ twin_path_move (twin_path_t *path, twin_fixed_t x, twin_fixed_t y)
 }
 
 void
+twin_path_rmove (twin_path_t *path, twin_fixed_t dx, twin_fixed_t dy)
+{
+    twin_spoint_t   here = _twin_path_current_spoint (path);
+    _twin_path_smove (path, 
+		      here.x + 
+		      _twin_matrix_dx (&path->state.matrix, dx, dy),
+		      here.y + 
+		      _twin_matrix_dy (&path->state.matrix, dx, dy));
+}
+
+void
 twin_path_draw (twin_path_t *path, twin_fixed_t x, twin_fixed_t y)
 {
     _twin_path_sdraw (path, 
 		      _twin_matrix_x (&path->state.matrix, x, y),
 		      _twin_matrix_y (&path->state.matrix, x, y));
+}
+
+void
+twin_path_rdraw (twin_path_t *path, twin_fixed_t dx, twin_fixed_t dy)
+{
+    twin_spoint_t   here = _twin_path_current_spoint (path);
+    _twin_path_sdraw (path, 
+		      here.x +
+		      _twin_matrix_dx (&path->state.matrix, dx, dy),
+		      here.y + 
+		      _twin_matrix_dy (&path->state.matrix, dx, dy));
 }
 
 void

@@ -1,3 +1,35 @@
+2004-10-04  Keith Packard  <keithp@keithp.com>
+
+	* twin.h:
+	* twin_draw.c: (twin_composite):
+	Fix a clipping bug
+	
+	* twinint.h:
+	* twin_font.c: (_snap), (_twin_g_base), (_twin_pen_size),
+	(twin_text_metrics_ucs4), (twin_add_snap), (twin_n_in_spline),
+	(twin_spline_fit), (_ucs4_string), (px), (py), (twin_dump_glyphs),
+	(twin_path_ucs4), (twin_text_metrics_utf8):
+	* twin_glyphs.c:
+	Change glyph representation to allow splines and include metrics.
+
+	* twin_matrix.c: (_twin_matrix_expand):
+	* twin_path.c: (twin_path_rmove), (twin_path_rdraw):
+	Add some new helper functions.
+	
+	* twin_spline.c:
+	Expose _twin_path_scurve for glyphs
+	
+	* twin_trig.c:
+	Increase sin table precision.
+	
+	* twin_x11.c: (_twin_x11_put_span), (twin_x11_screen_damaged),
+	(twin_x11_damage):
+	Fix off-by-one error in y position.
+	Lock screen while adding expose damage
+	
+	* xtwin.c: (twin_clock_face), (twin_clock), (main):
+	Change clock appearance.  Use corrected glyph metrics
+
 2004-10-01  Keith Packard  <keithp@keithp.com>
 
 	* twin.h:

@@ -34,13 +34,16 @@
 
 #define TWIN_CLOCK_BACKGROUND	0xff3b80ae
 #define TWIN_CLOCK_HOUR		0x80808080
-#define TWIN_CLOCK_HOUR_OUT	0xffdedede
+#define TWIN_CLOCK_HOUR_OUT	0x30000000
 #define TWIN_CLOCK_MINUTE	0x80808080
-#define TWIN_CLOCK_MINUTE_OUT	0xffdedede
+#define TWIN_CLOCK_MINUTE_OUT	0x30000000
 #define TWIN_CLOCK_SECOND	0x80808080
+#define TWIN_CLOCK_SECOND_OUT	0x30000000
 #define TWIN_CLOCK_TIC		0xffbababa
 #define TWIN_CLOCK_NUMBERS	0xffdedede
-#define TWIN_CLOCK_WATER	0x40404040
+#define TWIN_CLOCK_WATER	0x40000000
+#define TWIN_CLOCK_WATER_OUT	0x40404040
+#define TWIN_CLOCK_WATER_UNDER	0xcccc0000
 #define TWIN_CLOCK_BORDER	0xffbababa
 #define TWIN_CLOCK_BORDER_WIDTH	D(0.01)
 
@@ -97,26 +100,6 @@ twin_clock_hand (twin_pixmap_t	*clock,
     twin_path_destroy (stroke);
 }
 
-static void
-twin_clock_sec (twin_pixmap_t	*clock, 
-		 twin_angle_t	angle, 
-		 twin_fixed_t	len,
-		 twin_fixed_t	width,
-		 twin_argb32_t	pixel)
-{
-    twin_path_t	    *stroke = twin_path_create ();
-
-    twin_clock_set_transform (clock, stroke);
-
-    twin_path_rotate (stroke, angle);
-    twin_path_move (stroke, D(0), D(0));
-    twin_path_draw (stroke, len, D(0));
-
-    twin_paint_stroke (clock, pixel, stroke, width);
-    
-    twin_path_destroy (stroke);
-}
-
 static twin_angle_t
 twin_clock_minute_angle (int min)
 {
@@ -141,7 +124,7 @@ twin_clock_face (twin_pixmap_t *clock)
     {
 	twin_state_t	    state = twin_path_save (path);
 	twin_text_metrics_t metrics;
-	twin_fixed_t	    height;
+	twin_fixed_t	    height, width;
 	static char	    *label = "twin";
 
 	twin_path_empty (path);
@@ -150,8 +133,14 @@ twin_clock_face (twin_pixmap_t *clock)
 	twin_path_set_font_style (path, TWIN_TEXT_UNHINTED|TWIN_TEXT_OBLIQUE);
 	twin_text_metrics_utf8 (path, label, &metrics);
 	height = metrics.ascent + metrics.descent;
-/*	twin_path_move (path, -metrics.width / 2, height / 2 - metrics.ascent);*/
-	twin_path_move (path, -D(.4), -D(.16));
+	width = metrics.right_side_bearing - metrics.left_side_bearing;
+	
+	twin_path_move (path, -width / 2, metrics.ascent - height/2);
+	twin_path_draw (path, width / 2, metrics.ascent - height/2);
+	twin_paint_stroke (clock, TWIN_CLOCK_WATER_UNDER, path, D(0.02));
+	twin_path_empty (path);
+	
+	twin_path_move (path, -width / 2 - metrics.left_side_bearing, metrics.ascent - height/2);
 	twin_path_utf8 (path, label);
 	twin_paint_path (clock, TWIN_CLOCK_WATER, path);
 	twin_path_restore (path, &state);
@@ -173,12 +162,16 @@ twin_clock_face (twin_pixmap_t *clock)
 	}
 	else
 	{
-	    char    hour[3];
+	    char		hour[3];
+	    twin_text_metrics_t	metrics;
+	    twin_fixed_t	width;
+	    twin_fixed_t	left;
 	    
-	    twin_fixed_t    w;
 	    sprintf (hour, "%d", m / 5);
-	    w = twin_width_utf8 (path, hour);
-	    twin_path_move (path, -(w/2), -D(0.95));
+	    twin_text_metrics_utf8 (path, hour, &metrics);
+	    width = metrics.right_side_bearing - metrics.left_side_bearing;
+	    left = -width / 2 - metrics.left_side_bearing;
+	    twin_path_move (path, left, -D(0.98) + metrics.ascent);
 	    twin_path_utf8 (path, hour);
 	    twin_paint_path (clock, TWIN_CLOCK_NUMBERS, path);
 	}
@@ -197,19 +190,11 @@ twin_clock (twin_screen_t *screen, int x, int y, int w, int h)
     struct timeval  tv;
     struct tm	    t;
     twin_angle_t    hour_angle, minute_angle, second_angle;
-#if 0
-    int		    i;
-#endif
 
-    printf ("twin clock\n");
     twin_pixmap_move (clock, x, y);
     twin_pixmap_show (clock, screen, 0);
     
-#if 0
-    for (i = 0; i < 5; i++)
-#else
     for (;;)
-#endif
     {
 	twin_pixmap_disable_update (clock);
 	twin_fill (clock, 0x00000000, TWIN_SOURCE, 0, 0, 
@@ -222,15 +207,16 @@ twin_clock (twin_screen_t *screen, int x, int y, int w, int h)
 	second_angle = ((t.tm_sec * 100 + tv.tv_usec / 10000) * 
 			TWIN_ANGLE_360) / 6000 - TWIN_ANGLE_90;
 	minute_angle = twin_clock_minute_angle (t.tm_min) + second_angle / 60;
-	hour_angle = t.tm_hour * TWIN_ANGLE_360 / 12 - TWIN_ANGLE_90 + minute_angle / 12;
-
+	hour_angle = (t.tm_hour * TWIN_ANGLE_360 / 12 +
+		      (minute_angle + TWIN_ANGLE_90) / 12 -
+		      TWIN_ANGLE_90);
 	twin_clock_face (clock);
 	twin_clock_hand (clock, hour_angle, D(0.4), D(0.07), D(0.01),
 			 TWIN_CLOCK_HOUR, TWIN_CLOCK_HOUR_OUT);
 	twin_clock_hand (clock, minute_angle, D(0.8), D(0.05), D(0.01),
 			 TWIN_CLOCK_MINUTE, TWIN_CLOCK_MINUTE_OUT);
-	twin_clock_sec (clock, second_angle, D(0.9), D(0.02),
-			TWIN_CLOCK_SECOND);
+	twin_clock_hand (clock, second_angle, D(0.9), D(0.01), D(0.01),
+			 TWIN_CLOCK_SECOND, TWIN_CLOCK_SECOND_OUT);
 
 	twin_pixmap_enable_update (clock);
 	
@@ -392,7 +378,7 @@ main (int argc, char **argv)
     twin_path_convolve (path, extra, pen);
 #endif
     
-#if 1
+#if 0
     {
 	twin_state_t	state = twin_path_save (path);
     twin_path_translate (path, D(300), D(300));
@@ -409,12 +395,12 @@ main (int argc, char **argv)
     }
 #endif
 #if 1
-    fx = D(3);
+    fx = D(10);
     fy = 0;
-    for (g = 8; g < 30; g += 4)
+    for (g = 90; g < 91; g += 4)
     {
         twin_path_set_font_size (path, D(g));
-#if 1
+#if 0
         fy += D(g+2);
 	twin_path_move (path, fx, fy);
 	twin_path_utf8 (path,
@@ -443,7 +429,30 @@ main (int argc, char **argv)
 #if 0
 	fy += D(g);
 	twin_path_move (path, fx, fy);
-	twin_path_utf8 (path, "t");
+#define TEXT	"jelly world"
+	twin_path_utf8 (path, TEXT);
+	{
+	    twin_text_metrics_t	m;
+	    
+	    stroke = twin_path_create ();
+	    twin_path_set_matrix (stroke, twin_path_current_matrix (path));
+	    twin_text_metrics_utf8 (path, TEXT, &m);
+	    twin_path_move (stroke, fx, fy);
+	    twin_path_draw (stroke, fx + m.width, fy);
+	    twin_paint_stroke (red, 0xffff0000, stroke, D(1));
+	    twin_path_empty (stroke);
+	    twin_path_move (stroke, 
+			    fx + m.left_side_bearing, fy - m.ascent);
+	    twin_path_draw (stroke,
+			    fx + m.right_side_bearing, fy - m.ascent);
+	    twin_path_draw (stroke,
+			    fx + m.right_side_bearing, fy + m.descent);
+	    twin_path_draw (stroke,
+			    fx + m.left_side_bearing, fy + m.descent);
+	    twin_path_draw (stroke, 
+			    fx + m.left_side_bearing, fy - m.ascent);
+	    twin_paint_stroke (red, 0xff00ff00, stroke, D(1));
+	}
 #endif
     }
 #endif
@@ -461,7 +470,7 @@ main (int argc, char **argv)
 	fy += D(g);
     }
 #endif
-    twin_fill_path (alpha, path);
+    twin_fill_path (alpha, path, 0, 0);
     
     twin_path_destroy (path);
     
@@ -610,53 +619,20 @@ main (int argc, char **argv)
     twin_pixmap_move (blue, 100, 100);
     twin_pixmap_show (red, x11->screen, 0);
     twin_pixmap_show (blue, x11->screen, 0);
+    ++nclock;
 #endif
-    twin_start_clock (x11->screen, 0, 0, 512, 512);
-/*    twin_start_clock (x11->screen, 256, 0, 256, 256);
+
+#if 1
+    twin_start_clock (x11->screen, 0, 0, 256, 256);
+#endif
+#if 0
+    twin_start_clock (x11->screen, 0, 0, 256, 256);
+    twin_start_clock (x11->screen, 256, 0, 256, 256);
     twin_start_clock (x11->screen, 0, 256, 256, 256);
-    twin_start_clock (x11->screen, 256, 256, 256, 256); */
+    twin_start_clock (x11->screen, 256, 256, 256, 256);
+#endif
     while (nclock)
 	sleep (1);
-#if 0
-    had_motion = TWIN_FALSE;
-    for (;;)
-    {
-	if (had_motion)
-	{
-	    x = motion.xmotion.x - 50;
-	    y = motion.xmotion.y - 50;
-	    if (motion.xmotion.state & Button1Mask)
-		twin_pixmap_move (red, x, y);
-	    if (motion.xmotion.state & Button3Mask)
-		twin_pixmap_move (blue, x, y);
-	    had_motion = TWIN_FALSE;
-	}
-	if (twin_screen_damaged (x11->screen))
-	    twin_x11_update (x11);
-	XSync (dpy, False);
-	do {
-	    XNextEvent (dpy, &ev);
-	    switch (ev.type) {
-	    case Expose:
-		twin_x11_damage (x11, &ev.xexpose);
-		break;
-	    case ButtonPress:
-		if (ev.xbutton.button == 2)
-		{
-		    if (red->higher == 0)
-			twin_pixmap_show (red, x11->screen, 0);
-		    else
-			twin_pixmap_show (blue, x11->screen, 0);
-		}
-		break;
-	    case MotionNotify:
-		had_motion = TWIN_TRUE;
-		motion = ev;
-		break;
-	    }
-	} while (QLength (dpy));
-    }
-#endif
     return 0;
 }
 

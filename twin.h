@@ -49,16 +49,16 @@ typedef enum { TWIN_A8, TWIN_RGB16, TWIN_ARGB32 } twin_format_t;
 /*
  * Angles
  */
-typedef int16_t	    twin_angle_t;   /* -512 .. 512 for -180 .. 180 */
+typedef int16_t	    twin_angle_t;   /* -2048 .. 2048 for -180 .. 180 */
 
-#define TWIN_ANGLE_360	    1024
-#define TWIN_ANGLE_180	    512
-#define TWIN_ANGLE_90	    256
-#define TWIN_ANGLE_45	    128
-#define TWIN_ANGLE_22_5	    64
-#define TWIN_ANGLE_11_25    32
+#define TWIN_ANGLE_360	    4096
+#define TWIN_ANGLE_180	    (TWIN_ANGLE_360 >> 1)
+#define TWIN_ANGLE_90	    (TWIN_ANGLE_360 >> 2)
+#define TWIN_ANGLE_45	    (TWIN_ANGLE_360 >> 3)
+#define TWIN_ANGLE_22_5	    (TWIN_ANGLE_360 >> 4)
+#define TWIN_ANGLE_11_25    (TWIN_ANGLE_360 >> 5)
 
-#define twin_degrees_to_angle(d)    ((d) * 512 / 180)
+#define twin_degrees_to_angle(d)    ((twin_angle_t) ((((int32_t) (d)) * TWIN_ANGLE_360 / 360)))
 
 /*
  * A rectangle
@@ -181,6 +181,10 @@ typedef int32_t	    twin_fixed_t;   /* 16.16 format */
 #define twin_fixed_to_double(f)    ((double) (f) / 65536.0)
 
 #define twin_int_to_fixed(i)	   ((twin_fixed_t) (i) << 16)
+
+typedef struct _twin_point {
+    twin_fixed_t    x, y;
+} twin_point_t;
 
 /*
  * Place matrices in structures so they can be easily copied
@@ -333,8 +337,14 @@ twin_matrix_rotate (twin_matrix_t *m, twin_angle_t a);
 void 
 twin_path_move (twin_path_t *path, twin_fixed_t x, twin_fixed_t y);
 
+void 
+twin_path_rmove (twin_path_t *path, twin_fixed_t x, twin_fixed_t y);
+
 void
 twin_path_draw (twin_path_t *path, twin_fixed_t x, twin_fixed_t y);
+
+void
+twin_path_rdraw (twin_path_t *path, twin_fixed_t x, twin_fixed_t y);
 
 void
 twin_path_circle(twin_path_t *path, twin_fixed_t radius);

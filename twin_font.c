@@ -326,4 +326,4 @@ twin_path_string (twin_path_t	*path,
 	string += len;
     }
 }
-)
+

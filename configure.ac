@@ -52,10 +52,6 @@ PKG_CHECK_MODULES(X, x11,
 AC_SUBST(X_CFLAGS)
 AC_SUBST(X_LIBS)
 
-AC_CHECK_LIB([pthread], [pthread_create])
-
-AC_CHECK_HEADERS([pthread.h])
-
 #
 #AC_ARG_WITH(freetype-config, [  --with-freetype-config=PROG   Use FreeType configuration program PROG], freetype_config=$withval, freetype_config=yes)
 #

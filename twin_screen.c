@@ -44,25 +44,12 @@ twin_screen_create (twin_coord_t	width,
     screen->damaged_closure = NULL;
     screen->disable = 0;
     screen->background = 0;
-    twin_mutex_init (&screen->screen_mutex);
     screen->put_begin = put_begin;
     screen->put_span = put_span;
     screen->closure = closure;
 
     screen->button_x = screen->button_y = -1;
     return screen;
-}
-
-void
-twin_screen_lock (twin_screen_t *screen)
-{
-    twin_mutex_lock (&screen->screen_mutex);
-}
-
-void
-twin_screen_unlock (twin_screen_t *screen)
-{
-    twin_mutex_unlock (&screen->screen_mutex);
 }
 
 void

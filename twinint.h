@@ -345,6 +345,9 @@ _twin_path_scurve (twin_path_t	    *path,
 		   twin_sfixed_t    x2, twin_sfixed_t y2,
 		   twin_sfixed_t    x3, twin_sfixed_t y3);
 
+void
+_twin_path_sfinish (twin_path_t *path);
+
 /*
  * Glyph stuff.  Coordinates are stored in 2.6 fixed point format
  */
@@ -374,5 +377,90 @@ extern const uint16_t _twin_g_offsets[];
 #define twin_glyph_snap_x(g)	(&g[6])
 #define twin_glyph_snap_y(g)	(twin_glyph_snap_x(g) + twin_glyph_n_snap_x(g))
 #define twin_glyph_draw(g)	(twin_glyph_snap_y(g) + twin_glyph_n_snap_y(g))
+
+/*
+ * dispatch stuff
+ */
+
+typedef struct _twin_queue {
+    struct _twin_queue  *next;
+    struct _twin_queue	*order;
+    twin_bool_t		walking;
+    twin_bool_t		deleted;
+} twin_queue_t;
+
+struct _twin_timeout {
+    twin_queue_t	queue;
+    twin_time_t		time;
+    twin_time_t		delay;
+    twin_timeout_proc_t proc;
+    void		*closure;
+};
+
+struct _twin_work {
+    twin_queue_t	queue;
+    int			priority;
+    twin_work_proc_t	proc;
+    void		*closure;
+};
+
+struct _twin_file {
+    twin_queue_t	queue;
+    int			file;
+    twin_file_op_t	ops;
+    twin_file_proc_t	proc;
+    void		*closure;
+};
+
+struct _twin_block {
+    twin_queue_t	queue;
+    twin_block_proc_t   proc;
+    void		*closure;
+};
+
+struct _twin_wakeup {
+    twin_queue_t	queue;
+    twin_wakeup_proc_t  proc;
+    void		*closure;
+};
+
+typedef enum _twin_order {
+    TWIN_BEFORE = -1,
+    TWIN_AT = 0,
+    TWIN_AFTER = 1
+} twin_order_t;
+
+typedef twin_order_t (*twin_queue_proc_t) (twin_queue_t *a, twin_queue_t *b);
+
+void
+_twin_queue_insert (twin_queue_t	**head,
+		    twin_queue_proc_t	proc,
+		    twin_queue_t	*new);
+
+void
+_twin_queue_remove (twin_queue_t	**head,
+		    twin_queue_t	*old);
+
+void
+_twin_queue_delete (twin_queue_t	**head,
+		    twin_queue_t	*old);
+
+twin_queue_t *
+_twin_queue_set_order (twin_queue_t	**head);
+
+void
+_twin_queue_review_order (twin_queue_t	*first);
+
+void
+_twin_run_file (twin_time_t delay);
+
+void
+_twin_run_timeout (void);
+    
+twin_time_t
+_twin_timeout_delay (void);
+
+void
+_twin_run_work (void);
 
 #endif /* _TWININT_H_ */

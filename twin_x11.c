@@ -82,36 +82,18 @@ _twin_x11_put_span (twin_coord_t    left,
     }
 }
 
-static void *
-twin_x11_damage_thread (void *arg)
+static twin_bool_t
+twin_x11_read_events (int		file,
+		      twin_file_op_t	ops,
+		      void		*closure)
 {
-    twin_x11_t	*tx = arg;
+    twin_x11_t		    *tx = closure;
 
-    twin_mutex_lock (&tx->screen->screen_mutex);
-    for (;;)
+    while (XEventsQueued (tx->dpy, QueuedAfterReading))
     {
-	twin_cond_wait (&tx->damage_cond, &tx->screen->screen_mutex);
-	if (!tx->win)
-	    break;
-	if (twin_screen_damaged (tx->screen))
-	{
-	    twin_x11_update (tx);
-	    XFlush (tx->dpy);
-	}
-    }
-    twin_mutex_unlock (&tx->screen->screen_mutex);
-    return 0;
-}
+	XEvent		ev;
+	twin_event_t    tev;
 
-static void *
-twin_x11_event_thread (void *arg)
-{
-    twin_x11_t	    *tx = arg;
-    XEvent	    ev;
-    twin_event_t    tev;
-
-    for (;;)
-    {
 	XNextEvent (tx->dpy, &ev);
 	switch (ev.type) {
 	case Expose:
@@ -136,14 +118,20 @@ twin_x11_event_thread (void *arg)
 	    break;
 	}
     }
+    return TWIN_TRUE;
 }
 
-static void
-twin_x11_screen_damaged (void *closure)
+static twin_bool_t
+twin_x11_work (void *closure)
 {
-    twin_x11_t	*tx = closure;
-
-    twin_cond_broadcast (&tx->damage_cond);
+    twin_x11_t		    *tx = closure;
+    
+    if (twin_screen_damaged (tx->screen))
+    {
+	twin_x11_update (tx);
+	XFlush (tx->dpy);
+    }
+    return TWIN_TRUE;
 }
 
 twin_x11_t *
@@ -166,6 +154,13 @@ twin_x11_create (Display *dpy, int width, int height)
     tx->dpy = dpy;
     tx->visual = DefaultVisual (dpy, scr);
     tx->depth = DefaultDepth (dpy, scr);
+
+    twin_set_file (twin_x11_read_events,
+		      ConnectionNumber (dpy),
+		      TWIN_READ,
+		      tx);
+    
+    twin_set_work (twin_x11_work, TWIN_WORK_REDISPLAY, tx);
 
     wa.background_pixmap = None;
     wa.event_mask = (KeyPressMask|
@@ -200,16 +195,9 @@ twin_x11_create (Display *dpy, int width, int height)
     tx->gc = XCreateGC (dpy, tx->win, 0, 0);
     tx->screen = twin_screen_create (width, height, _twin_x11_put_begin,
 				     _twin_x11_put_span, tx);
-    twin_screen_register_damaged (tx->screen, twin_x11_screen_damaged, tx);
 
     XMapWindow (dpy, tx->win);
 
-    twin_cond_init (&tx->damage_cond);
-
-    twin_thread_create (&tx->damage_thread, twin_x11_damage_thread, tx);
-
-    twin_thread_create (&tx->event_thread, twin_x11_event_thread, tx);
-    
     return tx;
 }
 
@@ -218,17 +206,14 @@ twin_x11_destroy (twin_x11_t *tx)
 {
     XDestroyWindow (tx->dpy, tx->win);
     tx->win = 0;
-    twin_cond_broadcast (&tx->damage_cond);
     twin_screen_destroy (tx->screen);
 }
 
 void
 twin_x11_damage (twin_x11_t *tx, XExposeEvent *ev)
 {
-    twin_screen_lock (tx->screen);
     twin_screen_damage (tx->screen, 
 			ev->x, ev->y, ev->x + ev->width, ev->y + ev->height);
-    twin_screen_unlock (tx->screen);
 }
 
 void

@@ -28,9 +28,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <twin_def.h>
-#if HAVE_PTHREAD_H
-#include <pthread.h>
-#endif
 
 typedef uint8_t	    twin_a8_t;
 typedef uint16_t    twin_a16_t;
@@ -43,19 +40,7 @@ typedef int16_t	    twin_style_t;
 typedef int16_t	    twin_count_t;
 typedef int16_t	    twin_keysym_t;
 typedef int32_t	    twin_area_t;
-
-/*
- * Mutexes
- */
-#if HAVE_PTHREAD_H
-typedef pthread_mutex_t	twin_mutex_t;
-typedef pthread_cond_t	twin_cond_t;
-typedef pthread_t	twin_thread_t;
-#else
-typedef int		twin_mutext_t;
-typedef int		twin_cond_t;
-typedef int		twin_thread_t;
-#endif
+typedef int32_t	    twin_time_t;
 
 #define TWIN_FALSE  0
 #define TWIN_TRUE   1
@@ -120,6 +105,11 @@ typedef struct _twin_pixmap {
     twin_coord_t		height;	    /* pixels */
     twin_coord_t		stride;	    /* bytes */
     /*
+     * Clipping - a single rectangle in pixmap coordinates.
+     * Drawing is done relative to this rectangle
+     */
+    twin_rect_t			clip;
+    /*
      * Pixels
      */
     twin_pointer_t		p;
@@ -176,7 +166,6 @@ typedef struct _twin_screen {
     void		(*damaged) (void *);
     void		*damaged_closure;
     twin_count_t	disable;
-    twin_mutex_t	screen_mutex;
     /*
      * Repaint function
      */
@@ -220,6 +209,9 @@ typedef int32_t	    twin_fixed_t;   /* 16.16 format */
 #define twin_fixed_to_double(f)    ((double) (f) / 65536.0)
 
 #define twin_int_to_fixed(i)	   ((twin_fixed_t) (i) << 16)
+#define twin_fixed_ceil(f)	   (((f) + 0xffff) & ~0xffff)
+#define twin_fixed_floor(f)	   ((f) & ~0xffff)
+#define twin_fixed_to_int(f)	   ((int) ((f) >> 16))
 
 typedef struct _twin_point {
     twin_fixed_t    x, y;
@@ -328,11 +320,22 @@ typedef enum _twin_icon {
     TwinIconMinimize,
     TwinIconMaximize,
     TwinIconClose,
+    TwinIconResize,
 } twin_icon_t;
 
 /*
  * Widgets
  */
+
+typedef enum _twin_box_layout {
+    TwinLayoutHorz, TwinLayoutVert
+} twin_box_layout_t;
+
+typedef struct _twin_box {
+    twin_box_layout_t	layout;
+    twin_rect_t		geometry;
+    
+} twin_box_t;
 
 typedef struct {
     twin_rect_t		geometry;
@@ -343,12 +346,48 @@ typedef struct {
 } twin_button_t;
 
 /*
+ * Timeout and work procs return TWIN_TRUE to remain in the queue,
+ * timeout procs are called every 'delay' ms
+ */
+
+typedef twin_time_t (*twin_timeout_proc_t) (twin_time_t now,
+					    void	*closure);
+
+typedef twin_bool_t (*twin_work_proc_t) (void *closure);
+
+typedef enum _twin_file_op {
+    TWIN_READ = 1,
+    TWIN_WRITE = 2
+} twin_file_op_t;
+
+typedef twin_bool_t (*twin_file_proc_t) (int		file,
+					 twin_file_op_t	ops,
+					 void		*closure);
+					    
+typedef void	    (*twin_block_proc_t) (void *closure);
+typedef void	    (*twin_wakeup_proc_t) (void *closure);
+
+#define twin_time_compare(a,op,b)	(((a) - (b)) op 0)
+
+typedef struct _twin_timeout	twin_timeout_t;
+typedef struct _twin_work	twin_work_t;
+typedef struct _twin_file	twin_file_t;
+typedef struct _twin_block	twin_block_t;
+typedef struct _twin_wakeup	twin_wakeup_t;
+
+/*
  * twin_convolve.c
  */
 void
 twin_path_convolve (twin_path_t	*dest,
 		    twin_path_t	*stroke,
 		    twin_path_t	*pen);
+
+/*
+ * twin_dispatch.c
+ */
+void
+twin_dispatch (void);
 
 /*
  * twin_draw.c
@@ -383,6 +422,19 @@ twin_fill (twin_pixmap_t    *dst,
 
 void
 twin_event_enqueue (const twin_event_t *event);
+
+/*
+ * twin_file.c
+ */
+ 
+twin_file_t *
+twin_set_file (twin_file_proc_t	    file_proc,
+	       int		    file,
+	       twin_file_op_t	    ops,
+	       void		    *closure);
+
+void
+twin_clear_file (twin_file_t *file);
 
 /*
  * twin_fixed.c
@@ -620,9 +672,23 @@ void
 twin_pixmap_disable_update (twin_pixmap_t *pixmap);
 
 void
-twin_pixmap_damage (twin_pixmap_t *pixmap,
-		    twin_coord_t x1, twin_coord_t y1,
-		    twin_coord_t x2, twin_coord_t y2);
+twin_pixmap_clip (twin_pixmap_t *pixmap,
+		  twin_coord_t	left,	twin_coord_t top,
+		  twin_coord_t	right,	twin_coord_t bottom);
+
+twin_rect_t
+twin_pixmap_current_clip (twin_pixmap_t *pixmap);
+
+void
+twin_pixmap_restore_clip (twin_pixmap_t *pixmap, twin_rect_t rect);
+
+void
+twin_pixmap_reset_clip (twin_pixmap_t *pixmap);
+
+void
+twin_pixmap_damage (twin_pixmap_t   *pixmap,
+		    twin_coord_t    left,	twin_coord_t top,
+		    twin_coord_t    right,	twin_coord_t bottom);
 
 void
 twin_pixmap_lock (twin_pixmap_t *pixmap);
@@ -723,31 +789,21 @@ twin_path_curve (twin_path_t	*path,
 		 twin_fixed_t	x3, twin_fixed_t y3);
 
 /*
- * twin_thread.c
+ * twin_timeout.c
  */
 
-void
-twin_mutex_init (twin_mutex_t *mutex);
-		 
-void
-twin_mutex_lock (twin_mutex_t *mutex);
+#define twin_time_compare(a,op,b)	(((a) - (b)) op 0)
+
+twin_timeout_t *
+twin_set_timeout (twin_timeout_proc_t timeout_proc,
+		     twin_time_t	    delay,
+		     void		    *closure);
 
 void
-twin_mutex_unlock (twin_mutex_t *mutex);
+twin_clear_timeout (twin_timeout_t *timeout);
 
-void
-twin_cond_init (twin_cond_t *cond);
-
-void
-twin_cond_broadcast (twin_cond_t *cond);
-
-void
-twin_cond_wait (twin_cond_t *cond, twin_mutex_t *mutex);
-
-typedef void * (*twin_thread_func_t) (void *arg);
-
-int
-twin_thread_create (twin_thread_t *thread, twin_thread_func_t func, void *arg);
+twin_time_t
+twin_now (void);
 
 /*
  * twin_trig.c
@@ -806,5 +862,18 @@ twin_window_draw (twin_window_t *window);
 twin_bool_t
 twin_window_dispatch (twin_window_t *window, twin_event_t *event);
 
-    
+/*
+ * twin_work.c
+ */
+
+#define TWIN_WORK_REDISPLAY  0
+
+twin_work_t *
+twin_set_work (twin_work_proc_t	    work_proc,
+		  int			    priority,
+		  void			    *closure);
+
+void
+twin_clear_work (twin_work_t *work);
+
 #endif /* _TWIN_H_ */

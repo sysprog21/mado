@@ -42,6 +42,9 @@ twin_pixmap_create (twin_format_t   format,
     pixmap->format = format;
     pixmap->width = width;
     pixmap->height = height;
+    pixmap->clip.left = pixmap->clip.top = 0;
+    pixmap->clip.right = pixmap->width;
+    pixmap->clip.bottom = pixmap->height;
     pixmap->stride = stride;
     pixmap->disable = 0;
     pixmap->p.v = pixmap + 1;
@@ -94,8 +97,6 @@ twin_pixmap_show (twin_pixmap_t	*pixmap,
     if (pixmap->screen)
 	twin_pixmap_hide (pixmap);
     
-    twin_screen_lock (screen);
-
     pixmap->screen = screen;
     
     if (lower)
@@ -116,7 +117,6 @@ twin_pixmap_show (twin_pixmap_t	*pixmap,
     }
 
     twin_pixmap_damage (pixmap, 0, 0, pixmap->width, pixmap->height);
-    twin_screen_unlock (screen);
 }
 
 void
@@ -127,7 +127,7 @@ twin_pixmap_hide (twin_pixmap_t *pixmap)
 
     if (!screen)
 	return;
-    twin_screen_lock (screen);
+
     twin_pixmap_damage (pixmap, 0, 0, pixmap->width, pixmap->height);
 
     if (pixmap->up)
@@ -148,7 +148,6 @@ twin_pixmap_hide (twin_pixmap_t *pixmap)
     pixmap->down = 0;
     if (pixmap->disable)
 	twin_screen_enable_update (screen);
-    twin_screen_unlock (screen);
 }
 
 twin_pointer_t
@@ -183,6 +182,40 @@ twin_pixmap_disable_update (twin_pixmap_t *pixmap)
 }
 
 void
+twin_pixmap_clip (twin_pixmap_t *pixmap,
+		  twin_coord_t	left,	twin_coord_t top,
+		  twin_coord_t	right,	twin_coord_t bottom)
+{
+    if (left > pixmap->clip.left)	pixmap->clip.left = left;
+    if (top > pixmap->clip.top)		pixmap->clip.top = top;
+    if (right < pixmap->clip.right)	pixmap->clip.right = right;
+    if (bottom < pixmap->clip.bottom)	pixmap->clip.bottom = bottom;
+    if (pixmap->clip.left >= pixmap->clip.right)
+	pixmap->clip.right = pixmap->clip.left = 0;
+    if (pixmap->clip.top >= pixmap->clip.bottom)
+	pixmap->clip.bottom = pixmap->clip.top = 0;
+}
+
+twin_rect_t
+twin_pixmap_current_clip (twin_pixmap_t *pixmap)
+{
+    return pixmap->clip;
+}
+
+void
+twin_pixmap_restore_clip (twin_pixmap_t *pixmap, twin_rect_t rect)
+{
+    pixmap->clip = rect;
+}
+
+void
+twin_pixmap_reset_clip (twin_pixmap_t *pixmap)
+{
+    pixmap->clip.left = 0;		pixmap->clip.top = 0;
+    pixmap->clip.right = pixmap->width;	pixmap->clip.bottom = pixmap->height;
+}
+
+void
 twin_pixmap_damage (twin_pixmap_t *pixmap,
 		    twin_coord_t x1, twin_coord_t y1,
 		    twin_coord_t x2, twin_coord_t y2)
@@ -193,20 +226,6 @@ twin_pixmap_damage (twin_pixmap_t *pixmap,
 			    y1 + pixmap->y,
 			    x2 + pixmap->x,
 			    y2 + pixmap->y);
-}
-
-void
-twin_pixmap_lock (twin_pixmap_t *pixmap)
-{
-    if (pixmap->screen)
-	twin_screen_lock (pixmap->screen);
-}
-
-void
-twin_pixmap_unlock (twin_pixmap_t *pixmap)
-{
-    if (pixmap->screen)
-	twin_screen_unlock (pixmap->screen);
 }
 
 static twin_argb32_t
@@ -238,12 +257,10 @@ twin_pixmap_transparent (twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y)
 void
 twin_pixmap_move (twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y)
 {
-    twin_pixmap_lock (pixmap);
     twin_pixmap_damage (pixmap, 0, 0, pixmap->width, pixmap->height);
     pixmap->x = x;
     pixmap->y = y;
     twin_pixmap_damage (pixmap, 0, 0, pixmap->width, pixmap->height);
-    twin_pixmap_unlock (pixmap);
 }
 
 twin_bool_t

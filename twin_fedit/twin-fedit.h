@@ -21,43 +21,83 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
-#ifndef _TWIN_X11_H_
-#define _TWIN_X11_H_
 
-#include "twin.h"
+#ifndef _TWIN_FEDIT_H_
+#define _TWIN_FEDIT_H_
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <X11/Xlib.h>
-#include <X11/Xutil.h>
 #include <X11/Xatom.h>
+#include <cairo.h>
+#include <math.h>
+#include <X11/keysym.h>
 
-typedef struct _twin_x11 {
-    twin_screen_t   *screen;
-    Display	    *dpy;
-    Window	    win;
-    GC		    gc;
-    Visual	    *visual;
-    int		    depth;
-    XImage	    *image;
-    int		    image_y;
-} twin_x11_t;
+typedef enum _op { OpMove, OpLine, OpCurve, OpNoop } op_t;
 
-/*
- * twin_x11.c 
- */
+typedef struct { double x, y; } pt_t;
 
-twin_x11_t *
-twin_x11_create (Display *dpy, int width, int height);
+typedef struct _cmd {
+    struct _cmd	*next;
+    op_t	op;
+    pt_t	pt[3];
+} cmd_t;
+
+typedef struct _cmd_stack {
+    struct _cmd_stack	*prev;
+    cmd_t		*cmd;
+} cmd_stack_t;
+
+typedef struct _char {
+    cmd_t	*cmd;
+    cmd_stack_t	*stack;
+    cmd_t	*first;
+    cmd_t	*last;
+} char_t;
+
+typedef struct _pts_t {
+    int		n;
+    int		s;
+    pt_t	*pt;
+} pts_t;
+
+typedef struct _spline {
+    pt_t	a, b, c, d;
+} spline_t;
+
+spline_t fit (pt_t *p, int n);
+    
+double
+min (double a, double b);
+
+double
+max (double a, double b);
+
+#define abs my_abs
+
+double
+abs (double a);
+
+pts_t *
+new_pts (void);
 
 void
-twin_x11_destroy (twin_x11_t *tx);
+dispose_pts (pts_t *pts);
 
 void
-twin_x11_damage (twin_x11_t *tx, XExposeEvent *ev);
+add_pt (pts_t *pts, pt_t *pt);
 
-void
-twin_x11_configure (twin_x11_t *tx, XConfigureEvent *ev);
+double
+distance_to_point (pt_t * a, pt_t * b);
 
-void
-twin_x11_update (twin_x11_t *tx);
+double
+distance_to_line (pt_t * p, pt_t * p1, pt_t * p2);
 
-#endif /* _TWIN_X11_H_ */
+double
+distance_to_segment (pt_t * p, pt_t * p1, pt_t * p2);
+
+pt_t
+lerp (pt_t *a, pt_t *b);
+    
+#endif /* _TWIN_FEDIT_H_ */

@@ -275,68 +275,73 @@ twin_composite (twin_pixmap_t	*dst,
 {
     twin_coord_t    iy;
     twin_coord_t    left, right, top, bottom;
+    twin_coord_t    sdx, sdy;
+    twin_source_u   s;
 
+    dst_x += dst->clip.left;
+    dst_y += dst->clip.top;
     left = dst_x;
     right = dst_x + width;
     top = dst_y;
     bottom = dst_y + height;
-    if (left < 0)
-	left = 0;
-    if (right > dst->width)
-	right = dst->width;
-    if (top < 0)
-	top = 0;
-    if (bottom > dst->height)
-	bottom = dst->height;
+    /* clip */
+    if (left < dst->clip.left)
+	left = dst->clip.left;
+    if (right > dst->clip.right)
+	right = dst->clip.right;
+    if (top < dst->clip.top)
+	top = dst->clip.top;
+    if (bottom > dst->clip.bottom)
+	bottom = dst->clip.bottom;
+
     if (left >= right || top >= bottom)
 	return;
 
-    twin_pixmap_lock (dst);
+    if (src->source_kind == TWIN_PIXMAP)
+    {
+	src_x += src->u.pixmap->clip.left;
+	src_y += src->u.pixmap->clip.top;
+    }
+    else
+        s.c = src->u.argb;
+    
+    sdx = src_x - dst_x;
+    sdy = src_y - dst_y;
+
     if (msk)
     {
 	twin_src_msk_op	op;
-	twin_source_u   s, m;
-	twin_coord_t	sdx, sdy, mdx, mdy;
+	twin_source_u   m;
+	twin_coord_t	mdx, mdy;
 	
-	sdx = src_x - dst_x;
-	sdy = src_y - dst_y;
-	mdx = msk_x - dst_x;
-	mdy = msk_y - dst_y;
-	
-
-	op = comp3[operator][operand_index(src)][operand_index(msk)][dst->format];
-	if (op)
+	if (msk->source_kind == TWIN_PIXMAP)
 	{
-	    if (src->source_kind == TWIN_SOLID)
-		s.c = src->u.argb;
-	    if (msk->source_kind == TWIN_SOLID)
-		s.c = msk->u.argb;
-	    for (iy = top; iy < bottom; iy++)
-	    {
-		if (src->source_kind == TWIN_PIXMAP)
-		    s.p = twin_pixmap_pointer (src->u.pixmap, left+sdx, iy+sdy);
-		if (msk->source_kind == TWIN_PIXMAP)
-		    m.p = twin_pixmap_pointer (msk->u.pixmap, left+mdx, iy+mdy);
-		(*op) (twin_pixmap_pointer (dst, left, iy),
-		       s, m, right - left);
-	    }
+	    msk_x += msk->u.pixmap->clip.left;
+	    msk_y += msk->u.pixmap->clip.top;
 	}
 	else
+	    s.c = msk->u.argb;
+	
+	mdx = msk_x - dst_x;
+	mdy = msk_y - dst_y;
+
+	op = comp3[operator][operand_index(src)][operand_index(msk)][dst->format];
+	for (iy = top; iy < bottom; iy++)
 	{
+	    if (src->source_kind == TWIN_PIXMAP)
+		s.p = twin_pixmap_pointer (src->u.pixmap, left+sdx, iy+sdy);
+	    if (msk->source_kind == TWIN_PIXMAP)
+		m.p = twin_pixmap_pointer (msk->u.pixmap, left+mdx, iy+mdy);
+	    (*op) (twin_pixmap_pointer (dst, left, iy),
+		   s, m, right - left);
 	}
     }
     else
     {
 	twin_src_op	op;
-	twin_source_u   s;
-	twin_coord_t	sdx, sdy;
-	
-	sdx = src_x - dst_x;
-	sdy = src_y - dst_y;
 	
 	op = comp2[operator][operand_index(src)][dst->format];
-        if (src->source_kind == TWIN_SOLID)
-	    s.c = src->u.argb;
+	
 	for (iy = top; iy < bottom; iy++)
 	{
 	    if (src->source_kind == TWIN_PIXMAP)
@@ -346,7 +351,6 @@ twin_composite (twin_pixmap_t	*dst,
 	}
     }
     twin_pixmap_damage (dst, left, top, right, bottom);
-    twin_pixmap_unlock (dst);
 }
 	     
 /*
@@ -379,19 +383,24 @@ twin_fill (twin_pixmap_t    *dst,
     twin_source_u   src;
     twin_coord_t    iy;
     
-    twin_pixmap_lock (dst);
+    left += dst->clip.left;
+    right += dst->clip.left;
+    top += dst->clip.top;
+    bottom += dst->clip.top;
+    /* clip */
+    if (left < dst->clip.left)
+	left = dst->clip.left;
+    if (right > dst->clip.right)
+	right = dst->clip.right;
+    if (top < dst->clip.top)
+	top = dst->clip.top;
+    if (bottom > dst->clip.bottom)
+	bottom = dst->clip.bottom;
+    if (left >= right || top >= bottom)
+	return;
     src.c = pixel;
-    if (left < 0)
-	left = 0;
-    if (right > dst->width)
-	right = dst->width;
-    if (top < 0)
-	top = 0;
-    if (bottom > dst->height)
-	bottom = dst->height;
     op = fill[operator][dst->format];
     for (iy = top; iy < bottom; iy++)
 	(*op) (twin_pixmap_pointer (dst, left, iy), src, right - left);
     twin_pixmap_damage (dst, left, right, top, bottom);
-    twin_pixmap_unlock (dst);
 }

@@ -60,12 +60,44 @@ _twin_path_subpath_first_spoint (twin_path_t *path)
     return path->points[start];
 }
 
+void
+_twin_path_sfinish (twin_path_t *path)
+{
+    switch (_twin_current_subpath_len(path)) {
+    case 1:
+	path->npoints--;
+    case 0:
+	return;
+    }
+    
+    if (path->nsublen == path->size_sublen)
+    {
+	int	size_sublen;
+	int	*sublen;
+	
+	if (path->size_sublen > 0)
+	    size_sublen = path->size_sublen * 2;
+	else
+	    size_sublen = 1;
+	if (path->sublen)
+	    sublen = realloc (path->sublen, size_sublen * sizeof (int));
+	else
+	    sublen = malloc (size_sublen * sizeof (int));
+	if (!sublen)
+	    return;
+	path->sublen = sublen;
+	path->size_sublen = size_sublen;
+    }
+    path->sublen[path->nsublen] = path->npoints;
+    path->nsublen++;
+}
+
 void 
 _twin_path_smove (twin_path_t *path, twin_sfixed_t x, twin_sfixed_t y)
 {
     switch (_twin_current_subpath_len (path)) {
     default:
-	twin_path_close (path);
+	_twin_path_sfinish (path);
     case 0:
 	_twin_path_sdraw (path, x, y);
 	break;
@@ -147,33 +179,17 @@ twin_path_rdraw (twin_path_t *path, twin_fixed_t dx, twin_fixed_t dy)
 void
 twin_path_close (twin_path_t *path)
 {
-    switch (_twin_current_subpath_len(path)) {
-    case 1:
-	path->npoints--;
-    case 0:
-	return;
-    }
+    twin_spoint_t   f;
     
-    if (path->nsublen == path->size_sublen)
-    {
-	int	size_sublen;
-	int	*sublen;
-	
-	if (path->size_sublen > 0)
-	    size_sublen = path->size_sublen * 2;
-	else
-	    size_sublen = 1;
-	if (path->sublen)
-	    sublen = realloc (path->sublen, size_sublen * sizeof (int));
-	else
-	    sublen = malloc (size_sublen * sizeof (int));
-	if (!sublen)
-	    return;
-	path->sublen = sublen;
-	path->size_sublen = size_sublen;
+    switch (_twin_current_subpath_len(path)) {
+    case 0:
+    case 1:
+	break;
+    default:
+	f = _twin_path_subpath_first_spoint (path);
+	_twin_path_sdraw (path, f.x, f.y);
+	break;
     }
-    path->sublen[path->nsublen] = path->npoints;
-    path->nsublen++;
 }
 
 #define twin_fixed_abs(f)   ((f) < 0 ? -(f) : (f))
@@ -201,7 +217,7 @@ twin_path_circle (twin_path_t *path, twin_fixed_t radius)
 
     center = _twin_path_current_spoint (path);
 
-    twin_path_close (path);
+    _twin_path_sfinish (path);
     
     max_radius = _twin_matrix_max_radius (&path->state.matrix);
     
@@ -224,7 +240,7 @@ twin_path_circle (twin_path_t *path, twin_fixed_t radius)
 			  center.y + _twin_matrix_dy (&path->state.matrix, x, y));
     }
     
-    twin_path_close (path);
+    _twin_path_sfinish (path);
     twin_path_set_matrix (path, save);
 }
 
@@ -246,7 +262,7 @@ twin_path_ellipse (twin_path_t *path,
 
     center = _twin_path_current_spoint (path);
 
-    twin_path_close (path);
+    _twin_path_sfinish (path);
     
     max_radius = _twin_matrix_max_radius (&path->state.matrix);
     
@@ -269,7 +285,7 @@ twin_path_ellipse (twin_path_t *path,
 			  center.y + _twin_matrix_dy (&path->state.matrix, x, y));
     }
     
-    twin_path_close (path);
+    _twin_path_sfinish (path);
     twin_path_set_matrix (path, save);
 }
 
@@ -376,7 +392,7 @@ twin_path_append (twin_path_t *dst, twin_path_t *src)
     {
 	if (s < src->nsublen && p == src->sublen[s])
 	{
-	    twin_path_close (dst);
+	    _twin_path_sfinish (dst);
 	    s++;
 	}
 	_twin_path_sdraw (dst, src->points[p].x, src->points[p].y);
@@ -435,7 +451,7 @@ twin_composite_path (twin_pixmap_t	*dst,
     twin_coord_t    width, height;
 
     twin_path_bounds (path, &bounds);
-    if (bounds.left == bounds.right)
+    if (bounds.left >= bounds.right || bounds.top >= bounds.bottom)
 	return;
     width = bounds.right - bounds.left;
     height = bounds.bottom - bounds.top;

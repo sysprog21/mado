@@ -85,7 +85,7 @@ _twin_sfixed_grid_ceil (twin_sfixed_t f)
 
 static int
 _twin_edge_build (twin_spoint_t *vertices, int nvertices, twin_edge_t *edges,
-		  twin_sfixed_t dx, twin_sfixed_t dy)
+		  twin_sfixed_t dx, twin_sfixed_t dy, twin_sfixed_t top_y)
 {
     int		    v, nv;
     int		    tv, bv;
@@ -120,8 +120,8 @@ _twin_edge_build (twin_spoint_t *vertices, int nvertices, twin_edge_t *edges,
 
 	/* snap top to first grid point in pixmap */
 	y = _twin_sfixed_grid_ceil (vertices[tv].y + dy);
-	if (y < TWIN_POLY_START)
-	    y = TWIN_POLY_START;
+	if (y < TWIN_POLY_START + top_y)
+	    y = TWIN_POLY_START + top_y;
 	
 	/* skip vertices which don't span a sample row */
 	if (y >= vertices[bv].y + dy)
@@ -206,8 +206,8 @@ _span_fill (twin_pixmap_t   *pixmap,
     int		    col;
     
     /* clip to pixmap */
-    if (left < 0)
-	left = 0;
+    if (left < twin_int_to_sfixed (pixmap->clip.left))
+	left = twin_int_to_sfixed (pixmap->clip.left);
     
     if (right > twin_int_to_sfixed (pixmap->width))
 	right = twin_int_to_sfixed (pixmap->width);
@@ -311,7 +311,7 @@ _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
 	/* step down, clipping to pixmap */
 	y += TWIN_POLY_STEP;
 
-	if (twin_sfixed_trunc (y) >= pixmap->height)
+	if (twin_sfixed_trunc (y) >= pixmap->clip.bottom)
 	    break;
 	
 	/* strip out dead edges */
@@ -363,6 +363,8 @@ twin_fill_path (twin_pixmap_t *pixmap, twin_path_t *path,
     edges = malloc (sizeof (twin_edge_t) * nalloc);
     p = 0;
     nedges = 0;
+    dx += twin_int_to_sfixed (pixmap->clip.left);
+    dy += twin_int_to_sfixed (pixmap->clip.top);
     for (s = 0; s <= path->nsublen; s++)
     {
 	int sublen;
@@ -376,7 +378,7 @@ twin_fill_path (twin_pixmap_t *pixmap, twin_path_t *path,
 	if (npoints > 1)
 	{
 	    n = _twin_edge_build (path->points + p, npoints, edges + nedges,
-				  sdx, sdy);
+				  sdx, sdy, twin_int_to_sfixed (pixmap->clip.top));
 	    p = sublen;
 	    nedges += n;
 	}

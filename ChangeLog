@@ -1,3 +1,71 @@
+2004-10-25  Keith Packard  <keithp@keithp.com>
+
+	* Makefile.am:
+	* configure.ac:
+	* twin_dispatch.c: (twin_dispatch):
+	* twin_file.c: (_twin_file_order), (_twin_run_file),
+	(twin_set_file), (twin_clear_file):
+	* twin_queue.c: (_twin_queue_insert), (_twin_queue_remove),
+	(_twin_queue_delete), (_twin_queue_set_order),
+	(_twin_queue_review_order):
+	* twin_timeout.c: (_twin_timeout_order), (_twin_queue_timeout),
+	(_twin_run_timeout), (twin_set_timeout), (twin_clear_timeout),
+	(_twin_timeout_delay), (twin_now):
+	* twin_work.c: (_twin_work_order), (_twin_queue_work),
+	(_twin_run_work), (twin_set_work), (twin_clear_work):
+	* twinint.h:
+	Add dispatch stuff to manage timeouts, workprocs and files.
+	Remove thread stuff
+	
+	* twin.h:
+	* twin_clock.c: (twin_clock_set_transform), (twin_clock_hand),
+	(twin_clock_minute_angle), (twin_clock_face), (twin_clock_timeout),
+	(twin_clock_start):
+	* twin_clock.h:
+	* twin_demo.c: (twin_example_start), (twin_line_start),
+	(twin_circletext_start), (twin_quickbrown_start),
+	(twin_ascii_start), (twin_jelly_start), (twin_extents_start),
+	(twin_demo_start):
+	* twin_demo.h:
+	* twin_text.c: (twin_text_start):
+	* twin_text.h:
+	* xtwin.c: (main):
+	Split demos into separate files
+	
+	* twin_draw.c: (twin_composite), (twin_fill):
+	Make drawing origin match clip rectangle.
+
+	* twin_fedit
+	Add glyph editor to CVS to preserve it
+	
+	* twin_icon.c: (twin_icon_draw):
+	Add scalable icons
+
+	* twin_path.c: (_twin_path_sfinish), (_twin_path_smove),
+	(twin_path_close), (twin_path_circle), (twin_path_ellipse),
+	(twin_path_append), (twin_composite_path):
+	Separate 'closing' a subpath from 'finishing' a subpath; the
+	former adds a point back to the start while the latter just
+	leaves the path unclosed and prepares for a new subpath.
+	
+	* twin_pixmap.c: (twin_pixmap_create), (twin_pixmap_show),
+	(twin_pixmap_hide), (twin_pixmap_clip), (twin_pixmap_current_clip),
+	(twin_pixmap_restore_clip), (twin_pixmap_reset_clip),
+	(twin_pixmap_damage), (twin_pixmap_move):
+	* twin_poly.c: (_twin_edge_build), (_span_fill), (_twin_edge_fill),
+	(twin_fill_path):
+	* twin_screen.c: (twin_screen_create):
+	Eliminate locking, add clipping.
+
+	* twin_window.c: (twin_window_create), (twin_window_configure),
+	(twin_window_frame):
+	Clean up title drawing, use clipping
+	
+	* twin_x11.c: (twin_x11_read_events), (twin_x11_work),
+	(twin_x11_create), (twin_x11_destroy), (twin_x11_damage):
+	* twin_x11.h:
+	Eliminate locking, use dispatch stuff
+
 2004-10-05  Keith Packard  <keithp@keithp.com>
 
 	* Makefile.am:

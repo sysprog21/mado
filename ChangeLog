@@ -1,6 +1,26 @@
 2004-10-26  Keith Packard  <keithp@keithp.com>
 
 	* twin_button.c: (_twin_button_paint):
+	* twin_widget.c: (_twin_widget_bevel):
+	* twinint.h:
+	Move bevel routine to twin_widget for sharing
+	
+	* twin_dispatch.c: (twin_dispatch):
+	Change order of timeout vs work, making work come last as
+	that's where redisplay occurs.
+	
+	* twin_draw.c: (twin_fill):
+	Oops.  Argument order wrong in twin_pixmap_damage call
+	
+	* twin_hello.c: (twin_hello_start):
+	Make button italic to test
+	
+	* twin_pixmap.c: (twin_pixmap_damage):
+	Change names of formals to match prototype
+	
+2004-10-26  Keith Packard  <keithp@keithp.com>
+
+	* twin_button.c: (_twin_button_paint):
 	Paint polygons instead of stroked lines for button edges
 	
 	* twin_font.c: (_twin_text_compute_info):

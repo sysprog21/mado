@@ -402,5 +402,5 @@ twin_fill (twin_pixmap_t    *dst,
     op = fill[operator][dst->format];
     for (iy = top; iy < bottom; iy++)
 	(*op) (twin_pixmap_pointer (dst, left, iy), src, right - left);
-    twin_pixmap_damage (dst, left, right, top, bottom);
+    twin_pixmap_damage (dst, left, top, right, bottom);
 }

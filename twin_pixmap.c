@@ -226,16 +226,16 @@ twin_pixmap_reset_clip (twin_pixmap_t *pixmap)
 }
 
 void
-twin_pixmap_damage (twin_pixmap_t *pixmap,
-		    twin_coord_t x1, twin_coord_t y1,
-		    twin_coord_t x2, twin_coord_t y2)
+twin_pixmap_damage (twin_pixmap_t   *pixmap,
+		    twin_coord_t    left,	twin_coord_t top,
+		    twin_coord_t    right,	twin_coord_t bottom)
 {
     if (pixmap->screen)
 	twin_screen_damage (pixmap->screen,
-			    x1 + pixmap->x,
-			    y1 + pixmap->y,
-			    x2 + pixmap->x,
-			    y2 + pixmap->y);
+			    left + pixmap->x,
+			    top + pixmap->y,
+			    right + pixmap->x,
+			    bottom + pixmap->y);
 }
 
 static twin_argb32_t

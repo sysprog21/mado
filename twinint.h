@@ -485,6 +485,11 @@ _twin_widget_contains (twin_widget_t	*widget,
 		       twin_coord_t	y);
 
 void
+_twin_widget_bevel (twin_widget_t   *widget,
+		    twin_fixed_t    bevel_width,
+		    twin_bool_t	    down);
+
+void
 _twin_label_init (twin_label_t		*label,
 		  twin_box_t		*parent,
 		  const char		*value,

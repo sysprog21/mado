@@ -65,7 +65,7 @@ twin_hello_start (twin_screen_t *screen, const char *name, int x, int y, int w, 
 						  "Button",
 						  0xff800000,
 						  twin_int_to_fixed (18),
-						  TWIN_TEXT_BOLD);
+						  TWIN_TEXT_BOLD|TWIN_TEXT_OBLIQUE);
     twin_widget_set (&labela->widget, 0xc0c0c0c0);
     (void) widget;
     twin_widget_set (&labelb->widget, 0xc0c0c0c0);

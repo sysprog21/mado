@@ -29,46 +29,9 @@
 static void
 _twin_button_paint (twin_button_t *button)
 {
-    twin_path_t		*path = twin_path_create ();
-    twin_coord_t	w = button->label.widget.extents.right - button->label.widget.extents.left;
-    twin_coord_t	h = button->label.widget.extents.bottom - button->label.widget.extents.top;
-    twin_fixed_t	wf = twin_int_to_fixed (w);
-    twin_fixed_t	hf = twin_int_to_fixed (h);
-    twin_fixed_t	bf = _twin_button_bw (button);
-    twin_argb32_t	top_color, bot_color;
-    twin_pixmap_t	*pixmap = button->label.widget.window->pixmap;
-    
-    if (path)
-    {
-	if (button->active)
-	{
-	    top_color = 0x80000000;
-	    bot_color = 0x80808080;
-	}
-	else
-	{
-	    top_color = 0x80808080;
-	    bot_color = 0x80000000;
-	}
-	twin_path_move (path, 0, 0);
-	twin_path_draw (path, wf, 0);
-	twin_path_draw (path, wf-bf, bf);
-	twin_path_draw (path, bf, bf);
-	twin_path_draw (path, bf, hf-bf);
-	twin_path_draw (path, 0, hf);
-	twin_path_close (path);
-	twin_paint_path (pixmap, top_color, path);
-	twin_path_empty (path);
-	twin_path_move (path, bf, hf-bf);
-	twin_path_draw (path, wf-bf, hf-bf);
-	twin_path_draw (path, wf-bf, bf);
-	twin_path_draw (path, wf, 0);
-	twin_path_draw (path, wf, hf);
-	twin_path_draw (path, 0, hf);
-	twin_path_close (path);
-	twin_paint_path (pixmap, bot_color, path);
-	twin_path_destroy (path);
-    }
+    _twin_widget_bevel (&button->label.widget, 
+			_twin_button_bw(button),
+			button->active);
 }
 
 static void

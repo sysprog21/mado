@@ -122,6 +122,50 @@ _twin_widget_contains (twin_widget_t	*widget,
 	    0 <= y && y < _twin_widget_height(widget)); 
 }
 
+void
+_twin_widget_bevel (twin_widget_t   *widget,
+		    twin_fixed_t    b,
+		    twin_bool_t	    down)
+{
+    twin_path_t		*path = twin_path_create ();
+    twin_fixed_t	w = twin_int_to_fixed (_twin_widget_width (widget));
+    twin_fixed_t	h = twin_int_to_fixed (_twin_widget_height (widget));
+    twin_argb32_t	top_color, bot_color;
+    twin_pixmap_t	*pixmap = widget->window->pixmap;
+    
+    if (path)
+    {
+	if (down)
+	{
+	    top_color = 0x80000000;
+	    bot_color = 0x80808080;
+	}
+	else
+	{
+	    top_color = 0x80808080;
+	    bot_color = 0x80000000;
+	}
+	twin_path_move (path, 0, 0);
+	twin_path_draw (path, w, 0);
+	twin_path_draw (path, w-b, b);
+	twin_path_draw (path, b, b);
+	twin_path_draw (path, b, h-b);
+	twin_path_draw (path, 0, h);
+	twin_path_close (path);
+	twin_paint_path (pixmap, top_color, path);
+	twin_path_empty (path);
+	twin_path_move (path, b, h-b);
+	twin_path_draw (path, w-b, h-b);
+	twin_path_draw (path, w-b, b);
+	twin_path_draw (path, w, 0);
+	twin_path_draw (path, w, h);
+	twin_path_draw (path, 0, h);
+	twin_path_close (path);
+	twin_paint_path (pixmap, bot_color, path);
+	twin_path_destroy (path);
+    }
+}
+
 twin_widget_t *
 twin_widget_create (twin_box_t	    *parent,
 		    twin_argb32_t   background,

@@ -242,10 +242,6 @@ typedef struct _twin_edge {
     int			winding;
 } twin_edge_t;
 
-#define TWIN_POLY_STEP	    TWIN_FIXED_HALF
-#define TWIN_POLY_START	    (TWIN_POLY_STEP / 2)
-#define TWIN_POLY_CEIL(c)   (((c) + (TWIN_POLY_STEP-1)) & ~(TWIN_POLY_STEP-1))
-
 /*
  * Pixmap must be in a8 format.
  */
@@ -272,5 +268,23 @@ struct _twin_path {
     int		    size_sublen;
     int		    nsublen;
 };
+
+/*
+ * Glyph stuff
+ */
+
+typedef signed char	twin_gfixed_t;
+
+typedef struct _twin_gpoint { twin_gfixed_t x, y; } twin_gpoint_t;
+
+extern const twin_gpoint_t    *_twin_font[];
+
+#define TWIN_UCS_PAGE_SHIFT 7
+#define TWIN_UCS_PER_PAGE   (1 << TWIN_UCS_PAGE_SHIFT)
+
+typedef struct _twin_charmap {
+    uint16_t	page;
+    uint16_t	offsets[TWIN_UCS_PER_PAGE];
+} twin_charmap_t;
 
 #endif /* _TWININT_H_ */

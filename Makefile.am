@@ -1,5 +1,6 @@
 CFLAGS=-g
 INCLUDES= @X_CFLAGS@ @WARN_CFLAGS@
+SUBDIRS=twin_ttf
 
 #libtwin_la_SOURCES = \
 #	twin.h \
@@ -18,6 +19,8 @@ xtwin_SOURCES = \
 	twin.h \
 	twin_convolve.c \
 	twin_draw.c \
+	twin_glyphs.c \
+	twin_font.c \
 	twin_geom.c \
 	twin_path.c \
 	twin_pixmap.c \
@@ -25,8 +28,9 @@ xtwin_SOURCES = \
 	twin_primitive.c \
 	twin_screen.c \
 	twin_spline.c \
+	twin_vera.c \
 	twin_x11.c \
 	twinint.h \
 	xtwin.c
 
-xtwin_LDADD = @X_LIBS@
+xtwin_LDADD = @X_LIBS@ -lm

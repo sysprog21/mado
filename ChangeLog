@@ -1,3 +1,49 @@
+2004-09-23  Keith Packard  <keithp@keithp.com>
+
+ 	* Makefile.am:
+	* configure.ac:
+	* twin.h:
+	Fix twin_fixed_floor to work for negative values correctly
+	Add twin_path_cur_point
+	
+	* twin_convolve.c: (_twin_path_step), (_around_order), (_angle),
+	(_twin_subpath_convolve), (twin_path_convolve):
+	fix twin_path_step to actually handle duplicate points.
+	Change 'clockwise' to 'around_order' so that all three possible
+	results are returned (clockwise, parallel and counterclockwise)
+	Handle disjoint strokes
+
+	* twin_font.c: (twin_has_glyph), (twin_path_glyph),
+	(twin_glyph_width), (twin_path_string), (twin_path_fglyph),
+	(twin_path_ucs4), (_twin_utf8_to_ucs4), (twin_path_utf8):
+	Add outline and stroke font support (pick one and remove the other)
+	
+	* twin_glyphs.c:
+	Huge array of stroke fonts from Hershey.  Pick appropriate subset
+	and remove extra glyphs (there are a lot here)
+	
+	* twin_path.c: (_twin_cur_subpath_len), (twin_path_cur_point),
+	(twin_path_move), (twin_path_draw), (twin_path_close):
+	Eliminate repeated move and close, eliminate duplicate draw.
+	
+	* twin_poly.c: (_twin_edge_build), (_span_fill), (_twin_edge_fill):
+	Add support for 1, 4, 16 and 64 samples.  16 appears to be the
+	magic sweet spot.
+	
+	* twin_ttf/Makefile.am:
+	* twin_ttf/Vera.ttf:
+	* twin_ttf/twin_ttf.c: (pos), (command), (cpos), (ucs4_to_utf8),
+	(glyph), (outline_moveto), (outline_lineto), (outline_conicto),
+	(outline_cubicto), (ucs_page), (ucs_first_in_page), (sanitize),
+	(facename), (convert_font), (main):
+	Convert "real" outline fonts to twin built-ins
+
+	* twin_vera.c:
+	Converted version of Bitstream Vera Sans Roman
+
+	* twinint.h:
+	* xtwin.c: (main):
+
 2004-09-21  Keith Packard  <keithp@keithp.com>
 
 	* twin.h:

@@ -24,6 +24,15 @@
 
 #include "twinint.h"
 	    
+#define TWIN_POLY_SHIFT	    2
+#define TWIN_POLY_FIXED_SHIFT	(4 - TWIN_POLY_SHIFT)
+#define TWIN_POLY_SAMPLE    (1 << TWIN_POLY_SHIFT)
+#define TWIN_POLY_MASK	    (TWIN_POLY_SAMPLE - 1)
+#define TWIN_POLY_STEP	    (TWIN_FIXED_ONE >> TWIN_POLY_SHIFT)
+#define TWIN_POLY_START	    (TWIN_POLY_STEP >> 1)
+#define TWIN_POLY_CEIL(c)   (((c) + (TWIN_POLY_STEP-1)) & ~(TWIN_POLY_STEP-1))
+#define TWIN_POLY_COL(x)    (((x) >> TWIN_POLY_FIXED_SHIFT) & TWIN_POLY_MASK)
+
 static int
 _edge_compare_y (const void *a, const void *b)
 {
@@ -121,7 +130,6 @@ _twin_edge_build (twin_point_t *vertices, int nvertices, twin_edge_t *edges)
 	edges[e].top = y;
 	e++;
     }
-    qsort (edges, e, sizeof (twin_edge_t), _edge_compare_y);
     return e;
 }
     
@@ -131,61 +139,118 @@ _span_fill (twin_pixmap_t   *pixmap,
 	    twin_fixed_t    left,
 	    twin_fixed_t    right)
 {
-    /* 2x2 oversampling yields slightly uneven alpha values */
+#if TWIN_POLY_SHIFT == 0
+    /* 1x1 */
+    static const twin_a8_t	coverage[1][1] = {
+	{ 0xff },
+    };
+#endif
+#if TWIN_POLY_SHIFT == 1
+    /* 2x2 */
     static const twin_a8_t	coverage[2][2] = {
 	{ 0x40, 0x40 },
 	{ 0x3f, 0x40 },
     };
-    const twin_a8_t *cover = coverage[(y >> 3) & 1];
+#endif
+#if TWIN_POLY_SHIFT == 2
+    /* 4x4 */
+    static const twin_a8_t	coverage[4][4] = {
+	{ 0x10, 0x10, 0x10, 0x10 },
+	{ 0x10, 0x10, 0x10, 0x10 },
+	{ 0x0f, 0x10, 0x10, 0x10 },
+	{ 0x10, 0x10, 0x10, 0x10 },
+    };
+#endif
+#if TWIN_POLY_SHIFT == 3
+    /* 8x8 */
+    static const twin_a8_t	coverage[8][8] = {
+	{ 4, 4, 4, 4, 4, 4, 4, 4 },
+	{ 4, 4, 4, 4, 4, 4, 4, 4 },
+	{ 4, 4, 4, 4, 4, 4, 4, 4 },
+	{ 4, 4, 4, 4, 4, 4, 4, 4 },
+	{ 3, 4, 4, 4, 4, 4, 4, 4 },
+	{ 4, 4, 4, 4, 4, 4, 4, 4 },
+	{ 4, 4, 4, 4, 4, 4, 4, 4 },
+	{ 4, 4, 4, 4, 4, 4, 4, 4 },
+    };
+#endif
+    const twin_a8_t *cover = coverage[(y >> TWIN_POLY_FIXED_SHIFT) & TWIN_POLY_MASK];
     int		    row = twin_fixed_trunc (y);
     twin_a8_t	    *span = pixmap->p.a8 + row * pixmap->stride;
+    twin_a8_t	    *s;
     twin_fixed_t    x;
     twin_a16_t	    a;
     twin_a16_t	    w;
+    int		    col;
     
     /* clip to pixmap */
     if (left < 0)
 	left = 0;
     
-    if (twin_fixed_trunc (right) > pixmap->width)
+    if (right > twin_int_to_fixed (pixmap->width))
 	right = twin_int_to_fixed (pixmap->width);
 
-    left = _twin_fixed_grid_ceil (left);
-    right = _twin_fixed_grid_ceil (right);
+    /* convert to sample grid */
+    left = _twin_fixed_grid_ceil (left) >> TWIN_POLY_FIXED_SHIFT;
+    right = _twin_fixed_grid_ceil (right) >> TWIN_POLY_FIXED_SHIFT;
     
     /* check for empty */
-    if (right < left)
+    if (right <= left)
 	return;
 
     x = left;
     
     /* starting address */
-    span += twin_fixed_trunc(x);
+    s = span + (x >> TWIN_POLY_SHIFT);
     
     /* first pixel */
-    if (x & TWIN_FIXED_HALF)
+    if (x & TWIN_POLY_MASK)
     {
-	a = *span + (twin_a16_t) cover[1];
-	*span++ = twin_sat (a);
-	x += TWIN_FIXED_HALF;
+	w = 0;
+	col = 0;
+	while (x < right && (x & TWIN_POLY_MASK))
+	{
+	    w += cover[col++];
+	    x++;
+	}
+	a = *s + w;
+	*s++ = twin_sat (a);
     }
 
+    w = 0;
+    for (col = 0; col < TWIN_POLY_SAMPLE; col++)
+	w += cover[col];
+
     /* middle pixels */
-    w = cover[0] + cover[1];
-    while (x < right - TWIN_FIXED_HALF)
+    while (x + TWIN_POLY_MASK < right)
     {
-	a = *span + w;
-	*span++ = twin_sat (a);
-	x += TWIN_FIXED_ONE;
+	a = *s + w;
+	*s++ = twin_sat (a);
+	x += TWIN_POLY_SAMPLE;
     }
     
     /* last pixel */
-    if (x < right)
+    if (right & TWIN_POLY_MASK)
     {
-	a = *span + (twin_a16_t) cover[0];
-	*span = twin_sat (a);
+	w = 0;
+	col = 0;
+	while (x < right)
+	{
+	    w += cover[col++];
+	    x++;
+	}
+	a = *s + w;
+	*s = twin_sat (a);
     }
 }
+
+#if 0
+#include <stdio.h>
+#define F(x)	twin_fixed_to_double(x)
+#define DBGOUT(x...)	printf(x)
+#else
+#define DBGOUT(x...)
+#endif
 
 void
 _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
@@ -196,6 +261,7 @@ _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
     twin_fixed_t    x0;
     int		    w;
     
+    qsort (edges, nedges, sizeof (twin_edge_t), _edge_compare_y);
     e = 0;
     y = edges[0].top;
     active = 0;
@@ -211,16 +277,19 @@ _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
 	    *prev = &edges[e];
 	}
 	
+	DBGOUT ("Y %9.4f:", F(y));
 	/* walk this y value marking coverage */
 	w = 0;
 	for (a = active; a; a = a->next)
 	{
+	    DBGOUT (" %9.4f(%d)", F(a->x), a->winding);
 	    if (w == 0)
 		x0 = a->x;
 	    w += a->winding;
 	    if (w == 0)
 		_span_fill (pixmap, y, x0, a->x);
 	}
+	DBGOUT ("\n");
 	
 	/* step down, clipping to pixmap */
 	y += TWIN_POLY_STEP;

@@ -32,12 +32,14 @@ typedef uint8_t	    twin_a8_t;
 typedef uint16_t    twin_a16_t;
 typedef uint16_t    twin_rgb16_t;
 typedef uint32_t    twin_argb32_t;
+typedef uint32_t    twin_ucs4_t;
 typedef int	    twin_bool_t;
 typedef int16_t	    twin_fixed_t;   /* 12.4 format */
 typedef int32_t	    twin_dfixed_t;
 
-#define twin_fixed_floor(f) ((((f) < 0) ? ((f) + 0xf) : (f)) >> 4)
+#define twin_fixed_floor(f) ((f) & ~0xf)
 #define twin_fixed_trunc(f) ((f) >> 4)
+#define twin_fixed_ceil(f)  (((f) + 0xf) & ~0xf)
 
 #define twin_double_to_fixed(d)	((twin_fixed_t) ((d) * 16.0))
 #define twin_fixed_to_double(f)	((double) (f) / 16.0)
@@ -157,6 +159,18 @@ typedef struct _twin_point {
 typedef struct _twin_path twin_path_t;
 
 /*
+ * A font
+ */
+
+typedef struct _twin_font {
+    const struct _twin_charmap  *charmap;
+    const unsigned char		ncharmap;
+    const char			*outlines;
+    const char			ascender, descender, height;
+    const char			*family, *style;
+} twin_font_t;
+
+/*
  * twin_convolve.c
  */
 void
@@ -192,6 +206,30 @@ twin_fill (twin_pixmap_t    *dst,
 	   int		    height);
 
 /*
+ * twin_font.c
+ */
+
+twin_bool_t
+twin_has_glyph (int glyph);
+    
+void
+twin_path_glyph (twin_path_t *path, int glyph);
+ 
+int
+twin_glyph_width (int glyph);
+
+void
+twin_path_string (twin_path_t *path, unsigned char *string);
+
+void
+twin_path_ucs4 (twin_path_t *path, twin_fixed_t scale_x,
+		twin_fixed_t scale_y, twin_ucs4_t ucs4);
+    
+void
+twin_path_utf8 (twin_path_t *path, twin_fixed_t scale_x, twin_fixed_t scale_y, 
+		const char *string);
+
+/*
  * twin_path.c
  */
 
@@ -200,6 +238,9 @@ twin_path_move (twin_path_t *path, twin_fixed_t x, twin_fixed_t y);
 
 void
 twin_path_draw (twin_path_t *path, twin_fixed_t x, twin_fixed_t y);
+
+void
+twin_path_cur_point (twin_path_t *path, twin_fixed_t *xp, twin_fixed_t *yp);
 
 void
 twin_path_circle(twin_path_t *path, twin_fixed_t radius);

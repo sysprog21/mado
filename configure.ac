@@ -52,5 +52,23 @@ PKG_CHECK_MODULES(X, x11,
 AC_SUBST(X_CFLAGS)
 AC_SUBST(X_LIBS)
 
+AC_ARG_WITH(freetype-config, [  --with-freetype-config=PROG   Use FreeType configuration program PROG], freetype_config=$withval, freetype_config=yes)
+
+if test "$freetype_config" = "yes"; then 
+	AC_PATH_PROG(ft_config,freetype-config,no)
+	if test "$ft_config" = "no"; then
+		AC_MSG_ERROR([You must have freetype installed; see http://www.freetype.org/])
+	fi
+else
+	ft_config="$freetype_config"
+fi
+
+FREETYPE_CFLAGS="`$ft_config --cflags`"
+FREETYPE_LIBS="`$ft_config --libs`"
+
+AC_SUBST(FREETYPE_LIBS)
+AC_SUBST(FREETYPE_CFLAGS)
+
 AC_OUTPUT([Makefile
+	   twin_ttf/Makefile
            twin.pc])

@@ -24,17 +24,50 @@
 
 #include "twinint.h"
 
+static int
+_twin_cur_subpath_len (twin_path_t *path)
+{
+    int	start;
+    
+    if (path->nsublen)
+	start = path->sublen[path->nsublen-1];
+    else
+	start = 0;
+    return path->npoints - start;
+}
+
+void
+twin_path_cur_point (twin_path_t *path, twin_fixed_t *x, twin_fixed_t *y)
+{
+    if (!path->npoints)
+	twin_path_move (path, 0, 0);
+    *x = path->points[path->npoints - 1].x;
+    *y = path->points[path->npoints - 1].y;
+}
+
 void 
 twin_path_move (twin_path_t *path, twin_fixed_t x, twin_fixed_t y)
 {
-    if (path->npoints)
+    switch (_twin_cur_subpath_len (path)) {
+    default:
 	twin_path_close (path);
-    twin_path_draw (path, x, y);
+    case 0:
+	twin_path_draw (path, x, y);
+	break;
+    case 1:
+	path->points[path->npoints-1].x = x;
+	path->points[path->npoints-1].y = y;
+	break;
+    }
 }
 
 void
 twin_path_draw (twin_path_t *path, twin_fixed_t x, twin_fixed_t y)
 {
+    if (_twin_cur_subpath_len(path) > 0 &&
+	path->points[path->npoints-1].x == x &&
+	path->points[path->npoints-1].y == y)
+	return;
     if (path->npoints == path->size_points)
     {
 	int		size_points;
@@ -61,6 +94,13 @@ twin_path_draw (twin_path_t *path, twin_fixed_t x, twin_fixed_t y)
 void
 twin_path_close (twin_path_t *path)
 {
+    switch (_twin_cur_subpath_len(path)) {
+    case 1:
+	path->npoints--;
+    case 0:
+	return;
+    }
+    
     if (path->nsublen == path->size_sublen)
     {
 	int	size_sublen;

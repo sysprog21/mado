@@ -79,11 +79,7 @@ typedef signed char	twin_gfixed_t;
     ((twin_argb32_t) twin_int_mult (twin_get_8(s,i),(m),(t)) << (i))
 
 #define twin_over(s,d,i,m,t)	\
-    ((t) = twin_int_mult(twin_get_8(d,i),(m),(t)) + twin_get_8(s,i),\
-     (twin_argb32_t) twin_sat (t) << (i))
-
-#define twin_over(s,d,i,m,t)	\
-    ((t) = twin_int_mult(twin_get_8(d,i),(m),(t)) + twin_get_8(s,i),\
+    (((t) = twin_int_mult(twin_get_8(d,i),(m),(t)) + twin_get_8(s,i)),\
      (twin_argb32_t) twin_sat (t) << (i))
 
 #define twin_argb32_to_rgb16(s)    ((((s) >> 3) & 0x001f) | \
@@ -343,5 +339,7 @@ _twin_path_sdraw (twin_path_t *path, twin_sfixed_t x, twin_sfixed_t y);
 
 extern const twin_gpoint_t	_twin_glyphs[];
 extern const uint16_t		_twin_glyph_offsets[];
+
+#define TWIN_GLYPH_MAX_POINTS	56
 
 #endif /* _TWININT_H_ */

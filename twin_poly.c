@@ -272,7 +272,7 @@ _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
     twin_edge_t	    *active, *a, *n, **prev;
     int		    e;
     twin_sfixed_t    y;
-    twin_sfixed_t    x0;
+    twin_sfixed_t    x0 = 0;
     int		    w;
     
     qsort (edges, nedges, sizeof (twin_edge_t), _edge_compare_y);

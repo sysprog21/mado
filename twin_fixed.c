@@ -36,6 +36,7 @@
 #define uint32_hi(i)	((i) >> 16)
 #define uint32_carry16	((1) << 16)
 
+#if 0
 twin_fixed_t
 twin_fixed_mul (twin_fixed_t af, twin_fixed_t bf)
 {
@@ -88,7 +89,9 @@ twin_fixed_mul (twin_fixed_t af, twin_fixed_t bf)
 	     twin_fixed_to_double (r)));
     return r;
 }
+#endif
 
+#if 0
 twin_fixed_t
 twin_fixed_div (twin_fixed_t a, twin_fixed_t b)
 {
@@ -96,6 +99,7 @@ twin_fixed_div (twin_fixed_t a, twin_fixed_t b)
     q = (twin_fixed_t) ((((int64_t) a) << 16) / b);
     return q;
 }
+#endif
 
 twin_fixed_t
 twin_fixed_sqrt (twin_fixed_t a)

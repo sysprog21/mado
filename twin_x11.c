@@ -26,6 +26,29 @@
 #include "twinint.h"
 
 static void
+_twin_x11_put_begin (int    x,
+		     int    y,
+		     int    width,
+		     int    height,
+		     void   *closure)
+{
+    twin_x11_t	*tx = closure;
+
+    tx->iy = 0;
+    tx->image = XCreateImage (tx->dpy, tx->visual, tx->depth, ZPixmap,
+			      0, 0, width, height, 32, 0);
+    if (tx->image)
+    {
+	tx->image->data = malloc (4 * width * height);
+	if (!tx->image->data)
+	{
+	    XDestroyImage (tx->image);
+	    tx->image = 0;
+	}
+    }
+}
+
+static void
 _twin_x11_put_span (int		    x,
 		    int		    y,
 		    int		    width,
@@ -33,14 +56,11 @@ _twin_x11_put_span (int		    x,
 		    void	    *closure)
 {
     twin_x11_t	*tx = closure;
-    XImage	*image;
     int		ix = 0;
     int		iw = width;
 
-    image = XCreateImage (tx->dpy, tx->visual, tx->depth, ZPixmap,
-			  0, 0, width, 1, 32, 0);
-
-    image->data = malloc (4 * width);
+    if (!tx->image)
+	return;
 
     while (iw--)
     {
@@ -48,11 +68,17 @@ _twin_x11_put_span (int		    x,
 	
 	if (tx->depth == 16)
 	    pixel = twin_argb32_to_rgb16 (pixel);
-	XPutPixel (image, ix, 0, pixel);
+	XPutPixel (tx->image, ix, tx->iy, pixel);
 	ix++;
     }
-    XPutImage (tx->dpy, tx->win, tx->gc, image, 0, 0, x, y, width, 1);
-    XDestroyImage (image);
+    tx->iy++;
+    if (tx->iy == tx->image->height)
+    {
+	XPutImage (tx->dpy, tx->win, tx->gc, tx->image, 0, 0, 
+		   x, y - tx->iy, width, tx->image->height);
+	XDestroyImage (tx->image);
+	tx->image = 0;
+    }
 }
 
 static void *
@@ -111,6 +137,13 @@ twin_x11_create (Display *dpy, int width, int height)
     twin_x11_t		    *tx;
     int			    scr = DefaultScreen (dpy);
     XSetWindowAttributes    wa;
+    XTextProperty	    wm_name, icon_name;
+    XSizeHints		    sizeHints;
+    XWMHints		    wmHints;
+    XClassHint		    classHints;
+    Atom		    wm_delete_window;
+    static char		    *argv[] = { "xtwin", 0 };
+    static int		    argc = 1;
 
     tx = malloc (sizeof (twin_x11_t));
     if (!tx)
@@ -128,12 +161,29 @@ twin_x11_create (Display *dpy, int width, int height)
 		     ExposureMask|
 		     StructureNotifyMask);
 
+    wm_name.value = (unsigned char *) argv[0];
+    wm_name.encoding = XA_STRING;
+    wm_name.format = 8;
+    wm_name.nitems = strlen (wm_name.value) + 1;
+    icon_name = wm_name;
+
     tx->win = XCreateWindow (dpy, RootWindow (dpy, scr),
 			     0, 0, width, height, 0,
 			     tx->depth, InputOutput,
 			     tx->visual, CWBackPixmap|CWEventMask, &wa);
+    sizeHints.flags = 0;
+    wmHints.flags = InputHint;
+    wmHints.input = True;
+    classHints.res_name = argv[0];
+    classHints.res_class = argv[0];
+    XSetWMProperties (dpy, tx->win,
+		      &wm_name, &icon_name,
+		      argv, argc,
+ 		      &sizeHints, &wmHints, 0);
+    XSetWMProtocols (dpy, tx->win, &wm_delete_window, 1);
+
     tx->gc = XCreateGC (dpy, tx->win, 0, 0);
-    tx->screen = twin_screen_create (width, height,
+    tx->screen = twin_screen_create (width, height, _twin_x11_put_begin,
 				     _twin_x11_put_span, tx);
     twin_screen_register_damaged (tx->screen, twin_x11_screen_damaged, tx);
 

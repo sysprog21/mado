@@ -1,3 +1,36 @@
+2004-10-01  Keith Packard  <keithp@keithp.com>
+
+	* twin.h:
+	* twin_fixed.c:
+	* twin_font.c: (twin_text_metrics_ucs4), (twin_path_ucs4),
+	(twin_text_metrics_utf8):
+	* twin_screen.c: (twin_screen_create), (twin_screen_update):
+	* twin_x11.c: (_twin_x11_put_begin), (_twin_x11_put_span),
+	* twin_x11.h:
+	(twin_x11_create):
+	Add put_begin to screen structure so that the backend can batch
+	updates.
+	Add twin_int_to_fixed.
+	Inline twin_fixed_mul and twin_fixed_div using int64_t.
+	Add twin_text_metrics_utf8.
+	Hard-code the max number of vertices in a glyph.
+	Set various ICCCM properties to make X wms happy.
+
+	* twin_path.c: (_twin_matrix_max_radius), (twin_path_circle):
+	Use better approximation of ellipse major axis radius when
+	drawing circles.
+	
+	* twin_poly.c: (_twin_edge_fill):
+	Compiler warning.
+
+	* twinint.h:
+	Delete duplicate twin_over definition
+	
+	* xtwin.c: (twin_clock_hand), (twin_clock_face), (twin_clock),
+	(twin_app_thread), (twin_start_app), (twin_start_clock), (main):
+	Allow for multiple clocks, and add watermark.  Note that
+	text metrics are quite broken currently.
+
 2004-09-30  Keith Packard  <keithp@keithp.com>
 
 	* Makefile.am:

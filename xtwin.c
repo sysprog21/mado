@@ -32,17 +32,73 @@
 
 #define D(x) twin_double_to_fixed(x)
 
-#define CLOCK_SIZE 256
-
 #define TWIN_CLOCK_BACKGROUND	0xff3b80ae
-#define TWIN_CLOCK_HOUR		0xffdedede
-#define TWIN_CLOCK_MINUTE	0xffdedede
+#define TWIN_CLOCK_HOUR		0x80808080
+#define TWIN_CLOCK_HOUR_OUT	0xffdedede
+#define TWIN_CLOCK_MINUTE	0x80808080
+#define TWIN_CLOCK_MINUTE_OUT	0xffdedede
 #define TWIN_CLOCK_SECOND	0x80808080
 #define TWIN_CLOCK_TIC		0xffbababa
 #define TWIN_CLOCK_NUMBERS	0xffdedede
+#define TWIN_CLOCK_WATER	0x40404040
+#define TWIN_CLOCK_BORDER	0xffbababa
+#define TWIN_CLOCK_BORDER_WIDTH	D(0.01)
+
+static void
+twin_clock_set_transform (twin_pixmap_t	*clock,
+			  twin_path_t	*path)
+{
+    twin_fixed_t    scale;
+
+    scale = D(1) / 2;
+    scale = twin_fixed_mul (scale, TWIN_FIXED_ONE - TWIN_CLOCK_BORDER_WIDTH * 3);
+    twin_path_scale (path,
+		     clock->width * scale,
+		     clock->height * scale);
+
+    twin_path_translate (path, D(1) + TWIN_CLOCK_BORDER_WIDTH * 3,
+			 D(1) + TWIN_CLOCK_BORDER_WIDTH * 3);
+}
 
 static void
 twin_clock_hand (twin_pixmap_t	*clock, 
+		 twin_angle_t	angle, 
+		 twin_fixed_t	len,
+		 twin_fixed_t	fill_width,
+		 twin_fixed_t	out_width,
+		 twin_argb32_t	fill_pixel,
+		 twin_argb32_t	out_pixel)
+{
+    twin_path_t	    *stroke = twin_path_create ();
+    twin_path_t	    *pen = twin_path_create ();
+    twin_path_t	    *path = twin_path_create ();
+    twin_matrix_t   m;
+
+    twin_clock_set_transform (clock, stroke);
+
+    twin_path_rotate (stroke, angle);
+    twin_path_move (stroke, D(0), D(0));
+    twin_path_draw (stroke, len, D(0));
+
+    m = twin_path_current_matrix (stroke);
+    m.m[2][0] = 0;
+    m.m[2][1] = 0;
+    twin_path_set_matrix (pen, m);
+    twin_path_set_matrix (path, m);
+    twin_path_circle (pen, fill_width);
+    twin_path_convolve (path, stroke, pen);
+
+    twin_paint_path (clock, fill_pixel, path);
+
+    twin_paint_stroke (clock, out_pixel, path, out_width);
+    
+    twin_path_destroy (path);
+    twin_path_destroy (pen);
+    twin_path_destroy (stroke);
+}
+
+static void
+twin_clock_sec (twin_pixmap_t	*clock, 
 		 twin_angle_t	angle, 
 		 twin_fixed_t	len,
 		 twin_fixed_t	width,
@@ -50,8 +106,7 @@ twin_clock_hand (twin_pixmap_t	*clock,
 {
     twin_path_t	    *stroke = twin_path_create ();
 
-    twin_path_translate (stroke, D(CLOCK_SIZE) / 2, D(CLOCK_SIZE) / 2);
-    twin_path_scale (stroke, D(CLOCK_SIZE) / 2, D(CLOCK_SIZE) / 2);
+    twin_clock_set_transform (clock, stroke);
 
     twin_path_rotate (stroke, angle);
     twin_path_move (stroke, D(0), D(0));
@@ -74,15 +129,36 @@ twin_clock_face (twin_pixmap_t *clock)
     twin_path_t	    *path = twin_path_create ();
     int		    m;
 
-    twin_path_translate (path, D(CLOCK_SIZE) / 2, D(CLOCK_SIZE) / 2);
-    twin_path_scale (path, D(CLOCK_SIZE) / 2, D(CLOCK_SIZE) / 2);
-    twin_path_set_font_size (path, D(0.2));
-    twin_path_set_font_style (path, TWIN_TEXT_UNHINTED);
+    twin_clock_set_transform (clock, path);
 
     twin_path_move (path, 0, 0);
     twin_path_circle (path, TWIN_FIXED_ONE);
     
     twin_paint_path (clock, TWIN_CLOCK_BACKGROUND, path);
+
+    twin_paint_stroke (clock, TWIN_CLOCK_BORDER, path, TWIN_CLOCK_BORDER_WIDTH);
+
+    {
+	twin_state_t	    state = twin_path_save (path);
+	twin_text_metrics_t metrics;
+	twin_fixed_t	    height;
+	static char	    *label = "twin";
+
+	twin_path_empty (path);
+	twin_path_rotate (path, twin_degrees_to_angle (-11));
+	twin_path_set_font_size (path, D(0.5));
+	twin_path_set_font_style (path, TWIN_TEXT_UNHINTED|TWIN_TEXT_OBLIQUE);
+	twin_text_metrics_utf8 (path, label, &metrics);
+	height = metrics.ascent + metrics.descent;
+/*	twin_path_move (path, -metrics.width / 2, height / 2 - metrics.ascent);*/
+	twin_path_move (path, -D(.4), -D(.16));
+	twin_path_utf8 (path, label);
+	twin_paint_path (clock, TWIN_CLOCK_WATER, path);
+	twin_path_restore (path, &state);
+    }
+
+    twin_path_set_font_size (path, D(0.2));
+    twin_path_set_font_style (path, TWIN_TEXT_UNHINTED);
 
     for (m = 1; m <= 60; m++)
     {
@@ -112,22 +188,32 @@ twin_clock_face (twin_pixmap_t *clock)
     twin_path_destroy (path);
 }
 
+int nclock;
+
 static void
-twin_clock (twin_screen_t *screen)
+twin_clock (twin_screen_t *screen, int x, int y, int w, int h)
 {
-    twin_pixmap_t   *clock = twin_pixmap_create (TWIN_ARGB32, CLOCK_SIZE, CLOCK_SIZE);
+    twin_pixmap_t   *clock = twin_pixmap_create (TWIN_ARGB32, w, h);
     struct timeval  tv;
     struct tm	    t;
     twin_angle_t    hour_angle, minute_angle, second_angle;
+#if 0
+    int		    i;
+#endif
 
     printf ("twin clock\n");
-    twin_pixmap_move (clock, 0, 0);
+    twin_pixmap_move (clock, x, y);
     twin_pixmap_show (clock, screen, 0);
+    
+#if 0
+    for (i = 0; i < 5; i++)
+#else
     for (;;)
+#endif
     {
 	twin_pixmap_disable_update (clock);
 	twin_fill (clock, 0x00000000, TWIN_SOURCE, 0, 0, 
-		   CLOCK_SIZE, CLOCK_SIZE);
+		   clock->width, clock->height);
 
 	gettimeofday (&tv, NULL);
 
@@ -139,13 +225,63 @@ twin_clock (twin_screen_t *screen)
 	hour_angle = t.tm_hour * TWIN_ANGLE_360 / 12 - TWIN_ANGLE_90 + minute_angle / 12;
 
 	twin_clock_face (clock);
-	twin_clock_hand (clock, hour_angle, D(0.4), D(0.05), 0xffdedede);
-	twin_clock_hand (clock, minute_angle, D(0.8), D(0.03), 0xffdedede);
-	twin_clock_hand (clock, second_angle, D(0.6), D(0.01), 0x80808080);
+	twin_clock_hand (clock, hour_angle, D(0.4), D(0.07), D(0.01),
+			 TWIN_CLOCK_HOUR, TWIN_CLOCK_HOUR_OUT);
+	twin_clock_hand (clock, minute_angle, D(0.8), D(0.05), D(0.01),
+			 TWIN_CLOCK_MINUTE, TWIN_CLOCK_MINUTE_OUT);
+	twin_clock_sec (clock, second_angle, D(0.9), D(0.02),
+			TWIN_CLOCK_SECOND);
 
 	twin_pixmap_enable_update (clock);
+	
+	gettimeofday (&tv, NULL);
+	
 	usleep (1000000 - tv.tv_usec);
     }
+    nclock--;
+}
+
+typedef void (*twin_app_func_t) (twin_screen_t *screen,
+				 int x, int y, int w, int h);
+
+typedef struct _twin_app_args {
+    twin_app_func_t func;
+    twin_screen_t   *screen;
+    int		    x, y, w, h;
+} twin_app_args_t;
+
+static void *
+twin_app_thread (void *closure)
+{
+    twin_app_args_t *a = closure;
+
+    (*a->func) (a->screen, a->x, a->y, a->w, a->h);
+    free (a);
+    return 0;
+}
+
+static void
+twin_start_app (twin_app_func_t func, 
+		twin_screen_t *screen, 
+		int x, int y, int w, int h)
+{
+    twin_app_args_t *a = malloc (sizeof (twin_app_args_t));
+    pthread_t	    thread;
+    
+    a->func = func;
+    a->screen = screen;
+    a->x = x;
+    a->y = y;
+    a->w = w;
+    a->h = h;
+    pthread_create (&thread, NULL, twin_app_thread, a);
+}
+
+static void
+twin_start_clock (twin_screen_t *screen, int x, int y, int w, int h)
+{
+    ++nclock;
+    twin_start_app (twin_clock, screen, x, y, w, h);
 }
 
 int styles[] = {
@@ -475,8 +611,12 @@ main (int argc, char **argv)
     twin_pixmap_show (red, x11->screen, 0);
     twin_pixmap_show (blue, x11->screen, 0);
 #endif
-    twin_clock (x11->screen);
-    sleep (10000);
+    twin_start_clock (x11->screen, 0, 0, 512, 512);
+/*    twin_start_clock (x11->screen, 256, 0, 256, 256);
+    twin_start_clock (x11->screen, 0, 256, 256, 256);
+    twin_start_clock (x11->screen, 256, 256, 256, 256); */
+    while (nclock)
+	sleep (1);
 #if 0
     had_motion = TWIN_FALSE;
     for (;;)

@@ -106,8 +106,14 @@ typedef struct _twin_pixmap {
 } twin_pixmap_t;
 
 /*
- * A function that paints pixels to the screen
+ * twin_put_begin_t: called before data are drawn to the screen
+ * twin_put_span_t: called for each scanline drawn
  */
+typedef void	(*twin_put_begin_t) (int x,
+				     int y,
+				     int width,
+				     int height,
+				     void *closure);
 typedef void	(*twin_put_span_t) (int x,
 				    int y,
 				    int width,
@@ -139,6 +145,7 @@ typedef struct _twin_screen {
     /*
      * Repaint function
      */
+    twin_put_begin_t	put_begin;
     twin_put_span_t	put_span;
     void		*closure;
 } twin_screen_t;
@@ -172,6 +179,8 @@ typedef int32_t	    twin_fixed_t;   /* 16.16 format */
  */
 #define twin_double_to_fixed(d)    ((twin_fixed_t) ((d) * 65536))
 #define twin_fixed_to_double(f)    ((double) (f) / 65536.0)
+
+#define twin_int_to_fixed(i)	   ((twin_fixed_t) (i) << 16)
 
 /*
  * Place matrices in structures so they can be easily copied
@@ -241,14 +250,22 @@ twin_fill (twin_pixmap_t    *dst,
  * twin_fixed.c
  */
 
+#if 0
 twin_fixed_t
 twin_fixed_mul (twin_fixed_t af, twin_fixed_t bf);
+#else
+#define twin_fixed_mul(a,b)    ((twin_fixed_t) (((int64_t) (a) * (b)) >> 16))
+#endif
 
 twin_fixed_t
 twin_fixed_sqrt (twin_fixed_t a);
 
+#if 0
 twin_fixed_t
 twin_fixed_div (twin_fixed_t a, twin_fixed_t b);
+#else
+#define twin_fixed_div(a,b)	((twin_fixed_t) ((((int64_t) (a)) << 16) / b))
+#endif
 
 /*
  * twin_font.c
@@ -282,6 +299,10 @@ twin_text_metrics_ucs4 (twin_path_t	    *path,
 			twin_ucs4_t	    ucs4, 
 			twin_text_metrics_t *m);
 
+void
+twin_text_metrics_utf8 (twin_path_t	    *path,
+			const char	    *string,
+			twin_text_metrics_t *m);
 /*
  * twin_hull.c
  */
@@ -450,10 +471,11 @@ twin_fill_path (twin_pixmap_t *pixmap, twin_path_t *path, int dx, int dy);
  */
 
 twin_screen_t *
-twin_screen_create (int		    width,
-		    int		    height, 
-		    twin_put_span_t put_span,
-		    void	    *closure);
+twin_screen_create (int			width,
+		    int			height, 
+		    twin_put_begin_t	put_begin,
+		    twin_put_span_t	put_span,
+		    void		*closure);
 
 void
 twin_screen_destroy (twin_screen_t *screen);

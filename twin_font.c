@@ -209,7 +209,6 @@ twin_text_metrics_ucs4 (twin_path_t	    *path,
 	top = bottom = baseline;
 	right = Scale(p[0].y);
     }
-
     m->left_side_bearing = SNAPI(path, -left);
     m->right_side_bearing = SNAPI(path,right);
     m->width = m->left_side_bearing + m->right_side_bearing;
@@ -234,10 +233,10 @@ twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
     twin_fixed_t	pen_size;
     twin_matrix_t	pen_matrix;
     twin_fixed_t	pen_adjust;
-    twin_gfixed_t    	*snap_x = 0, *snap_y = 0;
+    twin_gfixed_t    	snap_x[TWIN_GLYPH_MAX_POINTS];
+    twin_gfixed_t    	snap_y[TWIN_GLYPH_MAX_POINTS];
     twin_text_metrics_t	metrics;
     int			nsnap_x = 0, nsnap_y = 0;
-    int			npoints;
     
     twin_text_metrics_ucs4 (path, ucs4, &metrics);
     
@@ -245,14 +244,6 @@ twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
     
     if (Hint (path))
     {
-	for (i = 1; p[i].y != -64; i++)
-	    ;
-    
-	npoints = i - 1 + 3;
-	
-	snap_x = malloc ((npoints * 2) * sizeof (twin_gfixed_t));
-	snap_y = snap_x + npoints;
-	
 	nsnap_x = 0;
 	nsnap_y = 0;
     
@@ -336,9 +327,6 @@ twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
     twin_path_destroy (stroke);
     twin_path_destroy (pen);
     
-    if (snap_x)
-	free (snap_x);
-
     w = metrics.width;
 
     _twin_path_smove (path, 
@@ -451,3 +439,40 @@ twin_width_utf8 (twin_path_t *path, const char *string)
     return w;
 }
 
+void
+twin_text_metrics_utf8 (twin_path_t	    *path, 
+			const char	    *string,
+			twin_text_metrics_t *m)
+{
+    int			len;
+    twin_ucs4_t		ucs4;
+    twin_fixed_t	w = 0;
+    twin_text_metrics_t	c;
+    twin_bool_t		first = TWIN_TRUE;
+
+    while ((len = _twin_utf8_to_ucs4(string, &ucs4)) > 0)
+    {
+	twin_text_metrics_ucs4 (path, ucs4, &c);
+	if (first)
+	    *m = c;
+	else
+	{
+	    c.left_side_bearing += w;
+	    c.right_side_bearing += w;
+	    c.width += w;
+
+	    if (c.left_side_bearing > m->left_side_bearing)
+		m->left_side_bearing = c.left_side_bearing;
+	    if (c.right_side_bearing > m->right_side_bearing)
+		m->right_side_bearing = c.right_side_bearing;
+	    if (c.width > m->width)
+		m->width = c.width;
+	    if (c.ascent < m->ascent)
+		m->ascent = c.ascent;
+	    if (c.descent > m->descent)
+		m->descent = c.descent;
+	}
+	w = c.width;
+	string += len;
+    }
+}

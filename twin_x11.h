@@ -28,6 +28,7 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xatom.h>
 #include <pthread.h>
 
 typedef struct _twin_x11 {
@@ -40,6 +41,8 @@ typedef struct _twin_x11 {
     pthread_t	    damage_thread;
     pthread_cond_t  damage_cond;
     pthread_t	    event_thread;
+    XImage	    *image;
+    int		    iy;
 } twin_x11_t;
 
 /*

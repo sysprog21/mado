@@ -154,6 +154,16 @@ twin_path_close (twin_path_t *path)
     path->nsublen++;
 }
 
+#define twin_fixed_abs(f)   ((f) < 0 ? -(f) : (f))
+
+static twin_fixed_t
+_twin_matrix_max_radius (twin_matrix_t *m)
+{
+    return (twin_fixed_abs (m->m[0][0]) + twin_fixed_abs (m->m[0][1]) +
+	    twin_fixed_abs (m->m[1][0]) + twin_fixed_abs (m->m[1][1]));
+}
+
+
 void
 twin_path_circle (twin_path_t *path, twin_fixed_t radius)
 {
@@ -162,7 +172,7 @@ twin_path_circle (twin_path_t *path, twin_fixed_t radius)
     twin_spoint_t   center;
     int		    i;
     twin_matrix_t   save;
-    twin_fixed_t    det;
+    twin_fixed_t    max_radius;
 
     save = twin_path_current_matrix (path);
 
@@ -172,14 +182,12 @@ twin_path_circle (twin_path_t *path, twin_fixed_t radius)
 
     twin_path_close (path);
     
-    /* The determinant represents the area expansion factor of the
-       transform. In the worst case, this is entirely in one
-       dimension, which is what we assume here. */
+    max_radius = _twin_matrix_max_radius (&path->state.matrix);
+    
+    sides = max_radius / twin_sfixed_to_fixed (TWIN_SFIXED_TOLERANCE);
+    
+    if (sides > 1024) sides = 1024;
 
-    det = _twin_matrix_determinant (&path->state.matrix);
-    
-    sides = (4 * det) / twin_sfixed_to_fixed (TWIN_SFIXED_TOLERANCE);
-    
     n = 2;
     while ((1 << n) < sides)
 	n++;

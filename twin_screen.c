@@ -25,10 +25,11 @@
 #include "twinint.h"
 
 twin_screen_t *
-twin_screen_create (int		    width,
-		    int		    height, 
-		    twin_put_span_t put_span,
-		    void	    *closure)
+twin_screen_create (int			width,
+		    int			height, 
+		    twin_put_begin_t	put_begin,
+		    twin_put_span_t	put_span,
+		    void		*closure)
 {
     twin_screen_t   *screen = malloc (sizeof (twin_screen_t));
     if (!screen)
@@ -44,6 +45,7 @@ twin_screen_create (int		    width,
 #if HAVE_PTHREAD_H
     pthread_mutex_init (&screen->screen_mutex, NULL);
 #endif
+    screen->put_begin = put_begin;
     screen->put_span = put_span;
     screen->closure = closure;
     return screen;
@@ -162,6 +164,8 @@ twin_screen_update (twin_screen_t *screen)
 	if (!span)
 	    return;
 	
+	if (screen->put_begin)
+	    (*screen->put_begin) (x, y, width, height, screen->closure);
 	while (height--)
 	{
 	    memset (span, 0xff, width * sizeof (twin_argb32_t));

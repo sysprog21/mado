@@ -110,7 +110,6 @@ _around_order (twin_point_t    *a1,
 #define F(x)	twin_fixed_to_double(x)
 #define DBGOUT(x...)	printf(x)
 
-#if 0
 static double
 _angle (twin_point_t *a, twin_point_t *b)
 {
@@ -121,7 +120,6 @@ _angle (twin_point_t *a, twin_point_t *b)
     rad = atan2 ((double) dy, (double) dx);
     return rad * 180 / M_PI;
 }
-#endif
 #else
 #define DBGOUT(x...)
 #endif
@@ -190,12 +188,10 @@ _twin_subpath_convolve (twin_path_t	*path,
 	     * step along pen (forwards or backwards) or stroke as appropriate
 	     */
 	     
-#if 0
 	    DBGOUT ("\tangles: stroke %9.4f +pen %9.4f -pen %9.4f\n",
 		    _angle (&sp[s], &sp[sn]),
 		    _angle (&pp[p], &pp[pn]),
 		    _angle (&pp[pm], &pp[p]));
-#endif
 	    if (_around_order (&sp[s],&sp[sn],&pp[p],&pp[pn]) > 0)
 	    {
 		DBGOUT ("+pen:   ");
@@ -261,6 +257,7 @@ twin_path_convolve (twin_path_t	*path,
 {
     int		p;
     int		s;
+    twin_path_t	*hull = twin_path_convex_hull (pen);
 
     p = 0;
     for (s = 0; s <= stroke->nsublen; s++)
@@ -281,8 +278,9 @@ twin_path_convolve (twin_path_t	*path,
 	    subpath.npoints = npoints;
 	    subpath.sublen = 0;
 	    subpath.nsublen = 0;
-	    _twin_subpath_convolve (path, &subpath, pen);
+	    _twin_subpath_convolve (path, &subpath, hull);
 	    p = sublen;
 	}
     }
+    twin_path_destroy (hull);
 }

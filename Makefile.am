@@ -20,6 +20,7 @@ xtwin_SOURCES = \
 	twin_convolve.c \
 	twin_draw.c \
 	twin_glyphs.c \
+	twin_hull.c \
 	twin_font.c \
 	twin_geom.c \
 	twin_path.c \

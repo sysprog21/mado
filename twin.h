@@ -47,7 +47,7 @@ typedef int32_t	    twin_dfixed_t;
 
 #define TWIN_FIXED_ONE		(0x10)
 #define TWIN_FIXED_HALF		(0x08)
-#define TWIN_FIXED_TOLERANCE	(TWIN_FIXED_HALF)
+#define TWIN_FIXED_TOLERANCE	(1)
 
 #define TWIN_FALSE  0
 #define TWIN_TRUE   1
@@ -213,13 +213,25 @@ twin_bool_t
 twin_has_glyph (int glyph);
     
 void
-twin_path_glyph (twin_path_t *path, int glyph);
+twin_path_glyph (twin_path_t	*path, 
+		 twin_fixed_t	scale_x,
+		 twin_fixed_t	scale_y,
+		 int		style,
+		 int		glyph);
  
 int
-twin_glyph_width (int glyph);
+twin_glyph_width (int glyph, twin_fixed_t scale_x);
+
+#define TWIN_TEXT_ROMAN	    0
+#define TWIN_TEXT_BOLD	    1
+#define TWIN_TEXT_OBLIQUE   2
 
 void
-twin_path_string (twin_path_t *path, unsigned char *string);
+twin_path_string (twin_path_t	*path, 
+		  twin_fixed_t	scale_x,
+		  twin_fixed_t	scale_y,
+		  int		style,
+		  unsigned char *string);
 
 void
 twin_path_ucs4 (twin_path_t *path, twin_fixed_t scale_x,
@@ -228,6 +240,13 @@ twin_path_ucs4 (twin_path_t *path, twin_fixed_t scale_x,
 void
 twin_path_utf8 (twin_path_t *path, twin_fixed_t scale_x, twin_fixed_t scale_y, 
 		const char *string);
+
+/*
+ * twin_hull.c
+ */
+
+twin_path_t *
+twin_path_convex_hull (twin_path_t *path);
 
 /*
  * twin_path.c

@@ -89,7 +89,7 @@ _twin_spline_decompose (twin_path_t	*path,
 			twin_spline_t	*spline, 
 			twin_dfixed_t	tolerance_squared)
 {
-    if (_twin_spline_error_squared (spline) < tolerance_squared)
+    if (_twin_spline_error_squared (spline) <= tolerance_squared)
     {
 	twin_path_draw (path, spline->a.x, spline->a.y);
     }

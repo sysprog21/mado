@@ -1,3 +1,40 @@
+2004-09-24  Keith Packard  <keithp@keithp.com>
+
+	* Makefile.am:
+	* twin_hull.c: (_twin_slope_init), (_twin_hull_create),
+	(_twin_slope_compare), (_twin_hull_vertex_compare),
+	(_twin_hull_prev_valid), (_twin_hull_next_valid),
+	(_twin_hull_eliminate_concave), (_twin_hull_to_path),
+	(twin_path_convex_hull):
+	Add convex hull algorithm from cairo sources.  Used to
+	constrain pens to convex shapes so that the convolution
+	algorithm works correctly.
+
+	* twin.h:
+	Reduce default tolerance to 1/16 of a pixel
+	
+	* twin_convolve.c: (_angle), (_twin_subpath_convolve),
+	(twin_path_convolve):
+	Use convex hull of pen.
+
+	* twin_font.c: (compare_snap), (_snap), (_add_snap),
+	(twin_path_glyph), (twin_glyph_width), (twin_path_string):
+	Snap horizontal and vertical elements of glyphs to
+	pixel boundaries.  Snap stem widths to integer amounts.
+	Add slanting and emboldening
+	
+	* twin_glyphs.c:
+	Add space and box
+	
+	* twin_primitive.c:
+	Avoid using __inline as it increases size dramatically
+	
+	* twin_spline.c: (_twin_spline_decompose):
+	Use <= tolerance_squared as that may be zero
+	
+	* xtwin.c: (main):
+	Swizzle code to show off recent changes
+
 2004-09-23  Keith Packard  <keithp@keithp.com>
 
  	* Makefile.am:

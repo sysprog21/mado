@@ -29,6 +29,13 @@
 
 #define D(x) twin_double_to_fixed(x)
 
+static int styles[] = {
+    TWIN_TEXT_ROMAN,
+    TWIN_TEXT_OBLIQUE,
+    TWIN_TEXT_BOLD,
+    TWIN_TEXT_BOLD|TWIN_TEXT_OBLIQUE
+};
+
 int
 main (int argc, char **argv)
 {
@@ -46,55 +53,35 @@ main (int argc, char **argv)
     int		    x, y;
     twin_fixed_t    fx, fy;
     int		    g;
+    int		    s;
 
     pen = twin_path_create ();
     twin_path_circle (pen, D (0.5));
-#define OFF TWIN_FIXED_HALF
-#if 0
-    twin_path_move (pen, D(-1), D(-1));
-    twin_path_draw (pen, D(1), D(-1));
-    twin_path_draw (pen, D(1), D(1));
-    twin_path_draw (pen, D(-1), D(1));
-#endif
     
     twin_fill (red, 0x00000000, TWIN_SOURCE, 0, 0, 512, 512);
     twin_fill (alpha, 0x00000000, TWIN_SOURCE, 0, 0, 512, 512);
 
     path = twin_path_create ();
-#if 0
-    stroke = twin_path_create();
-
-#define HEIGHT	twin_int_to_fixed(16)
-#define LEFT	(twin_int_to_fixed (3) + OFF)
-    
-    fx = LEFT;
-    fy = HEIGHT + OFF;
-    
-    twin_path_move (stroke, fx, fy);
-    
-    for (g = 0; g < 4000; g++)
-/*    for (g = 1000; g < 2000; g++) */
-/*    for (g = 2000; g < 2500; g++) */
-/*     for (g = 2500; g < 3000; g++) */
-/*    for (g = 3000; g < 4000; g++) */
-    /* really chunky looking */
-/*    for (g = 4000; g < 4327; g++) */
-/*  #define WIDTH	twin_int_to_fixed(60)
-    #define HEIGHT	twin_int_to_fixed(80)
- */
+#if 1
+    fx = D(3);
+    fy = D(8);
+    for (g = 10; g < 20; g++)
     {
-	if (twin_has_glyph (g))
+#if 1
+	for (s = 0; s < 4; s++)
 	{
-	    if (fx + twin_glyph_width (g) > twin_int_to_fixed (500))
-		twin_path_move (stroke, fx = LEFT, fy += HEIGHT);
-	    twin_path_glyph (stroke, g);
-	    fx += twin_glyph_width (g);
+	    twin_path_move (path, fx, fy);
+	    twin_path_string (path, D(g), D(g), styles[s],
+			      "the quick brown fox jumps over the lazy dog.");
+	    twin_path_string (path, D(g), D(g), styles[s], 
+			      "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG.");
+	    fy += D(g);
 	}
+#else
+	twin_path_string (path, D(g), D(g), "t");
+	fy += D(g);
+#endif
     }
-
-    twin_path_convolve (path, stroke, pen);
-
-    twin_path_destroy (stroke);
 #else
     fx = D(3);
     fy = D(8);
@@ -157,7 +144,7 @@ main (int argc, char **argv)
     twin_pixmap_move (red, 0, 0);
     twin_pixmap_move (blue, 100, 100);
     twin_pixmap_show (red, x11->screen, 0);
-    twin_pixmap_show (blue, x11->screen, 0);
+/*     twin_pixmap_show (blue, x11->screen, 0); */
     had_motion = TWIN_FALSE;
     for (;;)
     {

@@ -28,7 +28,9 @@
 
 #define F(x) twin_fixed_to_double(x)
 
-#define S(x) (twin_int_to_fixed (x) / 2)
+#define S(f,s)	((twin_fixed_t) ((((twin_dfixed_t) (f) * (s)) >> 5)))
+#define SX(x) (((x) * scale_x) >> 5)
+#define SY(y) (((y) * scale_y) >> 5)
 
 twin_bool_t
 twin_has_glyph (int glyph)
@@ -36,52 +38,216 @@ twin_has_glyph (int glyph)
     return _twin_font[glyph] != NULL;
 }
 
+static int
+compare_snap (const void *av, const void *bv)
+{
+    const twin_gfixed_t   *a = av;
+    const twin_gfixed_t   *b = bv;
+
+    return (int) (*a - *b);
+}
+
+#define SNAPI(p)	(((p) + 0x7) & ~0xf)
+#define SNAPH(p)	(((p) + 0x3) & ~0x7)
+
+static twin_fixed_t
+_snap (twin_gfixed_t g, twin_fixed_t scale, twin_gfixed_t *snap, int nsnap)
+{
+    int		    s;
+    twin_fixed_t    v;
+
+    v = S(g, scale);
+    for (s = 0; s < nsnap - 1; s++)
+    {
+	if (snap[s] <= g && g <= snap[s+1])
+	{
+	    twin_fixed_t    before = S(snap[s],scale);
+	    twin_fixed_t    after = S(snap[s+1],scale);
+	    twin_fixed_t    dist = after - before;
+	    twin_fixed_t    snap_before = SNAPI(before);
+	    twin_fixed_t    snap_after = SNAPI(after);
+	    twin_fixed_t    move_before = snap_before - before;
+	    twin_fixed_t    move_after = snap_after - after;
+	    twin_fixed_t    dist_before = v - before;
+	    twin_fixed_t    dist_after = after - v;
+	    twin_fixed_t    move = ((twin_dfixed_t) dist_before * move_after + 
+				    (twin_dfixed_t) dist_after * move_before) / dist;
+#if 0
+	    printf ("%d <= %d <= %d\n", snap[s], g, snap[s+1]);
+	    printf ("%9.4f <= %9.4f <= %9.4f\n", F(before), F(v), F(after));
+	    printf ("before: %9.4f -> %9.4f\n", F(before), F(snap_before));
+	    printf ("after: %9.4f -> %9.4f\n", F(after), F(snap_after));
+	    printf ("v: %9.4f -> %9.4f\n", F(v), F(v+move));
+#endif
+	    v += move;
+	    break;
+	}
+    }
+#if 0
+    printf ("_snap: %d => %9.4f\n", g, F(v));
+#endif
+    return v;
+}
+
+#define SNAPX(p)	_snap (p, scale_x, snap_x, nsnap_x)
+#define SNAPY(p)	_snap (p, scale_y, snap_y, nsnap_y)
+
+static int
+_add_snap (twin_gfixed_t *snaps, int nsnap, twin_fixed_t snap)
+{
+    int s;
+
+    for (s = 0; s < nsnap; s++)
+	if (snaps[s] == snap)
+	    return nsnap;
+    snaps[nsnap++] = snap;
+    return nsnap;
+}
+
 void
-twin_path_glyph (twin_path_t *path, int glyph)
+twin_path_glyph (twin_path_t	*path, 
+		 twin_fixed_t	scale_x,
+		 twin_fixed_t	scale_y,
+		 int		style,
+		 int		glyph)
 {
     const twin_gpoint_t	*p = _twin_font[glyph];
     int			i;
     twin_fixed_t	xo, yo;
     twin_fixed_t	xc, yc;
+    twin_path_t		*stroke;
+    twin_path_t		*pen;
+    twin_fixed_t	pen_size;
+    twin_fixed_t	pen_adjust;
+    twin_gfixed_t    	*snap_x, *snap_y;
+    int			nsnap_x, nsnap_y;
+    int			npoints;
     
     if (!p)
 	return;
     
     twin_path_cur_point (path, &xo, &yo);
-    twin_path_close (path);
     
-    xc = xo - S (p[0].x);
-    yc = yo - S (16);
+    for (i = 1; p[i].y != -64; i++)
+	;
+
+    npoints = i - 1 + 3;
+    
+    snap_x = malloc ((npoints * 2) * sizeof (twin_gfixed_t));
+    snap_y = snap_x + npoints;
+    
+    nsnap_x = 0;
+    nsnap_y = 0;
+
+    /* snap left and right boundaries */
+    
+    nsnap_x = _add_snap (snap_x, nsnap_x, p[0].x);
+    nsnap_x = _add_snap (snap_x, nsnap_x, p[0].y);
+    
+    /* snap baseline, x height and cap height  */
+    nsnap_y = _add_snap (snap_y, nsnap_y, 9);
+    nsnap_y = _add_snap (snap_y, nsnap_y, -5);
+    nsnap_y = _add_snap (snap_y, nsnap_y, -12);
+    
+    /*
+     * Locate horizontal and vertical segments
+     */
+    for (i = 1; p[i].y != -64 && p[i+1].y != -64; i++)
+    {
+	if (p[i].x == -64 || p[i+1].x == -64)
+	    continue;
+	if (p[i].x == p[i+1].x)
+	    nsnap_x = _add_snap (snap_x, nsnap_x, p[i].x);
+	if (p[i].y == p[i+1].y)
+	    nsnap_y = _add_snap (snap_y, nsnap_y, p[i].y);
+    }
+
+    qsort (snap_x, nsnap_x, sizeof (twin_gfixed_t), compare_snap);
+    qsort (snap_y, nsnap_y, sizeof (twin_gfixed_t), compare_snap);
+    
+#if 0
+    printf ("snap_x:");
+    for (i = 0; i < nsnap_x; i++)
+	printf (" %d", snap_x[i]); 
+    printf ("\n");
+    
+    printf ("snap_y:");
+    for (i = 0; i < nsnap_y; i++)
+	printf (" %d", snap_y[i]); 
+    printf ("\n");
+#endif
+
+    stroke = twin_path_create ();
+    
+    /* snap pen size to half integer value */
+    if (style & TWIN_TEXT_BOLD)
+	pen_size = SNAPH(scale_y / 12);
+    else
+	pen_size = SNAPH(scale_y / 24);
+    
+    if (pen_size < TWIN_FIXED_HALF)
+	pen_size = TWIN_FIXED_HALF;
+    
+    pen_adjust = pen_size & TWIN_FIXED_HALF;
+    
+    pen = twin_path_create ();
+    twin_path_circle (pen, pen_size);
+
+    xc = SNAPI(xo - SX (p[0].x)) + pen_adjust;
+    yc = SNAPI(yo - SY (16)) + pen_adjust;
 
     for (i = 1; p[i].y != -64; i++)
 	if (p[i].x == -64)
-	    twin_path_close (path);
+	    twin_path_close (stroke);
 	else
-	    twin_path_draw (path, 
-			    xc + S (p[i].x),
-			    yc + S (p[i].y));
+	{
+	    twin_fixed_t    x = SNAPX(p[i].x);
+	    twin_fixed_t    y = SNAPY(p[i].y);
+	    
+	    if (style & TWIN_TEXT_OBLIQUE)
+		x -= y / 4;
+	    twin_path_draw (stroke, x + xc, y + yc);
+	}
 
-    xo = xo + twin_glyph_width (glyph);
+    twin_path_convolve (path, stroke, pen);
+    twin_path_destroy (stroke);
+    twin_path_destroy (pen);
+    
+    free (snap_x);
+
+    xo = xo + twin_glyph_width (glyph, scale_x);
     twin_path_move (path, xo, yo);
 }
 
 int
-twin_glyph_width (int glyph)
+twin_glyph_width (int glyph, twin_fixed_t scale_x)
 {
     const twin_gpoint_t	*p = _twin_font[glyph];
 
     if (!p)
 	return 0;
     
-    return twin_fixed_ceil (S (p[0].y) - S (p[0].x));
+    return twin_fixed_ceil (SX (p[0].y) - SX (p[0].x));
 }
 
 extern const uint16_t _twin_unicode[];
     
 void
-twin_path_string (twin_path_t *path, unsigned char *string)
+twin_path_string (twin_path_t	*path, 
+		  twin_fixed_t	scale_x,
+		  twin_fixed_t	scale_y,
+		  int		style,
+		  unsigned char *string)
 {
-    
+    unsigned char c;
+
+    while ((c = *string++))
+    {
+	uint16_t    g = _twin_unicode[c];
+
+	if (g)
+	    twin_path_glyph (path, scale_x, scale_y, style, g);
+    }
 }
 
 extern twin_font_t  twin_Bitstream_Vera_Sans_Roman;

@@ -24,6 +24,8 @@
 
 #include "twinint.h"
 
+#define __inline
+
 static twin_argb32_t __inline
 in_over (twin_argb32_t	dst,
 	 twin_argb32_t	src,

@@ -77,14 +77,18 @@ main (int argc, char **argv)
 #endif
 #if 1
     stroke = twin_path_create ();
-    twin_path_move (stroke, D(-1), D(7));
-    twin_path_string (stroke, D(20), D(20), TWIN_TEXT_BOLD, ".");
-/*    twin_path_convolve (path, stroke, pen); */
-    twin_path_append (path, stroke);
+    twin_path_move (stroke, D(30), D(400));
+    twin_path_string (stroke, D(200), D(200), TWIN_TEXT_ROMAN, "jelly world.");
+    twin_path_convolve (path, stroke, pen);
+/*    twin_path_append (path, stroke); */
     twin_path_destroy (stroke);
+    stroke = twin_path_create ();
+    twin_path_move (stroke, D(30), D(400));
+    twin_path_draw (stroke, D(1000), D(400));
+    twin_path_convolve (path, stroke, pen);
 #endif
     
-#if 0
+#if 1
     fx = D(3);
     fy = 0;
     for (g = 8; g < 30; g += 4)

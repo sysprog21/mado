@@ -1,5 +1,22 @@
 2004-09-26  Keith Packard  <keithp@keithp.com>
 
+	* twin_convolve.c: (_twin_subpath_convolve):
+	Eliminate special case for closed paths.  Just draw caps at
+	both ends and accept that the resulting path isn't minimal
+	in all cases.  This eliminates the weird results from said
+	attempted minimal path with large pens and small curves.
+	It also eliminated a lot of extra code from this function.
+	
+	* twin_font.c: (twin_path_ucs4):
+	Fix font baseline value (should be 9).  Take pen size
+	into account when computing positions so that glyphs rest
+	on the baseline instead of painting on top of it.
+
+	* xtwin.c: (main):
+	Show baseline in huge text sample
+
+2004-09-26  Keith Packard  <keithp@keithp.com>
+
 	* twin.h:
 	* twin_convolve.c: (_twin_path_leftpoint), (_twin_path_step),
 	(_twin_subpath_convolve):

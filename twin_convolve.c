@@ -58,31 +58,6 @@ _twin_path_leftpoint (twin_path_t  *path,
     return best;
 }
 
-/*
- * step along a path avoiding coincident points.  These
- * occur in closed paths where the first and final points are
- * always the same
- */
-
-static int
-_twin_path_step (twin_point_t	*points,
-		 int		npoints,
-		 int		p,
-		 int		inc)
-{
-    int n = p;
-
-    for (;;)
-    {
-	n += inc;
-	if (n < 0) n += npoints;
-	else if (n >= npoints) n -= npoints;
-	if (points[n].x != points[p].x || points[n].y != points[p].y)
-	    break;
-    }
-    return n;
-}
-
 static int
 _around_order (twin_point_t    *a1,
 	       twin_point_t    *a2,
@@ -134,26 +109,21 @@ _twin_subpath_convolve (twin_path_t	*path,
     int		    ns    = stroke->npoints;
     int		    np    = pen->npoints;
     twin_point_t    *sp0  = &sp[0];
-    twin_point_t    *sp1  = &sp[_twin_path_step(sp,ns,0,1)];
+    twin_point_t    *sp1  = &sp[1];
     int		    start = _twin_path_leftpoint (pen, sp0, sp1);
     twin_point_t    *spn1 = &sp[ns-1];
-    twin_point_t    *spn2 = &sp[_twin_path_step(sp,ns,ns-1,-1)];
+    twin_point_t    *spn2 = &sp[ns-2];
     int		    ret   = _twin_path_leftpoint (pen, spn1, spn2);
     int		    p;
     int		    s;
     int		    starget;
     int		    ptarget;
     int		    inc;
-    twin_bool_t	    closed = TWIN_FALSE;
 
-    if (sp[0].x == sp[ns - 1].x && sp[0].y == sp[ns - 1].y)
-	closed = TWIN_TRUE;
-
-    DBGOUT ("convolve: closed(%s)\n", closed ? "true" : "false");
-    DBGOUT ("stroke:\n");
+    DBGOUT ("convolve stroke:\n");
     for (s = 0; s < ns; s++)
 	DBGOUT ("\ts%02d: %9.4f, %9.4f\n", s, F(sp[s].x), F(sp[s].y));
-    DBGOUT ("pen:\n");
+    DBGOUT ("convolve pen:\n");
     for (p = 0; p < np; p++)
 	DBGOUT ("\tp%02d: %9.4f, %9.4f\n", p, F(pp[p].x), F(pp[p].y));
     
@@ -168,16 +138,8 @@ _twin_subpath_convolve (twin_path_t	*path,
     
     /* step along the path first */
     inc = 1;
-    if (closed)
-    {
-	starget = ns-1;
-	ptarget = start;
-    }
-    else
-    {
-	starget = ns-1;
-	ptarget = ret;
-    }
+    starget = ns-1;
+    ptarget = ret;
     for (;;)
     {
 	/*
@@ -185,10 +147,9 @@ _twin_subpath_convolve (twin_path_t	*path,
 	 */
 	do
 	{
-	    int	sn = _twin_path_step(sp,ns,s,inc);
+	    int	sn = s + inc;
 	    int	pn = (p == np - 1) ? 0 : p + 1;
 	    int	pm = (p == 0) ? np - 1 : p - 1;
-	    int o;
     
 	    /*
 	     * step along pen (forwards or backwards) or stroke as appropriate
@@ -198,14 +159,12 @@ _twin_subpath_convolve (twin_path_t	*path,
 		    _angle (&sp[s], &sp[sn]),
 		    _angle (&pp[p], &pp[pn]),
 		    _angle (&pp[pm], &pp[p]));
-	    o = _around_order (&sp[s],&sp[sn],&pp[p],&pp[pn]);
-	    if (o > 0 || (o == 0 && (closed && s == starget)))
+	    if (_around_order (&sp[s],&sp[sn],&pp[p],&pp[pn]) > 0)
 	    {
 		DBGOUT ("+pen:   ");
 		p = pn;
 	    }
-	    else if ((s == starget && closed)
-		     || _around_order (&sp[s],&sp[sn],&pp[pm],&pp[p]) < 0)
+	    else if (_around_order (&sp[s],&sp[sn],&pp[pm],&pp[p]) < 0)
 	    {
 		DBGOUT ("-pen:   ");
 		p = pm;
@@ -220,29 +179,22 @@ _twin_subpath_convolve (twin_path_t	*path,
 		    p, F(pp[p].x), F(pp[p].y),
 		    F(sp[s].x + pp[p].x), F(sp[s].y + pp[p].y));
 	    twin_path_draw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
-	} while (s != starget || (closed && p != ptarget));
+	} while (s != starget);
 	
 	/*
 	 * Finish this edge
 	 */
 	
-	if (closed)
+	/* draw a cap */
+	while (p != ptarget)
 	{
-	    twin_path_close (path);
-	}
-	else
-	{
-	    /* draw a cap */
-	    while (p != ptarget)
-	    {
-		if (++p == np) p = 0;
-		DBGOUT("cap:    ");
-		DBGOUT ("s%02d (%9.4f, %9.4f), p%02d (%9.4f, %9.4f): %9.4f, %9.4f\n",
-			s, F(sp[s].x), F(sp[s].y),
-			p, F(pp[p].x), F(pp[p].y),
-			F(sp[s].x + pp[p].x), F(sp[s].y + pp[p].y));
-		twin_path_draw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
-	    }
+	    if (++p == np) p = 0;
+	    DBGOUT("cap:    ");
+	    DBGOUT ("s%02d (%9.4f, %9.4f), p%02d (%9.4f, %9.4f): %9.4f, %9.4f\n",
+		    s, F(sp[s].x), F(sp[s].y),
+		    p, F(pp[p].x), F(pp[p].y),
+		    F(sp[s].x + pp[p].x), F(sp[s].y + pp[p].y));
+	    twin_path_draw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
 	}
 	
 	if (inc == -1)
@@ -250,19 +202,8 @@ _twin_subpath_convolve (twin_path_t	*path,
 	
 	/* reach the end of the path?  Go back the other way now */
 	inc = -1;
-	
-	if (closed)
-	{
-	    p = ret;
-	    ptarget = ret;
-	    starget = 0;
-	    twin_path_move (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
-	}
-	else
-	{
-	    ptarget = start;
-	    starget = 0;
-	}
+	ptarget = start;
+	starget = 0;
     }
 }
 

@@ -112,6 +112,8 @@ _twin_ucs4_base(twin_ucs4_t ucs4)
     return _twin_glyphs + _twin_glyph_offsets[ucs4];
 }
 
+#define TWIN_FONT_BASELINE  9
+
 void
 twin_path_ucs4 (twin_path_t	*path, 
 		twin_fixed_t	scale_x,
@@ -205,7 +207,7 @@ twin_path_ucs4 (twin_path_t	*path,
     twin_path_circle (pen, pen_size);
 
     xc = SNAPI(xo - SX (p[0].x)) + pen_adjust;
-    yc = SNAPI(yo - SY (16)) + pen_adjust;
+    yc = SNAPI(yo - SY (TWIN_FONT_BASELINE) - pen_size) + pen_adjust;
 
     for (i = 1; p[i].y != -64; i++)
 	if (p[i].x == -64)

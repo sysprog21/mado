@@ -210,17 +210,17 @@ twin_fill (twin_pixmap_t    *dst,
  */
 
 twin_bool_t
-twin_has_glyph (int glyph);
+twin_has_ucs4 (twin_ucs4_t ucs4);
     
 void
-twin_path_glyph (twin_path_t	*path, 
-		 twin_fixed_t	scale_x,
-		 twin_fixed_t	scale_y,
-		 int		style,
-		 int		glyph);
+twin_path_ucs4 (twin_path_t	*path, 
+		twin_fixed_t	scale_x,
+		twin_fixed_t	scale_y,
+		int		style,
+		twin_ucs4_t	ucs4);
  
 int
-twin_glyph_width (int glyph, twin_fixed_t scale_x);
+twin_ucs4_width (twin_ucs4_t ucs4, twin_fixed_t scale_x);
 
 #define TWIN_TEXT_ROMAN	    0
 #define TWIN_TEXT_BOLD	    1
@@ -231,8 +231,9 @@ twin_path_string (twin_path_t	*path,
 		  twin_fixed_t	scale_x,
 		  twin_fixed_t	scale_y,
 		  int		style,
-		  unsigned char *string);
+		  const char	*string);
 
+#if 0
 void
 twin_path_ucs4 (twin_path_t *path, twin_fixed_t scale_x,
 		twin_fixed_t scale_y, twin_ucs4_t ucs4);
@@ -240,6 +241,7 @@ twin_path_ucs4 (twin_path_t *path, twin_fixed_t scale_x,
 void
 twin_path_utf8 (twin_path_t *path, twin_fixed_t scale_x, twin_fixed_t scale_y, 
 		const char *string);
+#endif
 
 /*
  * twin_hull.c

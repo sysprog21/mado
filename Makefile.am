@@ -29,7 +29,6 @@ xtwin_SOURCES = \
 	twin_primitive.c \
 	twin_screen.c \
 	twin_spline.c \
-	twin_vera.c \
 	twin_x11.c \
 	twinint.h \
 	xtwin.c

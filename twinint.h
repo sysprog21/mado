@@ -277,7 +277,13 @@ typedef signed char	twin_gfixed_t;
 
 typedef struct _twin_gpoint { twin_gfixed_t x, y; } twin_gpoint_t;
 
-extern const twin_gpoint_t    *_twin_font[];
+#define TWIN_FONT_MAX	0x7f
+
+extern const twin_gpoint_t	*_twin_font[TWIN_FONT_MAX + 1];
+extern const twin_gpoint_t	*_twin_default_char;
+
+extern const twin_gpoint_t	_twin_glyphs[];
+extern const uint16_t		_twin_glyph_offsets[];
 
 #define TWIN_UCS_PAGE_SHIFT 7
 #define TWIN_UCS_PER_PAGE   (1 << TWIN_UCS_PAGE_SHIFT)

@@ -62,27 +62,55 @@ main (int argc, char **argv)
     twin_fill (alpha, 0x00000000, TWIN_SOURCE, 0, 0, 512, 512);
 
     path = twin_path_create ();
+#if 0
+    twin_path_move (path, D(3), D(0));
+    for (g = 0; g < 4326; g++)
+    {
+	int glyph = g;
+	if (!twin_has_glyph (glyph)) glyph = 0;
+	twin_path_cur_point (path, &fx, &fy);
+	if (fx + twin_glyph_width (glyph, D(10)) >= D(512) || g % 50 == 0)
+	    twin_path_move (path, D(3), fy + D(10));
+	twin_path_glyph (path, D(10), D(10), TWIN_TEXT_ROMAN,
+			 glyph);
+    }
+#endif
 #if 1
     fx = D(3);
-    fy = D(8);
-    for (g = 10; g < 20; g++)
+    fy = D(10);
+    for (g = 10; g < 40; g += 2)
     {
 #if 1
+	twin_path_move (path, fx, fy);
+	twin_path_string (path, D(g), D(g), TWIN_TEXT_ROMAN,
+			  " !\"#$%&'()*+,-./0123456789:;<=>?");
+        fy += D(g);
+	twin_path_move (path, fx, fy);
+	twin_path_string (path, D(g), D(g), TWIN_TEXT_ROMAN,
+			  "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_");
+        fy += D(g);
+	twin_path_move (path, fx, fy);
+	twin_path_string (path, D(g), D(g), TWIN_TEXT_ROMAN,
+			  "`abcdefghijklmnopqrstuvwxyz{|}~");
+        fy += D(g);
+#endif
+#if 0
 	for (s = 0; s < 4; s++)
 	{
-	    twin_path_move (path, fx, fy);
 	    twin_path_string (path, D(g), D(g), styles[s],
 			      "the quick brown fox jumps over the lazy dog.");
 	    twin_path_string (path, D(g), D(g), styles[s], 
 			      "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG.");
 	    fy += D(g);
 	}
-#else
+#endif
+#if 0
 	twin_path_string (path, D(g), D(g), "t");
 	fy += D(g);
 #endif
     }
-#else
+#endif
+#if 0
     fx = D(3);
     fy = D(8);
     for (g = 6; g < 36; g++)

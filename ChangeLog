@@ -1,6 +1,29 @@
 2004-09-24  Keith Packard  <keithp@keithp.com>
 
 	* Makefile.am:
+	* twin.h:
+	Switch to just supporting stroke fonts
+	* twin_font.c: (twin_has_ucs4), (_twin_ucs4_base),
+	(_twin_ucs4_points), (twin_path_ucs4), (twin_ucs4_width),
+	(twin_path_string):
+	Finish needed stroke font API.
+	
+	* twin_glyphs.c:
+	Elimiate all but ascii glyphs, use offset table to
+	eliminate table of pointers (which can't be const)
+	
+	* twin_vera.c:
+	Remove twin_vera.c
+	
+	* twinint.h:
+	Change glyph structures around for offsets and ascii only
+	
+	* xtwin.c: (main):
+	Few more cases to show ascii text support
+
+2004-09-24  Keith Packard  <keithp@keithp.com>
+
+	* Makefile.am:
 	* twin_hull.c: (_twin_slope_init), (_twin_hull_create),
 	(_twin_slope_compare), (_twin_hull_vertex_compare),
 	(_twin_hull_prev_valid), (_twin_hull_next_valid),

@@ -28,11 +28,11 @@
  * Find the point in path which is furthest left of the line
  */
 static int
-_twin_path_leftpoint (twin_path_t  *path,
-		      twin_point_t *p1,
-		      twin_point_t *p2)
+_twin_path_leftpoint (twin_path_t   *path,
+		      twin_spoint_t *p1,
+		      twin_spoint_t *p2)
 {
-    twin_point_t    *points = path->points;
+    twin_spoint_t   *points = path->points;
     int		    p;
     int		    best = 0;
     /*
@@ -59,10 +59,10 @@ _twin_path_leftpoint (twin_path_t  *path,
 }
 
 static int
-_around_order (twin_point_t    *a1,
-	       twin_point_t    *a2,
-	       twin_point_t    *b1,
-	       twin_point_t    *b2)
+_around_order (twin_spoint_t    *a1,
+	       twin_spoint_t    *a2,
+	       twin_spoint_t    *b1,
+	       twin_spoint_t    *b2)
 {
     twin_dfixed_t   adx = (a2->x - a1->x);
     twin_dfixed_t   ady = (a2->y - a1->y);
@@ -78,14 +78,14 @@ _around_order (twin_point_t    *a1,
 #if 0
 #include <stdio.h>
 #include <math.h>
-#define F(x)	twin_fixed_to_double(x)
+#define F(x)	twin_sfixed_to_double(x)
 #define DBGOUT(x...)	printf(x)
 
 static double
-_angle (twin_point_t *a, twin_point_t *b)
+_angle (twin_spoint_t *a, twin_spoint_t *b)
 {
-    twin_fixed_t    dx = b->x - a->x;
-    twin_fixed_t    dy = b->y - a->y;
+    twin_sfixed_t    dx = b->x - a->x;
+    twin_sfixed_t    dy = b->y - a->y;
     double	    rad;
 
     rad = atan2 ((double) dy, (double) dx);
@@ -104,15 +104,15 @@ _twin_subpath_convolve (twin_path_t	*path,
 			twin_path_t	*stroke,
 			twin_path_t	*pen)
 {
-    twin_point_t    *sp   = stroke->points;
-    twin_point_t    *pp   = pen->points;
+    twin_spoint_t    *sp   = stroke->points;
+    twin_spoint_t    *pp   = pen->points;
     int		    ns    = stroke->npoints;
     int		    np    = pen->npoints;
-    twin_point_t    *sp0  = &sp[0];
-    twin_point_t    *sp1  = &sp[1];
+    twin_spoint_t    *sp0  = &sp[0];
+    twin_spoint_t    *sp1  = &sp[1];
     int		    start = _twin_path_leftpoint (pen, sp0, sp1);
-    twin_point_t    *spn1 = &sp[ns-1];
-    twin_point_t    *spn2 = &sp[ns-2];
+    twin_spoint_t    *spn1 = &sp[ns-1];
+    twin_spoint_t    *spn2 = &sp[ns-2];
     int		    ret   = _twin_path_leftpoint (pen, spn1, spn2);
     int		    p;
     int		    s;
@@ -134,7 +134,7 @@ _twin_subpath_convolve (twin_path_t	*path,
 	    s, F(sp[s].x), F(sp[s].y),
 	    p, F(pp[p].x), F(pp[p].y),
 	    F(sp[s].x + pp[p].x), F(sp[s].y + pp[p].y));
-    twin_path_move (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
+    _twin_path_smove (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
     
     /* step along the path first */
     inc = 1;
@@ -178,7 +178,7 @@ _twin_subpath_convolve (twin_path_t	*path,
 		    s, F(sp[s].x), F(sp[s].y),
 		    p, F(pp[p].x), F(pp[p].y),
 		    F(sp[s].x + pp[p].x), F(sp[s].y + pp[p].y));
-	    twin_path_draw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
+	    _twin_path_sdraw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
 	} while (s != starget);
 	
 	/*
@@ -194,7 +194,7 @@ _twin_subpath_convolve (twin_path_t	*path,
 		    s, F(sp[s].x), F(sp[s].y),
 		    p, F(pp[p].x), F(pp[p].y),
 		    F(sp[s].x + pp[p].x), F(sp[s].y + pp[p].y));
-	    twin_path_draw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
+	    _twin_path_sdraw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
 	}
 	
 	if (inc == -1)

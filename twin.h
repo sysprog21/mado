@@ -34,20 +34,6 @@ typedef uint16_t    twin_rgb16_t;
 typedef uint32_t    twin_argb32_t;
 typedef uint32_t    twin_ucs4_t;
 typedef int	    twin_bool_t;
-typedef int16_t	    twin_fixed_t;   /* 12.4 format */
-typedef int32_t	    twin_dfixed_t;
-
-#define twin_fixed_floor(f) ((f) & ~0xf)
-#define twin_fixed_trunc(f) ((f) >> 4)
-#define twin_fixed_ceil(f)  (((f) + 0xf) & ~0xf)
-
-#define twin_double_to_fixed(d)	((twin_fixed_t) ((d) * 16.0))
-#define twin_fixed_to_double(f)	((double) (f) / 16.0)
-#define twin_int_to_fixed(i)	((twin_fixed_t) ((i) * 16))
-
-#define TWIN_FIXED_ONE		(0x10)
-#define TWIN_FIXED_HALF		(0x08)
-#define TWIN_FIXED_TOLERANCE	(TWIN_FIXED_ONE >> 2)
 
 #define TWIN_FALSE  0
 #define TWIN_TRUE   1
@@ -55,6 +41,20 @@ typedef int32_t	    twin_dfixed_t;
 typedef enum { TWIN_A8, TWIN_RGB16, TWIN_ARGB32 } twin_format_t;
 
 #define twin_bytes_per_pixel(format)    (1 << (int) (format))
+
+/*
+ * Angles
+ */
+typedef int16_t	    twin_angle_t;   /* -512 .. 512 for -180 .. 180 */
+
+#define TWIN_ANGLE_360	    1024
+#define TWIN_ANGLE_180	    512
+#define TWIN_ANGLE_90	    256
+#define TWIN_ANGLE_45	    128
+#define TWIN_ANGLE_22_5	    64
+#define TWIN_ANGLE_11_25    32
+
+#define twin_degrees_to_angle(d)    ((d) * 512 / 180)
 
 /*
  * A rectangle
@@ -148,27 +148,34 @@ typedef struct _twin_operand {
 
 typedef enum { TWIN_OVER, TWIN_SOURCE } twin_operator_t;
 
-/*
- * A (fixed point) point
- */
+typedef int32_t	    twin_fixed_t;   /* 16.16 format */
 
-typedef struct _twin_point {
-    twin_fixed_t    x, y;
-} twin_point_t;
+#define TWIN_FIXED_ONE	(0x10000)
+#define TWIN_FIXED_HALF	(0x08000)
+#define TWIN_FIXED_MAX	(0x7fffffff)
+#define TWIN_FIXED_MIN	(-0x7fffffff)
+
+/* 
+ * 'double' is a no-no in any shipping code, but useful during
+ * development
+ */
+#define twin_double_to_fixed(d)    ((twin_fixed_t) ((d) * 65536))
+#define twin_fixed_to_double(f)    ((double) (f) / 65536.0)
+
+/*
+ * Place matrices in structures so they can be easily copied
+ */
+typedef struct _twin_matrix {
+    twin_fixed_t    m[3][2];
+} twin_matrix_t;
 
 typedef struct _twin_path twin_path_t;
 
-/*
- * A font
- */
-
-typedef struct _twin_font {
-    const struct _twin_charmap  *charmap;
-    const unsigned char		ncharmap;
-    const char			*outlines;
-    const char			ascender, descender, height;
-    const char			*family, *style;
-} twin_font_t;
+typedef struct _twin_state {
+    twin_matrix_t	matrix;
+    twin_fixed_t	font_size;
+    int			font_style;
+} twin_state_t;
 
 /*
  * twin_convolve.c
@@ -206,42 +213,38 @@ twin_fill (twin_pixmap_t    *dst,
 	   int		    height);
 
 /*
+ * twin_fixed.c
+ */
+
+twin_fixed_t
+twin_fixed_mul (twin_fixed_t af, twin_fixed_t bf);
+
+/*
  * twin_font.c
  */
 
 twin_bool_t
 twin_has_ucs4 (twin_ucs4_t ucs4);
     
-void
-twin_path_ucs4 (twin_path_t	*path, 
-		twin_fixed_t	scale_x,
-		twin_fixed_t	scale_y,
-		int		style,
-		twin_ucs4_t	ucs4);
- 
-int
-twin_ucs4_width (twin_ucs4_t ucs4, twin_fixed_t scale_x);
-
 #define TWIN_TEXT_ROMAN	    0
 #define TWIN_TEXT_BOLD	    1
 #define TWIN_TEXT_OBLIQUE   2
+#define TWIN_TEXT_UNHINTED  4
 
 void
-twin_path_string (twin_path_t	*path, 
-		  twin_fixed_t	scale_x,
-		  twin_fixed_t	scale_y,
-		  int		style,
-		  const char	*string);
+twin_path_ucs4_stroke (twin_path_t *path, twin_ucs4_t ucs4);
 
-#if 0
 void
-twin_path_ucs4 (twin_path_t *path, twin_fixed_t scale_x,
-		twin_fixed_t scale_y, twin_ucs4_t ucs4);
-    
+twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4);
+ 
 void
-twin_path_utf8 (twin_path_t *path, twin_fixed_t scale_x, twin_fixed_t scale_y, 
-		const char *string);
-#endif
+twin_path_utf8 (twin_path_t *path, const char *string);
+
+twin_fixed_t
+twin_width_ucs4 (twin_path_t *path, twin_ucs4_t ucs4);
+ 
+twin_fixed_t
+twin_width_utf8 (twin_path_t *path, const char *string);
 
 /*
  * twin_hull.c
@@ -249,6 +252,22 @@ twin_path_utf8 (twin_path_t *path, twin_fixed_t scale_x, twin_fixed_t scale_y,
 
 twin_path_t *
 twin_path_convex_hull (twin_path_t *path);
+
+/*
+ * twin_matrix.c
+ */
+
+void
+twin_matrix_identity (twin_matrix_t *m);
+
+void
+twin_matrix_translate (twin_matrix_t *m, twin_fixed_t tx, twin_fixed_t ty);
+
+void
+twin_matrix_scale (twin_matrix_t *m, twin_fixed_t sx, twin_fixed_t sy);
+
+void
+twin_matrix_rotate (twin_matrix_t *m, twin_angle_t a);
 
 /*
  * twin_path.c
@@ -261,16 +280,10 @@ void
 twin_path_draw (twin_path_t *path, twin_fixed_t x, twin_fixed_t y);
 
 void
-twin_path_cur_point (twin_path_t *path, twin_fixed_t *xp, twin_fixed_t *yp);
-
-void
 twin_path_circle(twin_path_t *path, twin_fixed_t radius);
 
 void
 twin_path_close (twin_path_t *path);
-
-void
-twin_path_fill (twin_pixmap_t *pixmap, twin_path_t *path);
 
 void
 twin_path_empty (twin_path_t *path);
@@ -283,6 +296,42 @@ twin_path_create (void);
 
 void
 twin_path_destroy (twin_path_t *path);
+
+void
+twin_path_identity (twin_path_t *path);
+
+void
+twin_path_translate (twin_path_t *path, twin_fixed_t tx, twin_fixed_t ty);
+
+void
+twin_path_scale (twin_path_t *path, twin_fixed_t sx, twin_fixed_t sy);
+
+void
+twin_path_rotate (twin_path_t *path, twin_angle_t a);
+
+twin_matrix_t
+twin_path_current_matrix (twin_path_t *path);
+
+void
+twin_path_set_matrix (twin_path_t *path, twin_matrix_t matrix);
+
+twin_fixed_t
+twin_path_current_font_size (twin_path_t *path);
+
+void
+twin_path_set_font_size (twin_path_t *path, twin_fixed_t font_size);
+
+int
+twin_path_current_font_style (twin_path_t *path);
+
+void
+twin_path_set_font_style (twin_path_t *path, int font_style);
+
+twin_state_t
+twin_path_save (twin_path_t *path);
+
+void
+twin_path_restore (twin_path_t *path, twin_state_t *state);
 
 /*
  * twin_pixmap.c
@@ -316,7 +365,7 @@ twin_pixmap_pointer (twin_pixmap_t *pixmap, int x, int y);
  * twin_poly.c
  */
 void
-twin_polygon (twin_pixmap_t *pixmap, twin_point_t *vertices, int nvertices);
+twin_fill_path (twin_pixmap_t *pixmap, twin_path_t *path);
 
 /*
  * twin_screen.c
@@ -353,6 +402,19 @@ twin_path_curve (twin_path_t	*path,
 		 twin_fixed_t	x1, twin_fixed_t y1,
 		 twin_fixed_t	x2, twin_fixed_t y2,
 		 twin_fixed_t	x3, twin_fixed_t y3);
+
+/*
+ * twin_trig.c
+ */
+
+twin_fixed_t
+twin_sin (twin_angle_t a);
+
+twin_fixed_t
+twin_cos (twin_angle_t a);
+
+twin_fixed_t
+twin_tan (twin_angle_t a);
 
 /*
  * twin_x11.c 

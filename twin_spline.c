@@ -25,11 +25,11 @@
 #include "twinint.h"
 
 typedef struct _twin_spline {
-    twin_point_t    a, b, c, d;
+    twin_spoint_t    a, b, c, d;
 } twin_spline_t;
 
 static void
-_lerp_half (twin_point_t *a, twin_point_t *b, twin_point_t *result)
+_lerp_half (twin_spoint_t *a, twin_spoint_t *b, twin_spoint_t *result)
 {
     result->x = a->x + ((b->x - a->x) >> 1);
     result->y = a->y + ((b->y - a->y) >> 1);
@@ -38,9 +38,9 @@ _lerp_half (twin_point_t *a, twin_point_t *b, twin_point_t *result)
 static void
 _de_casteljau (twin_spline_t *spline, twin_spline_t *s1, twin_spline_t *s2)
 {
-    twin_point_t ab, bc, cd;
-    twin_point_t abbc, bccd;
-    twin_point_t final;
+    twin_spoint_t ab, bc, cd;
+    twin_spoint_t abbc, bccd;
+    twin_spoint_t final;
 
     _lerp_half (&spline->a, &spline->b, &ab);
     _lerp_half (&spline->b, &spline->c, &bc);
@@ -91,7 +91,7 @@ _twin_spline_decompose (twin_path_t	*path,
 {
     if (_twin_spline_error_squared (spline) <= tolerance_squared)
     {
-	twin_path_draw (path, spline->a.x, spline->a.y);
+	_twin_path_sdraw (path, spline->a.x, spline->a.y);
     }
     else
     {
@@ -102,16 +102,16 @@ _twin_spline_decompose (twin_path_t	*path,
     }
 }
 
-void
-twin_path_curve (twin_path_t	*path,
-		 twin_fixed_t	x1, twin_fixed_t y1,
-		 twin_fixed_t	x2, twin_fixed_t y2,
-		 twin_fixed_t	x3, twin_fixed_t y3)
+static void
+_twin_path_scurve (twin_path_t	    *path,
+		   twin_sfixed_t    x1, twin_sfixed_t y1,
+		   twin_sfixed_t    x2, twin_sfixed_t y2,
+		   twin_sfixed_t    x3, twin_sfixed_t y3)
 {
     twin_spline_t   spline;
 
     if (path->npoints == 0)
-	twin_path_move (path, 0, 0);
+	_twin_path_smove (path, 0, 0);
     spline.a = path->points[path->npoints - 1];
     spline.b.x = x1;
     spline.b.y = y1;
@@ -119,6 +119,21 @@ twin_path_curve (twin_path_t	*path,
     spline.c.y = y2;
     spline.d.x = x3;
     spline.d.y = y3;
-    _twin_spline_decompose (path, &spline, TWIN_FIXED_TOLERANCE * TWIN_FIXED_TOLERANCE);
-    twin_path_draw (path, x3, y3);
+    _twin_spline_decompose (path, &spline, TWIN_SFIXED_TOLERANCE * TWIN_SFIXED_TOLERANCE);
+    _twin_path_sdraw (path, x3, y3);
+}
+
+void
+twin_path_curve (twin_path_t	*path,
+		 twin_fixed_t   x1, twin_fixed_t y1,
+		 twin_fixed_t   x2, twin_fixed_t y2,
+		 twin_fixed_t   x3, twin_fixed_t y3)
+{
+    return _twin_path_scurve (path,
+			      _twin_matrix_x (&path->state.matrix, x1, y1),
+			      _twin_matrix_y (&path->state.matrix, x1, y1),
+			      _twin_matrix_x (&path->state.matrix, x2, y2),
+			      _twin_matrix_y (&path->state.matrix, x2, y2),
+			      _twin_matrix_x (&path->state.matrix, x3, y3),
+			      _twin_matrix_y (&path->state.matrix, x3, y3));
 }

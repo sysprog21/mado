@@ -29,6 +29,40 @@
 #include <string.h>
 
 /*
+ * Post-transformed points are stored in 12.4 fixed point
+ * values
+ */
+
+typedef int16_t	    twin_sfixed_t;  /* 12.4 format */
+typedef int32_t	    twin_dfixed_t;  /* 24.8 format (12.4 * 12.4) */
+
+#define twin_sfixed_floor(f)	    ((f) & ~0xf)
+#define twin_sfixed_trunc(f)	    ((f) >> 4)
+#define twin_sfixed_ceil(f)	    (((f) + 0xf) & ~0xf)
+
+#define twin_int_to_sfixed(i)	    ((twin_sfixed_t) ((i) * 16))
+
+#define twin_sfixed_to_fixed(s)	    (((twin_fixed_t) (s)) << 12)
+#define twin_fixed_to_sfixed(f)	    ((twin_sfixed_t) ((f) >> 12))
+
+/* 
+ * 'double' is a no-no in any shipping code, but useful during
+ * development
+ */
+#define twin_double_to_sfixed(d)    ((twin_sfixed_t) ((d) * 16.0))
+#define twin_sfixed_to_double(f)    ((double) (f) / 16.0)
+
+#define TWIN_SFIXED_ONE		(0x10)
+#define TWIN_SFIXED_HALF	(0x08)
+#define TWIN_SFIXED_TOLERANCE	(TWIN_SFIXED_ONE >> 2)
+
+/*
+ * Glyph coordinates are stored in 2.6 fixed point
+ */
+
+typedef signed char	twin_gfixed_t;
+
+/*
  * Compositing stuff
  */
 #define twin_int_mult(a,b,t)	((t) = (a) * (b) + 0x80, \
@@ -81,6 +115,24 @@ typedef void twin_in_op_func (twin_pointer_t	dst,
 typedef void twin_op_func (twin_pointer_t	dst,
 			   twin_source_u	src,
 			   int			width);
+
+/* Geometrical objects */
+
+typedef struct _twin_point {
+    twin_sfixed_t    x, y;
+} twin_spoint_t;
+
+struct _twin_path {
+    twin_spoint_t   *points;
+    int		    size_points;
+    int		    npoints;
+    int		    *sublen;
+    int		    size_sublen;
+    int		    nsublen;
+    twin_state_t    state;
+};
+
+typedef struct _twin_gpoint { twin_gfixed_t x, y; } twin_gpoint_t;
 
 /*
  * This needs to be refactored to reduce the number of functions...
@@ -221,10 +273,10 @@ _twin_fetch_argb32 (twin_pixmap_t *pixmap, int x, int y, int w, twin_argb32_t *s
  */
 
 twin_dfixed_t
-_twin_distance_to_point_squared (twin_point_t *a, twin_point_t *b);
+_twin_distance_to_point_squared (twin_spoint_t *a, twin_spoint_t *b);
 
 twin_dfixed_t
-_twin_distance_to_line_squared (twin_point_t *p, twin_point_t *p1, twin_point_t *p2);
+_twin_distance_to_line_squared (twin_spoint_t *p, twin_spoint_t *p1, twin_spoint_t *p2);
 
 
 /*
@@ -233,12 +285,12 @@ _twin_distance_to_line_squared (twin_point_t *p, twin_point_t *p1, twin_point_t 
 
 typedef struct _twin_edge {
     struct _twin_edge	*next;
-    twin_fixed_t	top, bot;
-    twin_fixed_t	x;
-    twin_fixed_t	e;
-    twin_fixed_t	dx, dy;
-    twin_fixed_t	inc_x;
-    twin_fixed_t	step_x;
+    twin_sfixed_t	top, bot;
+    twin_sfixed_t	x;
+    twin_sfixed_t	e;
+    twin_sfixed_t	dx, dy;
+    twin_sfixed_t	inc_x;
+    twin_sfixed_t	step_x;
     int			winding;
 } twin_edge_t;
 
@@ -247,50 +299,57 @@ typedef struct _twin_edge {
  */
 
 int
-_twin_edge_build (twin_point_t *vertices, int nvertices, twin_edge_t *edges);
+_twin_edge_build (twin_spoint_t *vertices, int nvertices, twin_edge_t *edges);
 
 void
 _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges);
+
+/*
+ * Matrix stuff
+ */
+
+twin_sfixed_t
+_twin_matrix_x (twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y);
+
+twin_sfixed_t
+_twin_matrix_y (twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y);
+
+twin_sfixed_t
+_twin_matrix_dx (twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y);
+
+twin_sfixed_t
+_twin_matrix_dy (twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y);
+
+twin_fixed_t
+_twin_matrix_determinant (twin_matrix_t *matrix);
 
 /*
  * Path stuff
  */
 
 /*
- * A (fixed point) path
+ * A path
  */
 
-struct _twin_path {
-    twin_point_t    *points;
-    int		    size_points;
-    int		    npoints;
-    int		    *sublen;
-    int		    size_sublen;
-    int		    nsublen;
-};
+twin_spoint_t
+_twin_path_current_spoint (twin_path_t *path);
+
+twin_spoint_t
+_twin_path_subpath_first_spoint (twin_path_t *path);
+
+void 
+_twin_path_smove (twin_path_t *path, twin_sfixed_t x, twin_sfixed_t y);
+
+void
+_twin_path_sdraw (twin_path_t *path, twin_sfixed_t x, twin_sfixed_t y);
 
 /*
- * Glyph stuff
+ * Glyph stuff.  Coordinates are stored in 2.6 fixed point format
  */
-
-typedef signed char	twin_gfixed_t;
-
-typedef struct _twin_gpoint { twin_gfixed_t x, y; } twin_gpoint_t;
 
 #define TWIN_FONT_MAX	0x7f
 
-extern const twin_gpoint_t	*_twin_font[TWIN_FONT_MAX + 1];
-extern const twin_gpoint_t	*_twin_default_char;
-
 extern const twin_gpoint_t	_twin_glyphs[];
 extern const uint16_t		_twin_glyph_offsets[];
-
-#define TWIN_UCS_PAGE_SHIFT 7
-#define TWIN_UCS_PER_PAGE   (1 << TWIN_UCS_PAGE_SHIFT)
-
-typedef struct _twin_charmap {
-    uint16_t	page;
-    uint16_t	offsets[TWIN_UCS_PER_PAGE];
-} twin_charmap_t;
 
 #endif /* _TWININT_H_ */

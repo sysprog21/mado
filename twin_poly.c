@@ -28,7 +28,7 @@
 #define TWIN_POLY_FIXED_SHIFT	(4 - TWIN_POLY_SHIFT)
 #define TWIN_POLY_SAMPLE    (1 << TWIN_POLY_SHIFT)
 #define TWIN_POLY_MASK	    (TWIN_POLY_SAMPLE - 1)
-#define TWIN_POLY_STEP	    (TWIN_FIXED_ONE >> TWIN_POLY_SHIFT)
+#define TWIN_POLY_STEP	    (TWIN_SFIXED_ONE >> TWIN_POLY_SHIFT)
 #define TWIN_POLY_START	    (TWIN_POLY_STEP >> 1)
 #define TWIN_POLY_CEIL(c)   (((c) + (TWIN_POLY_STEP-1)) & ~(TWIN_POLY_STEP-1))
 #define TWIN_POLY_COL(x)    (((x) >> TWIN_POLY_FIXED_SHIFT) & TWIN_POLY_MASK)
@@ -43,7 +43,7 @@ _edge_compare_y (const void *a, const void *b)
 }
 
 static void
-_edge_step_by (twin_edge_t  *edge, twin_fixed_t dy)
+_edge_step_by (twin_edge_t  *edge, twin_sfixed_t dy)
 {
     twin_dfixed_t   e;
     
@@ -58,27 +58,27 @@ _edge_step_by (twin_edge_t  *edge, twin_fixed_t dy)
  * Grid coordinates are at TWIN_POLY_STEP/2 + n*TWIN_POLY_STEP
  */
 
-static twin_fixed_t
-_twin_fixed_grid_ceil (twin_fixed_t f)
+static twin_sfixed_t
+_twin_sfixed_grid_ceil (twin_sfixed_t f)
 {
     return ((f + (TWIN_POLY_START - 1)) & ~(TWIN_POLY_STEP - 1)) + TWIN_POLY_START;
 }
 
 #if 0
 #include <stdio.h>
-#define F(x)	twin_fixed_to_double(x)
+#define F(x)	twin_sfixed_to_double(x)
 #define DBGOUT(x...)	printf(x)
 #else
 #define DBGOUT(x...)
 #endif
 
 int
-_twin_edge_build (twin_point_t *vertices, int nvertices, twin_edge_t *edges)
+_twin_edge_build (twin_spoint_t *vertices, int nvertices, twin_edge_t *edges)
 {
     int		    v, nv;
     int		    tv, bv;
     int		    e;
-    twin_fixed_t    y;
+    twin_sfixed_t    y;
 
     e = 0;
     for (v = 0; v < nvertices; v++)
@@ -107,7 +107,7 @@ _twin_edge_build (twin_point_t *vertices, int nvertices, twin_edge_t *edges)
 	}
 
 	/* snap top to first grid point in pixmap */
-	y = _twin_fixed_grid_ceil (vertices[tv].y);
+	y = _twin_sfixed_grid_ceil (vertices[tv].y);
 	if (y < TWIN_POLY_START)
 	    y = TWIN_POLY_START;
 	
@@ -145,9 +145,9 @@ _twin_edge_build (twin_point_t *vertices, int nvertices, twin_edge_t *edges)
     
 static void
 _span_fill (twin_pixmap_t   *pixmap,
-	    twin_fixed_t    y,
-	    twin_fixed_t    left,
-	    twin_fixed_t    right)
+	    twin_sfixed_t    y,
+	    twin_sfixed_t    left,
+	    twin_sfixed_t    right)
 {
 #if TWIN_POLY_SHIFT == 0
     /* 1x1 */
@@ -185,10 +185,10 @@ _span_fill (twin_pixmap_t   *pixmap,
     };
 #endif
     const twin_a8_t *cover = coverage[(y >> TWIN_POLY_FIXED_SHIFT) & TWIN_POLY_MASK];
-    int		    row = twin_fixed_trunc (y);
+    int		    row = twin_sfixed_trunc (y);
     twin_a8_t	    *span = pixmap->p.a8 + row * pixmap->stride;
     twin_a8_t	    *s;
-    twin_fixed_t    x;
+    twin_sfixed_t    x;
     twin_a16_t	    a;
     twin_a16_t	    w;
     int		    col;
@@ -197,12 +197,12 @@ _span_fill (twin_pixmap_t   *pixmap,
     if (left < 0)
 	left = 0;
     
-    if (right > twin_int_to_fixed (pixmap->width))
-	right = twin_int_to_fixed (pixmap->width);
+    if (right > twin_int_to_sfixed (pixmap->width))
+	right = twin_int_to_sfixed (pixmap->width);
 
     /* convert to sample grid */
-    left = _twin_fixed_grid_ceil (left) >> TWIN_POLY_FIXED_SHIFT;
-    right = _twin_fixed_grid_ceil (right) >> TWIN_POLY_FIXED_SHIFT;
+    left = _twin_sfixed_grid_ceil (left) >> TWIN_POLY_FIXED_SHIFT;
+    right = _twin_sfixed_grid_ceil (right) >> TWIN_POLY_FIXED_SHIFT;
     
     /* check for empty */
     if (right <= left)
@@ -259,8 +259,8 @@ _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
 {
     twin_edge_t	    *active, *a, *n, **prev;
     int		    e;
-    twin_fixed_t    y;
-    twin_fixed_t    x0;
+    twin_sfixed_t    y;
+    twin_sfixed_t    x0;
     int		    w;
     
     qsort (edges, nedges, sizeof (twin_edge_t), _edge_compare_y);
@@ -299,7 +299,7 @@ _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
 	/* step down, clipping to pixmap */
 	y += TWIN_POLY_STEP;
 
-	if (twin_fixed_trunc (y) >= pixmap->height)
+	if (twin_sfixed_trunc (y) >= pixmap->height)
 	    break;
 	
 	/* strip out dead edges */
@@ -336,18 +336,36 @@ _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
 }
 
 void
-twin_polygon (twin_pixmap_t *pixmap, twin_point_t *vertices, int nvertices)
+twin_fill_path (twin_pixmap_t *pixmap, twin_path_t *path)
 {
-    twin_edge_t	    *edges;
-    int		    nedges;
-    
-    /*
-     * Construct the edge table
-     */
-    edges = malloc (sizeof (twin_edge_t) * (nvertices + 1));
-    if (!edges)
-	return;
-    nedges = _twin_edge_build (vertices, nvertices, edges);
+    twin_edge_t	*edges;
+    int		nedges, n;
+    int		nalloc;
+    int		s;
+    int		p;
+
+    nalloc = path->npoints + path->nsublen + 1;
+    edges = malloc (sizeof (twin_edge_t) * nalloc);
+    p = 0;
+    nedges = 0;
+    for (s = 0; s <= path->nsublen; s++)
+    {
+	int sublen;
+	int npoints;
+	
+	if (s == path->nsublen)
+	    sublen = path->npoints;
+	else
+	    sublen = path->sublen[s];
+	npoints = sublen - p;
+	if (npoints > 1)
+	{
+	    n = _twin_edge_build (path->points + p, npoints, edges + nedges);
+	    p = sublen;
+	    nedges += n;
+	}
+    }
     _twin_edge_fill (pixmap, edges, nedges);
     free (edges);
 }
+

@@ -1,3 +1,44 @@
+2004-09-27  Keith Packard  <keithp@keithp.com>
+
+	* Makefile.am:
+	* twin.h:
+	* twin_convolve.c: (_twin_path_leftpoint), (_around_order),
+	(_angle), (_twin_subpath_convolve):
+	* twin_fixed.c: (twin_fixed_mul):
+	* twin_font.c: (twin_path_ucs4), (twin_width_ucs4),
+	(twin_path_utf8):
+	* twin_geom.c: (_twin_distance_to_point_squared),
+	(_twin_distance_to_line_squared):
+	* twin_hull.c: (_twin_slope_init), (_twin_hull_create),
+	(_twin_hull_vertex_compare), (_twin_hull_eliminate_concave),
+	(_twin_hull_to_path):
+	* twin_matrix.c: (_twin_dump_matrix), (_twin_matrix_multiply),
+	(twin_matrix_identity), (twin_matrix_translate),
+	(twin_matrix_scale), (_twin_matrix_determinant),
+	(twin_matrix_rotate), (_twin_matrix_x), (_twin_matrix_y),
+	(_twin_matrix_dx), (_twin_matrix_dy):
+	* twin_path.c: (_twin_current_subpath_len),
+	(_twin_path_current_spoint), (_twin_path_subpath_first_spoint),
+	(_twin_path_smove), (_twin_path_sdraw), (twin_path_move),
+	(twin_path_draw), (twin_path_close), (twin_path_circle),
+	(twin_path_set_matrix), (twin_path_current_matrix),
+	(twin_path_identity), (twin_path_translate), (twin_path_scale),
+	(twin_path_rotate), (twin_path_set_font_size),
+	(twin_path_current_font_size), (twin_path_set_font_style),
+	(twin_path_current_font_style), (twin_path_append),
+	(twin_path_save), (twin_path_restore), (twin_path_create):
+	* twin_poly.c: (_edge_step_by), (_twin_sfixed_grid_ceil),
+	(_twin_edge_build), (_span_fill), (_twin_edge_fill),
+	(twin_fill_path):
+	* twin_spline.c: (_lerp_half), (_de_casteljau),
+	(_twin_spline_decompose), (_twin_path_scurve), (twin_path_curve):
+	* twin_trig.c: (twin_sin), (twin_cos), (twin_tan):
+	* twinint.h:
+	* xtwin.c: (main):
+	Add affine transformation support.
+	Fix convex hull to eliminate all points colinear with extreme.
+	Note that text snapping is currently broken.
+
 2004-09-26  Keith Packard  <keithp@keithp.com>
 
 	* twin_convolve.c: (_twin_subpath_convolve):

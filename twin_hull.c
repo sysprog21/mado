@@ -25,19 +25,28 @@
 
 #include "twinint.h"
 
+#if 0
+#include <stdio.h>
+#include <math.h>
+#define S(x)	twin_sfixed_to_double(x)
+#define DBGMSG(x)	printf x
+#else
+#define DBGMSG(x)
+#endif
+
 typedef struct twin_slope {
-    twin_fixed_t dx;
-    twin_fixed_t dy;
+    twin_sfixed_t dx;
+    twin_sfixed_t dy;
 } twin_slope_t, twin_distance_t;
 
 typedef struct _twin_hull {
-    twin_point_t point;
+    twin_spoint_t point;
     twin_slope_t slope;
     int discard;
 } twin_hull_t;
 
 static void
-_twin_slope_init (twin_slope_t *slope, twin_point_t *a, twin_point_t *b)
+_twin_slope_init (twin_slope_t *slope, twin_spoint_t *a, twin_spoint_t *b)
 {
     slope->dx = b->x - a->x;
     slope->dy = b->y - a->y;
@@ -48,7 +57,7 @@ _twin_hull_create (twin_path_t *path, int *nhull)
 {
     int		    i, j;
     int		    n = path->npoints;
-    twin_point_t    *p = path->points;
+    twin_spoint_t    *p = path->points;
     twin_hull_t	    *hull;
     int		    e;
     
@@ -62,8 +71,10 @@ _twin_hull_create (twin_path_t *path, int *nhull)
 	return NULL;
     *nhull = n;
 
+    DBGMSG (("original polygon: \n"));
     for (i = 0; i < n; i++) 
     {
+	DBGMSG (("\t%d: %9.4f, %9.4f\n", i, S(p[i].x), S(p[i].y)));
 	/* place extremum first in array */
 	if (i == 0) j = e;
 	else if (i == e) j = 0;
@@ -134,9 +145,15 @@ _twin_hull_vertex_compare (const void *av, const void *bv)
 	b_dist = ((twin_dfixed_t) b->slope.dx * b->slope.dx +
 		  (twin_dfixed_t) b->slope.dy * b->slope.dy);
 	if (a_dist < b_dist)
+	{
 	    a->discard = 1;
+	    ret = -1;
+	}
 	else
+	{
 	    b->discard = 1;
+	    ret = 1;
+	}
     }
 
     return ret;
@@ -178,6 +195,7 @@ _twin_hull_eliminate_concave (twin_hull_t *hull, int num_hull)
     k = _twin_hull_next_valid (hull, num_hull, j);
 
     do {
+	DBGMSG (("i: %d j: %d k: %d\n", i, j, k));
 	_twin_slope_init (&slope_ij, &hull[i].point, &hull[j].point);
 	_twin_slope_init (&slope_jk, &hull[j].point, &hull[k].point);
 
@@ -205,11 +223,15 @@ _twin_hull_to_path (twin_hull_t *hull, int num_hull)
     twin_path_t	*path = twin_path_create ();
     int		i;
 
+    DBGMSG (("convex hull\n"));
     for (i = 0; i < num_hull; i++) 
     {
+	DBGMSG (("\t%d: %9.4f, %9.4f %c\n",
+		 i, S(hull[i].point.x), S(hull[i].point.y), 
+		 hull[i].discard ? '*' : ' '));
 	if (hull[i].discard)
 	    continue;
-	twin_path_draw (path, hull[i].point.x, hull[i].point.y);
+	_twin_path_sdraw (path, hull[i].point.x, hull[i].point.y);
     }
 
     return path;

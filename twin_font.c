@@ -27,14 +27,16 @@
 #if 0
 #include <stdio.h>
 #define F(x) twin_fixed_to_double(x)
-#define DBGOUT(x)	printf x
+#define S(x) twin_sfixed_to_double(x)
+#define G(x) ((double) (x))
+#define DBGMSG(x)	printf x
 #else
-#define DBGOUT(x)
+#define DBGMSG(x)
 #endif
 
-#define S(f,s)	((twin_fixed_t) ((((twin_dfixed_t) (f) * (s)) >> 5)))
-#define SX(x) (((x) * scale_x) >> 5)
-#define SY(y) (((y) * scale_y) >> 5)
+#define Scale(f)	(((twin_fixed_t) (f) * path->state.font_size) >> 5)
+#define ScaleX(x)	Scale(x)
+#define ScaleY(y)	Scale(y)
 
 twin_bool_t
 twin_has_ucs4 (twin_ucs4_t ucs4)
@@ -42,6 +44,7 @@ twin_has_ucs4 (twin_ucs4_t ucs4)
     return ucs4 <= TWIN_FONT_MAX && _twin_glyph_offsets[ucs4] != 0;
 }
 
+#if 0
 static int
 compare_snap (const void *av, const void *bv)
 {
@@ -89,8 +92,8 @@ _snap (twin_gfixed_t g, twin_fixed_t scale, twin_gfixed_t *snap, int nsnap)
     return v;
 }
 
-#define SNAPX(p)	_snap (p, scale_x, snap_x, nsnap_x)
-#define SNAPY(p)	_snap (p, scale_y, snap_y, nsnap_y)
+#define SNAPX(p)	_snap (p, path->state.font_size, snap_x, nsnap_x)
+#define SNAPY(p)	_snap (p, path->state.font_size, snap_y, nsnap_y)
 
 static int
 _add_snap (twin_gfixed_t *snaps, int nsnap, twin_fixed_t snap)
@@ -103,6 +106,7 @@ _add_snap (twin_gfixed_t *snaps, int nsnap, twin_fixed_t snap)
     snaps[nsnap++] = snap;
     return nsnap;
 }
+#endif
 
 static const twin_gpoint_t *
 _twin_ucs4_base(twin_ucs4_t ucs4)
@@ -115,28 +119,31 @@ _twin_ucs4_base(twin_ucs4_t ucs4)
 #define TWIN_FONT_BASELINE  9
 
 void
-twin_path_ucs4 (twin_path_t	*path, 
-		twin_fixed_t	scale_x,
-		twin_fixed_t	scale_y,
-		int		style,
-		twin_ucs4_t	ucs4)
+twin_path_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
 {
     const twin_gpoint_t	*p = 0;
     int			i;
-    twin_fixed_t	xo, yo;
+    twin_spoint_t	origin;
     twin_fixed_t	xc, yc;
+    twin_sfixed_t	sx, sy;
     twin_path_t		*stroke;
     twin_path_t		*pen;
+    twin_fixed_t	w;
+    twin_fixed_t	x, y;
     twin_fixed_t	pen_size;
+    twin_matrix_t	pen_matrix;
+#if 0
     twin_fixed_t	pen_adjust;
     twin_gfixed_t    	*snap_x, *snap_y;
     int			nsnap_x, nsnap_y;
     int			npoints;
+#endif
     
     p = _twin_ucs4_base (ucs4);
     
-    twin_path_cur_point (path, &xo, &yo);
+    origin = _twin_path_current_spoint (path);
     
+#if 0
     for (i = 1; p[i].y != -64; i++)
 	;
 
@@ -173,73 +180,97 @@ twin_path_ucs4 (twin_path_t	*path,
 
     qsort (snap_x, nsnap_x, sizeof (twin_gfixed_t), compare_snap);
     qsort (snap_y, nsnap_y, sizeof (twin_gfixed_t), compare_snap);
-    
+#endif
+
 #if 0
     DBGOUT (("snap_x:"));
     for (i = 0; i < nsnap_x; i++)
 	DBGOUT ((" %d", snap_x[i])); 
     DBGOUT (("\n"));
     
-    DBGOUT (("snap_y:");
+    DBGOUT (("snap_y:"));
     for (i = 0; i < nsnap_y; i++)
 	DBGOUT ((" %d", snap_y[i])); 
     DBGOUT (("\n"));
 #endif
 
     stroke = twin_path_create ();
+    twin_path_set_matrix (stroke, twin_path_current_matrix (path));
     
+#if 0
     /* snap pen size to half integer value */
-    pen_size = SNAPH(scale_y / 24);
-    if (pen_size < TWIN_FIXED_HALF)
-	pen_size = TWIN_FIXED_HALF;
+    sx = _twin_matrix_dx (&path->state.matrix, 
+			  path->state.font_size, path->state.font_size);
     
-    if (style & TWIN_TEXT_BOLD)
+    pen_size = SNAPH(sx / 24);
+    if (pen_size < TWIN_SFIXED_HALF)
+	pen_size = TWIN_SFIXED_HALF;
+    
+    if (path->state.font_style & TWIN_TEXT_BOLD)
     {
 	twin_fixed_t	pen_add = SNAPH(pen_size >> 1);
 	if (pen_add == 0) 
-	    pen_add = TWIN_FIXED_HALF;
+	    pen_add = TWIN_SFIXED_HALF;
 	pen_size += pen_add;
     }
     
-    pen_adjust = pen_size & TWIN_FIXED_HALF;
+    pen_adjust = pen_size & TWIN_SFIXED_HALF;
+#endif
     
     pen = twin_path_create ();
+    pen_matrix = twin_path_current_matrix (path);
+    /* eliminate translation part */
+    pen_matrix.m[2][0] = 0;
+    pen_matrix.m[2][1] = 0;
+    twin_path_set_matrix (pen, pen_matrix);
+    pen_size = path->state.font_size / 24;
+    if (path->state.font_style & TWIN_TEXT_BOLD)
+	pen_size += pen_size / 2;
+
     twin_path_circle (pen, pen_size);
 
-    xc = SNAPI(xo - SX (p[0].x)) + pen_adjust;
-    yc = SNAPI(yo - SY (TWIN_FONT_BASELINE) - pen_size) + pen_adjust;
-
+    xc = -ScaleX(p[0].x);
+    yc = ScaleY(TWIN_FONT_BASELINE);
+    
     for (i = 1; p[i].y != -64; i++)
 	if (p[i].x == -64)
 	    twin_path_close (stroke);
 	else
 	{
-	    twin_fixed_t    x = SNAPX(p[i].x);
-	    twin_fixed_t    y = SNAPY(p[i].y);
-	    
-	    if (style & TWIN_TEXT_OBLIQUE)
+	    x = xc + ScaleX(p[i].x);
+	    y = yc + ScaleY(p[i].y);
+
+	    if (path->state.font_style & TWIN_TEXT_OBLIQUE)
 		x -= y / 4;
-	    twin_path_draw (stroke, x + xc, y + yc);
+	    sx = origin.x + _twin_matrix_dx (&path->state.matrix, x, y);
+	    sy = origin.y + _twin_matrix_dy (&path->state.matrix, x, y);
+	    DBGMSG(("x: %9.4f, y: %9.4f -> sx: %9.4f, sy: %9.4f\n",
+		    F(x), F(y), S(sx), S(sy)));
+	    _twin_path_sdraw (stroke, sx, sy);
 	}
 
     twin_path_convolve (path, stroke, pen);
     twin_path_destroy (stroke);
     twin_path_destroy (pen);
     
+#if 0
     free (snap_x);
+#endif
 
-    xo = xo + twin_ucs4_width (ucs4, scale_x);
-    twin_path_move (path, xo, yo);
+    w = twin_width_ucs4 (path, ucs4);
+    _twin_path_smove (path, 
+		      origin.x + _twin_matrix_dx (&path->state.matrix, w, 0),
+		      origin.y + _twin_matrix_dy (&path->state.matrix, w, 0));
 }
 
 int
-twin_ucs4_width (twin_ucs4_t ucs4, twin_fixed_t scale_x)
+twin_width_ucs4 (twin_path_t *path, twin_ucs4_t ucs4)
 {
     const twin_gpoint_t	*p = _twin_ucs4_base (ucs4);
     twin_fixed_t	left, right;
     
-    left = SNAPI(SX (p[0].x));
-    right = SNAPI(SX (p[0].y));
+    left = ScaleX (p[0].x);
+    right = ScaleX (p[0].y);
     
     return right - left;
 }
@@ -313,18 +344,14 @@ _twin_utf8_to_ucs4 (const char	    *src_orig,
 }
 
 void
-twin_path_string (twin_path_t	*path, 
-		  twin_fixed_t	scale_x,
-		  twin_fixed_t	scale_y,
-		  int		style,
-		  const char	*string)
+twin_path_utf8 (twin_path_t *path, const char *string)
 {
     int		len;
     twin_ucs4_t	ucs4;
 
     while ((len = _twin_utf8_to_ucs4(string, &ucs4)) > 0)
     {
-	twin_path_ucs4 (path, scale_x, scale_y, style, ucs4);
+	twin_path_ucs4 (path, ucs4);
 	string += len;
     }
 }

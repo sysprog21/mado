@@ -61,6 +61,7 @@ twin_clock_set_transform (twin_pixmap_t	*clock,
 
     twin_path_translate (path, D(1) + TWIN_CLOCK_BORDER_WIDTH * 3,
 			 D(1) + TWIN_CLOCK_BORDER_WIDTH * 3);
+    twin_path_rotate (path, -TWIN_ANGLE_90);
 }
 
 static void
@@ -103,7 +104,7 @@ twin_clock_hand (twin_pixmap_t	*clock,
 static twin_angle_t
 twin_clock_minute_angle (int min)
 {
-    return min * TWIN_ANGLE_360 / 60 - TWIN_ANGLE_90;
+    return min * TWIN_ANGLE_360 / 60;
 }
 
 static void
@@ -128,15 +129,15 @@ twin_clock_face (twin_pixmap_t *clock)
 	static char	    *label = "twin";
 
 	twin_path_empty (path);
-	twin_path_rotate (path, twin_degrees_to_angle (-11));
+	twin_path_rotate (path, twin_degrees_to_angle (-11) + TWIN_ANGLE_90);
 	twin_path_set_font_size (path, D(0.5));
 	twin_path_set_font_style (path, TWIN_TEXT_UNHINTED|TWIN_TEXT_OBLIQUE);
 	twin_text_metrics_utf8 (path, label, &metrics);
 	height = metrics.ascent + metrics.descent;
 	width = metrics.right_side_bearing - metrics.left_side_bearing;
 	
-	twin_path_move (path, -width / 2, metrics.ascent - height/2);
-	twin_path_draw (path, width / 2, metrics.ascent - height/2);
+	twin_path_move (path, -width / 2, metrics.ascent - height/2 + D(0.01));
+	twin_path_draw (path, width / 2, metrics.ascent - height/2 + D(0.01));
 	twin_paint_stroke (clock, TWIN_CLOCK_WATER_UNDER, path, D(0.02));
 	twin_path_empty (path);
 	
@@ -205,11 +206,9 @@ twin_clock (twin_screen_t *screen, int x, int y, int w, int h)
 	localtime_r(&tv.tv_sec, &t);
 
 	second_angle = ((t.tm_sec * 100 + tv.tv_usec / 10000) * 
-			TWIN_ANGLE_360) / 6000 - TWIN_ANGLE_90;
+			TWIN_ANGLE_360) / 6000;
 	minute_angle = twin_clock_minute_angle (t.tm_min) + second_angle / 60;
-	hour_angle = (t.tm_hour * TWIN_ANGLE_360 / 12 +
-		      (minute_angle + TWIN_ANGLE_90) / 12 -
-		      TWIN_ANGLE_90);
+	hour_angle = (t.tm_hour * TWIN_ANGLE_360 + minute_angle) / 12;
 	twin_clock_face (clock);
 	twin_clock_hand (clock, hour_angle, D(0.4), D(0.07), D(0.01),
 			 TWIN_CLOCK_HOUR, TWIN_CLOCK_HOUR_OUT);
@@ -222,7 +221,9 @@ twin_clock (twin_screen_t *screen, int x, int y, int w, int h)
 	
 	gettimeofday (&tv, NULL);
 	
-	usleep (1000000 - tv.tv_usec);
+#define INTERVAL    1000000
+	
+	usleep (INTERVAL - (tv.tv_usec % INTERVAL));
     }
     nclock--;
 }

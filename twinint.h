@@ -82,6 +82,10 @@ typedef signed char	twin_gfixed_t;
     (((t) = twin_int_mult(twin_get_8(d,i),(m),(t)) + twin_get_8(s,i)),\
      (twin_argb32_t) twin_sat (t) << (i))
 
+#define twin_add(s,d,i,t) \
+    (((t) = twin_get_8(d,i) + twin_get_8(s,i)),\
+     (twin_argb32_t) twin_sat (t) << (i))
+
 #define twin_argb32_to_rgb16(s)    ((((s) >> 3) & 0x001f) | \
 				    (((s) >> 5) & 0x07e0) | \
 				    (((s) >> 8) & 0xf800))

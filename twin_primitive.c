@@ -34,15 +34,38 @@ in_over (twin_argb32_t	dst,
     uint16_t	t1, t2, t3, t4;
     twin_a8_t	a;
 
-    src = (twin_in(src,0,msk,t1) |
-	   twin_in(src,8,msk,t2) |
-	   twin_in(src,16,msk,t3) |
-	   twin_in(src,24,msk,t4));
+    switch (msk) {
+    case 0:
+	return dst;
+    case 0xff:
+	break;
+    default:
+	src = (twin_in(src,0,msk,t1) |
+	       twin_in(src,8,msk,t2) |
+	       twin_in(src,16,msk,t3) |
+	       twin_in(src,24,msk,t4));
+	break;
+    }
+    if (!src)
+	return dst;
     a = ~(src >> 24);
-    return (twin_over (src, dst, 0, a, t1) |
-	    twin_over (src, dst, 8, a, t2) |
-	    twin_over (src, dst, 16, a, t3) |
-	    twin_over (src, dst, 24, a, t4));
+    switch (a) {
+    case 0:
+	return src;
+    case 0xff:
+	dst = (twin_add (src, dst, 0, t1) |
+	       twin_add (src, dst, 8, t2) |
+	       twin_add (src, dst, 16, t3) |
+	       twin_add (src, dst, 24, t4));
+	break;
+    default:
+	dst = (twin_over (src, dst, 0, a, t1) |
+	       twin_over (src, dst, 8, a, t2) |
+	       twin_over (src, dst, 16, a, t3) |
+	       twin_over (src, dst, 24, a, t4));
+	break;
+    }
+    return dst;
 }
     
 static twin_argb32_t __inline
@@ -64,11 +87,26 @@ over (twin_argb32_t	dst,
     uint16_t	t1, t2, t3, t4;
     twin_a8_t	a;
 
+    if (!src)
+	return dst;
     a = ~(src >> 24);
-    return (twin_over (src, dst, 0, a, t1) |
-	    twin_over (src, dst, 8, a, t2) |
-	    twin_over (src, dst, 16, a, t3) |
-	    twin_over (src, dst, 24, a, t4));
+    switch (a) {
+    case 0:
+	return src;
+    case 0xff:
+	dst = (twin_add (src, dst, 0, t1) |
+	       twin_add (src, dst, 8, t2) |
+	       twin_add (src, dst, 16, t3) |
+	       twin_add (src, dst, 24, t4));
+	break;
+    default:
+	dst = (twin_over (src, dst, 0, a, t1) |
+	       twin_over (src, dst, 8, a, t2) |
+	       twin_over (src, dst, 16, a, t3) |
+	       twin_over (src, dst, 24, a, t4));
+	break;
+    }
+    return dst;
 }
 
 static twin_argb32_t __inline

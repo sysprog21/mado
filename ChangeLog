@@ -1,5 +1,16 @@
 2004-10-04  Keith Packard  <keithp@keithp.com>
 
+	* twin_primitive.c: (in_over), (over):
+	* twinint.h:
+	Recognize a few special cases to speed up operations
+	
+	* xtwin.c: (twin_clock_set_transform), (twin_clock_minute_angle),
+	(twin_clock_face), (twin_clock):
+	Fix angular problems in hand position by rotating everything 90
+	degrees.
+
+2004-10-04  Keith Packard  <keithp@keithp.com>
+
 	* twin_font.c: (twin_has_ucs4), (twin_path_ucs4):
 	Delete old glyph representation support code.
 	

@@ -22,12 +22,131 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <X11/Xlib.h>
-#include "twin.h"
+#include "twin_x11.h"
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/time.h>
+#include <time.h>
+#include <assert.h>
 
 #define D(x) twin_double_to_fixed(x)
+
+#define CLOCK_SIZE 256
+
+#define TWIN_CLOCK_BACKGROUND	0xff3b80ae
+#define TWIN_CLOCK_HOUR		0xffdedede
+#define TWIN_CLOCK_MINUTE	0xffdedede
+#define TWIN_CLOCK_SECOND	0x80808080
+#define TWIN_CLOCK_TIC		0xffbababa
+#define TWIN_CLOCK_NUMBERS	0xffdedede
+
+static void
+twin_clock_hand (twin_pixmap_t	*clock, 
+		 twin_angle_t	angle, 
+		 twin_fixed_t	len,
+		 twin_fixed_t	width,
+		 twin_argb32_t	pixel)
+{
+    twin_path_t	    *stroke = twin_path_create ();
+
+    twin_path_translate (stroke, D(CLOCK_SIZE) / 2, D(CLOCK_SIZE) / 2);
+    twin_path_scale (stroke, D(CLOCK_SIZE) / 2, D(CLOCK_SIZE) / 2);
+
+    twin_path_rotate (stroke, angle);
+    twin_path_move (stroke, D(0), D(0));
+    twin_path_draw (stroke, len, D(0));
+
+    twin_paint_stroke (clock, pixel, stroke, width);
+    
+    twin_path_destroy (stroke);
+}
+
+static twin_angle_t
+twin_clock_minute_angle (int min)
+{
+    return min * TWIN_ANGLE_360 / 60 - TWIN_ANGLE_90;
+}
+
+static void
+twin_clock_face (twin_pixmap_t *clock)
+{
+    twin_path_t	    *path = twin_path_create ();
+    int		    m;
+
+    twin_path_translate (path, D(CLOCK_SIZE) / 2, D(CLOCK_SIZE) / 2);
+    twin_path_scale (path, D(CLOCK_SIZE) / 2, D(CLOCK_SIZE) / 2);
+    twin_path_set_font_size (path, D(0.2));
+    twin_path_set_font_style (path, TWIN_TEXT_UNHINTED);
+
+    twin_path_move (path, 0, 0);
+    twin_path_circle (path, TWIN_FIXED_ONE);
+    
+    twin_paint_path (clock, TWIN_CLOCK_BACKGROUND, path);
+
+    for (m = 1; m <= 60; m++)
+    {
+	twin_state_t	state = twin_path_save (path);
+	twin_path_rotate (path, twin_clock_minute_angle (m) + TWIN_ANGLE_90);
+        twin_path_empty (path);
+	if (m % 5 != 0)
+	{
+	    twin_path_move (path, 0, -TWIN_FIXED_ONE);
+	    twin_path_draw (path, 0, -D(0.9));
+	    twin_paint_stroke (clock, TWIN_CLOCK_TIC, path, D(0.01));
+	}
+	else
+	{
+	    char    hour[3];
+	    
+	    twin_fixed_t    w;
+	    sprintf (hour, "%d", m / 5);
+	    w = twin_width_utf8 (path, hour);
+	    twin_path_move (path, -(w/2), -D(0.95));
+	    twin_path_utf8 (path, hour);
+	    twin_paint_path (clock, TWIN_CLOCK_NUMBERS, path);
+	}
+        twin_path_restore (path, &state);
+    }
+    
+    twin_path_destroy (path);
+}
+
+static void
+twin_clock (twin_screen_t *screen)
+{
+    twin_pixmap_t   *clock = twin_pixmap_create (TWIN_ARGB32, CLOCK_SIZE, CLOCK_SIZE);
+    struct timeval  tv;
+    struct tm	    t;
+    twin_angle_t    hour_angle, minute_angle, second_angle;
+
+    printf ("twin clock\n");
+    twin_pixmap_move (clock, 0, 0);
+    twin_pixmap_show (clock, screen, 0);
+    for (;;)
+    {
+	twin_pixmap_disable_update (clock);
+	twin_fill (clock, 0x00000000, TWIN_SOURCE, 0, 0, 
+		   CLOCK_SIZE, CLOCK_SIZE);
+
+	gettimeofday (&tv, NULL);
+
+	localtime_r(&tv.tv_sec, &t);
+
+	second_angle = ((t.tm_sec * 100 + tv.tv_usec / 10000) * 
+			TWIN_ANGLE_360) / 6000 - TWIN_ANGLE_90;
+	minute_angle = twin_clock_minute_angle (t.tm_min) + second_angle / 60;
+	hour_angle = t.tm_hour * TWIN_ANGLE_360 / 12 - TWIN_ANGLE_90 + minute_angle / 12;
+
+	twin_clock_face (clock);
+	twin_clock_hand (clock, hour_angle, D(0.4), D(0.05), 0xffdedede);
+	twin_clock_hand (clock, minute_angle, D(0.8), D(0.03), 0xffdedede);
+	twin_clock_hand (clock, second_angle, D(0.6), D(0.01), 0x80808080);
+
+	twin_pixmap_enable_update (clock);
+	usleep (1000000 - tv.tv_usec);
+    }
+}
 
 int styles[] = {
     TWIN_TEXT_ROMAN,
@@ -42,6 +161,7 @@ int styles[] = {
 int
 main (int argc, char **argv)
 {
+    Status	    status = XInitThreads ();
     Display	    *dpy = XOpenDisplay (0);
     twin_x11_t	    *x11 = twin_x11_create (dpy, WIDTH, HEIGHT);
     twin_pixmap_t   *red = twin_pixmap_create (TWIN_ARGB32, WIDTH, HEIGHT);
@@ -59,12 +179,29 @@ main (int argc, char **argv)
     twin_fixed_t    fx, fy;
     int		    g;
 
+    (void) ev;
+    (void) motion;
+    (void) had_motion;
+    (void) x;
+    (void) y;
+    (void) red;
+    (void) blue;
+    (void) status;
+    (void) alpha;
+    (void) source;
+    (void) mask;
+    (void) source;
+    (void) path;
+    
     extra = 0;
     stroke = 0;
+    pen = 0;
     s = 0;
     fx = 0;
     fy = 0;
     g = 0 ;
+
+#if 0
     pen = twin_path_create ();
     twin_path_circle (pen, D (1));
     
@@ -337,6 +474,10 @@ main (int argc, char **argv)
     twin_pixmap_move (blue, 100, 100);
     twin_pixmap_show (red, x11->screen, 0);
     twin_pixmap_show (blue, x11->screen, 0);
+#endif
+    twin_clock (x11->screen);
+    sleep (10000);
+#if 0
     had_motion = TWIN_FALSE;
     for (;;)
     {
@@ -375,5 +516,7 @@ main (int argc, char **argv)
 	    }
 	} while (QLength (dpy));
     }
+#endif
+    return 0;
 }
 

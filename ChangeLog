@@ -1,3 +1,40 @@
+2004-09-30  Keith Packard  <keithp@keithp.com>
+
+	* Makefile.am:
+	* configure.ac:
+	* twin.h:
+	* twin_draw.c: (twin_composite), (twin_fill):
+	* twin_font.c: (_snap), (_twin_pen_size), (twin_text_metrics_ucs4),
+	(twin_path_ucs4), (twin_width_utf8):
+	Handle unhinted text.
+	
+	* twin_path.c: (twin_path_close), (twin_path_bounds),
+	(twin_composite_path), (twin_paint_path), (twin_composite_stroke),
+	(twin_paint_stroke):
+	Add helper functions 
+	
+	* twin_pixmap.c: (twin_pixmap_create), (twin_pixmap_show),
+	(twin_pixmap_hide), (twin_pixmap_enable_update),
+	(twin_pixmap_disable_update), (twin_pixmap_lock),
+	(twin_pixmap_unlock):
+	Lock pixmaps during drawing
+	
+	* twin_poly.c: (_twin_edge_build), (twin_fill_path):
+	* twin_screen.c: (twin_screen_create), (twin_screen_lock),
+	(twin_screen_unlock), (twin_screen_register_damaged),
+	(twin_screen_enable_update), (twin_screen_disable_update),
+	(twin_screen_damage), (twin_screen_update):
+	Disable screen updates while applications are busy
+	
+	* twin_x11.c: (twin_x11_damage_thread), (twin_x11_event_thread),
+	(twin_x11_screen_damaged), (twin_x11_create), (twin_x11_destroy):
+	Add threads to manage events and redisplay
+
+	* twinint.h:
+	* xtwin.c: (twin_clock_hand), (twin_clock_minute_angle),
+	(twin_clock_face), (twin_clock), (main):
+	Paint a clock
+
 2004-09-27  Keith Packard  <keithp@keithp.com>
 
 	* twin.h:

@@ -22,8 +22,8 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "twin_x11.h"
 #include "twinint.h"
-#include <X11/Xutil.h>
 
 static void
 _twin_x11_put_span (int		    x,
@@ -53,6 +53,56 @@ _twin_x11_put_span (int		    x,
     }
     XPutImage (tx->dpy, tx->win, tx->gc, image, 0, 0, x, y, width, 1);
     XDestroyImage (image);
+}
+
+static void *
+twin_x11_damage_thread (void *arg)
+{
+    twin_x11_t	*tx = arg;
+
+    pthread_mutex_lock (&tx->screen->screen_mutex);
+    for (;;)
+    {
+	pthread_cond_wait (&tx->damage_cond, &tx->screen->screen_mutex);
+	if (!tx->win)
+	    break;
+	if (twin_screen_damaged (tx->screen))
+	{
+	    twin_x11_update (tx);
+	    XFlush (tx->dpy);
+	}
+    }
+    pthread_mutex_unlock (&tx->screen->screen_mutex);
+    return 0;
+}
+
+static void *
+twin_x11_event_thread (void *arg)
+{
+    twin_x11_t	*tx = arg;
+    XEvent	ev;
+
+    for (;;)
+    {
+	XNextEvent (tx->dpy, &ev);
+	switch (ev.type) {
+	case Expose:
+	    twin_x11_damage (tx, (XExposeEvent *) &ev);
+	    break;
+	case DestroyNotify:
+	    return 0;
+	}
+    }
+}
+
+static void
+twin_x11_screen_damaged (void *closure)
+{
+    twin_x11_t	*tx = closure;
+
+    pthread_mutex_unlock (&tx->screen->screen_mutex);
+    pthread_cond_broadcast (&tx->damage_cond);
+    pthread_mutex_unlock (&tx->screen->screen_mutex);
 }
 
 twin_x11_t *
@@ -85,15 +135,26 @@ twin_x11_create (Display *dpy, int width, int height)
     tx->gc = XCreateGC (dpy, tx->win, 0, 0);
     tx->screen = twin_screen_create (width, height,
 				     _twin_x11_put_span, tx);
+    twin_screen_register_damaged (tx->screen, twin_x11_screen_damaged, tx);
+
     XMapWindow (dpy, tx->win);
+
+    pthread_cond_init (&tx->damage_cond, NULL);
+
+    pthread_create (&tx->damage_thread, NULL, twin_x11_damage_thread, tx);
+
+    pthread_create (&tx->event_thread, NULL, twin_x11_event_thread, tx);
+    
     return tx;
 }
 
 void
 twin_x11_destroy (twin_x11_t *tx)
 {
-    twin_screen_destroy (tx->screen);
     XDestroyWindow (tx->dpy, tx->win);
+    tx->win = 0;
+    pthread_cond_broadcast (&tx->damage_cond);
+    twin_screen_destroy (tx->screen);
 }
 
 void

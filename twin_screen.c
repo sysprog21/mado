@@ -38,9 +38,31 @@ twin_screen_create (int		    width,
     screen->height = height;
     screen->damage.left = screen->damage.right = 0;
     screen->damage.top = screen->damage.bottom = 0;
+    screen->damaged = NULL;
+    screen->damaged_closure = NULL;
+    screen->disable = 0;
+#if HAVE_PTHREAD_H
+    pthread_mutex_init (&screen->screen_mutex, NULL);
+#endif
     screen->put_span = put_span;
     screen->closure = closure;
     return screen;
+}
+
+void
+twin_screen_lock (twin_screen_t *screen)
+{
+#if HAVE_PTHREAD_H
+    pthread_mutex_lock (&screen->screen_mutex);
+#endif
+}
+
+void
+twin_screen_unlock (twin_screen_t *screen)
+{
+#if HAVE_PTHREAD_H
+    pthread_mutex_unlock (&screen->screen_mutex);
+#endif
 }
 
 void
@@ -49,6 +71,35 @@ twin_screen_destroy (twin_screen_t *screen)
     while (screen->bottom)
 	twin_pixmap_hide (screen->bottom);
     free (screen);
+}
+
+void
+twin_screen_register_damaged (twin_screen_t *screen, 
+			      void (*damaged) (void *),
+			      void *closure)
+{
+    screen->damaged = damaged;
+    screen->damaged_closure = closure;
+}
+
+void
+twin_screen_enable_update (twin_screen_t *screen)
+{
+    if (--screen->disable == 0)
+    {
+	if (screen->damage.left < screen->damage.right &&
+	    screen->damage.top < screen->damage.bottom)
+	{
+	    if (screen->damaged)
+		(*screen->damaged) (screen->damaged_closure);
+	}
+    }
+}
+
+void
+twin_screen_disable_update (twin_screen_t *screen)
+{
+    screen->disable++;
 }
 
 void
@@ -73,6 +124,8 @@ twin_screen_damage (twin_screen_t *screen,
 	if (screen->damage.bottom < bottom)
 	    screen->damage.bottom = bottom;
     }
+    if (screen->damaged && !screen->disable)
+	(*screen->damaged) (screen->damaged_closure);
 }
 
 void
@@ -93,7 +146,8 @@ twin_screen_damaged (twin_screen_t *screen)
 void
 twin_screen_update (twin_screen_t *screen)
 {
-    if (screen->damage.left < screen->damage.right &&
+    if (!screen->disable &&
+	screen->damage.left < screen->damage.right &&
 	screen->damage.top < screen->damage.bottom)
     {
 	int		x = screen->damage.left;

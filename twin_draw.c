@@ -256,6 +256,7 @@ static twin_src_msk_op	comp3[2][4][4][3] = {
     }
 };
 
+    
 #define operand_index(o)    ((o)->source_kind == TWIN_SOLID ? 3 : o->u.pixmap->format)
 
 void
@@ -275,6 +276,7 @@ twin_composite (twin_pixmap_t	*dst,
     int	    iy;
     int	    left, right, top, bottom;
 
+    twin_pixmap_lock (dst);
     if (msk)
     {
 	twin_src_msk_op	op;
@@ -353,6 +355,8 @@ twin_composite (twin_pixmap_t	*dst,
 		   s, right - left);
 	}
     }
+    twin_pixmap_damage (dst, left, top, right, bottom);
+    twin_pixmap_unlock (dst);
 }
 	     
 /*
@@ -386,6 +390,7 @@ twin_fill (twin_pixmap_t    *dst,
     int		    iy;
     int		    left, right, top, bottom;
     
+    twin_pixmap_lock (dst);
     src.c = pixel;
     left = x;
     right = x + width;
@@ -402,4 +407,5 @@ twin_fill (twin_pixmap_t    *dst,
     op = fill[operator][dst->format];
     for (iy = top; iy < bottom; iy++)
 	(*op) (twin_pixmap_pointer (dst, left, iy), src, right - left);
+    twin_pixmap_unlock (dst);
 }

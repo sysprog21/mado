@@ -57,6 +57,8 @@ typedef int32_t	    twin_dfixed_t;  /* 24.8 format (12.4 * 12.4) */
 #define TWIN_SFIXED_ONE		(0x10)
 #define TWIN_SFIXED_HALF	(0x08)
 #define TWIN_SFIXED_TOLERANCE	(TWIN_SFIXED_ONE >> 2)
+#define TWIN_SFIXED_MIN		(-0x7fff)
+#define TWIN_SFIXED_MAX		(0x7fff)
 
 /*
  * Glyph coordinates are stored in 2.6 fixed point
@@ -284,27 +286,6 @@ _twin_distance_to_line_squared (twin_spoint_t *p, twin_spoint_t *p1, twin_spoint
 /*
  * Polygon stuff
  */
-
-typedef struct _twin_edge {
-    struct _twin_edge	*next;
-    twin_sfixed_t	top, bot;
-    twin_sfixed_t	x;
-    twin_sfixed_t	e;
-    twin_sfixed_t	dx, dy;
-    twin_sfixed_t	inc_x;
-    twin_sfixed_t	step_x;
-    int			winding;
-} twin_edge_t;
-
-/*
- * Pixmap must be in a8 format.
- */
-
-int
-_twin_edge_build (twin_spoint_t *vertices, int nvertices, twin_edge_t *edges);
-
-void
-_twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges);
 
 /*
  * Fixed point helper functions

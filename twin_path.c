@@ -140,7 +140,7 @@ twin_path_close (twin_path_t *path)
 	if (path->size_sublen > 0)
 	    size_sublen = path->size_sublen * 2;
 	else
-	    size_sublen = 16;
+	    size_sublen = 1;
 	if (path->sublen)
 	    sublen = realloc (path->sublen, size_sublen * sizeof (int));
 	else
@@ -267,6 +267,32 @@ twin_path_empty (twin_path_t *path)
 }
 
 void
+twin_path_bounds (twin_path_t *path, twin_rect_t *rect)
+{
+    twin_sfixed_t   left = TWIN_SFIXED_MAX;
+    twin_sfixed_t   top = TWIN_SFIXED_MAX;
+    twin_sfixed_t   right = TWIN_SFIXED_MIN;
+    twin_sfixed_t   bottom = TWIN_SFIXED_MIN;
+    int		    i;
+
+    for (i = 0; i < path->npoints; i++)
+    {
+	twin_sfixed_t	x = path->points[i].x;
+	twin_sfixed_t	y = path->points[i].y;
+	if (x < left) left = x;
+	if (x > right) right = x;
+	if (y < top) top = y;
+	if (y > bottom) bottom = y;
+    }
+    if (left >= right || top >= bottom)
+	left = right = top = bottom = 0;
+    rect->left = twin_sfixed_trunc (left);
+    rect->top = twin_sfixed_trunc (top);
+    rect->right = twin_sfixed_trunc (twin_sfixed_ceil (right));
+    rect->bottom = twin_sfixed_trunc (twin_sfixed_ceil (bottom));
+}
+
+void
 twin_path_append (twin_path_t *dst, twin_path_t *src)
 {
     int	    p;
@@ -320,3 +346,84 @@ twin_path_destroy (twin_path_t *path)
 	free (path->sublen);
     free (path);
 }
+
+void
+twin_composite_path (twin_pixmap_t	*dst,
+		     twin_operand_t	*src,
+		     int		src_x,
+		     int		src_y,
+		     twin_path_t	*path,
+		     twin_operator_t	operator)
+{
+    twin_rect_t	    bounds;
+    twin_pixmap_t   *mask;
+    twin_operand_t  msk;
+    int		    width, height;
+
+    twin_path_bounds (path, &bounds);
+    if (bounds.left == bounds.right)
+	return;
+    width = bounds.right - bounds.left;
+    height = bounds.bottom - bounds.top;
+    mask = twin_pixmap_create (TWIN_A8, width, height);
+			       
+    if (!mask)
+	return;
+    twin_fill (mask, 0x00000000, TWIN_SOURCE, 0, 0, width, height);
+    twin_fill_path (mask, path, -bounds.left, -bounds.top);
+    msk.source_kind = TWIN_PIXMAP;
+    msk.u.pixmap = mask;
+    twin_composite (dst, bounds.left, bounds.top, 
+		    src, src_x + bounds.left, src_y + bounds.top,
+		    &msk, 0, 0, operator, width, height);
+    twin_pixmap_destroy (mask);
+}
+
+void
+twin_paint_path (twin_pixmap_t	*dst,
+		 twin_argb32_t	argb,
+		 twin_path_t	*path)
+{
+    twin_operand_t  src;
+
+    src.source_kind = TWIN_SOLID;
+    src.u.argb = argb;
+    twin_composite_path (dst, &src, 0, 0, path, TWIN_OVER);
+}
+
+void
+twin_composite_stroke (twin_pixmap_t	*dst,
+		       twin_operand_t	*src,
+		       int		src_x,
+		       int		src_y,
+		       twin_path_t	*stroke,
+		       twin_fixed_t	pen_width,
+		       twin_operator_t	operator)
+{
+    twin_path_t	    *pen = twin_path_create ();
+    twin_path_t	    *path = twin_path_create ();
+    twin_matrix_t   m = twin_path_current_matrix (stroke);
+    
+    m.m[2][0] = 0;
+    m.m[2][1] = 0;
+    twin_path_set_matrix (pen, m);
+    twin_path_circle (pen, pen_width / 2);
+    twin_path_convolve (path, stroke, pen);
+    twin_composite_path (dst, src, src_x, src_y, path, operator);
+    twin_path_destroy (path);
+    twin_path_destroy (pen);
+}
+
+void
+twin_paint_stroke (twin_pixmap_t    *dst,
+		   twin_argb32_t    argb,
+		   twin_path_t	    *stroke,
+		   twin_fixed_t	    pen_width)
+{
+    twin_operand_t  src;
+
+    src.source_kind = TWIN_SOLID;
+    src.u.argb = argb;
+    twin_composite_stroke (dst, &src, 0, 0, stroke, pen_width, TWIN_OVER);
+}
+

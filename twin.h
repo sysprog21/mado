@@ -27,6 +27,10 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <twin_def.h>
+#if HAVE_PTHREAD_H
+#include <pthread.h>
+#endif
 
 typedef uint8_t	    twin_a8_t;
 typedef uint16_t    twin_a16_t;
@@ -79,6 +83,7 @@ typedef struct _twin_pixmap {
      * Screen showing these pixels
      */
     struct _twin_screen		*screen;
+    int				disable;
     /*
      * List of displayed pixmaps
      */
@@ -125,6 +130,12 @@ typedef struct _twin_screen {
      * Damage
      */
     twin_rect_t		damage;
+    void		(*damaged) (void *);
+    void		*damaged_closure;
+    int			disable;
+#if HAVE_PTHREAD_H
+    pthread_mutex_t	screen_mutex;
+#endif
     /*
      * Repaint function
      */
@@ -314,6 +325,9 @@ void
 twin_path_empty (twin_path_t *path);
 
 void
+twin_path_bounds (twin_path_t *path, twin_rect_t *rect);
+
+void
 twin_path_append (twin_path_t *dst, twin_path_t *src);
 
 twin_path_t *
@@ -358,6 +372,33 @@ twin_path_save (twin_path_t *path);
 void
 twin_path_restore (twin_path_t *path, twin_state_t *state);
 
+void
+twin_composite_path (twin_pixmap_t	*dst,
+		     twin_operand_t	*src,
+		     int		src_x,
+		     int		src_y,
+		     twin_path_t	*path,
+		     twin_operator_t	operator);
+void
+twin_paint_path (twin_pixmap_t	*dst,
+		 twin_argb32_t	argb,
+		 twin_path_t	*path);
+
+void
+twin_composite_stroke (twin_pixmap_t	*dst,
+		       twin_operand_t	*src,
+		       int		src_x,
+		       int		src_y,
+		       twin_path_t	*stroke,
+		       twin_fixed_t	pen_width,
+		       twin_operator_t	operator);
+
+void
+twin_paint_stroke (twin_pixmap_t    *dst,
+		   twin_argb32_t    argb,
+		   twin_path_t	    *stroke,
+		   twin_fixed_t	    pen_width);
+
 /*
  * twin_pixmap.c
  */
@@ -377,8 +418,20 @@ void
 twin_pixmap_hide (twin_pixmap_t *pixmap);
 
 void
+twin_pixmap_enable_update (twin_pixmap_t *pixmap);
+
+void
+twin_pixmap_disable_update (twin_pixmap_t *pixmap);
+
+void
 twin_pixmap_damage (twin_pixmap_t *pixmap,
 		    int x1, int y1, int x2, int y2);
+
+void
+twin_pixmap_lock (twin_pixmap_t *pixmap);
+
+void
+twin_pixmap_unlock (twin_pixmap_t *pixmap);
 
 void
 twin_pixmap_move (twin_pixmap_t *pixmap, int x, int y);
@@ -390,7 +443,7 @@ twin_pixmap_pointer (twin_pixmap_t *pixmap, int x, int y);
  * twin_poly.c
  */
 void
-twin_fill_path (twin_pixmap_t *pixmap, twin_path_t *path);
+twin_fill_path (twin_pixmap_t *pixmap, twin_path_t *path, int dx, int dy);
 
 /*
  * twin_screen.c
@@ -406,9 +459,20 @@ void
 twin_screen_destroy (twin_screen_t *screen);
 
 void
+twin_screen_enable_update (twin_screen_t *screen);
+
+void
+twin_screen_disable_update (twin_screen_t *screen);
+
+void
 twin_screen_damage (twin_screen_t *screen,
 		    int x1, int y1, int x2, int y2);
 		    
+void
+twin_screen_register_damaged (twin_screen_t *screen, 
+			      void (*damaged) (void *),
+			      void *closure);
+
 void
 twin_screen_resize (twin_screen_t *screen, int width, int height);
 
@@ -417,6 +481,13 @@ twin_screen_damaged (twin_screen_t *screen);
 
 void
 twin_screen_update (twin_screen_t *screen);
+
+void
+twin_screen_lock (twin_screen_t *screen);
+
+void
+twin_screen_unlock (twin_screen_t *screen);
+
 
 /*
  * twin_spline.c
@@ -440,35 +511,5 @@ twin_cos (twin_angle_t a);
 
 twin_fixed_t
 twin_tan (twin_angle_t a);
-
-/*
- * twin_x11.c 
- */
-
-#include <X11/Xlib.h>
-
-typedef struct _twin_x11 {
-    twin_screen_t   *screen;
-    Display	    *dpy;
-    Window	    win;
-    GC		    gc;
-    Visual	    *visual;
-    int		    depth;
-} twin_x11_t;
-
-twin_x11_t *
-twin_x11_create (Display *dpy, int width, int height);
-
-void
-twin_x11_destroy (twin_x11_t *tx);
-
-void
-twin_x11_damage (twin_x11_t *tx, XExposeEvent *ev);
-
-void
-twin_x11_configure (twin_x11_t *tx, XConfigureEvent *ev);
-
-void
-twin_x11_update (twin_x11_t *tx);
 
 #endif /* _TWIN_H_ */

@@ -39,6 +39,7 @@ twin_pixmap_create (twin_format_t format, int width, int height)
     pixmap->width = width;
     pixmap->height = height;
     pixmap->stride = stride;
+    pixmap->disable = 0;
     pixmap->p.v = pixmap + 1;
     return pixmap;
 }
@@ -57,8 +58,15 @@ twin_pixmap_show (twin_pixmap_t	*pixmap,
 		  twin_pixmap_t	*lower)
 {
     twin_pixmap_t   **higherp;
+    
+    twin_screen_lock (screen);
+
+    if (pixmap->disable)
+	twin_screen_disable_update (screen);
+    
     if (pixmap->screen)
 	twin_pixmap_hide (pixmap);
+    
     pixmap->screen = screen;
     if (lower)
 	higherp = &lower->higher;
@@ -67,6 +75,7 @@ twin_pixmap_show (twin_pixmap_t	*pixmap,
     pixmap->higher = *higherp;
     *higherp = pixmap;
     twin_pixmap_damage (pixmap, 0, 0, pixmap->width, pixmap->height);
+    twin_screen_unlock (screen);
 }
 
 void
@@ -77,12 +86,16 @@ twin_pixmap_hide (twin_pixmap_t *pixmap)
 
     if (!screen)
 	return;
+    twin_screen_lock (screen);
     twin_pixmap_damage (pixmap, 0, 0, pixmap->width, pixmap->height);
     for (higherp = &screen->bottom; *higherp != pixmap; higherp = &(*higherp)->higher)
 	;
     *higherp = pixmap->higher;
     pixmap->screen = 0;
     pixmap->higher = 0;
+    if (pixmap->disable)
+	twin_screen_enable_update (screen);
+    twin_screen_unlock (screen);
 }
 
 twin_pointer_t
@@ -97,6 +110,26 @@ twin_pixmap_pointer (twin_pixmap_t *pixmap, int x, int y)
 }
 
 void
+twin_pixmap_enable_update (twin_pixmap_t *pixmap)
+{
+    if (--pixmap->disable == 0)
+    {
+	if (pixmap->screen)
+	    twin_screen_enable_update (pixmap->screen);
+    }
+}
+
+void
+twin_pixmap_disable_update (twin_pixmap_t *pixmap)
+{
+    if (pixmap->disable++ == 0)
+    {
+	if (pixmap->screen)
+	    twin_screen_disable_update (pixmap->screen);
+    }
+}
+
+void
 twin_pixmap_damage (twin_pixmap_t *pixmap,
 		    int x1, int y1, int x2, int y2)
 {
@@ -106,6 +139,20 @@ twin_pixmap_damage (twin_pixmap_t *pixmap,
 			    y1 + pixmap->y,
 			    x2 + pixmap->x,
 			    y2 + pixmap->y);
+}
+
+void
+twin_pixmap_lock (twin_pixmap_t *pixmap)
+{
+    if (pixmap->screen)
+	twin_screen_lock (pixmap->screen);
+}
+
+void
+twin_pixmap_unlock (twin_pixmap_t *pixmap)
+{
+    if (pixmap->screen)
+	twin_screen_unlock (pixmap->screen);
 }
 
 void

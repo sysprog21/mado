@@ -1,6 +1,5 @@
 CFLAGS=-g
 INCLUDES= @X_CFLAGS@ @WARN_CFLAGS@
-SUBDIRS=twin_ttf
 
 #libtwin_la_SOURCES = \
 #	twin.h \

@@ -273,7 +273,7 @@ twin_path_fill (twin_pixmap_t *pixmap, twin_path_t *path)
 	else
 	    sublen = path->sublen[s];
 	npoints = sublen - p;
-	if (npoints)
+	if (npoints > 1)
 	{
 	    n = _twin_edge_build (path->points + p, npoints, edges + nedges);
 	    p = sublen;
@@ -289,6 +289,23 @@ twin_path_empty (twin_path_t *path)
 {
     path->npoints = 0;
     path->nsublen = 0;
+}
+
+void
+twin_path_append (twin_path_t *dst, twin_path_t *src)
+{
+    int	    p;
+    int	    s = 0;
+
+    for (p = 0; p < src->npoints; p++)
+    {
+	if (s < src->nsublen && p == src->sublen[s])
+	{
+	    twin_path_close (dst);
+	    s++;
+	}
+	twin_path_draw (dst, src->points[p].x, src->points[p].y);
+    }
 }
 
 twin_path_t *

@@ -76,6 +76,15 @@ main (int argc, char **argv)
     }
 #endif
 #if 1
+    stroke = twin_path_create ();
+    twin_path_move (stroke, D(-1), D(7));
+    twin_path_string (stroke, D(20), D(20), TWIN_TEXT_BOLD, ".");
+/*    twin_path_convolve (path, stroke, pen); */
+    twin_path_append (path, stroke);
+    twin_path_destroy (stroke);
+#endif
+    
+#if 0
     fx = D(3);
     fy = 0;
     for (g = 8; g < 30; g += 4)
@@ -137,7 +146,7 @@ main (int argc, char **argv)
 
     twin_fill (blue, 0x00000000, TWIN_SOURCE, 0, 0, 100, 100);
 
-#if 1
+#if 0
     path = twin_path_create ();
 
     stroke = twin_path_create ();
@@ -194,7 +203,7 @@ main (int argc, char **argv)
     twin_pixmap_move (red, 0, 0);
     twin_pixmap_move (blue, 100, 100);
     twin_pixmap_show (red, x11->screen, 0);
-     twin_pixmap_show (blue, x11->screen, 0);
+    twin_pixmap_show (blue, x11->screen, 0);
     had_motion = TWIN_FALSE;
     for (;;)
     {

@@ -47,7 +47,7 @@ typedef int32_t	    twin_dfixed_t;
 
 #define TWIN_FIXED_ONE		(0x10)
 #define TWIN_FIXED_HALF		(0x08)
-#define TWIN_FIXED_TOLERANCE	(1)
+#define TWIN_FIXED_TOLERANCE	(TWIN_FIXED_ONE >> 2)
 
 #define TWIN_FALSE  0
 #define TWIN_TRUE   1
@@ -274,6 +274,9 @@ twin_path_fill (twin_pixmap_t *pixmap, twin_path_t *path);
 
 void
 twin_path_empty (twin_path_t *path);
+
+void
+twin_path_append (twin_path_t *dst, twin_path_t *src);
 
 twin_path_t *
 twin_path_create (void);

@@ -1,3 +1,31 @@
+2004-09-26  Keith Packard  <keithp@keithp.com>
+
+	* twin.h:
+	* twin_convolve.c: (_twin_path_leftpoint), (_twin_path_step),
+	(_twin_subpath_convolve):
+	Hmm.  Not sure this is right, but I'm giving it a try.
+	Recognize closed paths and attempt to construct two
+	disjoint paths as their convolution with the pen.  This
+	appears to break when the path has a radius of curvature smaller
+	than the radius of the pen.  I'm committing it to CVS mostly
+	so I don't lose the code; I will shortly commit a patch which
+	eliminates the check for a closed path.
+
+	Oh, one correct change is to _twin_path_leftpoint which used
+	to try to be clever about point selection.  Now that pens are
+	forced to be convex, the correct point to use is the one furthest
+	from the line.
+	
+	* twin_path.c: (twin_path_fill), (twin_path_append):
+	Ignore subpaths containing a single point.
+	Add 'twin_path_append' to glue one path into another.
+
+	* twin_poly.c: (_twin_edge_build), (_twin_edge_fill):
+	Add debug output that shows vertices of polygons
+	
+	* xtwin.c: (main):
+	Code to test convolution change mentioned above
+
 2004-09-25  Keith Packard  <keithp@keithp.com>
 
 	* twin_font.c:

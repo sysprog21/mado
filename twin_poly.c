@@ -64,6 +64,14 @@ _twin_fixed_grid_ceil (twin_fixed_t f)
     return ((f + (TWIN_POLY_START - 1)) & ~(TWIN_POLY_STEP - 1)) + TWIN_POLY_START;
 }
 
+#if 0
+#include <stdio.h>
+#define F(x)	twin_fixed_to_double(x)
+#define DBGOUT(x...)	printf(x)
+#else
+#define DBGOUT(x...)
+#endif
+
 int
 _twin_edge_build (twin_point_t *vertices, int nvertices, twin_edge_t *edges)
 {
@@ -81,6 +89,8 @@ _twin_edge_build (twin_point_t *vertices, int nvertices, twin_edge_t *edges)
 	/* skip horizontal edges */
 	if (vertices[v].y == vertices[nv].y)
 	    continue;
+
+	DBGOUT ("Vertex: %9.4f, %9.4f\n", F(vertices[v].x), F(vertices[v].y));
 
 	/* figure winding */
 	if (vertices[v].y < vertices[nv].y)
@@ -244,14 +254,6 @@ _span_fill (twin_pixmap_t   *pixmap,
     }
 }
 
-#if 0
-#include <stdio.h>
-#define F(x)	twin_fixed_to_double(x)
-#define DBGOUT(x...)	printf(x)
-#else
-#define DBGOUT(x...)
-#endif
-
 void
 _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
 {
@@ -287,7 +289,10 @@ _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
 		x0 = a->x;
 	    w += a->winding;
 	    if (w == 0)
+	    {
+		DBGOUT (" F ");
 		_span_fill (pixmap, y, x0, a->x);
+	    }
 	}
 	DBGOUT ("\n");
 	

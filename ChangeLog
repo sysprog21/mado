@@ -1,5 +1,19 @@
 2004-10-04  Keith Packard  <keithp@keithp.com>
 
+	* twin_font.c: (twin_has_ucs4), (twin_path_ucs4):
+	Delete old glyph representation support code.
+	
+	* twin_geom.c: (_twin_distance_to_line_squared):
+	Oops -- overflow not handled correctly in distance functions.
+	
+	* twin_glyphs.c:
+	Replace new glyphs with versions using splines.
+
+	* xtwin.c: (main):
+	Whack around the default presentation a bit more
+
+2004-10-04  Keith Packard  <keithp@keithp.com>
+
 	* twin.h:
 	* twin_draw.c: (twin_composite):
 	Fix a clipping bug

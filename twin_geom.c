@@ -56,8 +56,10 @@ _twin_distance_to_line_squared (twin_spoint_t *p, twin_spoint_t *p1, twin_spoint
     twin_dfixed_t   den, num;
 
     num = A * p->x + B * p->y + C;
+    if (num < 0)
+	num = -num;
     den = A * A + B * B;
-    if (den == 0 || num >= 0x10000)
+    if (den == 0 || num >= 0x8000)
 	return _twin_distance_to_point_squared (p, p1);
     else
 	return (num * num) / den;

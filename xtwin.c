@@ -277,8 +277,8 @@ int styles[] = {
     TWIN_TEXT_BOLD|TWIN_TEXT_OBLIQUE
 };
 
-#define WIDTH	512
-#define HEIGHT	512
+#define WIDTH	256
+#define HEIGHT	256
 
 int
 main (int argc, char **argv)
@@ -347,7 +347,8 @@ main (int argc, char **argv)
 #if 0
     stroke = twin_path_create ();
     twin_path_move (stroke, D(30), D(400));
-    twin_path_string (stroke, D(200), D(200), TWIN_TEXT_ROMAN, "jelly world.");
+    twin_path_set_font_size (stroke, D(100));
+    twin_path_utf8 (stroke, "jelly world.");
     twin_path_convolve (path, stroke, pen);
 /*    twin_path_append (path, stroke); */
     twin_path_destroy (stroke);
@@ -397,10 +398,10 @@ main (int argc, char **argv)
 #if 1
     fx = D(10);
     fy = 0;
-    for (g = 90; g < 91; g += 4)
+    for (g = 10; g <= 38; g += 4)
     {
         twin_path_set_font_size (path, D(g));
-#if 0
+#if 1
         fy += D(g+2);
 	twin_path_move (path, fx, fy);
 	twin_path_utf8 (path,
@@ -623,7 +624,7 @@ main (int argc, char **argv)
 #endif
 
 #if 1
-    twin_start_clock (x11->screen, 0, 0, 256, 256);
+    twin_start_clock (x11->screen, 0, 0, WIDTH, HEIGHT);
 #endif
 #if 0
     twin_start_clock (x11->screen, 0, 0, 256, 256);

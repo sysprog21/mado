@@ -49,10 +49,10 @@ _twin_dump_matrix (char *name, const twin_matrix_t *m)
 #define _twin_dump_matrix(n,m)
 #endif
 
-static void
-_twin_matrix_multiply (twin_matrix_t	    *result,
-		       const twin_matrix_t  *a,
-		       const twin_matrix_t  *b)
+void
+twin_matrix_multiply (twin_matrix_t	    *result,
+		      const twin_matrix_t   *a,
+		      const twin_matrix_t   *b)
 {
     twin_matrix_t   r;
     int		    row, col, n;
@@ -91,7 +91,7 @@ twin_matrix_translate (twin_matrix_t *m, twin_fixed_t tx, twin_fixed_t ty)
     t.m[0][0] = TWIN_FIXED_ONE;	    t.m[0][1] = 0;
     t.m[1][0] = 0;		    t.m[1][1] = TWIN_FIXED_ONE;
     t.m[2][0] = tx;		    t.m[2][1] = ty;
-    _twin_matrix_multiply (m, &t, m);
+    twin_matrix_multiply (m, &t, m);
 }
 
 void
@@ -102,7 +102,7 @@ twin_matrix_scale (twin_matrix_t *m, twin_fixed_t sx, twin_fixed_t sy)
     t.m[0][0] = sx;		    t.m[0][1] = 0;
     t.m[1][0] = 0;		    t.m[1][1] = sy;
     t.m[2][0] = 0;		    t.m[2][1] = 0;
-    _twin_matrix_multiply (m, &t, m);
+    twin_matrix_multiply (m, &t, m);
 }
 
 twin_fixed_t
@@ -144,7 +144,7 @@ twin_matrix_rotate (twin_matrix_t *m, twin_angle_t a)
     t.m[0][0] = c;		    t.m[0][1] = s;
     t.m[1][0] = -s;		    t.m[1][1] = c;
     t.m[2][0] = 0;		    t.m[2][1] = 0;
-    _twin_matrix_multiply (m, &t, m);
+    twin_matrix_multiply (m, &t, m);
 }
 
 twin_sfixed_t

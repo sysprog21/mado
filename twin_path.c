@@ -185,7 +185,6 @@ _twin_matrix_max_radius (twin_matrix_t *m)
 	    twin_fixed_abs (m->m[1][0]) + twin_fixed_abs (m->m[1][1]));
 }
 
-
 void
 twin_path_circle (twin_path_t *path, twin_fixed_t radius)
 {
@@ -199,6 +198,51 @@ twin_path_circle (twin_path_t *path, twin_fixed_t radius)
     save = twin_path_current_matrix (path);
 
     twin_path_scale (path, radius, radius);
+
+    center = _twin_path_current_spoint (path);
+
+    twin_path_close (path);
+    
+    max_radius = _twin_matrix_max_radius (&path->state.matrix);
+    
+    sides = max_radius / twin_sfixed_to_fixed (TWIN_SFIXED_TOLERANCE);
+    
+    if (sides > 1024) sides = 1024;
+
+    n = 2;
+    while ((1 << n) < sides)
+	n++;
+
+    for (i = 0; i <= (1 << n); i++)
+    {
+	twin_angle_t	a = (i * TWIN_ANGLE_360) >> n;
+	twin_fixed_t	x = twin_cos (a);
+	twin_fixed_t	y = twin_sin (a);
+
+	_twin_path_sdraw (path, 
+			  center.x + _twin_matrix_dx (&path->state.matrix, x, y),
+			  center.y + _twin_matrix_dy (&path->state.matrix, x, y));
+    }
+    
+    twin_path_close (path);
+    twin_path_set_matrix (path, save);
+}
+
+void
+twin_path_ellipse (twin_path_t *path, 
+		   twin_fixed_t x_radius, 
+		   twin_fixed_t	y_radius)
+{
+    int		    sides;
+    int		    n;
+    twin_spoint_t   center;
+    int		    i;
+    twin_matrix_t   save;
+    twin_fixed_t    max_radius;
+
+    save = twin_path_current_matrix (path);
+
+    twin_path_scale (path, x_radius, y_radius);
 
     center = _twin_path_current_spoint (path);
 
@@ -278,12 +322,12 @@ twin_path_current_font_size (twin_path_t *path)
 }
 
 void
-twin_path_set_font_style (twin_path_t *path, int font_style)
+twin_path_set_font_style (twin_path_t *path, twin_style_t font_style)
 {
     path->state.font_style = font_style;
 }
 
-int
+twin_style_t
 twin_path_current_font_style (twin_path_t *path)
 {
     return path->state.font_style;
@@ -380,15 +424,15 @@ twin_path_destroy (twin_path_t *path)
 void
 twin_composite_path (twin_pixmap_t	*dst,
 		     twin_operand_t	*src,
-		     int		src_x,
-		     int		src_y,
+		     twin_coord_t	src_x,
+		     twin_coord_t	src_y,
 		     twin_path_t	*path,
 		     twin_operator_t	operator)
 {
     twin_rect_t	    bounds;
     twin_pixmap_t   *mask;
     twin_operand_t  msk;
-    int		    width, height;
+    twin_coord_t    width, height;
 
     twin_path_bounds (path, &bounds);
     if (bounds.left == bounds.right)
@@ -424,8 +468,8 @@ twin_paint_path (twin_pixmap_t	*dst,
 void
 twin_composite_stroke (twin_pixmap_t	*dst,
 		       twin_operand_t	*src,
-		       int		src_x,
-		       int		src_y,
+		       twin_coord_t	src_x,
+		       twin_coord_t	src_y,
 		       twin_path_t	*stroke,
 		       twin_fixed_t	pen_width,
 		       twin_operator_t	operator)

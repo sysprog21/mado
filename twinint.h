@@ -66,6 +66,8 @@ typedef int32_t	    twin_dfixed_t;  /* 24.8 format (12.4 * 12.4) */
 
 typedef signed char	twin_gfixed_t;
 
+#define TWIN_GFIXED_ONE		(0x40)
+
 /*
  * Compositing stuff
  */
@@ -356,6 +358,12 @@ extern const uint16_t		_twin_glyph_offsets[];
 
 extern const signed char _twin_gtable[];
 extern const uint16_t _twin_g_offsets[];
+
+/*
+ * Check these whenever glyphs are changed
+ */
+#define TWIN_GLYPH_MAX_SNAP_X	4
+#define TWIN_GLYPH_MAX_SNAP_Y	7
 
 #define twin_glyph_left(g)	((g)[0])
 #define twin_glyph_right(g)	((g)[1])

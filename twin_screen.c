@@ -25,8 +25,8 @@
 #include "twinint.h"
 
 twin_screen_t *
-twin_screen_create (int			width,
-		    int			height, 
+twin_screen_create (twin_coord_t	width,
+		    twin_coord_t	height, 
 		    twin_put_begin_t	put_begin,
 		    twin_put_span_t	put_span,
 		    void		*closure)
@@ -106,7 +106,8 @@ twin_screen_disable_update (twin_screen_t *screen)
 
 void
 twin_screen_damage (twin_screen_t *screen,
-		    int left, int top, int right, int bottom)
+		    twin_coord_t left, twin_coord_t top,
+		    twin_coord_t right, twin_coord_t bottom)
 {
     if (screen->damage.left == screen->damage.right)
     {
@@ -131,7 +132,8 @@ twin_screen_damage (twin_screen_t *screen,
 }
 
 void
-twin_screen_resize (twin_screen_t *screen, int width, int height)
+twin_screen_resize (twin_screen_t *screen, 
+		    twin_coord_t width, twin_coord_t height)
 {
     screen->width = width;
     screen->height = height;
@@ -152,10 +154,10 @@ twin_screen_update (twin_screen_t *screen)
 	screen->damage.left < screen->damage.right &&
 	screen->damage.top < screen->damage.bottom)
     {
-	int		x = screen->damage.left;
-	int		y = screen->damage.top;
-	int		width = screen->damage.right - screen->damage.left;
-	int		height = screen->damage.bottom - screen->damage.top;
+	twin_coord_t	x = screen->damage.left;
+	twin_coord_t	y = screen->damage.top;
+	twin_coord_t	width = screen->damage.right - screen->damage.left;
+	twin_coord_t	height = screen->damage.bottom - screen->damage.top;
 	twin_argb32_t	*span;
         twin_pixmap_t	*p;
 

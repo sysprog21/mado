@@ -1,3 +1,30 @@
+2004-10-05  Keith Packard  <keithp@keithp.com>
+
+	* twin.h:
+	* twin_draw.c: (twin_composite), (twin_fill):
+	* twin_matrix.c: (twin_matrix_multiply), (twin_matrix_translate),
+	(twin_matrix_scale), (twin_matrix_rotate):
+	* twin_path.c: (twin_path_ellipse), (twin_path_set_font_style),
+	(twin_composite_path), (twin_composite_stroke):
+	* twin_pixmap.c: (twin_pixmap_create), (twin_pixmap_pointer),
+	(twin_pixmap_damage), (twin_pixmap_move):
+	* twin_poly.c: (twin_fill_path):
+	* twin_screen.c: (twin_screen_create), (twin_screen_damage),
+	(twin_screen_resize), (twin_screen_update):
+	* twin_x11.c: (_twin_x11_put_begin), (_twin_x11_put_span):
+	* twinint.h:
+	Update API to use twin_ types for most everything.
+	
+	* twin_font.c: (_twin_text_compute_info),
+	(_twin_text_compute_snap), (_twin_text_compute_pen), (_twin_snap),
+	(twin_has_ucs4), (_twin_glyph_width), (twin_text_metrics_ucs4),
+	(twin_path_ucs4):
+	Rework snapping to correctly snap vertical and horizontal text
+	on pixel boundaries.
+	
+	* xtwin.c: (main):
+	Change clock watermark
+
 2004-10-04  Keith Packard  <keithp@keithp.com>
 
 	* twin_primitive.c: (in_over), (over):

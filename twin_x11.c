@@ -26,11 +26,11 @@
 #include "twinint.h"
 
 static void
-_twin_x11_put_begin (int    x,
-		     int    y,
-		     int    width,
-		     int    height,
-		     void   *closure)
+_twin_x11_put_begin (twin_coord_t   x,
+		     twin_coord_t   y,
+		     twin_coord_t   width,
+		     twin_coord_t   height,
+		     void	    *closure)
 {
     twin_x11_t	*tx = closure;
 
@@ -49,15 +49,15 @@ _twin_x11_put_begin (int    x,
 }
 
 static void
-_twin_x11_put_span (int		    x,
-		    int		    y,
-		    int		    width,
+_twin_x11_put_span (twin_coord_t	    x,
+		    twin_coord_t	    y,
+		    twin_coord_t	    width,
 		    twin_argb32_t   *pixels,
 		    void	    *closure)
 {
     twin_x11_t	*tx = closure;
-    int		ix = 0;
-    int		iw = width;
+    twin_coord_t	ix = 0;
+    twin_coord_t	iw = width;
 
     if (!tx->image)
 	return;

@@ -25,10 +25,12 @@
 #include "twinint.h"
 
 twin_pixmap_t *
-twin_pixmap_create (twin_format_t format, int width, int height)
+twin_pixmap_create (twin_format_t   format,
+		    twin_coord_t    width,
+		    twin_coord_t    height)
 {
-    int	stride = twin_bytes_per_pixel (format) * width;
-    int	size = sizeof (twin_pixmap_t) + stride * height;
+    twin_coord_t    stride = twin_bytes_per_pixel (format) * width;
+    twin_area_t	    size = sizeof (twin_pixmap_t) + (twin_area_t) stride * height;
     twin_pixmap_t   *pixmap = malloc (size);
     if (!pixmap)
 	return 0;
@@ -99,7 +101,7 @@ twin_pixmap_hide (twin_pixmap_t *pixmap)
 }
 
 twin_pointer_t
-twin_pixmap_pointer (twin_pixmap_t *pixmap, int x, int y)
+twin_pixmap_pointer (twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y)
 {
     twin_pointer_t  p;
 
@@ -131,7 +133,8 @@ twin_pixmap_disable_update (twin_pixmap_t *pixmap)
 
 void
 twin_pixmap_damage (twin_pixmap_t *pixmap,
-		    int x1, int y1, int x2, int y2)
+		    twin_coord_t x1, twin_coord_t y1,
+		    twin_coord_t x2, twin_coord_t y2)
 {
     if (pixmap->screen)
 	twin_screen_damage (pixmap->screen,
@@ -156,7 +159,7 @@ twin_pixmap_unlock (twin_pixmap_t *pixmap)
 }
 
 void
-twin_pixmap_move (twin_pixmap_t *pixmap, int x, int y)
+twin_pixmap_move (twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y)
 {
     twin_pixmap_damage (pixmap, 0, 0, pixmap->width, pixmap->height);
     pixmap->x = x;

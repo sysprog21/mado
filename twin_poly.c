@@ -348,7 +348,8 @@ _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
 }
 
 void
-twin_fill_path (twin_pixmap_t *pixmap, twin_path_t *path, int dx, int dy)
+twin_fill_path (twin_pixmap_t *pixmap, twin_path_t *path,
+		twin_coord_t dx, twin_coord_t dy)
 {
     twin_edge_t	    *edges;
     int		    nedges, n;

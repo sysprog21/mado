@@ -261,45 +261,48 @@ static twin_src_msk_op	comp3[2][4][4][3] = {
 
 void
 twin_composite (twin_pixmap_t	*dst,
-		int		dst_x,
-		int		dst_y,
+		twin_coord_t	dst_x,
+		twin_coord_t	dst_y,
 		twin_operand_t	*src,
-		int		src_x,
-		int		src_y,
+		twin_coord_t	src_x,
+		twin_coord_t	src_y,
 		twin_operand_t	*msk,
-		int		msk_x,
-		int		msk_y,
+		twin_coord_t	msk_x,
+		twin_coord_t	msk_y,
 		twin_operator_t	operator,
-		int		width,
-		int		height)
+		twin_coord_t	width,
+		twin_coord_t	height)
 {
-    int	    iy;
-    int	    left, right, top, bottom;
+    twin_coord_t    iy;
+    twin_coord_t    left, right, top, bottom;
+
+    left = dst_x;
+    right = dst_x + width;
+    top = dst_y;
+    bottom = dst_y + height;
+    if (left < 0)
+	left = 0;
+    if (right > dst->width)
+	right = dst->width;
+    if (top < 0)
+	top = 0;
+    if (bottom > dst->height)
+	bottom = dst->height;
+    if (left >= right || top >= bottom)
+	return;
 
     twin_pixmap_lock (dst);
     if (msk)
     {
 	twin_src_msk_op	op;
 	twin_source_u   s, m;
-	int		sdx, sdy, mdx, mdy;
+	twin_coord_t	sdx, sdy, mdx, mdy;
 	
 	sdx = src_x - dst_x;
 	sdy = src_y - dst_y;
 	mdx = msk_x - dst_x;
 	mdy = msk_y - dst_y;
 	
-	left = dst_x;
-	right = dst_x + width;
-	top = dst_y;
-	bottom = dst_y + height;
-	if (left < 0)
-	    left = 0;
-	if (right > dst->width)
-	    right = dst->width;
-	if (top < 0)
-	    top = 0;
-	if (bottom > dst->height)
-	    bottom = dst->height;
 
 	op = comp3[operator][operand_index(src)][operand_index(msk)][dst->format];
 	if (op)
@@ -326,24 +329,11 @@ twin_composite (twin_pixmap_t	*dst,
     {
 	twin_src_op	op;
 	twin_source_u   s;
-	int		sdx, sdy;
+	twin_coord_t	sdx, sdy;
 	
 	sdx = src_x - dst_x;
 	sdy = src_y - dst_y;
 	
-	left = dst_x;
-	right = dst_x + width;
-	top = dst_y;
-	bottom = dst_y + height;
-	if (left < 0)
-	    left = 0;
-	if (right > dst->width)
-	    right = dst->width;
-	if (top < 0)
-	    top = 0;
-	if (top > dst->height)
-	    top = dst->height;
-
 	op = comp2[operator][operand_index(src)][dst->format];
         if (src->source_kind == TWIN_SOLID)
 	    s.c = src->u.argb;
@@ -380,15 +370,15 @@ void
 twin_fill (twin_pixmap_t    *dst,
 	   twin_argb32_t    pixel,
 	   twin_operator_t  operator,
-	   int		    x,
-	   int		    y,
-	   int		    width,
-	   int		    height)
+	   twin_coord_t	    x,
+	   twin_coord_t	    y,
+	   twin_coord_t	    width,
+	   twin_coord_t	    height)
 {
     twin_src_op	    op;
     twin_source_u   src;
-    int		    iy;
-    int		    left, right, top, bottom;
+    twin_coord_t    iy;
+    twin_coord_t    left, right, top, bottom;
     
     twin_pixmap_lock (dst);
     src.c = pixel;

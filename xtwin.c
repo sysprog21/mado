@@ -41,9 +41,9 @@
 #define TWIN_CLOCK_SECOND_OUT	0x30000000
 #define TWIN_CLOCK_TIC		0xffbababa
 #define TWIN_CLOCK_NUMBERS	0xffdedede
-#define TWIN_CLOCK_WATER	0x40000000
+#define TWIN_CLOCK_WATER	0x60200000
 #define TWIN_CLOCK_WATER_OUT	0x40404040
-#define TWIN_CLOCK_WATER_UNDER	0xcccc0000
+#define TWIN_CLOCK_WATER_UNDER	0x60400000
 #define TWIN_CLOCK_BORDER	0xffbababa
 #define TWIN_CLOCK_BORDER_WIDTH	D(0.01)
 
@@ -278,8 +278,8 @@ int styles[] = {
     TWIN_TEXT_BOLD|TWIN_TEXT_OBLIQUE
 };
 
-#define WIDTH	256
-#define HEIGHT	256
+#define WIDTH	512
+#define HEIGHT	512
 
 int
 main (int argc, char **argv)
@@ -349,7 +349,7 @@ main (int argc, char **argv)
     stroke = twin_path_create ();
     twin_path_move (stroke, D(30), D(400));
     twin_path_set_font_size (stroke, D(100));
-    twin_path_utf8 (stroke, "jelly world.");
+    twin_path_utf8 (stroke, "jelly HEzt/[].");
     twin_path_convolve (path, stroke, pen);
 /*    twin_path_append (path, stroke); */
     twin_path_destroy (stroke);
@@ -397,12 +397,21 @@ main (int argc, char **argv)
     }
 #endif
 #if 1
-    fx = D(10);
+    fx = D(15);
     fy = 0;
-    for (g = 10; g <= 38; g += 4)
+    twin_path_translate (path, 0, D(HEIGHT));
+    twin_path_rotate (path, -twin_degrees_to_angle (90));
+    twin_path_scale (path, D(1), D(0.5));
+    twin_path_set_font_style (path, TWIN_TEXT_OBLIQUE);
+    for (g = 40; g <= 60; g += 4)
     {
         twin_path_set_font_size (path, D(g));
-#if 1
+#if 0
+        fy += D(g+2);
+	twin_path_move (path, fx, fy);
+	twin_path_utf8 (path, "H");
+#endif
+#if 0
         fy += D(g+2);
 	twin_path_move (path, fx, fy);
 	twin_path_utf8 (path,
@@ -428,10 +437,11 @@ main (int argc, char **argv)
 			    "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG.");
 	}
 #endif
-#if 0
-	fy += D(g);
+#if 1
+	fy += D(g + 2);
 	twin_path_move (path, fx, fy);
-#define TEXT	"jelly world"
+#define TEXT	"jelly HEzt/[]."
+/*	twin_path_set_font_style (path, TWIN_TEXT_UNHINTED); */
 	twin_path_utf8 (path, TEXT);
 	{
 	    twin_text_metrics_t	m;
@@ -439,6 +449,7 @@ main (int argc, char **argv)
 	    stroke = twin_path_create ();
 	    twin_path_set_matrix (stroke, twin_path_current_matrix (path));
 	    twin_text_metrics_utf8 (path, TEXT, &m);
+	    twin_path_translate (stroke, TWIN_FIXED_HALF, TWIN_FIXED_HALF);
 	    twin_path_move (stroke, fx, fy);
 	    twin_path_draw (stroke, fx + m.width, fy);
 	    twin_paint_stroke (red, 0xffff0000, stroke, D(1));
@@ -624,9 +635,8 @@ main (int argc, char **argv)
     ++nclock;
 #endif
 
-#if 1
-    twin_start_clock (x11->screen, 0, 0, WIDTH, HEIGHT);
-#endif
+    if (!nclock)
+	twin_start_clock (x11->screen, 0, 0, WIDTH, HEIGHT);
 #if 0
     twin_start_clock (x11->screen, 0, 0, 256, 256);
     twin_start_clock (x11->screen, 256, 0, 256, 256);
@@ -637,4 +647,3 @@ main (int argc, char **argv)
 	sleep (1);
     return 0;
 }
-

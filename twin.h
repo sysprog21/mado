@@ -38,13 +38,18 @@ typedef uint16_t    twin_rgb16_t;
 typedef uint32_t    twin_argb32_t;
 typedef uint32_t    twin_ucs4_t;
 typedef int	    twin_bool_t;
+typedef int16_t	    twin_coord_t;
+typedef int16_t	    twin_style_t;
+typedef int16_t	    twin_count_t;
+typedef int16_t	    twin_keysym_t;
+typedef int32_t	    twin_area_t;
 
 #define TWIN_FALSE  0
 #define TWIN_TRUE   1
 
 typedef enum { TWIN_A8, TWIN_RGB16, TWIN_ARGB32 } twin_format_t;
 
-#define twin_bytes_per_pixel(format)    (1 << (int) (format))
+#define twin_bytes_per_pixel(format)    (1 << (twin_coord_t) (format))
 
 /*
  * Angles
@@ -64,7 +69,7 @@ typedef int16_t	    twin_angle_t;   /* -2048 .. 2048 for -180 .. 180 */
  * A rectangle
  */
 typedef struct _twin_rect {
-    int	    left, right, top, bottom;
+    twin_coord_t    left, right, top, bottom;
 } twin_rect_t;
 
 typedef union _twin_pointer {
@@ -83,7 +88,7 @@ typedef struct _twin_pixmap {
      * Screen showing these pixels
      */
     struct _twin_screen		*screen;
-    int				disable;
+    twin_count_t		disable;
     /*
      * List of displayed pixmaps
      */
@@ -91,32 +96,32 @@ typedef struct _twin_pixmap {
     /*
      * Screen position
      */
-    int			x, y;
+    twin_coord_t		x, y;
     /*
      * Pixmap layout
      */
-    twin_format_t	format;
-    int			width;	    /* pixels */
-    int			height;	    /* pixels */
-    int			stride;	    /* bytes */
+    twin_format_t		format;
+    twin_coord_t		width;	    /* pixels */
+    twin_coord_t		height;	    /* pixels */
+    twin_coord_t		stride;	    /* bytes */
     /*
      * Pixels
      */
-    twin_pointer_t	p;
+    twin_pointer_t		p;
 } twin_pixmap_t;
 
 /*
  * twin_put_begin_t: called before data are drawn to the screen
  * twin_put_span_t: called for each scanline drawn
  */
-typedef void	(*twin_put_begin_t) (int x,
-				     int y,
-				     int width,
-				     int height,
+typedef void	(*twin_put_begin_t) (twin_coord_t x,
+				     twin_coord_t y,
+				     twin_coord_t width,
+				     twin_coord_t height,
 				     void *closure);
-typedef void	(*twin_put_span_t) (int x,
-				    int y,
-				    int width,
+typedef void	(*twin_put_span_t) (twin_coord_t x,
+				    twin_coord_t y,
+				    twin_coord_t width,
 				    twin_argb32_t *pixels,
 				    void *closure);
 
@@ -131,14 +136,14 @@ typedef struct _twin_screen {
     /*
      * Output size
      */
-    int			width, height;
+    twin_coord_t	width, height;
     /*
      * Damage
      */
     twin_rect_t		damage;
     void		(*damaged) (void *);
     void		*damaged_closure;
-    int			disable;
+    twin_count_t	disable;
 #if HAVE_PTHREAD_H
     pthread_mutex_t	screen_mutex;
 #endif
@@ -190,15 +195,15 @@ typedef struct _twin_point {
  * Place matrices in structures so they can be easily copied
  */
 typedef struct _twin_matrix {
-    twin_fixed_t    m[3][2];
+    twin_fixed_t	m[3][2];
 } twin_matrix_t;
 
 typedef struct _twin_path twin_path_t;
 
 typedef struct _twin_state {
-    twin_matrix_t	matrix;
-    twin_fixed_t	font_size;
-    int			font_style;
+    twin_matrix_t   matrix;
+    twin_fixed_t    font_size;
+    twin_style_t    font_style;
 } twin_state_t;
 
 /*
@@ -216,6 +221,34 @@ typedef struct _twin_text_metrics {
 } twin_text_metrics_t;
 
 /*
+ * Events
+ */
+
+typedef enum _twin_event_kind {
+    EventButtonDown, EventButtonUp, EventMotion,
+    EventKeyDown, EventKeyUp, EventUcs4
+} twin_event_kind_t;
+
+typedef struct _twin_event {
+    twin_event_kind_t	kind;
+    union {
+	struct {
+	    twin_coord_t    x, y;
+	    twin_count_t    button;
+	} button;
+	struct {
+	    twin_coord_t    x, y;
+	} motion;
+	struct {
+	    twin_keysym_t   key;
+	} key;
+	struct {
+	    twin_ucs4_t	    ucs4;
+	} ucs4;
+    } u;
+} twin_event_t;
+
+/*
  * twin_convolve.c
  */
 void
@@ -229,26 +262,26 @@ twin_path_convolve (twin_path_t	*dest,
 
 void
 twin_composite (twin_pixmap_t	*dst,
-		int		dst_x,
-		int		dst_y,
+		twin_coord_t	dst_x,
+		twin_coord_t	dst_y,
 		twin_operand_t	*src,
-		int		src_x,
-		int		src_y,
+		twin_coord_t	src_x,
+		twin_coord_t	src_y,
 		twin_operand_t	*msk,
-		int		msk_x,
-		int		msk_y,
+		twin_coord_t	msk_x,
+		twin_coord_t	msk_y,
 		twin_operator_t	operator,
-		int		width,
-		int		height);
+		twin_coord_t	width,
+		twin_coord_t	height);
 
 void
 twin_fill (twin_pixmap_t    *dst,
 	   twin_argb32_t    pixel,
 	   twin_operator_t  operator,
-	   int		    x,
-	   int		    y,
-	   int		    width,
-	   int		    height);
+	   twin_coord_t	    x,
+	   twin_coord_t	    y,
+	   twin_coord_t	    width,
+	   twin_coord_t	    height);
 
 /*
  * twin_fixed.c
@@ -330,6 +363,11 @@ twin_matrix_scale (twin_matrix_t *m, twin_fixed_t sx, twin_fixed_t sy);
 void
 twin_matrix_rotate (twin_matrix_t *m, twin_angle_t a);
 
+void
+twin_matrix_multiply (twin_matrix_t	    *result,
+		      const twin_matrix_t   *a,
+		      const twin_matrix_t   *b);
+
 /*
  * twin_path.c
  */
@@ -349,6 +387,10 @@ twin_path_rdraw (twin_path_t *path, twin_fixed_t x, twin_fixed_t y);
 void
 twin_path_circle(twin_path_t *path, twin_fixed_t radius);
 
+void
+twin_path_ellipse (twin_path_t *path, 
+		   twin_fixed_t x_radius, 
+		   twin_fixed_t	y_radius);
 void
 twin_path_close (twin_path_t *path);
 
@@ -391,11 +433,11 @@ twin_path_current_font_size (twin_path_t *path);
 void
 twin_path_set_font_size (twin_path_t *path, twin_fixed_t font_size);
 
-int
+twin_style_t
 twin_path_current_font_style (twin_path_t *path);
 
 void
-twin_path_set_font_style (twin_path_t *path, int font_style);
+twin_path_set_font_style (twin_path_t *path, twin_style_t font_style);
 
 twin_state_t
 twin_path_save (twin_path_t *path);
@@ -406,8 +448,8 @@ twin_path_restore (twin_path_t *path, twin_state_t *state);
 void
 twin_composite_path (twin_pixmap_t	*dst,
 		     twin_operand_t	*src,
-		     int		src_x,
-		     int		src_y,
+		     twin_coord_t	src_x,
+		     twin_coord_t	src_y,
 		     twin_path_t	*path,
 		     twin_operator_t	operator);
 void
@@ -418,8 +460,8 @@ twin_paint_path (twin_pixmap_t	*dst,
 void
 twin_composite_stroke (twin_pixmap_t	*dst,
 		       twin_operand_t	*src,
-		       int		src_x,
-		       int		src_y,
+		       twin_coord_t	src_x,
+		       twin_coord_t	src_y,
 		       twin_path_t	*stroke,
 		       twin_fixed_t	pen_width,
 		       twin_operator_t	operator);
@@ -435,7 +477,9 @@ twin_paint_stroke (twin_pixmap_t    *dst,
  */
 
 twin_pixmap_t *
-twin_pixmap_create (twin_format_t format, int width, int height);
+twin_pixmap_create (twin_format_t   format,
+		    twin_coord_t    width,
+		    twin_coord_t    height);
 
 void
 twin_pixmap_destroy (twin_pixmap_t *pixmap);
@@ -456,7 +500,8 @@ twin_pixmap_disable_update (twin_pixmap_t *pixmap);
 
 void
 twin_pixmap_damage (twin_pixmap_t *pixmap,
-		    int x1, int y1, int x2, int y2);
+		    twin_coord_t x1, twin_coord_t y1,
+		    twin_coord_t x2, twin_coord_t y2);
 
 void
 twin_pixmap_lock (twin_pixmap_t *pixmap);
@@ -465,24 +510,25 @@ void
 twin_pixmap_unlock (twin_pixmap_t *pixmap);
 
 void
-twin_pixmap_move (twin_pixmap_t *pixmap, int x, int y);
+twin_pixmap_move (twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y);
 
 twin_pointer_t
-twin_pixmap_pointer (twin_pixmap_t *pixmap, int x, int y);
+twin_pixmap_pointer (twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y);
 
 /*
  * twin_poly.c
  */
 void
-twin_fill_path (twin_pixmap_t *pixmap, twin_path_t *path, int dx, int dy);
+twin_fill_path (twin_pixmap_t *pixmap, twin_path_t *path,
+		twin_coord_t dx, twin_coord_t dy);
 
 /*
  * twin_screen.c
  */
 
 twin_screen_t *
-twin_screen_create (int			width,
-		    int			height, 
+twin_screen_create (twin_coord_t	width,
+		    twin_coord_t	height, 
 		    twin_put_begin_t	put_begin,
 		    twin_put_span_t	put_span,
 		    void		*closure);
@@ -498,7 +544,8 @@ twin_screen_disable_update (twin_screen_t *screen);
 
 void
 twin_screen_damage (twin_screen_t *screen,
-		    int x1, int y1, int x2, int y2);
+		    twin_coord_t left, twin_coord_t top,
+		    twin_coord_t right, twin_coord_t bottom);
 		    
 void
 twin_screen_register_damaged (twin_screen_t *screen, 
@@ -506,7 +553,8 @@ twin_screen_register_damaged (twin_screen_t *screen,
 			      void *closure);
 
 void
-twin_screen_resize (twin_screen_t *screen, int width, int height);
+twin_screen_resize (twin_screen_t *screen, 
+		    twin_coord_t width, twin_coord_t height);
 
 twin_bool_t
 twin_screen_damaged (twin_screen_t *screen);

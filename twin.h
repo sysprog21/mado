@@ -312,6 +312,8 @@ struct _twin_window {
     twin_window_style_t	style;
     twin_rect_t		client;
     twin_rect_t		damage;
+    twin_bool_t		client_grab;
+    twin_bool_t		want_focus;
     void		*client_data;
     char		*name;
     
@@ -364,12 +366,11 @@ typedef struct _twin_file	twin_file_t;
 typedef struct _twin_widget twin_widget_t;
 typedef struct _twin_box    twin_box_t;
 
-typedef enum _twin_widget_kind_t {
-    TwinWidgetToplevel,
-    TwinWidgetBox,
-    TwinWidgetLabel,
-    TwinWidgetGlue,
-} twin_widget_kind_t;
+#define _twin_widget_width(w)	(((twin_widget_t *)(w))->extents.right - \
+				 ((twin_widget_t *)(w))->extents.left)
+
+#define _twin_widget_height(w)	(((twin_widget_t *)(w))->extents.bottom - \
+				 ((twin_widget_t *)(w))->extents.top)
 
 typedef enum _twin_dispatch_result {
     TwinDispatchNone,
@@ -417,11 +418,18 @@ typedef struct _twin_label {
     twin_argb32_t	foreground;
     twin_fixed_t	font_size;
     twin_style_t	font_style;
+    twin_point_t	offset;
 } twin_label_t;
 
-typedef struct _twin_glue {
-    twin_widget_t	widget;
-} twin_glue_t;
+typedef void	(*twin_callback_t) (twin_widget_t *widget, void *closure);
+
+typedef struct _twin_button {
+    twin_label_t	label;
+    twin_bool_t		pressed;
+    twin_bool_t		active;
+    twin_callback_t	callback;
+    void		*closure;
+} twin_button_t;
 
 /*
  * twin_box.c
@@ -430,6 +438,17 @@ typedef struct _twin_glue {
 twin_box_t *
 twin_box_create (twin_box_t	*parent,
 		 twin_layout_t	layout);
+
+/*
+ * twin_button.c
+ */
+
+twin_button_t *
+twin_button_create (twin_box_t	    *parent,
+		   const char	    *value,
+		   twin_argb32_t    foreground,
+		   twin_fixed_t	    font_size,
+		   twin_style_t	    font_style);
 
 /*
  * twin_convolve.c

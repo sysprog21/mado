@@ -1,3 +1,33 @@
+2004-10-26  Keith Packard  <keithp@keithp.com>
+
+	* Makefile.am:
+	* twin_button.c: (_twin_button_paint),
+	(_twin_button_set_label_offset), (_twin_button_dispatch),
+	(_twin_button_init), (twin_button_create):
+	Add button widget
+	
+	* twin.h:
+	* twinint.h:
+	Grab button down inside client area.
+	Add button widget
+	
+	* twin_hello.c: (twin_hello_start):
+	* twin_hello.h:
+	Test button widget
+	
+	* twin_label.c: (_twin_label_paint), (_twin_label_init),
+	(twin_label_create):
+	Permit subclassing; add offset to make text shift in button
+	
+	* twin_widget.c: (_twin_widget_contains):
+	Add _twin_widget_contains to test inclusion
+	
+	* twin_window.c: (twin_window_create), (twin_window_dispatch):
+	Grab button down inside client area 
+	
+	* xtwin.c: (main):
+	Make hello window larger
+
 2004-10-25  Keith Packard  <keithp@keithp.com>
 
 	* Makefile.am:

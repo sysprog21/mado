@@ -77,6 +77,8 @@ twin_window_create (twin_screen_t	*screen,
     twin_pixmap_move (window->pixmap, x, y);
     window->damage.left = window->damage.right = 0;
     window->damage.top = window->damage.bottom = 0;
+    window->client_grab = TWIN_FALSE;
+    window->want_focus = TWIN_FALSE;
     window->client_data = 0;
     window->name = 0;
     
@@ -337,19 +339,43 @@ twin_window_dispatch (twin_window_t *window, twin_event_t *event)
     
     switch (ev.kind) {
     case TwinEventButtonDown:
-	if (ev.u.pointer.x < window->client.left ||
-	    window->client.right <= ev.u.pointer.x ||
-	    ev.u.pointer.y < window->client.top ||
-	    window->client.bottom <= ev.u.pointer.y)
+	if (window->client.left <= ev.u.pointer.x &&
+	    ev.u.pointer.x < window->client.right &&
+	    window->client.top  <= ev.u.pointer.y &&
+	    ev.u.pointer.y < window->client.bottom)
 	{
-	    delegate = TWIN_FALSE;
-	    break;
+	    delegate = TWIN_TRUE;
+	    window->client_grab = TWIN_TRUE;
+	    ev.u.pointer.x -= window->client.left;
+	    ev.u.pointer.y -= window->client.top;
 	}
-	/* fall through... */
+	else
+	    delegate = TWIN_FALSE;
+	break;
     case TwinEventButtonUp:
+	if (window->client_grab)
+	{
+	    delegate = TWIN_TRUE;
+	    window->client_grab = TWIN_FALSE;
+	    ev.u.pointer.x -= window->client.left;
+	    ev.u.pointer.y -= window->client.top;
+	}
+	else
+	    delegate = TWIN_FALSE;
+	break;
     case TwinEventMotion:
-	ev.u.pointer.x -= window->client.left;
-	ev.u.pointer.y -= window->client.top;
+	if (window->client_grab ||
+	    (window->client.left <= ev.u.pointer.x &&
+	     ev.u.pointer.x < window->client.right &&
+	     window->client.top  <= ev.u.pointer.y &&
+	     ev.u.pointer.y < window->client.bottom))
+	{
+	    delegate = TWIN_TRUE;
+	    ev.u.pointer.x -= window->client.left;
+	    ev.u.pointer.y -= window->client.top;
+	}
+	else
+	    delegate = TWIN_FALSE;
 	break;
     default:
 	break;

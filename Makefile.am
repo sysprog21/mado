@@ -16,6 +16,7 @@ bin_PROGRAMS = xtwin
 xtwin_SOURCES = \
 	twin.h \
 	twin_box.c \
+	twin_button.c \
 	twin_convolve.c \
 	twin_dispatch.c \
 	twin_draw.c \

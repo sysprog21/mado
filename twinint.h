@@ -479,13 +479,19 @@ _twin_widget_queue_paint (twin_widget_t   *widget);
 void
 _twin_widget_queue_layout (twin_widget_t    *widget);
 
+twin_bool_t
+_twin_widget_contains (twin_widget_t	*widget,
+		       twin_coord_t	x,
+		       twin_coord_t	y);
+
 void
-_twin_label_init (twin_label_t	*label,
-		  twin_box_t	*parent,
-		  const char	*value,
-		  twin_argb32_t	foreground,
-		  twin_fixed_t	font_size,
-		  twin_style_t	font_style);
+_twin_label_init (twin_label_t		*label,
+		  twin_box_t		*parent,
+		  const char		*value,
+		  twin_argb32_t		foreground,
+		  twin_fixed_t		font_size,
+		  twin_style_t		font_style,
+		  twin_dispatch_proc_t	dispatch);
 
 twin_dispatch_result_t
 _twin_label_dispatch (twin_widget_t *widget, twin_event_t *event);
@@ -504,5 +510,17 @@ _twin_toplevel_queue_paint (twin_widget_t *widget);
 
 void
 _twin_toplevel_queue_layout (twin_widget_t *widget);
+
+twin_dispatch_result_t
+_twin_button_dispatch (twin_widget_t *widget, twin_event_t *event);
+
+void
+_twin_button_init (twin_button_t	*button,
+		   twin_box_t		*parent,
+		   const char		*value,
+		   twin_argb32_t	foreground,
+		   twin_fixed_t		font_size,
+		   twin_style_t		font_style,
+		   twin_dispatch_proc_t	dispatch);
 
 #endif /* _TWININT_H_ */

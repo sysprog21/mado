@@ -22,7 +22,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <twin.h>
+#include "twin_hello.h"
 #include <time.h>
 
 static twin_time_t
@@ -58,8 +58,15 @@ twin_hello_start (twin_screen_t *screen, const char *name, int x, int y, int w, 
 						 0xff008000,
 						 twin_int_to_fixed (12),
 						 TWIN_TEXT_OBLIQUE);
+    twin_button_t   *button = twin_button_create (&top->box,
+						  "Button",
+						  0xff800000,
+						  twin_int_to_fixed (18),
+						  TWIN_TEXT_BOLD);
     twin_widget_set (&labela->widget, 0xc0c0c0c0);
+    (void) widget;
     twin_widget_set (&labelb->widget, 0xc0c0c0c0);
+    twin_widget_set (&button->label.widget, 0xc0808080);
     twin_toplevel_show (top);
     twin_set_timeout (_twin_hello_timeout, 1000, labelb);
 }

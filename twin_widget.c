@@ -113,6 +113,15 @@ _twin_widget_queue_layout (twin_widget_t   *widget)
     _twin_toplevel_queue_layout (widget);
 }
 
+twin_bool_t
+_twin_widget_contains (twin_widget_t	*widget,
+		       twin_coord_t	x,
+		       twin_coord_t	y)
+{
+    return (0 <= x && x < _twin_widget_width(widget) && 
+	    0 <= y && y < _twin_widget_height(widget)); 
+}
+
 twin_widget_t *
 twin_widget_create (twin_box_t	    *parent,
 		    twin_argb32_t   background,

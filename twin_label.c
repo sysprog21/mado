@@ -49,8 +49,8 @@ _twin_label_paint (twin_label_t *label)
 {
     twin_path_t		*path = twin_path_create ();
     twin_text_metrics_t	m;
-    twin_coord_t	w = label->widget.extents.right - label->widget.extents.left;
-    twin_coord_t	h = label->widget.extents.bottom - label->widget.extents.top;
+    twin_coord_t	w = _twin_widget_width(label);
+    twin_coord_t	h = _twin_widget_height(label);
 
     if (path)
     {
@@ -60,8 +60,8 @@ _twin_label_paint (twin_label_t *label)
 	twin_path_set_font_size (path, label->font_size);
 	twin_path_set_font_style (path, label->font_style);
 	twin_text_metrics_utf8 (path, label->label, &m);
-	twin_path_move (path, (wf - m.width) / 2,
-			(hf - (m.font_ascent + m.font_descent)) / 2 + m.font_ascent);
+	twin_path_move (path, (wf - m.width) / 2 + label->offset.x,
+			(hf - (m.ascent + m.descent)) / 2 + m.ascent + label->offset.y);
 
 	twin_path_utf8 (path, label->label);
 	twin_paint_path (label->widget.window->pixmap, label->foreground, path);
@@ -114,17 +114,20 @@ twin_label_set (twin_label_t	*label,
 }
 
 void
-_twin_label_init (twin_label_t	*label,
-		  twin_box_t	*parent,
-		  const char	*value,
-		  twin_argb32_t	foreground,
-		  twin_fixed_t	font_size,
-		  twin_style_t	font_style)
+_twin_label_init (twin_label_t		*label,
+		  twin_box_t		*parent,
+		  const char		*value,
+		  twin_argb32_t		foreground,
+		  twin_fixed_t		font_size,
+		  twin_style_t		font_style,
+		  twin_dispatch_proc_t	dispatch)
 {
     static const twin_rect_t	empty = { 0, 0, 0, 0 };
     _twin_widget_init (&label->widget, parent, 0, 
-		       empty, 1, 1, _twin_label_dispatch);
+		       empty, 1, 1, dispatch);
     label->label = NULL;
+    label->offset.x = 0;
+    label->offset.y = 0;
     twin_label_set (label, value, foreground, font_size, font_style);
 }
 
@@ -140,7 +143,8 @@ twin_label_create (twin_box_t	    *parent,
 
     if (!label)
 	return 0;
-    _twin_label_init (label, parent, value, foreground, font_size, font_style);
+    _twin_label_init (label, parent, value, foreground, 
+		      font_size, font_style, _twin_label_dispatch);
     return label;
 }
 

@@ -23,7 +23,7 @@
  */
 
 #include "twinint.h"
-
+	    
 static int
 _edge_compare_y (const void *a, const void *b)
 {
@@ -41,6 +41,18 @@ _edge_step_by (twin_edge_t  *edge, twin_fixed_t dy)
     e = edge->e + (twin_dfixed_t) dy * edge->dx;
     edge->x += edge->step_x * dy + edge->inc_x * (e / edge->dy);
     edge->e = e % edge->dy;
+}
+
+/*
+ * Returns the nearest grid coordinate no less than f
+ *
+ * Grid coordinates are at TWIN_POLY_STEP/2 + n*TWIN_POLY_STEP
+ */
+
+static twin_fixed_t
+_twin_fixed_grid_ceil (twin_fixed_t f)
+{
+    return ((f + (TWIN_POLY_START - 1)) & ~(TWIN_POLY_STEP - 1)) + TWIN_POLY_START;
 }
 
 int
@@ -75,19 +87,16 @@ _twin_edge_build (twin_point_t *vertices, int nvertices, twin_edge_t *edges)
 	    bv = v;
 	}
 
-	y = vertices[tv].y;
-	if (y < 0)
-	    y = 0;
-	y = (y + 0x7) & ~0x7;
+	/* snap top to first grid point in pixmap */
+	y = _twin_fixed_grid_ceil (vertices[tv].y);
+	if (y < TWIN_POLY_START)
+	    y = TWIN_POLY_START;
 	
 	/* skip vertices which don't span a sample row */
 	if (y >= vertices[bv].y)
 	    continue;
 
-	/* Compute bresenham terms for 2x2 oversampling 
-	 * which is 8 sub-pixel steps per 
-	 */
-
+	/* Compute bresenham terms */
 	edges[e].dx = vertices[bv].x - vertices[tv].x;
 	edges[e].dy = vertices[bv].y - vertices[tv].y;
 	if (edges[e].dx >= 0)
@@ -100,12 +109,13 @@ _twin_edge_build (twin_point_t *vertices, int nvertices, twin_edge_t *edges)
 	edges[e].step_x = edges[e].inc_x * (edges[e].dx / edges[e].dy);
 	edges[e].dx = edges[e].dx % edges[e].dy;
 
-	edges[e].top = y;
+	edges[e].top = vertices[tv].y;
 	edges[e].bot = vertices[bv].y;
 
 	edges[e].x = vertices[tv].x;
 	edges[e].e = 0;
 
+	/* step to first grid point */
 	_edge_step_by (&edges[e], y - edges[e].top);
 
 	edges[e].top = y;
@@ -115,9 +125,6 @@ _twin_edge_build (twin_point_t *vertices, int nvertices, twin_edge_t *edges)
     return e;
 }
     
-#define twin_fixed_ceil_half(f)	(((f) + 7) & ~7)
-#define TWIN_FIXED_HALF	(TWIN_FIXED_ONE >> 1)
-
 static void
 _span_fill (twin_pixmap_t   *pixmap,
 	    twin_fixed_t    y,
@@ -134,11 +141,49 @@ _span_fill (twin_pixmap_t   *pixmap,
     twin_a8_t	    *span = pixmap->p.a8 + row * pixmap->stride;
     twin_fixed_t    x;
     twin_a16_t	    a;
+    twin_a16_t	    w;
     
-    for (x = twin_fixed_ceil_half (left); x < right; x += TWIN_FIXED_HALF)
+    /* clip to pixmap */
+    if (left < 0)
+	left = 0;
+    
+    if (twin_fixed_trunc (right) > pixmap->width)
+	right = twin_int_to_fixed (pixmap->width);
+
+    left = _twin_fixed_grid_ceil (left);
+    right = _twin_fixed_grid_ceil (right);
+    
+    /* check for empty */
+    if (right < left)
+	return;
+
+    x = left;
+    
+    /* starting address */
+    span += twin_fixed_trunc(x);
+    
+    /* first pixel */
+    if (x & TWIN_FIXED_HALF)
     {
-	a = (twin_a16_t) cover[(x >> 3) & 1] + (twin_a16_t) span[twin_fixed_trunc(x)];
-	span[twin_fixed_trunc(x)] = twin_sat(a);
+	a = *span + (twin_a16_t) cover[1];
+	*span++ = twin_sat (a);
+	x += TWIN_FIXED_HALF;
+    }
+
+    /* middle pixels */
+    w = cover[0] + cover[1];
+    while (x < right - TWIN_FIXED_HALF)
+    {
+	a = *span + w;
+	*span++ = twin_sat (a);
+	x += TWIN_FIXED_ONE;
+    }
+    
+    /* last pixel */
+    if (x < right)
+    {
+	a = *span + (twin_a16_t) cover[0];
+	*span = twin_sat (a);
     }
 }
 
@@ -156,10 +201,6 @@ _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
     active = 0;
     for (;;)
     {
-	/* strip out dead edges */
-	for (prev = &active; (a = *prev); prev = &(a->next))
-	    if (a->bot <= y)
-		*prev = a->next;
 	/* add in new edges */
 	for (;e < nedges && edges[e].top <= y; e++)
 	{
@@ -169,8 +210,7 @@ _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
 	    edges[e].next = *prev;
 	    *prev = &edges[e];
 	}
-	if (!active)
-	    break;
+	
 	/* walk this y value marking coverage */
 	w = 0;
 	for (a = active; a; a = a->next)
@@ -181,10 +221,29 @@ _twin_edge_fill (twin_pixmap_t *pixmap, twin_edge_t *edges, int nedges)
 	    if (w == 0)
 		_span_fill (pixmap, y, x0, a->x);
 	}
-	y += TWIN_FIXED_ONE >> 1;
+	
+	/* step down, clipping to pixmap */
+	y += TWIN_POLY_STEP;
+
+	if (twin_fixed_trunc (y) >= pixmap->height)
+	    break;
+	
+	/* strip out dead edges */
+	for (prev = &active; (a = *prev);)
+	{
+	    if (a->bot <= y)
+		*prev = a->next;
+	    else
+		prev = &a->next;
+	}
+
+	/* check for all done */
+	if (!active && e == nedges)
+	    break;
+	
 	/* step all edges */
 	for (a = active; a; a = a->next)
-	    _edge_step_by (a, TWIN_FIXED_ONE >> 1);
+	    _edge_step_by (a, TWIN_POLY_STEP);
 	
 	/* fix x sorting */
 	for (prev = &active; (a = *prev) && (n = a->next);)

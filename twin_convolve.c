@@ -23,32 +23,46 @@
  */
 
 #include "twinint.h"
-
+	    
 /*
- * Find the point in path closest to a line normal to p1-p2 which passes through p1
- * (this does not do this yet, but it should)
+ * Find the point in path which is left of the line and
+ * closest to a line normal to p1-p2 passing through p1
  */
 static int
-_twin_path_leftmost (twin_path_t  *path,
-		     twin_point_t *p1,
-		     twin_point_t *p2)
+_twin_path_leftpoint (twin_path_t  *path,
+		      twin_point_t *p1,
+		      twin_point_t *p2)
 {
     int		    p;
     int		    best = 0;
-    twin_dfixed_t   A = p2->y - p1->y;
-    twin_dfixed_t   B = p1->x - p2->x;
-    twin_dfixed_t   C = ((twin_dfixed_t) p1->y * p2->x - 
-			 (twin_dfixed_t) p1->x * p2->y);
-    twin_dfixed_t   max = -0x7fffffff;
+    /*
+     * Along the path
+     */
+    twin_dfixed_t   Ap = p2->y - p1->y;
+    twin_dfixed_t   Bp = p1->x - p2->x;
+    
+    /*
+     * Normal to the path
+     */
+    
+    twin_fixed_t    xn = (p1->x - (p2->y - p1->y));
+    twin_fixed_t    yn = (p1->y + (p2->x - p1->x));
+    twin_dfixed_t   An = yn - p1->y;
+    twin_dfixed_t   Bn = p1->x - xn;
+    
+    twin_dfixed_t   min = 0x7fffffff;
     
     for (p = 0; p < path->npoints; p++)
     {
-	twin_fixed_t	x = path->points[p].x + p1->x;
-	twin_fixed_t	y = path->points[p].y + p1->y;
-	twin_dfixed_t	v = A * x + B * y + C;
-	if (v > max)
+	twin_fixed_t	x = path->points[p].x;
+	twin_fixed_t	y = path->points[p].y;
+	twin_dfixed_t	vp = Ap * x + Bp * y;
+	twin_dfixed_t	vn = An * x + Bn * y;
+
+	if (vn < 0) vn = -vn;
+	if (vp > 0 && vn < min)
 	{
-	    max = v;
+	    min = vn;
 	    best = p;
 	}
     }
@@ -87,23 +101,21 @@ _clockwise (twin_point_t    *a1,
     return diff <= 0;
 }
 
-#include <stdio.h>
-
 void
 twin_path_convolve (twin_path_t	*path,
 		    twin_path_t	*stroke,
 		    twin_path_t	*pen)
 {
-    twin_point_t    *sp = stroke->points;
-    twin_point_t    *pp = pen->points;
-    int		    ns = stroke->npoints;
-    int		    np = pen->npoints;
-    int		    start = _twin_path_leftmost (pen,
-						 &sp[0],
-						 &sp[_twin_path_step(stroke,0,1)]);
-    int		    ret = _twin_path_leftmost (pen,
-					       &sp[ns-1],
-					       &sp[_twin_path_step(stroke,ns-1,-1)]);
+    twin_point_t    *sp   = stroke->points;
+    twin_point_t    *pp   = pen->points;
+    int		    ns    = stroke->npoints;
+    int		    np    = pen->npoints;
+    twin_point_t    *sp0  = &sp[0];
+    twin_point_t    *sp1  = &sp[_twin_path_step(stroke,0,1)];
+    int		    start = _twin_path_leftpoint (pen, sp0, sp1);
+    twin_point_t    *spn1 = &sp[ns-1];
+    twin_point_t    *spn2 = &sp[_twin_path_step(stroke,ns-1,-1)];
+    int		    ret   = _twin_path_leftpoint (pen, spn1, spn2);
     int		    p;
     int		    s;
     int		    starget;
@@ -124,46 +136,55 @@ twin_path_convolve (twin_path_t	*path,
     ptarget = ret;
     for (;;)
     {
-	int	sn = _twin_path_step(stroke,s,inc);
-	int	pn = _twin_path_step(pen,p,1);
-	int	pm = _twin_path_step(pen,p,-1);
-
 	/*
-	 * step along pen (forwards or backwards) or stroke as appropriate
+	 * Convolve the edges
 	 */
-	 
-	if (!_clockwise (&sp[s],&sp[sn],&pp[p],&pp[pn]))
-	    p = pn;
-	else if (_clockwise(&sp[s],&sp[sn],&pp[pm],&pp[p]))
-	    p = pm;
-	else
-	    s = sn;
-	
-	twin_path_draw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
-	
-	if (s == starget)
+	while (s != starget)
 	{
-	    if (closed)
-	    {
-		twin_path_close (path);
-		if (inc == 1)
-		    twin_path_move (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
-	    }
+	    int	sn = _twin_path_step(stroke,s,inc);
+	    int	pn = _twin_path_step(pen,p,1);
+	    int	pm = _twin_path_step(pen,p,-1);
+    
+	    /*
+	     * step along pen (forwards or backwards) or stroke as appropriate
+	     */
+	     
+	    if (!_clockwise (&sp[s],&sp[sn],&pp[p],&pp[pn]))
+		p = pn;
+	    else if (_clockwise(&sp[s],&sp[sn],&pp[pm],&pp[p]))
+		p = pm;
 	    else
-	    {
-		/* draw a cap */
-		while (p != ptarget)
-		{
-		    if (++p == np) p = 0;
-		    twin_path_draw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
-		}
-	    }
-	    if (inc == -1)
-		break;
-	    /* reach the end of the path?  Go back the other way now */
-	    inc = -1;
-	    starget = 0;
-	    ptarget = start;
+		s = sn;
+	    twin_path_draw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
 	}
+	
+	/*
+	 * Finish this edge
+	 */
+	if (closed)
+	{
+	    twin_path_close (path);
+	    p = ptarget;
+	}
+	else
+	{
+	    /* draw a cap */
+	    while (p != ptarget)
+	    {
+	        if (++p == np) p = 0;
+	        twin_path_draw (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
+	    }
+	}
+	if (inc == -1)
+	    break;
+	
+	
+	/* reach the end of the path?  Go back the other way now */
+	inc = -1;
+	starget = 0;
+	ptarget = start;
+	
+	if (closed)
+	    twin_path_move (path, sp[s].x + pp[p].x, sp[s].y + pp[p].y);
     }
 }

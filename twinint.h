@@ -242,6 +242,10 @@ typedef struct _twin_edge {
     int			winding;
 } twin_edge_t;
 
+#define TWIN_POLY_STEP	    TWIN_FIXED_HALF
+#define TWIN_POLY_START	    (TWIN_POLY_STEP / 2)
+#define TWIN_POLY_CEIL(c)   (((c) + (TWIN_POLY_STEP-1)) & ~(TWIN_POLY_STEP-1))
+
 /*
  * Pixmap must be in a8 format.
  */

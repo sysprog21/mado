@@ -41,9 +41,11 @@ typedef int32_t	    twin_dfixed_t;
 
 #define twin_double_to_fixed(d)	((twin_fixed_t) ((d) * 16.0))
 #define twin_fixed_to_double(f)	((double) (f) / 16.0)
+#define twin_int_to_fixed(i)	((twin_fixed_t) ((i) * 16))
 
 #define TWIN_FIXED_ONE		(0x10)
-#define TWIN_FIXED_TOLERANCE	(TWIN_FIXED_ONE >> 1)
+#define TWIN_FIXED_HALF		(0x08)
+#define TWIN_FIXED_TOLERANCE	(TWIN_FIXED_HALF)
 
 #define TWIN_FALSE  0
 #define TWIN_TRUE   1

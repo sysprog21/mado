@@ -1,5 +1,28 @@
 2004-09-21  Keith Packard  <keithp@keithp.com>
 
+	* twin.h:
+	* twinint.h:
+	Add a few definitions
+
+	* twin_convolve.c: (_twin_path_leftpoint), (twin_path_convolve):
+	Find pen starting point as closest to the normal to the path.
+	Restructure convolve loop to be easier to understand
+	
+	* twin_path.c: (twin_path_circle):
+	Round circle coordinates instead of truncating them
+	
+	* twin_poly.c: (_twin_fixed_grid_ceil), (_twin_edge_build),
+	(_span_fill), (_twin_edge_fill):
+	Move sample grid by 1/2 sample step.
+	Clip polygons to mask pixmap.
+	Modest performance improvement in span filling.
+	Fix end case to remove edges before stepping.
+	
+	* xtwin.c: (main):
+	Stroke a path.
+
+2004-09-21  Keith Packard  <keithp@keithp.com>
+
 	* Makefile.am:
 	* twin.h:
 	* twin_convolve.c: (_twin_path_leftmost), (_twin_path_step),

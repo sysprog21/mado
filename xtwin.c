@@ -27,6 +27,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#define D(x) twin_double_to_fixed(x)
+
 int
 main (int argc, char **argv)
 {
@@ -50,31 +52,22 @@ main (int argc, char **argv)
 
     path = twin_path_create ();
 
-#if 1
     pen = twin_path_create ();
-    twin_path_circle (pen, twin_double_to_fixed (6));
+    twin_path_circle (pen, D (3));
     
     stroke = twin_path_create ();
     
-    twin_path_move (stroke, twin_double_to_fixed (10), twin_double_to_fixed (50));
-    twin_path_draw (stroke, twin_double_to_fixed (30), twin_double_to_fixed (50));
-    twin_path_draw (stroke, twin_double_to_fixed (10), twin_double_to_fixed (10));
+    twin_path_move (stroke, D (10), D (40));
+    twin_path_draw (stroke, D (40), D (40));
+    twin_path_draw (stroke, D (10), D (10));
 
     twin_path_convolve (path, stroke, pen);
-#else
-    twin_path_move (path, twin_double_to_fixed (10), twin_double_to_fixed (10));
-    twin_path_circle (path, twin_double_to_fixed (10));
-#endif
 
     twin_path_fill (alpha, path);
     twin_path_empty (path);
 
-    twin_path_move (path, 
-		    twin_double_to_fixed  (50), twin_double_to_fixed (50));
-    twin_path_curve (path,
-		     twin_double_to_fixed (70), twin_double_to_fixed (70),
-		     twin_double_to_fixed (80), twin_double_to_fixed (70),
-		     twin_double_to_fixed (100), twin_double_to_fixed (50));
+    twin_path_move (path, D (50), D (50));
+    twin_path_curve (path, D (70), D (70), D (80), D (70), D (100), D (50));
 
     twin_path_fill (alpha, path);
 
@@ -85,13 +78,9 @@ main (int argc, char **argv)
     twin_composite (blue, 0, 0, &source, 0, 0, &mask, 0, 0, TWIN_OVER,
 		    100, 100);
     
-    /*
-    twin_fill (blue, 0x80000080, TWIN_SOURCE, 0, 0, 100, 100);
-    twin_fill (blue, 0xff00c000, TWIN_SOURCE, 25, 25, 50, 50);
-     */
-    twin_pixmap_move (red, 20, 20);
-    twin_pixmap_move (blue, 80, 80);
-/*    twin_pixmap_show (red, x11->screen, 0); */
+    twin_pixmap_move (red, 0, 0);
+    twin_pixmap_move (blue, 100, 100);
+    twin_pixmap_show (red, x11->screen, 0);
     twin_pixmap_show (blue, x11->screen, 0);
     for (;;)
     {

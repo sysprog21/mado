@@ -179,6 +179,7 @@ twin_path_circle (twin_path_t *path, twin_fixed_t radius)
     int		    sides = (4 * radius) / TWIN_FIXED_TOLERANCE;
     int		    n;
     twin_fixed_t    cx, cy;
+    twin_dfixed_t   dradius = (twin_dfixed_t) radius;
     int		    i;
 
     if (sides > 256) sides = 256;
@@ -201,8 +202,8 @@ twin_path_circle (twin_path_t *path, twin_fixed_t radius)
 
     for (i = 1; i < (1 << n); i++)
     {
-	twin_fixed_t	x = ((twin_dfixed_t) radius * _cos (i, n - 2)) >> 14;
-	twin_fixed_t	y = ((twin_dfixed_t) radius * _sin (i, n - 2)) >> 14;
+	twin_fixed_t	x = (dradius * _cos (i, n - 2) + (1 << 13)) >> 14;
+	twin_fixed_t	y = (dradius * _sin (i, n - 2) + (1 << 13)) >> 14;
 
 	twin_path_draw (path, cx + x, cy + y);
     }

@@ -50,6 +50,8 @@ new_pts (void)
     pts->n = 0;
     pts->s = 0;
     pts->pt = 0;
+
+    return pts;
 }
 
 void
@@ -66,7 +68,6 @@ add_pt (pts_t *pts, pt_t *pt)
     if (pts->n == pts->s)
     {
 	int	ns = pts->s ? pts->s * 2 : 16;
-	pt_t	*npt;
 
 	if (pts->pt)
 	    pts->pt = realloc (pts->pt, ns * sizeof (pt_t));
@@ -279,10 +280,6 @@ spline_t fit (pt_t *p, int n)
 
     double	dist;
     
-    double	start_first;
-    double	stop_first;
-    double	start_last;
-    double	stop_last;
     double	tol = 0.5;
     double	best_err = 10000;
     double	sbx_min;

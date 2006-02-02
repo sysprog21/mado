@@ -1,3 +1,19 @@
+2006-02-02  Carl Worth  <cworth@cworth.org>
+
+	* twin_fedit/Makefile: Add x11 as a required package, (cairo no
+	longer pulls this in by default).
+	
+	* twin_fedit/twin-fedit.c: (init), (read_char), (dot), (spot),
+	(draw_char), (pos_to_cmd), (replace_with_spline), (main): Track
+	changes in cairo API to bring forward to be compatible with cairo
+	1.0.x. Remove some unused variables.
+	
+	* twin_fedit/twin-fedit.h: Add missing includes of cairo-xlib.h,
+	X11/Xutil.h, and string.h.
+	
+	* twin_fedit/twin-sfit.c: (new_pts), (add_pt), (fit): Add missing
+	return value and remove unused variables.
+
 2004-10-29  Keith Packard  <keithp@keithp.com>
 
 	* Makefile.am:

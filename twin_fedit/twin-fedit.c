@@ -32,6 +32,7 @@ int	width = 512;
 int	height = 512;
 double	scale = 8;
 cairo_t	*cr;
+cairo_surface_t *surface;
 int	offset;
 
 int	offsets[1024];
@@ -64,7 +65,7 @@ init (int argc, char **argv)
     wm_name.value = (unsigned char *) argv[0];
     wm_name.encoding = XA_STRING;
     wm_name.format = 8;
-    wm_name.nitems = strlen (wm_name.value) + 1;
+    wm_name.nitems = strlen ((char *) wm_name.value) + 1;
     icon_name = wm_name;
 
     win = XCreateWindow (dpy, RootWindow (dpy, scr),
@@ -84,14 +85,18 @@ init (int argc, char **argv)
 
     XMapWindow (dpy, win);
 
-    cr = cairo_create ();
-    
-    cairo_set_target_drawable (cr, dpy, win);
+    surface = cairo_xlib_surface_create (dpy,
+					 win,
+					 visual,
+					 width,
+					 height);
+
+    cr = cairo_create (surface);
 
     cairo_translate (cr, 150, 420);
     cairo_scale (cr, scale, scale);
 
-    cairo_scale_font (cr, 2);
+    cairo_set_font_size (cr, 2);
     return 1;
 }
 
@@ -195,9 +200,7 @@ read_char (void)
 {
     char_t  *c = malloc (sizeof (char_t));
     char    line[1024];
-    char    op;
     cmd_t   *cmd;
-    char    *comma;
 
     c->cmd = 0;
     c->stack = 0;
@@ -252,8 +255,7 @@ read_char (void)
 void
 dot (cairo_t *cr, double x, double y, double red, double blue, double green, double alpha)
 {
-    cairo_set_rgb_color (cr, red, blue, green);
-    cairo_set_alpha (cr, alpha);
+    cairo_set_source_rgba (cr, red, blue, green, alpha);
     cairo_set_line_width (cr, 0.7);
     cairo_arc (cr, x, y, DOT_SIZE, 0, M_PI * 2);
     cairo_stroke (cr);
@@ -262,8 +264,7 @@ dot (cairo_t *cr, double x, double y, double red, double blue, double green, dou
 void
 spot (cairo_t *cr, double x, double y, double red, double blue, double green, double alpha)
 {
-    cairo_set_rgb_color (cr, red, blue, green);
-    cairo_set_alpha (cr, alpha);
+    cairo_set_source_rgba (cr, red, blue, green, alpha);
     cairo_arc (cr, x, y, DOT_SIZE, 0, M_PI * 2);
     cairo_fill (cr);
 }
@@ -281,7 +282,6 @@ draw_char (char_t *c)
     {
 	double	alpha;
 	double	tx, ty;
-	char	buf[10];
 
 	if (cmd == c->first || cmd == c->last)
 	    alpha = 1;
@@ -330,8 +330,7 @@ draw_char (char_t *c)
 	    }
 	}
     }
-    cairo_set_rgb_color (cr, 0, 0, 0);
-    cairo_set_alpha (cr, 1);
+    cairo_set_source_rgb (cr, 0, 0, 0);
     cairo_set_line_width (cr, 0.5);
 
     for (cmd = c->cmd; cmd; cmd = cmd->next)
@@ -373,13 +372,12 @@ draw_char (char_t *c)
 	{
 	    cairo_save (cr);
 	    if (cmd == c->first)
-		cairo_set_rgb_color (cr, 0, .5, 0);
+		cairo_set_source_rgb (cr, 0, .5, 0);
 	    else if (cmd == c->last)
-		cairo_set_rgb_color (cr, 0, 0, .5);
+		cairo_set_source_rgb (cr, 0, 0, .5);
 	    else
-		cairo_set_rgb_color (cr, 0, .5, .5);
+		cairo_set_source_rgb (cr, 0, .5, .5);
 		
-	    cairo_set_alpha (cr, 1);
 	    cairo_move_to (cr, tx - 2, ty + 3);
 	    sprintf (buf, "%d", i);
 	    cairo_show_text (cr, buf);
@@ -393,9 +391,9 @@ pos_to_cmd (char_t *c, cmd_t *start, int ix, int iy)
 {
     double  x = ix, y = iy;
     double  best_err = 1;
-    cmd_t   *cmd, *best_cmd = 0, *next;
+    cmd_t   *cmd, *best_cmd = 0;
 
-    cairo_inverse_transform_point (cr, &x, &y);
+    cairo_device_to_user (cr, &x, &y);
     if (start)
 	start = start->next;
     if (!start)
@@ -447,7 +445,6 @@ void
 replace_with_spline (char_t *c, cmd_t *first, cmd_t *last)
 {
     pts_t	*pts = new_pts ();
-    int		n;
     spline_t	s;
     cmd_t	*cmd, *next, *save;
     
@@ -683,7 +680,7 @@ main (int argc, char **argv)
     
     if (!init (argc, argv))
 	exit (1);
-    while (c = read_char ())
+    while ((c = read_char ()))
     {
 	play (c);
 	write_char (c);

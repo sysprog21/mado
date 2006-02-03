@@ -1,3 +1,9 @@
+2006-02-02  Keith Packard  <keithp@keithp.com>
+
+	* twin_fedit/twin-fedit.c: (dot), (spot):
+	Eliminate spurious segment by moving to initial arc point
+	(sigh).
+
 2006-02-02  Carl Worth  <cworth@cworth.org>
 
 	* twin_fedit/Makefile: Add x11 as a required package, (cairo no

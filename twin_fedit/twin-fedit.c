@@ -257,6 +257,7 @@ dot (cairo_t *cr, double x, double y, double red, double blue, double green, dou
 {
     cairo_set_source_rgba (cr, red, blue, green, alpha);
     cairo_set_line_width (cr, 0.7);
+    cairo_move_to (cr, x + DOT_SIZE, y);
     cairo_arc (cr, x, y, DOT_SIZE, 0, M_PI * 2);
     cairo_stroke (cr);
 }
@@ -265,6 +266,7 @@ void
 spot (cairo_t *cr, double x, double y, double red, double blue, double green, double alpha)
 {
     cairo_set_source_rgba (cr, red, blue, green, alpha);
+    cairo_move_to (cr, x - DOT_SIZE, y);
     cairo_arc (cr, x, y, DOT_SIZE, 0, M_PI * 2);
     cairo_fill (cr);
 }

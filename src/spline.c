@@ -1,6 +1,6 @@
 /*
  * Twin - A Tiny Window System
- * Copyright © 2004 Carl Worth <cworth@cworth.org>
+ * Copyright (c) 2004 Carl Worth <cworth@cworth.org>
  * All rights reserved.
  */
 

@@ -1,6 +1,6 @@
 /*
  * Twin - A Tiny Window System
- * Copyright © 2004 Keith Packard <keithp@keithp.com>
+ * Copyright (c) 2004 Keith Packard <keithp@keithp.com>
  * All rights reserved.
  */
 #include <machine/endian.h>

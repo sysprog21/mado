@@ -1,5 +1,5 @@
 /*
- * Copyright © 2004 Keith Packard
+ * Copyright (c) 2004 Keith Packard
  */
 
 #include "twin.h"

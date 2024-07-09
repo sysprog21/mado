@@ -106,13 +106,14 @@ void twin_window_configure(twin_window_t *window,
     }
     if (width != window->pixmap->width || height != window->pixmap->height) {
         twin_pixmap_t *old = window->pixmap;
+        int i;
 
         window->pixmap = twin_pixmap_create(old->format, width, height);
         window->pixmap->window = window;
         twin_pixmap_move(window->pixmap, x, y);
         if (old->screen)
             twin_pixmap_show(window->pixmap, window->screen, old);
-        for (int i = 0; i < old->disable; i++)
+        for (i = 0; i < old->disable; i++)
             twin_pixmap_disable_update(window->pixmap);
         twin_pixmap_destroy(old);
         twin_pixmap_reset_clip(window->pixmap);
@@ -177,6 +178,11 @@ static void twin_window_frame(twin_window_t *window)
     twin_fixed_t text_y = icon_y + icon_size;
     twin_fixed_t text_width;
     twin_fixed_t title_right;
+    twin_fixed_t close_x;
+    twin_fixed_t max_x;
+    twin_fixed_t min_x;
+    twin_fixed_t resize_x;
+    twin_fixed_t resize_y;
     const char *name;
 
     twin_pixmap_reset_clip(pixmap);
@@ -201,6 +207,13 @@ static void twin_window_frame(twin_window_t *window)
 
     if (title_right < c_right)
         c_right = title_right;
+
+
+    close_x = c_right - t_arc_2 - icon_size;
+    max_x = close_x - bw - icon_size;
+    min_x = max_x - bw - icon_size;
+    resize_x = twin_int_to_fixed(window->client.right);
+    resize_y = twin_int_to_fixed(window->client.bottom);
 
     /* border */
 
@@ -231,7 +244,37 @@ static void twin_window_frame(twin_window_t *window)
     twin_pixmap_reset_clip(pixmap);
     twin_pixmap_origin_to_clip(pixmap);
 
-    /* widget were eliminated */
+    /* widgets */
+
+    {
+        twin_matrix_t m;
+
+        twin_matrix_identity(&m);
+        twin_matrix_translate(&m, menu_x, icon_y);
+        twin_matrix_scale(&m, icon_size, icon_size);
+        twin_icon_draw(pixmap, TwinIconMenu, m);
+
+        twin_matrix_identity(&m);
+        twin_matrix_translate(&m, min_x, icon_y);
+        twin_matrix_scale(&m, icon_size, icon_size);
+        twin_icon_draw(pixmap, TwinIconMinimize, m);
+
+        twin_matrix_identity(&m);
+        twin_matrix_translate(&m, max_x, icon_y);
+        twin_matrix_scale(&m, icon_size, icon_size);
+        twin_icon_draw(pixmap, TwinIconMaximize, m);
+
+        twin_matrix_identity(&m);
+        twin_matrix_translate(&m, close_x, icon_y);
+        twin_matrix_scale(&m, icon_size, icon_size);
+        twin_icon_draw(pixmap, TwinIconClose, m);
+
+        twin_matrix_identity(&m);
+        twin_matrix_translate(&m, resize_x, resize_y);
+        twin_matrix_scale(&m, twin_int_to_fixed(TWIN_TITLE_HEIGHT),
+                          twin_int_to_fixed(TWIN_TITLE_HEIGHT));
+        twin_icon_draw(pixmap, TwinIconResize, m);
+    }
 
     twin_pixmap_clip(pixmap, window->client.left, window->client.top,
                      window->client.right, window->client.bottom);

@@ -412,6 +412,18 @@ struct _twin_window {
 };
 
 /*
+ * Icons
+ */
+
+typedef enum _twin_icon {
+    TwinIconMenu,
+    TwinIconMinimize,
+    TwinIconMaximize,
+    TwinIconClose,
+    TwinIconResize,
+} twin_icon_t;
+
+/*
  * Timeout and work procs return TWIN_TRUE to remain in the queue,
  * timeout procs are called every 'delay' ms
  */
@@ -665,6 +677,14 @@ void twin_text_metrics_utf8(twin_path_t *path,
  */
 
 twin_path_t *twin_path_convex_hull(twin_path_t *path);
+
+/*
+ * icon.c
+ */
+
+void twin_icon_draw(twin_pixmap_t *pixmap,
+                    twin_icon_t icon,
+                    twin_matrix_t matrix);
 
 /*
  * label.c

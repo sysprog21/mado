@@ -26,6 +26,7 @@ LIB_SRCS := \
 	src/work.c \
 	src/draw.c \
 	src/hull.c \
+	src/icon.c \
 	src/pixmap.c \
 	src/timeout.c 
 

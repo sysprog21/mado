@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright © 2004 Keith Packard
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
@@ -22,7 +20,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "twin_ttf.h"
+#include "twin-ttf.h"
 
 static double pos(FT_Pos x, outline_closure_t *c)
 {
@@ -84,7 +82,7 @@ static void glyph(FT_Pos advance, FT_ULong ucs4, outline_closure_t *c)
     printf("\n");
 }
 
-static int outline_moveto(FT_Vector *to, void *user)
+static int outline_moveto(const FT_Vector *to, void *user)
 {
     outline_closure_t *c = user;
     command('m', c);
@@ -94,7 +92,7 @@ static int outline_moveto(FT_Vector *to, void *user)
     return 0;
 }
 
-static int outline_lineto(FT_Vector *to, void *user)
+static int outline_lineto(const FT_Vector *to, void *user)
 {
     outline_closure_t *c = user;
     command('l', c);
@@ -104,7 +102,9 @@ static int outline_lineto(FT_Vector *to, void *user)
     return 0;
 }
 
-static int outline_conicto(FT_Vector *control, FT_Vector *to, void *user)
+static int outline_conicto(const FT_Vector *control,
+                           const FT_Vector *to,
+                           void *user)
 {
     outline_closure_t *c = user;
     command('2', c);
@@ -116,9 +116,9 @@ static int outline_conicto(FT_Vector *control, FT_Vector *to, void *user)
     return 0;
 }
 
-static int outline_cubicto(FT_Vector *control1,
-                           FT_Vector *control2,
-                           FT_Vector *to,
+static int outline_cubicto(const FT_Vector *control1,
+                           const FT_Vector *control2,
+                           const FT_Vector *to,
                            void *user)
 {
     outline_closure_t *c = user;
@@ -134,7 +134,8 @@ static int outline_cubicto(FT_Vector *control1,
 }
 
 static const FT_Outline_Funcs outline_funcs = {
-    outline_moveto, outline_lineto, outline_conicto, outline_cubicto, 0, 0};
+    outline_moveto, outline_lineto, outline_conicto, outline_cubicto, 0, 0,
+};
 
 #define UCS_PAGE_SHIFT 7
 #define UCS_PER_PAGE (1 << UCS_PAGE_SHIFT)

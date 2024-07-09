@@ -1,7 +1,6 @@
 /*
  * Twin - A Tiny Window System
  * Copyright (c) 2024 National Cheng Kung University, Taiwan
- * Copyright (c) 2004 Keith Packard <keithp@keithp.com>
  * All rights reserved.
  */
 
@@ -16,22 +15,15 @@
 typedef struct _twin_sdl {
     twin_screen_t *screen;
     SDL_Window *win;
-    int dpy;
     int depth;
     int *pixels;
     SDL_Renderer *render;
     SDL_Texture *texture;
-    twin_coord_t width;
-    twin_coord_t height;
+    twin_coord_t width, height;
     int image_y;
 } twin_sdl_t;
 
-twin_sdl_t *twin_sdl_create_ext(int width, int height, int handle_events);
-
-static inline twin_sdl_t *twin_sdl_create(int width, int height)
-{
-    return twin_sdl_create_ext(width, height, 1);
-}
+twin_sdl_t *twin_sdl_create(int width, int height);
 
 void twin_sdl_destroy(twin_sdl_t *tx);
 

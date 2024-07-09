@@ -1,7 +1,6 @@
 /*
  * Twin - A Tiny Window System
  * Copyright (c) 2024 National Cheng Kung University, Taiwan
- * Copyright (c) 2004 Keith Packard <keithp@keithp.com>
  * All rights reserved.
  */
 
@@ -65,7 +64,7 @@ static bool twin_sdl_read_events(int maybe_unused file,
             break;
         case SDL_QUIT:
             twin_sdl_destroy(tx);
-            return 0;
+            return false;
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP:
             tev.u.pointer.screen_x = ev.button.x;
@@ -104,17 +103,15 @@ static bool twin_sdl_work(void *closure)
     return true;
 }
 
-twin_sdl_t *twin_sdl_create_ext(int width, int height, int handle_events)
+twin_sdl_t *twin_sdl_create(int width, int height)
 {
-    twin_sdl_t *tx;
-
     static char *argv[] = {"twin-sdl", 0};
 
-    tx = malloc(sizeof(twin_sdl_t));
+    twin_sdl_t *tx = malloc(sizeof(twin_sdl_t));
     if (!tx)
-        return 0;
+        return NULL;
 
-    if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
+    if (SDL_Init(SDL_INIT_VIDEO) < 0)
         printf("error : %s\n", SDL_GetError());
     tx->win = SDL_CreateWindow(argv[0], SDL_WINDOWPOS_UNDEFINED,
                                SDL_WINDOWPOS_UNDEFINED, width, height,
@@ -131,18 +128,15 @@ twin_sdl_t *twin_sdl_create_ext(int width, int height, int handle_events)
     SDL_RenderClear(tx->render);
 
     tx->texture = SDL_CreateTexture(tx->render, SDL_PIXELFORMAT_ARGB8888,
-                                    SDL_TEXTUREACCESS_STATIC, width, height);
+                                    SDL_TEXTUREACCESS_STREAMING, width, height);
 
     tx->screen = twin_screen_create(width, height, _twin_sdl_put_begin,
                                     _twin_sdl_put_span, tx);
 
-    tx->dpy = SDL_GetWindowDisplayIndex(tx->win);
-
-    if (handle_events)
-        twin_set_file(twin_sdl_read_events, tx->dpy, TWIN_READ, tx);
+    twin_set_file(twin_sdl_read_events, SDL_GetWindowDisplayIndex(tx->win),
+                  TWIN_READ, tx);
 
     twin_set_work(twin_sdl_work, TWIN_WORK_REDISPLAY, tx);
-
 
     return tx;
 }
@@ -180,7 +174,7 @@ bool twin_sdl_process_events(twin_sdl_t *tx)
     bool result;
 
     _twin_run_work();
-    result = twin_sdl_read_events(tx->dpy, 0, tx);
+    result = twin_sdl_read_events(SDL_GetWindowDisplayIndex(tx->win), 0, tx);
     _twin_run_work();
 
     return result;

@@ -124,9 +124,9 @@ twin_label_t *twin_label_create(twin_box_t *parent,
                                 twin_style_t font_style)
 {
     twin_label_t *label = malloc(sizeof(twin_label_t));
-
     if (!label)
-        return 0;
+        return NULL;
+
     _twin_label_init(label, parent, value, foreground, font_size, font_style,
                      _twin_label_dispatch);
     return label;

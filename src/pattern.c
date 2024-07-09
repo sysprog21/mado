@@ -34,9 +34,7 @@ static const struct {
 
 twin_pixmap_t *twin_make_pattern(void)
 {
-    twin_pointer_t pixels;
-
-    pixels.v = (void *) cork_image.pixel_data;
+    twin_pointer_t pixels = {.v = (void *) cork_image.pixel_data};
 
     return twin_pixmap_create_const(
         TWIN_ARGB32, cork_image.width, cork_image.height,

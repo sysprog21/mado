@@ -14,7 +14,6 @@ static int _twin_path_leftpoint(twin_path_t *path,
                                 twin_spoint_t *p2)
 {
     twin_spoint_t *points = path->points;
-    int p;
     int best = 0;
     /*
      * Normal form of the line is Ax + By + C = 0,
@@ -26,7 +25,7 @@ static int _twin_path_leftpoint(twin_path_t *path,
 
     twin_dfixed_t max = -0x7fffffff;
 
-    for (p = 0; p < path->npoints; p++) {
+    for (int p = 0; p < path->npoints; p++) {
         twin_dfixed_t vp = Ap * points[p].x + Bp * points[p].y;
 
         if (vp > max) {
@@ -203,12 +202,12 @@ void twin_path_convolve(twin_path_t *path,
             sublen = stroke->sublen[s];
         npoints = sublen - p;
         if (npoints > 1) {
-            twin_path_t subpath;
-
-            subpath.points = stroke->points + p;
-            subpath.npoints = npoints;
-            subpath.sublen = 0;
-            subpath.nsublen = 0;
+            twin_path_t subpath = {
+                .points = stroke->points + p,
+                .npoints = npoints,
+                .sublen = 0,
+                .nsublen = 0,
+            };
             _twin_subpath_convolve(path, &subpath, hull);
             p = sublen;
         }

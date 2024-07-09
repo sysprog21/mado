@@ -184,9 +184,8 @@ static void _twin_hull_eliminate_concave(twin_hull_t *hull, int num_hull)
 static twin_path_t *_twin_hull_to_path(twin_hull_t *hull, int num_hull)
 {
     twin_path_t *path = twin_path_create();
-    int i;
 
-    for (i = 0; i < num_hull; i++) {
+    for (int i = 0; i < num_hull; i++) {
         if (hull[i].discard)
             continue;
         _twin_path_sdraw(path, hull[i].point.x, hull[i].point.y);
@@ -206,9 +205,8 @@ twin_path_t *twin_path_convex_hull(twin_path_t *path)
     twin_path_t *convex_path;
 
     hull = _twin_hull_create(path, &num_hull);
-
-    if (hull == NULL)
-        return 0;
+    if (!hull)
+        return NULL;
 
     qsort(hull + 1, num_hull - 1, sizeof(twin_hull_t),
           _twin_hull_vertex_compare);

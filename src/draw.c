@@ -3,289 +3,293 @@
  * Copyright (c) 2004 Keith Packard <keithp@keithp.com>
  * All rights reserved.
  */
+
 #include <machine/endian.h>
+
 #include "twinint.h"
 
 /* op, src, dst */
-static twin_src_op comp2[2][4][3] = {
-    {/* OVER */
-     {
-         /* A8 */
-         _twin_a8_over_a8,
-         _twin_a8_over_rgb16,
-         _twin_a8_over_argb32,
-     },
-     {
-         /* RGB16 */
-         _twin_rgb16_over_a8,
-         _twin_rgb16_over_rgb16,
-         _twin_rgb16_over_argb32,
-     },
-     {
-         /* ARGB32 */
-         _twin_argb32_over_a8,
-         _twin_argb32_over_rgb16,
-         _twin_argb32_over_argb32,
-     },
-     {
-         /* C */
-         _twin_c_over_a8,
-         _twin_c_over_rgb16,
-         _twin_c_over_argb32,
-     }},
-    {
-        /* SOURCE */
+static const twin_src_op comp2[2][4][3] = {
+    [TWIN_OVER] =
         {
-            /* A8 */
-            _twin_a8_source_a8,
-            _twin_a8_source_rgb16,
-            _twin_a8_source_argb32,
+            [TWIN_A8] =
+                {
+                    _twin_a8_over_a8,
+                    _twin_a8_over_rgb16,
+                    _twin_a8_over_argb32,
+                },
+            [TWIN_RGB16] =
+                {
+                    _twin_rgb16_over_a8,
+                    _twin_rgb16_over_rgb16,
+                    _twin_rgb16_over_argb32,
+                },
+            [TWIN_ARGB32] =
+                {
+                    _twin_argb32_over_a8,
+                    _twin_argb32_over_rgb16,
+                    _twin_argb32_over_argb32,
+                },
+            {
+                /* C */
+                _twin_c_over_a8,
+                _twin_c_over_rgb16,
+                _twin_c_over_argb32,
+            },
         },
+    [TWIN_SOURCE] =
         {
-            /* RGB16 */
-            _twin_rgb16_source_a8,
-            _twin_rgb16_source_rgb16,
-            _twin_rgb16_source_argb32,
+            [TWIN_A8] =
+                {
+                    _twin_a8_source_a8,
+                    _twin_a8_source_rgb16,
+                    _twin_a8_source_argb32,
+                },
+            [TWIN_RGB16] =
+                {
+                    _twin_rgb16_source_a8,
+                    _twin_rgb16_source_rgb16,
+                    _twin_rgb16_source_argb32,
+                },
+            [TWIN_ARGB32] =
+                {
+                    _twin_argb32_source_a8,
+                    _twin_argb32_source_rgb16,
+                    _twin_argb32_source_argb32,
+                },
+            {
+                /* C */
+                _twin_c_source_a8,
+                _twin_c_source_rgb16,
+                _twin_c_source_argb32,
+            },
         },
-        {
-            /* ARGB32 */
-            _twin_argb32_source_a8,
-            _twin_argb32_source_rgb16,
-            _twin_argb32_source_argb32,
-        },
-        {
-            /* C */
-            _twin_c_source_a8,
-            _twin_c_source_rgb16,
-            _twin_c_source_argb32,
-        },
-    },
 };
 
 /* op, src, msk, dst */
-static twin_src_msk_op comp3[2][4][4][3] = {
-    {
-        /* OVER */
+static const twin_src_msk_op comp3[2][4][4][3] = {
+    [TWIN_OVER] =
         {
-            /* A8 */
-            {
-                /* A8 */
-                _twin_a8_in_a8_over_a8,
-                _twin_a8_in_a8_over_rgb16,
-                _twin_a8_in_a8_over_argb32,
-            },
-            {
-                /* RGB16 */
-                _twin_a8_in_rgb16_over_a8,
-                _twin_a8_in_rgb16_over_rgb16,
-                _twin_a8_in_rgb16_over_argb32,
-            },
-            {
-                /* ARGB32 */
-                _twin_a8_in_argb32_over_a8,
-                _twin_a8_in_argb32_over_rgb16,
-                _twin_a8_in_argb32_over_argb32,
-            },
+            [TWIN_A8] =
+                {
+                    [TWIN_A8] =
+                        {
+                            _twin_a8_in_a8_over_a8,
+                            _twin_a8_in_a8_over_rgb16,
+                            _twin_a8_in_a8_over_argb32,
+                        },
+                    [TWIN_RGB16] =
+                        {
+                            _twin_a8_in_rgb16_over_a8,
+                            _twin_a8_in_rgb16_over_rgb16,
+                            _twin_a8_in_rgb16_over_argb32,
+                        },
+                    [TWIN_ARGB32] =
+                        {
+                            _twin_a8_in_argb32_over_a8,
+                            _twin_a8_in_argb32_over_rgb16,
+                            _twin_a8_in_argb32_over_argb32,
+                        },
+                    {
+                        /* C */
+                        _twin_a8_in_c_over_a8,
+                        _twin_a8_in_c_over_rgb16,
+                        _twin_a8_in_c_over_argb32,
+                    },
+                },
+            [TWIN_RGB16] =
+                {
+                    [TWIN_A8] =
+                        {
+                            _twin_rgb16_in_a8_over_a8,
+                            _twin_rgb16_in_a8_over_rgb16,
+                            _twin_rgb16_in_a8_over_argb32,
+                        },
+                    [TWIN_RGB16] =
+                        {
+                            _twin_rgb16_in_rgb16_over_a8,
+                            _twin_rgb16_in_rgb16_over_rgb16,
+                            _twin_rgb16_in_rgb16_over_argb32,
+                        },
+                    [TWIN_ARGB32] =
+                        {
+                            _twin_rgb16_in_argb32_over_a8,
+                            _twin_rgb16_in_argb32_over_rgb16,
+                            _twin_rgb16_in_argb32_over_argb32,
+                        },
+                    {
+                        /* C */
+                        _twin_rgb16_in_c_over_a8,
+                        _twin_rgb16_in_c_over_rgb16,
+                        _twin_rgb16_in_c_over_argb32,
+                    },
+                },
+            [TWIN_ARGB32] =
+                {
+                    [TWIN_A8] =
+                        {
+                            _twin_argb32_in_a8_over_a8,
+                            _twin_argb32_in_a8_over_rgb16,
+                            _twin_argb32_in_a8_over_argb32,
+                        },
+                    [TWIN_RGB16] =
+                        {
+                            _twin_argb32_in_rgb16_over_a8,
+                            _twin_argb32_in_rgb16_over_rgb16,
+                            _twin_argb32_in_rgb16_over_argb32,
+                        },
+                    [TWIN_ARGB32] =
+                        {
+                            _twin_argb32_in_argb32_over_a8,
+                            _twin_argb32_in_argb32_over_rgb16,
+                            _twin_argb32_in_argb32_over_argb32,
+                        },
+                    {
+                        /* C */
+                        _twin_argb32_in_c_over_a8,
+                        _twin_argb32_in_c_over_rgb16,
+                        _twin_argb32_in_c_over_argb32,
+                    },
+                },
             {
                 /* C */
-                _twin_a8_in_c_over_a8,
-                _twin_a8_in_c_over_rgb16,
-                _twin_a8_in_c_over_argb32,
+                [TWIN_A8] =
+                    {
+                        _twin_c_in_a8_over_a8,
+                        _twin_c_in_a8_over_rgb16,
+                        _twin_c_in_a8_over_argb32,
+                    },
+                [TWIN_RGB16] =
+                    {
+                        _twin_c_in_rgb16_over_a8,
+                        _twin_c_in_rgb16_over_rgb16,
+                        _twin_c_in_rgb16_over_argb32,
+                    },
+                [TWIN_ARGB32] =
+                    {
+                        _twin_c_in_argb32_over_a8,
+                        _twin_c_in_argb32_over_rgb16,
+                        _twin_c_in_argb32_over_argb32,
+                    },
+                {
+                    /* C */
+                    _twin_c_in_c_over_a8,
+                    _twin_c_in_c_over_rgb16,
+                    _twin_c_in_c_over_argb32,
+                },
             },
         },
+    [TWIN_SOURCE] =
         {
-            /* RGB16 */
-            {
-                /* A8 */
-                _twin_rgb16_in_a8_over_a8,
-                _twin_rgb16_in_a8_over_rgb16,
-                _twin_rgb16_in_a8_over_argb32,
-            },
-            {
-                /* RGB16 */
-                _twin_rgb16_in_rgb16_over_a8,
-                _twin_rgb16_in_rgb16_over_rgb16,
-                _twin_rgb16_in_rgb16_over_argb32,
-            },
-            {
-                /* ARGB32 */
-                _twin_rgb16_in_argb32_over_a8,
-                _twin_rgb16_in_argb32_over_rgb16,
-                _twin_rgb16_in_argb32_over_argb32,
-            },
+            [TWIN_A8] =
+                {
+                    [TWIN_A8] =
+                        {
+                            _twin_a8_in_a8_source_a8,
+                            _twin_a8_in_a8_source_rgb16,
+                            _twin_a8_in_a8_source_argb32,
+                        },
+                    [TWIN_RGB16] =
+                        {
+                            _twin_a8_in_rgb16_source_a8,
+                            _twin_a8_in_rgb16_source_rgb16,
+                            _twin_a8_in_rgb16_source_argb32,
+                        },
+                    [TWIN_ARGB32] =
+                        {
+                            _twin_a8_in_argb32_source_a8,
+                            _twin_a8_in_argb32_source_rgb16,
+                            _twin_a8_in_argb32_source_argb32,
+                        },
+                    {
+                        /* C */
+                        _twin_a8_in_c_source_a8,
+                        _twin_a8_in_c_source_rgb16,
+                        _twin_a8_in_c_source_argb32,
+                    },
+                },
+            [TWIN_RGB16] =
+                {
+                    [TWIN_A8] =
+                        {
+                            _twin_rgb16_in_a8_source_a8,
+                            _twin_rgb16_in_a8_source_rgb16,
+                            _twin_rgb16_in_a8_source_argb32,
+                        },
+                    [TWIN_RGB16] =
+                        {
+                            _twin_rgb16_in_rgb16_source_a8,
+                            _twin_rgb16_in_rgb16_source_rgb16,
+                            _twin_rgb16_in_rgb16_source_argb32,
+                        },
+                    [TWIN_ARGB32] =
+                        {
+                            _twin_rgb16_in_argb32_source_a8,
+                            _twin_rgb16_in_argb32_source_rgb16,
+                            _twin_rgb16_in_argb32_source_argb32,
+                        },
+                    {
+                        /* C */
+                        _twin_rgb16_in_c_source_a8,
+                        _twin_rgb16_in_c_source_rgb16,
+                        _twin_rgb16_in_c_source_argb32,
+                    },
+                },
+            [TWIN_ARGB32] =
+                {
+                    [TWIN_A8] =
+                        {
+                            _twin_argb32_in_a8_source_a8,
+                            _twin_argb32_in_a8_source_rgb16,
+                            _twin_argb32_in_a8_source_argb32,
+                        },
+                    [TWIN_RGB16] =
+                        {
+                            _twin_argb32_in_rgb16_source_a8,
+                            _twin_argb32_in_rgb16_source_rgb16,
+                            _twin_argb32_in_rgb16_source_argb32,
+                        },
+                    [TWIN_ARGB32] =
+                        {
+                            _twin_argb32_in_argb32_source_a8,
+                            _twin_argb32_in_argb32_source_rgb16,
+                            _twin_argb32_in_argb32_source_argb32,
+                        },
+                    {
+                        /* C */
+                        _twin_argb32_in_c_source_a8,
+                        _twin_argb32_in_c_source_rgb16,
+                        _twin_argb32_in_c_source_argb32,
+                    },
+                },
             {
                 /* C */
-                _twin_rgb16_in_c_over_a8,
-                _twin_rgb16_in_c_over_rgb16,
-                _twin_rgb16_in_c_over_argb32,
+                [TWIN_A8] =
+                    {
+                        _twin_c_in_a8_source_a8,
+                        _twin_c_in_a8_source_rgb16,
+                        _twin_c_in_a8_source_argb32,
+                    },
+                [TWIN_RGB16] =
+                    {
+                        _twin_c_in_rgb16_source_a8,
+                        _twin_c_in_rgb16_source_rgb16,
+                        _twin_c_in_rgb16_source_argb32,
+                    },
+                [TWIN_ARGB32] =
+                    {
+                        _twin_c_in_argb32_source_a8,
+                        _twin_c_in_argb32_source_rgb16,
+                        _twin_c_in_argb32_source_argb32,
+                    },
+                {
+                    /* C */
+                    _twin_c_in_c_source_a8,
+                    _twin_c_in_c_source_rgb16,
+                    _twin_c_in_c_source_argb32,
+                },
             },
         },
-        {
-            /* ARGB32 */
-            {
-                /* A8 */
-                _twin_argb32_in_a8_over_a8,
-                _twin_argb32_in_a8_over_rgb16,
-                _twin_argb32_in_a8_over_argb32,
-            },
-            {
-                /* RGB16 */
-                _twin_argb32_in_rgb16_over_a8,
-                _twin_argb32_in_rgb16_over_rgb16,
-                _twin_argb32_in_rgb16_over_argb32,
-            },
-            {
-                /* ARGB32 */
-                _twin_argb32_in_argb32_over_a8,
-                _twin_argb32_in_argb32_over_rgb16,
-                _twin_argb32_in_argb32_over_argb32,
-            },
-            {
-                /* C */
-                _twin_argb32_in_c_over_a8,
-                _twin_argb32_in_c_over_rgb16,
-                _twin_argb32_in_c_over_argb32,
-            },
-        },
-        {
-            /* C */
-            {
-                /* A8 */
-                _twin_c_in_a8_over_a8,
-                _twin_c_in_a8_over_rgb16,
-                _twin_c_in_a8_over_argb32,
-            },
-            {
-                /* RGB16 */
-                _twin_c_in_rgb16_over_a8,
-                _twin_c_in_rgb16_over_rgb16,
-                _twin_c_in_rgb16_over_argb32,
-            },
-            {
-                /* ARGB32 */
-                _twin_c_in_argb32_over_a8,
-                _twin_c_in_argb32_over_rgb16,
-                _twin_c_in_argb32_over_argb32,
-            },
-            {
-                /* C */
-                _twin_c_in_c_over_a8,
-                _twin_c_in_c_over_rgb16,
-                _twin_c_in_c_over_argb32,
-            },
-        },
-    },
-    {
-        /* SOURCE */
-        {
-            /* A8 */
-            {
-                /* A8 */
-                _twin_a8_in_a8_source_a8,
-                _twin_a8_in_a8_source_rgb16,
-                _twin_a8_in_a8_source_argb32,
-            },
-            {
-                /* RGB16 */
-                _twin_a8_in_rgb16_source_a8,
-                _twin_a8_in_rgb16_source_rgb16,
-                _twin_a8_in_rgb16_source_argb32,
-            },
-            {
-                /* ARGB32 */
-                _twin_a8_in_argb32_source_a8,
-                _twin_a8_in_argb32_source_rgb16,
-                _twin_a8_in_argb32_source_argb32,
-            },
-            {
-                /* C */
-                _twin_a8_in_c_source_a8,
-                _twin_a8_in_c_source_rgb16,
-                _twin_a8_in_c_source_argb32,
-            },
-        },
-        {
-            /* RGB16 */
-            {
-                /* A8 */
-                _twin_rgb16_in_a8_source_a8,
-                _twin_rgb16_in_a8_source_rgb16,
-                _twin_rgb16_in_a8_source_argb32,
-            },
-            {
-                /* RGB16 */
-                _twin_rgb16_in_rgb16_source_a8,
-                _twin_rgb16_in_rgb16_source_rgb16,
-                _twin_rgb16_in_rgb16_source_argb32,
-            },
-            {
-                /* ARGB32 */
-                _twin_rgb16_in_argb32_source_a8,
-                _twin_rgb16_in_argb32_source_rgb16,
-                _twin_rgb16_in_argb32_source_argb32,
-            },
-            {
-                /* C */
-                _twin_rgb16_in_c_source_a8,
-                _twin_rgb16_in_c_source_rgb16,
-                _twin_rgb16_in_c_source_argb32,
-            },
-        },
-        {
-            /* ARGB32 */
-            {
-                /* A8 */
-                _twin_argb32_in_a8_source_a8,
-                _twin_argb32_in_a8_source_rgb16,
-                _twin_argb32_in_a8_source_argb32,
-            },
-            {
-                /* RGB16 */
-                _twin_argb32_in_rgb16_source_a8,
-                _twin_argb32_in_rgb16_source_rgb16,
-                _twin_argb32_in_rgb16_source_argb32,
-            },
-            {
-                /* ARGB32 */
-                _twin_argb32_in_argb32_source_a8,
-                _twin_argb32_in_argb32_source_rgb16,
-                _twin_argb32_in_argb32_source_argb32,
-            },
-            {
-                /* C */
-                _twin_argb32_in_c_source_a8,
-                _twin_argb32_in_c_source_rgb16,
-                _twin_argb32_in_c_source_argb32,
-            },
-        },
-        {
-            /* C */
-            {
-                /* A8 */
-                _twin_c_in_a8_source_a8,
-                _twin_c_in_a8_source_rgb16,
-                _twin_c_in_a8_source_argb32,
-            },
-            {
-                /* RGB16 */
-                _twin_c_in_rgb16_source_a8,
-                _twin_c_in_rgb16_source_rgb16,
-                _twin_c_in_rgb16_source_argb32,
-            },
-            {
-                /* ARGB32 */
-                _twin_c_in_argb32_source_a8,
-                _twin_c_in_argb32_source_rgb16,
-                _twin_c_in_argb32_source_argb32,
-            },
-            {
-                /* C */
-                _twin_c_in_c_source_a8,
-                _twin_c_in_c_source_rgb16,
-                _twin_c_in_c_source_argb32,
-            },
-        },
-    },
 };
 
 
@@ -717,18 +721,18 @@ void twin_premultiply_alpha(twin_pixmap_t *px)
  * array secondary  index is ARGB32 RGB16 A8
  */
 static twin_src_op fill[2][3] = {
-    {
-        /* OVER */
-        _twin_c_over_a8,
-        _twin_c_over_rgb16,
-        _twin_c_over_argb32,
-    },
-    {
-        /* SOURCE */
-        _twin_c_source_a8,
-        _twin_c_source_rgb16,
-        _twin_c_source_argb32,
-    },
+    [TWIN_OVER] =
+        {
+            _twin_c_over_a8,
+            _twin_c_over_rgb16,
+            _twin_c_over_argb32,
+        },
+    [TWIN_SOURCE] =
+        {
+            _twin_c_source_a8,
+            _twin_c_source_rgb16,
+            _twin_c_source_argb32,
+        },
 };
 
 void twin_fill(twin_pixmap_t *dst,

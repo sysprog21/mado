@@ -59,8 +59,7 @@ static twin_dfixed_t _twin_spline_error_squared(twin_spline_t *spline)
 
     if (berr > cerr)
         return berr;
-    else
-        return cerr;
+    return cerr;
 }
 
 /*
@@ -89,17 +88,15 @@ void _twin_path_scurve(twin_path_t *path,
                        twin_sfixed_t x3,
                        twin_sfixed_t y3)
 {
-    twin_spline_t spline;
-
     if (path->npoints == 0)
         _twin_path_smove(path, 0, 0);
-    spline.a = path->points[path->npoints - 1];
-    spline.b.x = x1;
-    spline.b.y = y1;
-    spline.c.x = x2;
-    spline.c.y = y2;
-    spline.d.x = x3;
-    spline.d.y = y3;
+
+    twin_spline_t spline = {
+        .a = path->points[path->npoints - 1],
+        .b = {.x = x1, .y = y1},
+        .c = {.x = x2, .y = y2},
+        .d = {.x = x3, .y = y3},
+    };
     _twin_spline_decompose(path, &spline,
                            TWIN_SFIXED_TOLERANCE * TWIN_SFIXED_TOLERANCE);
     _twin_path_sdraw(path, x3, y3);

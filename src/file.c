@@ -4,11 +4,11 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
-
 #include <assert.h>
 #include <sys/poll.h>
 #include <unistd.h>
+
+#include "twinint.h"
 
 static twin_queue_t *head;
 

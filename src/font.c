@@ -211,12 +211,10 @@ static twin_fixed_t _twin_snap(twin_fixed_t v, twin_fixed_t *snap, int n)
 
 static bool twin_find_ucs4_page(twin_font_t *font, uint32_t page)
 {
-    int i;
-
     if (font->cur_page && font->cur_page->page == page)
         return true;
 
-    for (i = 0; i < font->n_charmap; i++)
+    for (int i = 0; i < font->n_charmap; i++)
         if (font->charmap[i].page == page) {
             font->cur_page = &font->charmap[i];
             return true;

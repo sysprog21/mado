@@ -11,16 +11,15 @@ void twin_matrix_multiply(twin_matrix_t *result,
                           const twin_matrix_t *b)
 {
     twin_matrix_t r;
-    int row, col, n;
     twin_fixed_t t;
 
-    for (row = 0; row < 3; row++)
-        for (col = 0; col < 2; col++) {
+    for (int row = 0; row < 3; row++)
+        for (int col = 0; col < 2; col++) {
             if (row == 2)
                 t = b->m[2][col];
             else
                 t = 0;
-            for (n = 0; n < 2; n++)
+            for (int n = 0; n < 2; n++)
                 t += twin_fixed_mul(a->m[row][n], b->m[n][col]);
             r.m[row][col] = t;
         }

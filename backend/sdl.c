@@ -109,7 +109,6 @@ twin_sdl_t *twin_sdl_create_ext(int width, int height, int handle_events)
     twin_sdl_t *tx;
 
     static char *argv[] = {"twin-sdl", 0};
-    static int argc = 1;
 
     tx = malloc(sizeof(twin_sdl_t));
     if (!tx)

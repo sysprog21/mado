@@ -53,9 +53,8 @@ twin_timeout_t *twin_set_timeout(twin_timeout_proc_t timeout_proc,
                                  void *closure)
 {
     twin_timeout_t *timeout = malloc(sizeof(twin_timeout_t));
-
     if (!timeout)
-        return 0;
+        return NULL;
 
     if (!start)
         start = twin_now();

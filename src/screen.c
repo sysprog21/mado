@@ -14,7 +14,8 @@ twin_screen_t *twin_screen_create(twin_coord_t width,
 {
     twin_screen_t *screen = calloc(1, sizeof(twin_screen_t));
     if (!screen)
-        return 0;
+        return NULL;
+
     screen->top = 0;
     screen->bottom = 0;
     screen->width = width;
@@ -63,8 +64,6 @@ void twin_screen_disable_update(twin_screen_t *screen)
 {
     screen->disable++;
 }
-
-#include <stdio.h>
 
 void twin_screen_damage(twin_screen_t *screen,
                         twin_coord_t left,

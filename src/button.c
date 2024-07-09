@@ -97,9 +97,9 @@ twin_button_t *twin_button_create(twin_box_t *parent,
                                   twin_style_t font_style)
 {
     twin_button_t *button = malloc(sizeof(twin_button_t));
-
     if (!button)
-        return 0;
+        return NULL;
+
     _twin_button_init(button, parent, value, foreground, font_size, font_style,
                       _twin_button_dispatch);
     return button;

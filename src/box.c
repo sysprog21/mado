@@ -22,12 +22,9 @@ void _twin_box_init(twin_box_t *box,
 
 static twin_dispatch_result_t _twin_box_query_geometry(twin_box_t *box)
 {
-    twin_widget_t *child;
     twin_event_t ev;
-    twin_widget_layout_t preferred;
+    twin_widget_layout_t preferred = {.width = 0, .height = 0};
 
-    preferred.width = 0;
-    preferred.height = 0;
     if (box->dir == TwinBoxHorz) {
         preferred.stretch_width = 0;
         preferred.stretch_height = 10000;
@@ -35,10 +32,11 @@ static twin_dispatch_result_t _twin_box_query_geometry(twin_box_t *box)
         preferred.stretch_width = 10000;
         preferred.stretch_height = 0;
     }
+
     /*
      * Find preferred geometry
      */
-    for (child = box->children; child; child = child->next) {
+    for (twin_widget_t *child = box->children; child; child = child->next) {
         if (child->layout) {
             ev.kind = TwinEventQueryGeometry;
             (*child->dispatch)(child, &ev);
@@ -139,9 +137,7 @@ static twin_widget_t *_twin_box_xy_to_widget(twin_box_t *box,
                                              twin_coord_t x,
                                              twin_coord_t y)
 {
-    twin_widget_t *widget;
-
-    for (widget = box->children; widget; widget = widget->next) {
+    for (twin_widget_t *widget = box->children; widget; widget = widget->next) {
         if (widget->extents.left <= x && x < widget->extents.right &&
             widget->extents.top <= y && y < widget->extents.bottom)
             return widget;
@@ -218,7 +214,8 @@ twin_box_t *twin_box_create(twin_box_t *parent, twin_box_dir_t dir)
 {
     twin_box_t *box = malloc(sizeof(twin_box_t));
     if (!box)
-        return 0;
+        return NULL;
+
     _twin_box_init(box, parent, 0, dir, _twin_box_dispatch);
     return box;
 }

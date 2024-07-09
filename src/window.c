@@ -106,14 +106,13 @@ void twin_window_configure(twin_window_t *window,
     }
     if (width != window->pixmap->width || height != window->pixmap->height) {
         twin_pixmap_t *old = window->pixmap;
-        int i;
 
         window->pixmap = twin_pixmap_create(old->format, width, height);
         window->pixmap->window = window;
         twin_pixmap_move(window->pixmap, x, y);
         if (old->screen)
             twin_pixmap_show(window->pixmap, window->screen, old);
-        for (i = 0; i < old->disable; i++)
+        for (int i = 0; i < old->disable; i++)
             twin_pixmap_disable_update(window->pixmap);
         twin_pixmap_destroy(old);
         twin_pixmap_reset_clip(window->pixmap);

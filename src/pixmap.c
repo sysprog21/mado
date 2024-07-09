@@ -15,7 +15,8 @@ twin_pixmap_t *twin_pixmap_create(twin_format_t format,
     twin_area_t size = sizeof(twin_pixmap_t) + space;
     twin_pixmap_t *pixmap = malloc(size);
     if (!pixmap)
-        return 0;
+        return NULL;
+
     pixmap->screen = 0;
     pixmap->up = 0;
     pixmap->down = 0;
@@ -43,7 +44,8 @@ twin_pixmap_t *twin_pixmap_create_const(twin_format_t format,
 {
     twin_pixmap_t *pixmap = malloc(sizeof(twin_pixmap_t));
     if (!pixmap)
-        return 0;
+        return NULL;
+
     pixmap->screen = 0;
     pixmap->up = 0;
     pixmap->down = 0;

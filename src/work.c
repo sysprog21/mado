@@ -42,9 +42,8 @@ twin_work_t *twin_set_work(twin_work_proc_t work_proc,
                            void *closure)
 {
     twin_work_t *work = malloc(sizeof(twin_work_t));
-
     if (!work)
-        return 0;
+        return NULL;
 
     work->proc = work_proc;
     work->priority = priority;

@@ -205,14 +205,15 @@ twin_widget_t *twin_widget_create(twin_box_t *parent,
                                   twin_stretch_t stretch_height)
 {
     twin_widget_t *widget = malloc(sizeof(twin_widget_t));
-    twin_widget_layout_t preferred;
-
     if (!widget)
         return NULL;
-    preferred.width = width;
-    preferred.height = height;
-    preferred.stretch_width = stretch_width;
-    preferred.stretch_height = stretch_height;
+
+    twin_widget_layout_t preferred = {
+        .width = width,
+        .height = height,
+        .stretch_width = stretch_width,
+        .stretch_height = stretch_height,
+    };
     _twin_widget_init(widget, parent, 0, preferred, _twin_widget_dispatch);
     widget->background = background;
     return widget;

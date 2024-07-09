@@ -7,11 +7,11 @@
 #include <string.h>
 #include <time.h>
 
-#include "twin_hello.h"
+#include "apps_hello.h"
 
 #define maybe_unused __attribute__((unused))
 
-static twin_time_t _twin_hello_timeout(twin_time_t maybe_unused now,
+static twin_time_t _apps_hello_timeout(twin_time_t maybe_unused now,
                                        void *closure)
 {
     twin_label_t *labelb = closure;
@@ -24,7 +24,7 @@ static twin_time_t _twin_hello_timeout(twin_time_t maybe_unused now,
     return 1000;
 }
 
-void twin_hello_start(twin_screen_t *screen,
+void apps_hello_start(twin_screen_t *screen,
                       const char *name,
                       int x,
                       int y,
@@ -47,5 +47,5 @@ void twin_hello_start(twin_screen_t *screen,
     twin_widget_set(&labelb->widget, 0xc0c0c0c0);
     twin_widget_set(&button->label.widget, 0xc0808080);
     twin_toplevel_show(top);
-    twin_set_timeout(_twin_hello_timeout, 1000, labelb);
+    twin_set_timeout(_apps_hello_timeout, 1000, labelb);
 }

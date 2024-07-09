@@ -58,9 +58,9 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
     window->pixmap->window = window;
     twin_pixmap_move(window->pixmap, x, y);
     window->damage = window->client;
-    window->client_grab = TWIN_FALSE;
-    window->want_focus = TWIN_FALSE;
-    window->draw_queued = TWIN_FALSE;
+    window->client_grab = false;
+    window->want_focus = false;
+    window->draw_queued = false;
     window->client_data = 0;
     window->name = 0;
 
@@ -97,12 +97,12 @@ void twin_window_configure(twin_window_t *window,
                            twin_coord_t width,
                            twin_coord_t height)
 {
-    twin_bool_t need_repaint = TWIN_FALSE;
+    bool need_repaint = false;
 
     twin_pixmap_disable_update(window->pixmap);
     if (style != window->style) {
         window->style = style;
-        need_repaint = TWIN_TRUE;
+        need_repaint = true;
     }
     if (width != window->pixmap->width || height != window->pixmap->height) {
         twin_pixmap_t *old = window->pixmap;
@@ -314,28 +314,28 @@ void twin_window_damage(twin_window_t *window,
     }
 }
 
-static twin_bool_t _twin_window_repaint(void *closure)
+static bool _twin_window_repaint(void *closure)
 {
     twin_window_t *window = closure;
 
-    window->draw_queued = TWIN_FALSE;
+    window->draw_queued = false;
     twin_window_draw(window);
 
-    return TWIN_FALSE;
+    return false;
 }
 
 void twin_window_queue_paint(twin_window_t *window)
 {
     if (!window->draw_queued) {
-        window->draw_queued = TWIN_TRUE;
+        window->draw_queued = true;
         twin_set_work(_twin_window_repaint, TWIN_WORK_PAINT, window);
     }
 }
 
-twin_bool_t twin_window_dispatch(twin_window_t *window, twin_event_t *event)
+bool twin_window_dispatch(twin_window_t *window, twin_event_t *event)
 {
     twin_event_t ev = *event;
-    twin_bool_t delegate = TWIN_TRUE;
+    bool delegate = true;
 
     switch (ev.kind) {
     case TwinEventButtonDown:
@@ -343,41 +343,41 @@ twin_bool_t twin_window_dispatch(twin_window_t *window, twin_event_t *event)
             ev.u.pointer.x < window->client.right &&
             window->client.top <= ev.u.pointer.y &&
             ev.u.pointer.y < window->client.bottom) {
-            delegate = TWIN_TRUE;
-            window->client_grab = TWIN_TRUE;
+            delegate = true;
+            window->client_grab = true;
             ev.u.pointer.x -= window->client.left;
             ev.u.pointer.y -= window->client.top;
         } else
-            delegate = TWIN_FALSE;
+            delegate = false;
         break;
     case TwinEventButtonUp:
         if (window->client_grab) {
-            delegate = TWIN_TRUE;
-            window->client_grab = TWIN_FALSE;
+            delegate = true;
+            window->client_grab = false;
             ev.u.pointer.x -= window->client.left;
             ev.u.pointer.y -= window->client.top;
         } else
-            delegate = TWIN_FALSE;
+            delegate = false;
         break;
     case TwinEventMotion:
         if (window->client_grab || (window->client.left <= ev.u.pointer.x &&
                                     ev.u.pointer.x < window->client.right &&
                                     window->client.top <= ev.u.pointer.y &&
                                     ev.u.pointer.y < window->client.bottom)) {
-            delegate = TWIN_TRUE;
+            delegate = true;
             ev.u.pointer.x -= window->client.left;
             ev.u.pointer.y -= window->client.top;
         } else
-            delegate = TWIN_FALSE;
+            delegate = false;
         break;
     default:
         break;
     }
     if (!window->event)
-        delegate = TWIN_FALSE;
+        delegate = false;
 
     if (delegate && (*window->event)(window, &ev))
-        return TWIN_TRUE;
+        return true;
 
     /*
      * simple window management
@@ -387,7 +387,7 @@ twin_bool_t twin_window_dispatch(twin_window_t *window, twin_event_t *event)
         twin_window_show(window);
         window->screen->button_x = event->u.pointer.x;
         window->screen->button_y = event->u.pointer.y;
-        return TWIN_TRUE;
+        return true;
     case TwinEventButtonUp:
         window->screen->button_x = -1;
         window->screen->button_y = -1;
@@ -401,9 +401,9 @@ twin_bool_t twin_window_dispatch(twin_window_t *window, twin_event_t *event)
                                   window->pixmap->width,
                                   window->pixmap->height);
         }
-        return TWIN_TRUE;
+        return true;
     default:
         break;
     }
-    return TWIN_FALSE;
+    return false;
 }

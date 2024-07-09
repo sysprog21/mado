@@ -4,11 +4,11 @@
  * All rights reserved.
  */
 
-#include "twin_text.h"
+#include "apps_text.h"
 
 #define D(x) twin_double_to_fixed(x)
 
-void twin_text_start(twin_screen_t *screen,
+void apps_text_start(twin_screen_t *screen,
                      const char *name,
                      int x,
                      int y,

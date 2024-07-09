@@ -38,7 +38,7 @@ void twin_matrix_identity(twin_matrix_t *m)
     m->m[2][1] = 0;
 }
 
-twin_bool_t twin_matrix_is_identity(twin_matrix_t *m)
+bool twin_matrix_is_identity(twin_matrix_t *m)
 {
     return m->m[0][0] == TWIN_FIXED_ONE && m->m[0][1] == 0 && m->m[1][0] == 0 &&
            m->m[1][1] == TWIN_FIXED_ONE && m->m[2][0] == 0 && m->m[2][1] == 0;

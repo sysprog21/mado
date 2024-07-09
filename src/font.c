@@ -16,7 +16,7 @@ typedef struct _twin_text_info {
     twin_point_t pen;
     twin_point_t margin;
     twin_point_t reverse_scale;
-    twin_bool_t snap;
+    bool snap;
     twin_matrix_t matrix;
     twin_matrix_t pen_matrix;
     int n_snap_x;
@@ -51,11 +51,11 @@ static void _twin_text_compute_info(twin_path_t *path,
         info->matrix.m[yi][0] = 0;
         info->matrix.m[yi][1] = TWIN_FIXED_ONE;
         if (font->type == TWIN_FONT_TYPE_STROKE) {
-            info->snap = TWIN_TRUE;
+            info->snap = true;
             info->matrix.m[2][0] = SNAPI(twin_sfixed_to_fixed(origin.x));
             info->matrix.m[2][1] = SNAPI(twin_sfixed_to_fixed(origin.y));
         } else {
-            info->snap = TWIN_FALSE;
+            info->snap = false;
             info->matrix.m[2][0] = twin_sfixed_to_fixed(origin.x);
             info->matrix.m[2][1] = twin_sfixed_to_fixed(origin.y);
         }
@@ -115,7 +115,7 @@ static void _twin_text_compute_info(twin_path_t *path,
                               -info->pen.y);
         info->pen_matrix = info->matrix;
     } else {
-        info->snap = TWIN_FALSE;
+        info->snap = false;
         info->matrix = path->state.matrix;
         info->matrix.m[2][0] = twin_sfixed_to_fixed(origin.x);
         info->matrix.m[2][1] = twin_sfixed_to_fixed(origin.y);
@@ -209,24 +209,24 @@ static twin_fixed_t _twin_snap(twin_fixed_t v, twin_fixed_t *snap, int n)
     return v;
 }
 
-static twin_bool_t twin_find_ucs4_page(twin_font_t *font, uint32_t page)
+static bool twin_find_ucs4_page(twin_font_t *font, uint32_t page)
 {
     int i;
 
     if (font->cur_page && font->cur_page->page == page)
-        return TWIN_TRUE;
+        return true;
 
     for (i = 0; i < font->n_charmap; i++)
         if (font->charmap[i].page == page) {
             font->cur_page = &font->charmap[i];
-            return TWIN_TRUE;
+            return true;
         }
 
     font->cur_page = &font->charmap[0];
-    return TWIN_FALSE;
+    return false;
 }
 
-twin_bool_t twin_has_ucs4(twin_font_t *font, twin_ucs4_t ucs4)
+bool twin_has_ucs4(twin_font_t *font, twin_ucs4_t ucs4)
 {
     return twin_find_ucs4_page(font, twin_ucs_page(ucs4));
 }
@@ -506,13 +506,13 @@ void twin_text_metrics_utf8(twin_path_t *path,
     twin_ucs4_t ucs4;
     twin_fixed_t w = 0;
     twin_text_metrics_t c;
-    twin_bool_t first = TWIN_TRUE;
+    bool first = true;
 
     while ((len = _twin_utf8_to_ucs4(string, &ucs4)) > 0) {
         twin_text_metrics_ucs4(path, ucs4, &c);
         if (first) {
             *m = c;
-            first = TWIN_FALSE;
+            first = false;
         } else {
             c.left_side_bearing += w;
             c.right_side_bearing += w;

@@ -109,7 +109,7 @@ void twin_screen_resize(twin_screen_t *screen,
     twin_screen_damage(screen, 0, 0, screen->width, screen->height);
 }
 
-twin_bool_t twin_screen_damaged(twin_screen_t *screen)
+bool twin_screen_damaged(twin_screen_t *screen)
 {
     return (screen->damage.left < screen->damage.right &&
             screen->damage.top < screen->damage.bottom);
@@ -308,12 +308,12 @@ static void _twin_adj_mouse_evt(twin_event_t *event, twin_pixmap_t *pixmap)
     event->u.pointer.y = event->u.pointer.screen_y - pixmap->y;
 }
 
-twin_bool_t twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
+bool twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
 {
     twin_pixmap_t *pixmap, *ntarget;
 
     if (screen->event_filter && screen->event_filter(screen, event))
-        return TWIN_TRUE;
+        return true;
 
     switch (event->kind) {
     case TwinEventMotion:
@@ -383,5 +383,5 @@ twin_bool_t twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
     }
     if (pixmap)
         return twin_pixmap_dispatch(pixmap, event);
-    return TWIN_FALSE;
+    return false;
 }

@@ -4,16 +4,16 @@
  * All rights reserved.
  */
 
-#ifndef _TWIN_TEXT_H_
-#define _TWIN_TEXT_H_
+#ifndef _APPS_CALC_H_
+#define _APPS_CALC_H_
 
 #include <twin.h>
 
-void twin_text_start(twin_screen_t *screen,
+void apps_calc_start(twin_screen_t *screen,
                      const char *name,
                      int x,
                      int y,
                      int w,
                      int h);
 
-#endif /* _TWIN_TEXT_H_ */
+#endif /* _APPS_CALC_H_ */

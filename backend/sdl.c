@@ -47,9 +47,9 @@ static void _twin_sdl_put_span(twin_coord_t left,
     }
 }
 
-static twin_bool_t twin_sdl_read_events(int maybe_unused file,
-                                        twin_file_op_t maybe_unused ops,
-                                        void *closure)
+static bool twin_sdl_read_events(int maybe_unused file,
+                                 twin_file_op_t maybe_unused ops,
+                                 void *closure)
 {
     twin_sdl_t *tx = closure;
     SDL_Event ev;
@@ -91,16 +91,16 @@ static twin_bool_t twin_sdl_read_events(int maybe_unused file,
             break;
         }
     }
-    return TWIN_TRUE;
+    return true;
 }
 
-static twin_bool_t twin_sdl_work(void *closure)
+static bool twin_sdl_work(void *closure)
 {
     twin_sdl_t *tx = closure;
 
     if (twin_screen_damaged(tx->screen))
         twin_sdl_update(tx);
-    return TWIN_TRUE;
+    return true;
 }
 
 twin_sdl_t *twin_sdl_create_ext(int width, int height, int handle_events)
@@ -175,9 +175,9 @@ void twin_sdl_update(twin_sdl_t *tx)
     twin_screen_update(tx->screen);
 }
 
-twin_bool_t twin_sdl_process_events(twin_sdl_t *tx)
+bool twin_sdl_process_events(twin_sdl_t *tx)
 {
-    twin_bool_t result;
+    bool result;
 
     _twin_run_work();
     result = twin_sdl_read_events(tx->dpy, 0, tx);

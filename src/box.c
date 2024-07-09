@@ -187,7 +187,7 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
             return (*box->focus->dispatch)(box->focus, event);
         break;
     case TwinEventPaint:
-        box->widget.paint = TWIN_FALSE;
+        box->widget.paint = false;
         for (child = box->children; child; child = child->next)
             if (child->paint) {
                 twin_pixmap_t *pixmap = box->widget.window->pixmap;
@@ -202,7 +202,7 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
                               child->extents.bottom);
                 twin_pixmap_set_clip(pixmap, child->extents);
                 twin_pixmap_origin_to_clip(pixmap);
-                child->paint = TWIN_FALSE;
+                child->paint = false;
                 (*child->dispatch)(child, event);
                 twin_pixmap_restore_clip(pixmap, clip);
                 twin_pixmap_set_origin(pixmap, ox, oy);

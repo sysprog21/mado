@@ -7,6 +7,7 @@
 #ifndef _TWIN_H_
 #define _TWIN_H_
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -15,7 +16,6 @@ typedef uint16_t twin_a16_t;
 typedef uint16_t twin_rgb16_t;
 typedef uint32_t twin_argb32_t;
 typedef uint32_t twin_ucs4_t;
-typedef int twin_bool_t;
 typedef int16_t twin_coord_t;
 typedef int16_t twin_style_t;
 typedef int16_t twin_count_t;
@@ -26,9 +26,6 @@ typedef int32_t twin_area_t;
 typedef int32_t twin_time_t;
 typedef int16_t twin_stretch_t;
 typedef int32_t twin_fixed_t; /* 16.16 format */
-
-#define TWIN_FALSE 0
-#define TWIN_TRUE 1
 
 typedef enum { TWIN_A8, TWIN_RGB16, TWIN_ARGB32 } twin_format_t;
 
@@ -217,7 +214,7 @@ struct _twin_screen {
      * this pixmap is target of mouse events
      */
     twin_pixmap_t *target;
-    twin_bool_t clicklock;
+    bool clicklock;
 
     /*
      * mouse image (optional)
@@ -261,7 +258,7 @@ struct _twin_screen {
     /*
      * Event filter
      */
-    twin_bool_t (*event_filter)(twin_screen_t *screen, twin_event_t *event);
+    bool (*event_filter)(twin_screen_t *screen, twin_event_t *event);
 };
 
 /*
@@ -393,8 +390,7 @@ typedef enum _twin_window_style {
 
 typedef void (*twin_draw_func_t)(twin_window_t *window);
 
-typedef twin_bool_t (*twin_event_func_t)(twin_window_t *window,
-                                         twin_event_t *event);
+typedef bool (*twin_event_func_t)(twin_window_t *window, twin_event_t *event);
 
 typedef void (*twin_destroy_func_t)(twin_window_t *window);
 
@@ -404,9 +400,9 @@ struct _twin_window {
     twin_window_style_t style;
     twin_rect_t client;
     twin_rect_t damage;
-    twin_bool_t client_grab;
-    twin_bool_t want_focus;
-    twin_bool_t draw_queued;
+    bool client_grab;
+    bool want_focus;
+    bool draw_queued;
     void *client_data;
     char *name;
 
@@ -422,13 +418,11 @@ struct _twin_window {
 
 typedef twin_time_t (*twin_timeout_proc_t)(twin_time_t now, void *closure);
 
-typedef twin_bool_t (*twin_work_proc_t)(void *closure);
+typedef bool (*twin_work_proc_t)(void *closure);
 
 typedef enum _twin_file_op { TWIN_READ = 1, TWIN_WRITE = 2 } twin_file_op_t;
 
-typedef twin_bool_t (*twin_file_proc_t)(int file,
-                                        twin_file_op_t ops,
-                                        void *closure);
+typedef bool (*twin_file_proc_t)(int file, twin_file_op_t ops, void *closure);
 
 #define twin_time_compare(a, op, b) (((a) - (b)) op 0)
 
@@ -483,9 +477,9 @@ struct _twin_widget {
     twin_dispatch_proc_t dispatch;
     twin_rect_t extents; /* current geometry */
     twin_widget_t *copy_geom;
-    twin_bool_t paint;
-    twin_bool_t layout;
-    twin_bool_t want_focus;
+    bool paint;
+    bool layout;
+    bool want_focus;
     twin_argb32_t background;
     twin_widget_layout_t preferred;
     twin_shape_t shape;
@@ -533,8 +527,8 @@ typedef void (*twin_button_signal_proc_t)(twin_button_t *button,
 
 struct _twin_button {
     twin_label_t label;
-    twin_bool_t pressed;
-    twin_bool_t active;
+    bool pressed;
+    bool active;
     twin_button_signal_proc_t signal;
     void *closure;
 };
@@ -642,7 +636,7 @@ twin_fixed_t twin_fixed_sqrt(twin_fixed_t a);
  * font.c
  */
 
-twin_bool_t twin_has_ucs4(twin_font_t *font, twin_ucs4_t ucs4);
+bool twin_has_ucs4(twin_font_t *font, twin_ucs4_t ucs4);
 
 #define TWIN_TEXT_ROMAN 0
 #define TWIN_TEXT_BOLD 1
@@ -694,7 +688,7 @@ void twin_label_set(twin_label_t *label,
 
 void twin_matrix_identity(twin_matrix_t *m);
 
-twin_bool_t twin_matrix_is_identity(twin_matrix_t *m);
+bool twin_matrix_is_identity(twin_matrix_t *m);
 
 void twin_matrix_translate(twin_matrix_t *m, twin_fixed_t tx, twin_fixed_t ty);
 
@@ -905,11 +899,11 @@ twin_pointer_t twin_pixmap_pointer(twin_pixmap_t *pixmap,
                                    twin_coord_t x,
                                    twin_coord_t y);
 
-twin_bool_t twin_pixmap_transparent(twin_pixmap_t *pixmap,
-                                    twin_coord_t x,
-                                    twin_coord_t y);
+bool twin_pixmap_transparent(twin_pixmap_t *pixmap,
+                             twin_coord_t x,
+                             twin_coord_t y);
 
-twin_bool_t twin_pixmap_dispatch(twin_pixmap_t *pixmap, twin_event_t *event);
+bool twin_pixmap_dispatch(twin_pixmap_t *pixmap, twin_event_t *event);
 
 /*
  * poly.c
@@ -949,7 +943,7 @@ void twin_screen_resize(twin_screen_t *screen,
                         twin_coord_t width,
                         twin_coord_t height);
 
-twin_bool_t twin_screen_damaged(twin_screen_t *screen);
+bool twin_screen_damaged(twin_screen_t *screen);
 
 void twin_screen_update(twin_screen_t *screen);
 
@@ -966,7 +960,7 @@ void twin_screen_set_cursor(twin_screen_t *screen,
                             twin_fixed_t hotspot_x,
                             twin_fixed_t hotspot_y);
 
-twin_bool_t twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event);
+bool twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event);
 
 void twin_screen_lock(twin_screen_t *screen);
 
@@ -1075,7 +1069,7 @@ void twin_window_damage(twin_window_t *window,
 
 void twin_window_queue_paint(twin_window_t *window);
 
-twin_bool_t twin_window_dispatch(twin_window_t *window, twin_event_t *event);
+bool twin_window_dispatch(twin_window_t *window, twin_event_t *event);
 
 /*
  * work.c

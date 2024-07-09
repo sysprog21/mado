@@ -375,8 +375,8 @@ void _twin_path_sfinish(twin_path_t *path);
 typedef struct _twin_queue {
     struct _twin_queue *next;
     struct _twin_queue *order;
-    twin_bool_t walking;
-    twin_bool_t deleted;
+    bool walking;
+    bool deleted;
 } twin_queue_t;
 
 struct _twin_timeout {
@@ -464,13 +464,13 @@ void _twin_widget_queue_paint(twin_widget_t *widget);
 
 void _twin_widget_queue_layout(twin_widget_t *widget);
 
-twin_bool_t _twin_widget_contains(twin_widget_t *widget,
-                                  twin_coord_t x,
-                                  twin_coord_t y);
+bool _twin_widget_contains(twin_widget_t *widget,
+                           twin_coord_t x,
+                           twin_coord_t y);
 
 void _twin_widget_bevel(twin_widget_t *widget,
                         twin_fixed_t bevel_width,
-                        twin_bool_t down);
+                        bool down);
 
 void _twin_label_init(twin_label_t *label,
                       twin_box_t *parent,

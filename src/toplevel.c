@@ -27,8 +27,7 @@ twin_dispatch_result_t _twin_toplevel_dispatch(twin_widget_t *widget,
     return _twin_box_dispatch(&toplevel->box.widget, &ev);
 }
 
-static twin_bool_t _twin_toplevel_event(twin_window_t *window,
-                                        twin_event_t *event)
+static bool _twin_toplevel_event(twin_window_t *window, twin_event_t *event)
 {
     twin_toplevel_t *toplevel = window->client_data;
 
@@ -93,7 +92,7 @@ twin_toplevel_t *twin_toplevel_create(twin_screen_t *screen,
     return toplevel;
 }
 
-static twin_bool_t _twin_toplevel_paint(void *closure)
+static bool _twin_toplevel_paint(void *closure)
 {
     twin_toplevel_t *toplevel = closure;
     twin_event_t ev;
@@ -102,7 +101,7 @@ static twin_bool_t _twin_toplevel_paint(void *closure)
     ev.kind = TwinEventPaint;
     (*toplevel->box.widget.dispatch)(&toplevel->box.widget, &ev);
     twin_screen_enable_update(toplevel->box.widget.window->screen);
-    return TWIN_FALSE;
+    return false;
 }
 
 void _twin_toplevel_queue_paint(twin_widget_t *widget)
@@ -110,12 +109,12 @@ void _twin_toplevel_queue_paint(twin_widget_t *widget)
     twin_toplevel_t *toplevel = (twin_toplevel_t *) widget;
 
     if (!toplevel->box.widget.paint) {
-        toplevel->box.widget.paint = TWIN_TRUE;
+        toplevel->box.widget.paint = true;
         twin_set_work(_twin_toplevel_paint, TWIN_WORK_PAINT, toplevel);
     }
 }
 
-static twin_bool_t _twin_toplevel_layout(void *closure)
+static bool _twin_toplevel_layout(void *closure)
 {
     twin_toplevel_t *toplevel = closure;
     twin_event_t ev;
@@ -129,7 +128,7 @@ static twin_bool_t _twin_toplevel_layout(void *closure)
     ev.u.configure.extents.right = window->client.right - window->client.left;
     ev.u.configure.extents.bottom = window->client.bottom - window->client.top;
     (*toplevel->box.widget.dispatch)(&toplevel->box.widget, &ev);
-    return TWIN_FALSE;
+    return false;
 }
 
 void _twin_toplevel_queue_layout(twin_widget_t *widget)
@@ -137,7 +136,7 @@ void _twin_toplevel_queue_layout(twin_widget_t *widget)
     twin_toplevel_t *toplevel = (twin_toplevel_t *) widget;
 
     if (!toplevel->box.widget.layout) {
-        toplevel->box.widget.layout = TWIN_TRUE;
+        toplevel->box.widget.layout = true;
         twin_set_work(_twin_toplevel_layout, TWIN_WORK_LAYOUT, toplevel);
         _twin_toplevel_queue_paint(widget);
     }

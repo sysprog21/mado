@@ -4,16 +4,16 @@
  * All rights reserved.
  */
 
-#ifndef _TWIN_DEMO_H_
-#define _TWIN_DEMO_H_
+#ifndef _TWIN_TEXT_H_
+#define _TWIN_TEXT_H_
 
 #include <twin.h>
 
-void twin_demo_start(twin_screen_t *screen,
+void apps_text_start(twin_screen_t *screen,
                      const char *name,
                      int x,
                      int y,
                      int w,
                      int h);
 
-#endif /* _TWIN_DEMO_H_ */
+#endif /* _TWIN_TEXT_H_ */

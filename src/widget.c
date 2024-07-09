@@ -76,7 +76,7 @@ twin_dispatch_result_t _twin_widget_dispatch(twin_widget_t *widget,
 {
     switch (event->kind) {
     case TwinEventQueryGeometry:
-        widget->layout = TWIN_FALSE;
+        widget->layout = false;
         if (widget->copy_geom) {
             twin_widget_t *copy = widget->copy_geom;
             if (copy->layout)
@@ -90,7 +90,7 @@ twin_dispatch_result_t _twin_widget_dispatch(twin_widget_t *widget,
         break;
     case TwinEventPaint:
         _twin_widget_paint(widget);
-        widget->paint = TWIN_FALSE;
+        widget->paint = false;
         break;
     default:
         break;
@@ -117,9 +117,9 @@ void _twin_widget_init(twin_widget_t *widget,
     widget->window = window;
     widget->parent = parent;
     widget->copy_geom = NULL;
-    widget->paint = TWIN_TRUE;
-    widget->layout = TWIN_TRUE;
-    widget->want_focus = TWIN_FALSE;
+    widget->paint = true;
+    widget->layout = true;
+    widget->want_focus = false;
     widget->background = 0x00000000;
     widget->extents.left = widget->extents.top = 0;
     widget->extents.right = widget->extents.bottom = 0;
@@ -134,7 +134,7 @@ void _twin_widget_queue_paint(twin_widget_t *widget)
     while (widget->parent) {
         if (widget->paint)
             return;
-        widget->paint = TWIN_TRUE;
+        widget->paint = true;
         widget = &widget->parent->widget;
     }
     _twin_toplevel_queue_paint(widget);
@@ -145,22 +145,22 @@ void _twin_widget_queue_layout(twin_widget_t *widget)
     while (widget->parent) {
         if (widget->layout)
             return;
-        widget->layout = TWIN_TRUE;
-        widget->paint = TWIN_TRUE;
+        widget->layout = true;
+        widget->paint = true;
         widget = &widget->parent->widget;
     }
     _twin_toplevel_queue_layout(widget);
 }
 
-twin_bool_t _twin_widget_contains(twin_widget_t *widget,
-                                  twin_coord_t x,
-                                  twin_coord_t y)
+bool _twin_widget_contains(twin_widget_t *widget,
+                           twin_coord_t x,
+                           twin_coord_t y)
 {
     return (0 <= x && x < _twin_widget_width(widget) && 0 <= y &&
             y < _twin_widget_height(widget));
 }
 
-void _twin_widget_bevel(twin_widget_t *widget, twin_fixed_t b, twin_bool_t down)
+void _twin_widget_bevel(twin_widget_t *widget, twin_fixed_t b, bool down)
 {
     twin_path_t *path = twin_path_create();
     twin_fixed_t w = twin_int_to_fixed(_twin_widget_width(widget));

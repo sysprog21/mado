@@ -40,6 +40,6 @@ void twin_sdl_configure(twin_sdl_t *tx, SDL_Event *ev);
 
 void twin_sdl_update(twin_sdl_t *tx);
 
-twin_bool_t twin_sdl_process_events(twin_sdl_t *tx);
+bool twin_sdl_process_events(twin_sdl_t *tx);
 
 #endif /* _TWIN_SDL_H_ */

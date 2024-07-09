@@ -292,9 +292,9 @@ static twin_argb32_t _twin_pixmap_fetch(twin_pixmap_t *pixmap,
     return 0;
 }
 
-twin_bool_t twin_pixmap_transparent(twin_pixmap_t *pixmap,
-                                    twin_coord_t x,
-                                    twin_coord_t y)
+bool twin_pixmap_transparent(twin_pixmap_t *pixmap,
+                             twin_coord_t x,
+                             twin_coord_t y)
 {
     return (_twin_pixmap_fetch(pixmap, x, y) >> 24) == 0;
 }
@@ -307,9 +307,9 @@ void twin_pixmap_move(twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y)
     twin_pixmap_damage(pixmap, 0, 0, pixmap->width, pixmap->height);
 }
 
-twin_bool_t twin_pixmap_dispatch(twin_pixmap_t *pixmap, twin_event_t *event)
+bool twin_pixmap_dispatch(twin_pixmap_t *pixmap, twin_event_t *event)
 {
     if (pixmap->window)
         return twin_window_dispatch(pixmap->window, event);
-    return TWIN_FALSE;
+    return false;
 }

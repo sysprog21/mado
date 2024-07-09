@@ -4,12 +4,11 @@
  * All rights reserved.
  */
 
-#include "twin_demo.h"
+#include "apps_demo.h"
 
-#define maybe_unused __attribute__((unused))
 #define D(x) twin_double_to_fixed(x)
 
-static void twin_line_start(twin_screen_t *screen, int x, int y, int w, int h)
+static void apps_line_start(twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t *window = twin_window_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
@@ -32,8 +31,11 @@ static void twin_line_start(twin_screen_t *screen, int x, int y, int w, int h)
     twin_window_show(window);
 }
 
-static void maybe_unused
-twin_circletext_start(twin_screen_t *screen, int x, int y, int w, int h)
+static void apps_circletext_start(twin_screen_t *screen,
+                                  int x,
+                                  int y,
+                                  int w,
+                                  int h)
 {
     twin_window_t *window = twin_window_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
@@ -74,8 +76,11 @@ twin_circletext_start(twin_screen_t *screen, int x, int y, int w, int h)
     twin_window_show(window);
 }
 
-static void maybe_unused
-twin_quickbrown_start(twin_screen_t *screen, int x, int y, int w, int h)
+static void apps_quickbrown_start(twin_screen_t *screen,
+                                  int x,
+                                  int y,
+                                  int w,
+                                  int h)
 {
     twin_window_t *window = twin_window_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
@@ -118,8 +123,7 @@ twin_quickbrown_start(twin_screen_t *screen, int x, int y, int w, int h)
     twin_window_show(window);
 }
 
-static void maybe_unused
-twin_ascii_start(twin_screen_t *screen, int x, int y, int w, int h)
+static void apps_ascii_start(twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t *window = twin_window_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
@@ -167,8 +171,7 @@ twin_ascii_start(twin_screen_t *screen, int x, int y, int w, int h)
     twin_window_show(window);
 }
 
-static void maybe_unused
-twin_jelly_start(twin_screen_t *screen, int x, int y, int w, int h)
+static void apps_jelly_start(twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t *window = twin_window_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
@@ -216,20 +219,16 @@ twin_jelly_start(twin_screen_t *screen, int x, int y, int w, int h)
     twin_window_show(window);
 }
 
-void twin_demo_start(twin_screen_t *screen,
-                     const char maybe_unused *name,
+void apps_demo_start(twin_screen_t *screen,
+                     const char *name,
                      int x,
                      int y,
                      int w,
                      int h)
 {
-#if 1
-    twin_circletext_start(screen, x, y, w, h);
-#endif
-    twin_line_start(screen, x += 20, y += 20, w, h);
-#if 1
-    twin_quickbrown_start(screen, x += 20, y += 20, w, h);
-    twin_ascii_start(screen, x += 20, y += 20, w, h);
-    twin_jelly_start(screen, x += 20, y += 20, w, h);
-#endif
+    apps_circletext_start(screen, x, y, w, h);
+    apps_line_start(screen, x += 20, y += 20, w, h);
+    apps_quickbrown_start(screen, x += 20, y += 20, w, h);
+    apps_ascii_start(screen, x += 20, y += 20, w, h);
+    apps_jelly_start(screen, x += 20, y += 20, w, h);
 }

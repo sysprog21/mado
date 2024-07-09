@@ -4,7 +4,11 @@
  * All rights reserved.
  */
 
+#if defined(__APPLE__)
 #include <machine/endian.h>
+#else
+#include <endian.h>
+#endif
 
 #include "twinint.h"
 
@@ -458,13 +462,11 @@ static void twin_pixmap_free_xform(twin_xform_t *xform)
         *((twin_argb32_t *) (char *) (d)) = p;                               \
     } while (0)
 
-
 #define _pix_saucemix(tl, tr, bl, br, wx, wy)                     \
     ((((((br * wx) + (bl * (TWIN_FIXED_ONE - wx))) >> 16) * wy) + \
       ((((tr * wx) + (tl * (TWIN_FIXED_ONE - wx))) >> 16) *       \
        (TWIN_FIXED_ONE - wy))) >>                                 \
      16)
-
 
 static void twin_pixmap_read_xform_8(twin_xform_t *xform, twin_coord_t line)
 {
@@ -681,23 +683,29 @@ void twin_composite(twin_pixmap_t *dst,
 static twin_argb32_t _twin_apply_alpha(twin_argb32_t v)
 {
     uint16_t t1, t2, t3;
-    twin_a8_t alpha = twin_get_8(v, (BYTE_ORDER == BIG_ENDIAN) ? 0 : 24);
+    twin_a8_t alpha = twin_get_8(v,
+#if __BYTE_ORDER == __BIG_ENDIAN
+                                 0
+#else
+                                 24
+#endif
+    );
 
     /* clear RGB data if alpha is zero */
 
     if (!alpha)
         return 0;
 
-    /* twin needs ARGB format */
-
-    if (BYTE_ORDER == BIG_ENDIAN)
-        return alpha << 24 | twin_int_mult(twin_get_8(v, 24), alpha, t1) << 16 |
-               twin_int_mult(twin_get_8(v, 16), alpha, t2) << 8 |
-               twin_int_mult(twin_get_8(v, 8), alpha, t3) << 0;
-
+        /* twin needs ARGB format */
+#if __BYTE_ORDER == __BIG_ENDIAN
+    return alpha << 24 | twin_int_mult(twin_get_8(v, 24), alpha, t1) << 16 |
+           twin_int_mult(twin_get_8(v, 16), alpha, t2) << 8 |
+           twin_int_mult(twin_get_8(v, 8), alpha, t3) << 0;
+#else
     return alpha << 24 | twin_int_mult(twin_get_8(v, 0), alpha, t1) << 16 |
            twin_int_mult(twin_get_8(v, 8), alpha, t2) << 8 |
            twin_int_mult(twin_get_8(v, 16), alpha, t3) << 0;
+#endif
 }
 
 void twin_premultiply_alpha(twin_pixmap_t *px)

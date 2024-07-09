@@ -26,32 +26,16 @@
 
 int main(void)
 {
-    // Display	    *dpy = XOpenDisplay (0);
-    twin_x11_t *x11;
+    twin_sdl_t *sdl = twin_sdl_create(WIDTH, HEIGHT);
 
-    x11 = twin_x11_create(WIDTH, HEIGHT);
+    twin_demo_start(sdl->screen, "Demo", 100, 100, 400, 400);
+    twin_text_start(sdl->screen, "Gettysburg Address", 0, 0, 300, 300);
+    twin_hello_start(sdl->screen, "Hello, World", 0, 0, 200, 200);
+    twin_clock_start(sdl->screen, "Clock", 10, 10, 200, 200);
+    twin_calc_start(sdl->screen, "Calculator", 100, 100, 200, 200);
+    twin_demoline_start(sdl->screen, "Demo Line", 0, 0, 200, 200);
+    twin_demospline_start(sdl->screen, "Demo Spline", 20, 20, 400, 400);
 
-#if 1
-    twin_demo_start(x11->screen, "Demo", 100, 100, 400, 400);
-#endif
-#if 1
-    twin_text_start(x11->screen, "Gettysburg Address", 0, 0, 300, 300);
-#endif
-#if 1
-    twin_hello_start(x11->screen, "Hello, World", 0, 0, 200, 200);
-#endif
-#if 1
-    twin_clock_start(x11->screen, "Clock", 10, 10, 200, 200);
-#endif
-#if 1
-    twin_calc_start(x11->screen, "Calculator", 100, 100, 200, 200);
-#endif
-#if 1
-    twin_demoline_start(x11->screen, "Demo Line", 0, 0, 200, 200);
-#endif
-#if 1
-    twin_demospline_start(x11->screen, "Demo Spline", 20, 20, 400, 400);
-#endif
     twin_dispatch();
     return 0;
 }

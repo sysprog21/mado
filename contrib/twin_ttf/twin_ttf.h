@@ -35,7 +35,7 @@
 
 typedef struct {
     FT_Face face;
-    int	    offset;
+    int offset;
 } outline_closure_t;
 
 #endif /* _TWIN_TTF_H_ */

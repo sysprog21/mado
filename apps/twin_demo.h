@@ -9,7 +9,11 @@
 
 #include <twin.h>
 
-void
-twin_demo_start (twin_screen_t *screen, const char *name, int x, int y, int w, int h);
+void twin_demo_start(twin_screen_t *screen,
+                     const char *name,
+                     int x,
+                     int y,
+                     int w,
+                     int h);
 
 #endif /* _TWIN_DEMO_H_ */

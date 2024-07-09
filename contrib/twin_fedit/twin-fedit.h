@@ -25,82 +25,74 @@
 #ifndef _TWIN_FEDIT_H_
 #define _TWIN_FEDIT_H_
 
+#include <X11/Xatom.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/keysym.h>
+#include <cairo-xlib.h>
+#include <cairo.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <X11/Xlib.h>
-#include <X11/Xatom.h>
-#include <cairo.h>
-#include <cairo-xlib.h>
-#include <math.h>
-#include <X11/keysym.h>
-#include <X11/Xutil.h>
 #include <string.h>
+#include <unistd.h>
 
 typedef enum _op { OpMove, OpLine, OpCurve, OpNoop } op_t;
 
-typedef struct { double x, y; } pt_t;
+typedef struct {
+    double x, y;
+} pt_t;
 
 typedef struct _cmd {
-    struct _cmd	*next;
-    op_t	op;
-    pt_t	pt[3];
+    struct _cmd *next;
+    op_t op;
+    pt_t pt[3];
 } cmd_t;
 
 typedef struct _cmd_stack {
-    struct _cmd_stack	*prev;
-    cmd_t		*cmd;
+    struct _cmd_stack *prev;
+    cmd_t *cmd;
 } cmd_stack_t;
 
 typedef struct _char {
-    cmd_t	*cmd;
-    cmd_stack_t	*stack;
-    cmd_t	*first;
-    cmd_t	*last;
+    cmd_t *cmd;
+    cmd_stack_t *stack;
+    cmd_t *first;
+    cmd_t *last;
 } char_t;
 
 typedef struct _pts_t {
-    int		n;
-    int		s;
-    pt_t	*pt;
+    int n;
+    int s;
+    pt_t *pt;
 } pts_t;
 
 typedef struct _spline {
-    pt_t	a, b, c, d;
+    pt_t a, b, c, d;
 } spline_t;
 
-spline_t fit (pt_t *p, int n);
-    
-double
-min (double a, double b);
+spline_t fit(pt_t *p, int n);
 
-double
-max (double a, double b);
+double min(double a, double b);
+
+double max(double a, double b);
 
 #define abs my_abs
 
-double
-abs (double a);
+double abs(double a);
 
-pts_t *
-new_pts (void);
+pts_t *new_pts(void);
 
-void
-dispose_pts (pts_t *pts);
+void dispose_pts(pts_t *pts);
 
-void
-add_pt (pts_t *pts, pt_t *pt);
+void add_pt(pts_t *pts, pt_t *pt);
 
-double
-distance_to_point (pt_t * a, pt_t * b);
+double distance_to_point(pt_t *a, pt_t *b);
 
-double
-distance_to_line (pt_t * p, pt_t * p1, pt_t * p2);
+double distance_to_line(pt_t *p, pt_t *p1, pt_t *p2);
 
-double
-distance_to_segment (pt_t * p, pt_t * p1, pt_t * p2);
+double distance_to_segment(pt_t *p, pt_t *p1, pt_t *p2);
 
-pt_t
-lerp (pt_t *a, pt_t *b);
-    
+pt_t lerp(pt_t *a, pt_t *b);
+
 #endif /* _TWIN_FEDIT_H_ */

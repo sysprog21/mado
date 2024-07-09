@@ -28,6 +28,8 @@ int main(void)
 {
     twin_sdl_t *sdl = twin_sdl_create(WIDTH, HEIGHT);
 
+    twin_screen_set_background(sdl->screen, twin_make_pattern());
+
     apps_demo_start(sdl->screen, "Demo", 100, 100, 400, 400);
     apps_text_start(sdl->screen, "Gettysburg Address", 0, 0, 300, 300);
     apps_hello_start(sdl->screen, "Hello, World", 0, 0, 200, 200);

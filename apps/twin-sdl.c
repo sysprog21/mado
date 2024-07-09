@@ -21,8 +21,8 @@
 #include "apps_spline.h"
 #include "apps_text.h"
 
-#define WIDTH 1000
-#define HEIGHT 1000
+#define WIDTH 640
+#define HEIGHT 480
 
 int main(void)
 {

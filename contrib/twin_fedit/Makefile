@@ -1,9 +1,14 @@
-CFLAGS=$(shell pkg-config --cflags cairo x11) -g -Wall
-LIBS=$(shell pkg-config --libs cairo x11)
+TARGET = twin-fedit
 
-OBJS=twin-fedit.o twin-sfit.o
+CFLAGS = $(shell pkg-config --cflags cairo x11) -g -Wall
+LIBS = $(shell pkg-config --libs cairo x11)
 
-twin-fedit: $(OBJS)
+OBJS = \
+	twin-fedit.o \
+	sfit.o
+
+$(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LIBS)
 
-$(OBJS): twin-fedit.h
+clean:
+	rm -f $(TARGET) $(OBJS)

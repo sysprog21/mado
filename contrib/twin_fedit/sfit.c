@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright © 2004 Keith Packard
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
@@ -37,6 +35,16 @@ double max(double a, double b)
 double abs(double a)
 {
     return a < 0 ? -a : a;
+}
+
+double sqrt(double x)
+{
+    double i = x / 2;
+    if (x < 0)
+        return 0;
+    while (fabs(i - (x / i)) / i > 0.000000000000001)
+        i = (i + (x / i)) / 2;
+    return i;
 }
 
 pts_t *new_pts(void)
@@ -115,13 +123,12 @@ double distance_to_segment(pt_t *p, pt_t *p1, pt_t *p2)
 
     /* intersection pt_t * (px):
 
-            px = p1 + u(p2 - p1)
-            (p - px) . (p2 - p1) = 0
+       px = p1 + u(p2 - p1)
+       (p - px) . (p2 - p1) = 0
 
-            Thus:
-
-            u = ((p - p1) . (p2 - p1)) / (||(p2 - p1)|| ^ 2);
-         */
+    Thus:
+      u = ((p - p1) . (p2 - p1)) / (||(p2 - p1)|| ^ 2);
+    */
 
     dx = p2->x - p1->x;
     dy = p2->y - p1->y;
@@ -145,7 +152,7 @@ double distance_to_segment(pt_t *p, pt_t *p1, pt_t *p2)
     return distance_to_point(p, &px);
 }
 
-double distance_to_segments(pt_t *p, pts_t *s)
+static double distance_to_segments(pt_t *p, pts_t *s)
 {
     double m = distance_to_segment(p, &s->pt[0], &s->pt[1]);
     int i;
@@ -165,7 +172,7 @@ pt_t lerp(pt_t *a, pt_t *b)
     return p;
 }
 
-void dcj(spline_t *s, spline_t *s1, spline_t *s2)
+static void dcj(spline_t *s, spline_t *s1, spline_t *s2)
 {
     pt_t ab = lerp(&s->a, &s->b);
     pt_t bc = lerp(&s->b, &s->c);
@@ -185,8 +192,7 @@ void dcj(spline_t *s, spline_t *s1, spline_t *s2)
     s2->d = s->d;
 }
 
-
-double spline_error(spline_t *s)
+static double spline_error(spline_t *s)
 {
     double berr, cerr;
 
@@ -195,11 +201,11 @@ double spline_error(spline_t *s)
     return max(berr, cerr);
 }
 
-void decomp(pts_t *pts, spline_t *s, double tolerance)
+static void decomp(pts_t *pts, spline_t *s, double tolerance)
 {
-    if (spline_error(s) <= tolerance) {
+    if (spline_error(s) <= tolerance)
         add_pt(pts, &s->a);
-    } else {
+    else {
         spline_t s1, s2;
         dcj(s, &s1, &s2);
         decomp(pts, &s1, tolerance);
@@ -207,7 +213,7 @@ void decomp(pts_t *pts, spline_t *s, double tolerance)
     }
 }
 
-pts_t *decompose(spline_t *s, double tolerance)
+static pts_t *decompose(spline_t *s, double tolerance)
 {
     pts_t *result = new_pts();
 
@@ -216,8 +222,7 @@ pts_t *decompose(spline_t *s, double tolerance)
     return result;
 }
 
-
-double spline_fit_error(pt_t *p, int n, spline_t *s, double tolerance)
+static double spline_fit_error(pt_t *p, int n, spline_t *s, double tolerance)
 {
     pts_t *sp = decompose(s, tolerance);
     double err = 0;
@@ -231,33 +236,10 @@ double spline_fit_error(pt_t *p, int n, spline_t *s, double tolerance)
     return err;
 }
 
-pt_t lerp_a(pt_t *p1, pt_t *p2, double r)
-{
-    double dx = p2->x - p1->x;
-    double dy = p2->y - p1->y;
-    pt_t pt;
-
-    pt.x = p1->x + r * dx;
-    pt.y = p1->y + r * dy;
-    return pt;
-}
-
-double lerp_dist(pt_t *p1, pt_t *p2, double r)
-{
-    double dx = p2->x - p1->x;
-    double dy = p2->y - p1->y;
-
-    dx *= r;
-    dy *= r;
-    return sqrt(dx * dx + dy * dy);
-}
-
 spline_t fit(pt_t *p, int n)
 {
     spline_t s;
     spline_t best_s;
-
-    double dist;
 
     double tol = 0.5;
     double best_err = 10000;
@@ -272,8 +254,6 @@ spline_t fit(pt_t *p, int n)
 
     s.a = p[0];
     s.d = p[n - 1];
-
-    dist = floor(distance_to_point(&s.a, &s.d) + 0.5);
 
     if (s.a.x < s.d.x) {
         sbx_min = s.a.x;
@@ -309,7 +289,6 @@ spline_t fit(pt_t *p, int n)
             for (s.c.x = scx_min; s.c.x <= scx_max; s.c.x += 1.0)
                 for (s.c.y = scy_min; s.c.y <= scy_max; s.c.y += 1.0) {
                     double err = spline_fit_error(p, n, &s, tol);
-
                     if (err < best_err) {
                         best_err = err;
                         best_s = s;

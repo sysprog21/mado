@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright © 2004 Keith Packard
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
@@ -24,27 +22,26 @@
 
 #include "twin-fedit.h"
 
-Display *dpy;
-Window win;
-Visual *visual;
-int depth;
-int width = 512;
-int height = 512;
-double scale = 8;
-cairo_t *cr;
-cairo_surface_t *surface;
-int offset;
+static Display *dpy;
+static Window win;
+static Visual *visual;
+static int depth;
+static int width = 512;
+static int height = 512;
+static double scale = 8;
+static cairo_t *cr;
+static cairo_surface_t *surface;
+static int offset;
 
-int offsets[1024];
+static int offsets[1024];
 
-int init(int argc, char **argv)
+static int init(int argc, char **argv)
 {
     int scr;
     XSetWindowAttributes wa;
     XTextProperty wm_name, icon_name;
     XSizeHints sizeHints;
     XWMHints wmHints;
-    XClassHint classHints;
     Atom wm_delete_window;
 
     dpy = XOpenDisplay(0);
@@ -69,8 +66,6 @@ int init(int argc, char **argv)
     sizeHints.flags = 0;
     wmHints.flags = InputHint;
     wmHints.input = True;
-    classHints.res_name = argv[0];
-    classHints.res_class = argv[0];
     XSetWMProperties(dpy, win, &wm_name, &icon_name, argv, argc, &sizeHints,
                      &wmHints, 0);
     XSetWMProtocols(dpy, win, &wm_delete_window, 1);
@@ -88,7 +83,7 @@ int init(int argc, char **argv)
     return 1;
 }
 
-cmd_t *copy_cmd(cmd_t *cmd)
+static cmd_t *copy_cmd(cmd_t *cmd)
 {
     cmd_t *n = malloc(sizeof(cmd_t));
     if (!cmd)
@@ -98,7 +93,7 @@ cmd_t *copy_cmd(cmd_t *cmd)
     return n;
 }
 
-void free_cmd(cmd_t *cmd)
+static void free_cmd(cmd_t *cmd)
 {
     if (cmd) {
         free_cmd(cmd->next);
@@ -106,16 +101,7 @@ void free_cmd(cmd_t *cmd)
     }
 }
 
-cmd_t **before(cmd_t **head, cmd_t *cmd)
-{
-    cmd_t **prev;
-
-    for (prev = head; *prev != cmd; prev = &(*prev)->next)
-        ;
-    return prev;
-}
-
-cmd_t *insert_cmd(cmd_t **prev)
+static cmd_t *insert_cmd(cmd_t **prev)
 {
     cmd_t *n = malloc(sizeof(cmd_t));
 
@@ -125,7 +111,7 @@ cmd_t *insert_cmd(cmd_t **prev)
     return n;
 }
 
-void delete_cmd(cmd_t **head, cmd_t *cmd)
+static void delete_cmd(cmd_t **head, cmd_t *cmd)
 {
     while (*head != cmd)
         head = &(*head)->next;
@@ -133,7 +119,7 @@ void delete_cmd(cmd_t **head, cmd_t *cmd)
     free(cmd);
 }
 
-void push(char_t *c)
+static void push(char_t *c)
 {
     cmd_stack_t *s = malloc(sizeof(cmd_stack_t));
 
@@ -142,7 +128,7 @@ void push(char_t *c)
     c->stack = s;
 }
 
-void pop(char_t *c)
+static void pop(char_t *c)
 {
     cmd_stack_t *s = c->stack;
     if (!s)
@@ -155,8 +141,7 @@ void pop(char_t *c)
     free(s);
 }
 
-
-cmd_t *append_cmd(char_t *c)
+static cmd_t *append_cmd(char_t *c)
 {
     cmd_t **prev;
 
@@ -165,7 +150,7 @@ cmd_t *append_cmd(char_t *c)
     return insert_cmd(prev);
 }
 
-int commas(char *line)
+static int commas(char *line)
 {
     int n = 0;
     char c;
@@ -175,7 +160,7 @@ int commas(char *line)
     return n;
 }
 
-char_t *read_char(void)
+static char_t *read_char(void)
 {
     char_t *c = malloc(sizeof(char_t));
     char line[1024];
@@ -188,7 +173,6 @@ char_t *read_char(void)
     while (fgets(line, sizeof(line), stdin)) {
         if (line[0] == '/') {
             int ucs4;
-
             if (sscanf(line + 5, "%x", &ucs4) == 1)
                 offsets[ucs4] = offset;
             line[strlen(line) - 3] = '\0';
@@ -227,13 +211,13 @@ char_t *read_char(void)
 
 #define DOT_SIZE 1
 
-void dot(cairo_t *cr,
-         double x,
-         double y,
-         double red,
-         double blue,
-         double green,
-         double alpha)
+static void dot(cairo_t *cr,
+                double x,
+                double y,
+                double red,
+                double blue,
+                double green,
+                double alpha)
 {
     cairo_set_source_rgba(cr, red, blue, green, alpha);
     cairo_set_line_width(cr, 0.7);
@@ -242,13 +226,13 @@ void dot(cairo_t *cr,
     cairo_stroke(cr);
 }
 
-void spot(cairo_t *cr,
-          double x,
-          double y,
-          double red,
-          double blue,
-          double green,
-          double alpha)
+static void spot(cairo_t *cr,
+                 double x,
+                 double y,
+                 double red,
+                 double blue,
+                 double green,
+                 double alpha)
 {
     cairo_set_source_rgba(cr, red, blue, green, alpha);
     cairo_move_to(cr, x - DOT_SIZE, y);
@@ -256,7 +240,7 @@ void spot(cairo_t *cr,
     cairo_fill(cr);
 }
 
-void draw_char(char_t *c)
+static void draw_char(char_t *c)
 {
     cmd_t *cmd;
     cmd_stack_t *s;
@@ -266,15 +250,12 @@ void draw_char(char_t *c)
 
     for (cmd = c->cmd; cmd; cmd = cmd->next) {
         double alpha;
-        double tx, ty;
 
         if (cmd == c->first || cmd == c->last)
             alpha = 1;
         else
             alpha = 0.5;
 
-        tx = cmd->pt[0].x;
-        ty = cmd->pt[0].y;
         switch (cmd->op) {
         case OpMove:
             dot(cr, cmd->pt[0].x, cmd->pt[0].y, 1, 1, 0, alpha);
@@ -286,8 +267,8 @@ void draw_char(char_t *c)
             dot(cr, cmd->pt[0].x, cmd->pt[0].y, 0, 0, 1, alpha);
             dot(cr, cmd->pt[1].x, cmd->pt[1].y, 0, 0, 1, alpha);
             dot(cr, cmd->pt[2].x, cmd->pt[2].y, 0, 1, 0, alpha);
-            tx = cmd->pt[2].x;
-            ty = cmd->pt[2].y;
+            break;
+        default:
             break;
         }
     }
@@ -309,6 +290,8 @@ void draw_char(char_t *c)
                 spot(cr, cmd->pt[0].x, cmd->pt[0].y, 0, 0, 1, alpha);
                 spot(cr, cmd->pt[1].x, cmd->pt[1].y, 0, 0, 1, alpha);
                 spot(cr, cmd->pt[2].x, cmd->pt[2].y, 0, 1, 0, alpha);
+                break;
+            default:
                 break;
             }
         }
@@ -362,7 +345,7 @@ void draw_char(char_t *c)
     }
 }
 
-cmd_t *pos_to_cmd(char_t *c, cmd_t *start, int ix, int iy)
+static cmd_t *pos_to_cmd(char_t *c, cmd_t *start, int ix, int iy)
 {
     double x = ix, y = iy;
     double best_err = 1;
@@ -395,7 +378,7 @@ cmd_t *pos_to_cmd(char_t *c, cmd_t *start, int ix, int iy)
     return best_cmd;
 }
 
-int is_before(cmd_t *before, cmd_t *after)
+static int is_before(cmd_t *before, cmd_t *after)
 {
     if (!before)
         return 0;
@@ -404,7 +387,7 @@ int is_before(cmd_t *before, cmd_t *after)
     return is_before(before->next, after);
 }
 
-void order(cmd_t **first_p, cmd_t **last_p)
+static void order(cmd_t **first_p, cmd_t **last_p)
 {
     if (!is_before(*first_p, *last_p)) {
         cmd_t *t = *first_p;
@@ -413,7 +396,7 @@ void order(cmd_t **first_p, cmd_t **last_p)
     }
 }
 
-void replace_with_spline(char_t *c, cmd_t *first, cmd_t *last)
+static void replace_with_spline(char_t *c, cmd_t *first, cmd_t *last)
 {
     pts_t *pts = new_pts();
     spline_t s;
@@ -422,7 +405,6 @@ void replace_with_spline(char_t *c, cmd_t *first, cmd_t *last)
     order(&first, &last);
     for (cmd = first; cmd != last->next; cmd = cmd->next) {
         int i = cmd->op == OpCurve ? 2 : 0;
-
         add_pt(pts, &cmd->pt[i]);
     }
 
@@ -448,7 +430,7 @@ void replace_with_spline(char_t *c, cmd_t *first, cmd_t *last)
     c->first = c->last = 0;
 }
 
-void split(char_t *c, cmd_t *first, cmd_t *last)
+static void split(char_t *c, cmd_t *first, cmd_t *last)
 {
     cmd_t *cmd;
 
@@ -466,14 +448,14 @@ void split(char_t *c, cmd_t *first, cmd_t *last)
     c->first = c->last = 0;
 }
 
-void delete(char_t *c, cmd_t *first)
+static void delete(char_t *c, cmd_t *first)
 {
     push(c);
     delete_cmd(&c->cmd, first);
     c->first = c->last = 0;
 }
 
-void tweak_spline(char_t *c, cmd_t *first, int p2, double dx, double dy)
+static void tweak_spline(char_t *c, cmd_t *first, int p2, double dx, double dy)
 {
     int i = p2 ? 1 : 0;
 
@@ -482,12 +464,12 @@ void tweak_spline(char_t *c, cmd_t *first, int p2, double dx, double dy)
     first->pt[i].y += dy;
 }
 
-void undo(char_t *c)
+static void undo(char_t *c)
 {
     pop(c);
 }
 
-void button(char_t *c, XButtonEvent *bev)
+static void button(char_t *c, XButtonEvent *bev)
 {
     cmd_t *first = bev->button == 1 ? c->first : c->last;
     cmd_t *where = pos_to_cmd(c, first, bev->x, bev->y);
@@ -508,7 +490,7 @@ void button(char_t *c, XButtonEvent *bev)
     draw_char(c);
 }
 
-void play(char_t *c)
+static void play(char_t *c)
 {
     XEvent ev;
     char key_string[10];
@@ -551,7 +533,6 @@ void play(char_t *c)
                 }
             } else {
                 cmd_t *spline;
-
                 if (c->first && c->first->op == OpCurve)
                     spline = c->first;
                 else if (c->last && c->last->op == OpCurve)
@@ -559,7 +540,10 @@ void play(char_t *c)
                 else
                     spline = 0;
                 if (spline) {
-                    switch (XKeycodeToKeysym(dpy, ev.xkey.keycode, 0)) {
+                    int keysyms_keycode;
+                    KeySym *keysym = XGetKeyboardMapping(dpy, ev.xkey.keycode,
+                                                         1, &keysyms_keycode);
+                    switch (keysyms_keycode) {
                     case XK_Left:
                         tweak_spline(c, spline, ev.xkey.state & ShiftMask, -1,
                                      0);
@@ -581,6 +565,7 @@ void play(char_t *c)
                         draw_char(c);
                         break;
                     }
+                    XFree(keysym);
                 }
             }
             break;
@@ -595,7 +580,7 @@ void play(char_t *c)
     }
 }
 
-void write_char(char_t *c)
+static void write_char(char_t *c)
 {
     cmd_t *cmd;
 
@@ -614,6 +599,8 @@ void write_char(char_t *c)
                    cmd->pt[0].y, cmd->pt[1].x, cmd->pt[1].y, cmd->pt[2].x,
                    cmd->pt[2].y);
             offset += 7;
+            break;
+        default:
             break;
         }
     }
@@ -639,5 +626,5 @@ int main(int argc, char **argv)
     }
     printf("\n");
 
-    exit(0);
+    return 0;
 }

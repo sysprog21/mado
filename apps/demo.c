@@ -230,5 +230,5 @@ void apps_demo_start(twin_screen_t *screen,
     apps_line_start(screen, x += 20, y += 20, w, h);
     apps_quickbrown_start(screen, x += 20, y += 20, w, h);
     apps_ascii_start(screen, x += 20, y += 20, w, h);
-    apps_jelly_start(screen, x += 20, y += 20, w, h);
+    apps_jelly_start(screen, x += 20, y += 20, w / 2, h);
 }

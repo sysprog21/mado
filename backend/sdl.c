@@ -6,8 +6,8 @@
 
 #include <stdio.h>
 
-#include "twin_sdl.h"
 #include "twin_private.h"
+#include "twin_sdl.h"
 
 static void _twin_sdl_put_begin(twin_coord_t left,
                                 twin_coord_t top,

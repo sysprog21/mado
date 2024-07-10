@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 void twin_matrix_multiply(twin_matrix_t *result,
                           const twin_matrix_t *a,

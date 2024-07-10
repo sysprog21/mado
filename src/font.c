@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 #define SNAPI(p) (((p) + 0x8000) & ~0xffff)
 #define SNAPH(p) (((p) + 0x4000) & ~0x7fff)

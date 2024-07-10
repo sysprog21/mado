@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 static inline twin_argb32_t in_over(twin_argb32_t dst,
                                     twin_argb32_t src,

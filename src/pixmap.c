@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 twin_pixmap_t *twin_pixmap_create(twin_format_t format,
                                   twin_coord_t width,

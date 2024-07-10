@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 typedef struct twin_slope {
     twin_sfixed_t dx;

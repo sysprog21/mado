@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 twin_screen_t *twin_screen_create(twin_coord_t width,
                                   twin_coord_t height,

@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-#include "twinint.h"
+#include "twin_private.h"
 
 #include "apps_clock.h"
 

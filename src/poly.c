@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 typedef struct _twin_edge {
     struct _twin_edge *next;

@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 twin_dispatch_result_t _twin_toplevel_dispatch(twin_widget_t *widget,
                                                twin_event_t *event)

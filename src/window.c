@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 #define TWIN_ACTIVE_BG 0xd03b80ae
 #define TWIN_INACTIVE_BG 0xff808080

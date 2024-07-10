@@ -10,7 +10,7 @@
 #include <endian.h>
 #endif
 
-#include "twinint.h"
+#include "twin_private.h"
 
 /* op, src, dst */
 static const twin_src_op comp2[2][4][3] = {

@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 void _twin_queue_insert(twin_queue_t **head,
                         twin_queue_proc_t proc,

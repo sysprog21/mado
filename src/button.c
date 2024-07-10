@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 #define _twin_button_bw(button) ((button)->label.font_size / 5)
 

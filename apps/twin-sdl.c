@@ -35,8 +35,8 @@ int main(void)
     apps_hello_start(sdl->screen, "Hello, World", 0, 0, 200, 200);
     apps_clock_start(sdl->screen, "Clock", 10, 10, 200, 200);
     apps_calc_start(sdl->screen, "Calculator", 100, 100, 200, 200);
-    apps_line_start(sdl->screen, "Demo Line", 0, 0, 200, 200);
-    apps_spline_start(sdl->screen, "Demo Spline", 20, 20, 400, 400);
+    apps_line_start(sdl->screen, "Line", 0, 0, 200, 200);
+    apps_spline_start(sdl->screen, "Spline", 20, 20, 400, 400);
 
     twin_dispatch();
     return 0;

@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 static twin_path_t *_twin_path_shape(twin_shape_t shape,
                                      twin_coord_t left,

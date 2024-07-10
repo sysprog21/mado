@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 twin_dfixed_t _twin_distance_to_point_squared(twin_spoint_t *a,
                                               twin_spoint_t *b)

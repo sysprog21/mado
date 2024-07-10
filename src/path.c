@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 static int _twin_current_subpath_len(twin_path_t *path)
 {

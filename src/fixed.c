@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 #define uint32_lo(i) ((i) & 0xffff)
 #define uint32_hi(i) ((i) >> 16)

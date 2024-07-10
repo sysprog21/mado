@@ -1,6 +1,6 @@
 /* GIMP RGBA C-Source image dump (cork.c) */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 static const struct {
     unsigned int width;

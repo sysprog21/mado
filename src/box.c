@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twinint.h"
+#include "twin_private.h"
 
 void _twin_box_init(twin_box_t *box,
                     twin_box_t *parent,

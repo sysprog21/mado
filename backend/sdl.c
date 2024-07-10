@@ -133,8 +133,7 @@ twin_sdl_t *twin_sdl_create(int width, int height)
     tx->screen = twin_screen_create(width, height, _twin_sdl_put_begin,
                                     _twin_sdl_put_span, tx);
 
-    twin_set_file(twin_sdl_read_events, SDL_GetWindowDisplayIndex(tx->win),
-                  TWIN_READ, tx);
+    twin_set_file(twin_sdl_read_events, 0, TWIN_READ, tx);
 
     twin_set_work(twin_sdl_work, TWIN_WORK_REDISPLAY, tx);
 
@@ -174,7 +173,7 @@ bool twin_sdl_process_events(twin_sdl_t *tx)
     bool result;
 
     _twin_run_work();
-    result = twin_sdl_read_events(SDL_GetWindowDisplayIndex(tx->win), 0, tx);
+    result = twin_sdl_read_events(0, 0, tx);
     _twin_run_work();
 
     return result;

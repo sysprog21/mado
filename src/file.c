@@ -5,8 +5,11 @@
  */
 
 #include <assert.h>
-#include <sys/poll.h>
 #include <unistd.h>
+
+#ifdef USE_POLL
+#include <sys/poll.h>
+#endif
 
 #include "twinint.h"
 
@@ -31,15 +34,16 @@ int _twin_run_file(twin_time_t delay)
     int n;
     int i;
     int r;
-    short events;
-    twin_file_op_t op;
+#ifdef USE_POLL
     struct pollfd *polls;
+#endif
 
     first = (twin_file_t *) _twin_queue_set_order(&head);
     if (first) {
         for (file = first, n = 0; file;
              file = (twin_file_t *) file->queue.order, n++)
             ;
+#ifdef USE_POLL
         polls = malloc(n * sizeof(struct pollfd));
         if (!polls)
             return 1;
@@ -56,20 +60,29 @@ int _twin_run_file(twin_time_t delay)
         }
         r = poll(polls, n, delay);
         if (r > 0)
+#endif
             for (file = first, i = 0; file;
                  file = (twin_file_t *) file->queue.order, i++) {
-                events = polls[i].revents;
+                twin_file_op_t op = 0;
+#ifdef USE_POLL
+                short events = polls[i].revents;
                 assert(polls[i].fd == file->file);
-                op = 0;
                 if (events & POLLIN)
                     op |= TWIN_READ;
                 if (events & POLLOUT)
                     op |= TWIN_WRITE;
-                if (op && !(*file->proc)(file->file, op, file->closure))
+#endif
+                if (
+#ifdef USE_POLL
+                    op &&
+#endif
+                    !(*file->proc)(file->file, op, file->closure))
                     _twin_queue_delete(&head, &file->queue);
             }
         _twin_queue_review_order(&first->queue);
+#ifdef USE_POLL
         free(polls);
+#endif
         return 1;
     } else {
         if (delay > 0)

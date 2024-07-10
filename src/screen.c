@@ -174,7 +174,7 @@ void twin_screen_update(twin_screen_t *screen)
 
         screen->damage.left = screen->damage.right = 0;
         screen->damage.top = screen->damage.bottom = 0;
-        /* XXX what is the maximum number of lines? */
+        /* FIXME: what is the maximum number of lines? */
         span = malloc(width * sizeof(twin_argb32_t));
         if (!span)
             return;

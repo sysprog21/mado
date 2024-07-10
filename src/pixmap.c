@@ -278,7 +278,7 @@ static twin_argb32_t _twin_pixmap_fetch(twin_pixmap_t *pixmap,
 {
     twin_pointer_t p =
         twin_pixmap_pointer(pixmap, x - pixmap->x, y - pixmap->y);
-    // XXX FIX FOR TRANSFORM
+    /* FIXME: for transform */
 
     if (pixmap->x <= x && x < pixmap->x + pixmap->width && pixmap->y <= y &&
         y < pixmap->y + pixmap->height) {

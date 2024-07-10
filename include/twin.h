@@ -369,12 +369,11 @@ typedef struct _twin_font {
 
 } twin_font_t;
 
-/* XXX one global font for now, to fix */
+/* FIXME: one global font for now */
 extern twin_font_t *g_twin_font;
 
 /* Built-in default stroke font */
 extern twin_font_t twin_Default_Font_Roman;
-
 
 /*
  * Windows

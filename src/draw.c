@@ -300,8 +300,7 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
 #define operand_index(o) \
     ((o)->source_kind == TWIN_SOLID ? 3 : o->u.pixmap->format)
 
-/* XXX Fixme: source clipping is busted
- */
+/* FIXME: source clipping is busted */
 static void _twin_composite_simple(twin_pixmap_t *dst,
                                    twin_coord_t dst_x,
                                    twin_coord_t dst_y,

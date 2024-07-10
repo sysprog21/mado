@@ -33,7 +33,6 @@ int _twin_run_file(twin_time_t delay)
     twin_file_t *file;
     int n;
     int i;
-    int r;
 #ifdef USE_POLL
     struct pollfd *polls;
 #endif
@@ -58,7 +57,7 @@ int _twin_run_file(twin_time_t delay)
             polls[i].fd = file->file;
             polls[i].events = events;
         }
-        r = poll(polls, n, delay);
+        int r = poll(polls, n, delay);
         if (r > 0)
 #endif
             for (file = first, i = 0; file;

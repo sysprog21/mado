@@ -1,4 +1,4 @@
-LIBSUF ?= .a
+include mk/common.mk
 
 LIB_SRCS := \
 	src/box.c \
@@ -31,9 +31,12 @@ LIB_SRCS := \
 	src/timeout.c 
 
 LIB_OBJS := $(patsubst %.c, %.o, $(LIB_SRCS))
-PRODUCTS := libtwin$(LIBSUF)
+deps := $(LIB_OBJS:%.o=%.o.d)
 
-DEMO_SRCS = \
+LIBSUF ?= .a
+LIBTWIN := libtwin$(LIBSUF)
+
+APPS_SRCS = \
 	apps/calc.c \
 	apps/spline.c \
 	apps/clock.c \
@@ -42,38 +45,44 @@ DEMO_SRCS = \
 	apps/text.c \
 	apps/demo.c
 
-DEMO_OBJS = $(patsubst %.c, %.o, $(DEMO_SRCS))
+APPS_OBJS = $(patsubst %.c, %.o, $(APPS_SRCS))
+deps += $(APPS_OBJS:%.o=%.o.d)
+
+SDL_CFLAGS := $(shell sdl2-config --cflags)
+SDL_LDFLAGS := $(shell sdl2-config --libs)
 
 SDL_BACKEND_SRCS = \
 	backend/sdl.c \
 	apps/twin-sdl.c
 
 SDL_BACKEND_OBJS := $(patsubst %.c, %.o, $(SDL_BACKEND_SRCS))
+deps += $(SDL_BACKEND_OBJS:%.o=%.o.d)
 
 .PHONY: all
-all: $(PRODUCTS) demo-sdl
+all: $(LIBTWIN) demo-sdl
 
-demo-sdl: $(PRODUCTS) $(DEMO_OBJS) $(SDL_BACKEND_OBJS)
-	$(CC) $(CFLAGS) -o $@ \
-		$(DEMO_OBJS) $(SDL_BACKEND_SRCS) $(PRODUCTS) \
-		$(shell sdl2-config --libs)
+demo-sdl: $(LIBTWIN) $(APPS_OBJS) $(SDL_BACKEND_OBJS)
+	$(VECHO) "  LD\t$@\n"
+	$(Q)$(CC) -o $@ $^ $(SDL_LDFLAGS)
 
-%$(LIBSUF): $(LIB_OBJS)
+$(LIBTWIN): $(LIB_OBJS)
 	$(AR) -r $@ $?
 
 CFLAGS = \
-	-Wall -pipe -Os -ffast-math \
+	-Wall -pipe -O2 \
 	-I include \
 	-I backend \
 	-I apps \
-    $(shell sdl2-config --cflags)
+	$(SDL_CFLAGS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -o $@ -c $< -lm
+	$(VECHO) "  CC\t$@\n"
+	$(Q)$(CC) $(CFLAGS) -o $@ -c -MMD -MF $@.d $<
 
 .PHONY: clean
 clean:
 	@rm -fv demo-sdl \
-		$(LIB_OBJS) $(DEMO_OBJS) \
-		$(SDL_BACKEND_OBJS) \
-		*$(LIBSUF) | xargs echo --
+		$(LIB_OBJS) $(APPS_OBJS) $(SDL_BACKEND_OBJS) $(deps) \
+		$(LIBTWIN) | xargs echo --
+
+-include $(deps)

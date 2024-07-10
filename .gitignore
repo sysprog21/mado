@@ -1,0 +1,4 @@
+*.o
+*.o.d
+demo-sdl
+libtwin.a

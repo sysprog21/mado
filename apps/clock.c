@@ -31,7 +31,7 @@
 
 #define _apps_clock_pixmap(clock) ((clock)->widget.window->pixmap)
 
-typedef struct _twin_clock {
+typedef struct {
     twin_widget_t widget;
     twin_timeout_t *timeout;
 } apps_clock_t;
@@ -86,6 +86,32 @@ static void apps_clock_hand(apps_clock_t *clock,
     twin_path_destroy(stroke);
 }
 
+static void _apps_clock_date(apps_clock_t *clock, struct tm *t)
+{
+    char text[7];
+    twin_text_metrics_t metrics;
+    twin_fixed_t height, width;
+
+    strftime(text, sizeof(text), "%b %d", t);
+
+    twin_path_t *path = twin_path_create();
+    if (!path)
+        return;
+
+    apps_clock_set_transform(clock, path);
+    twin_path_rotate(path, TWIN_ANGLE_90);
+    twin_path_translate(path, D(0.8), 0);
+    twin_path_set_font_size(path, D(0.25));
+    twin_path_set_font_style(path, TWIN_TEXT_UNHINTED);
+    twin_text_metrics_utf8(path, text, &metrics);
+    height = metrics.ascent + metrics.descent;
+    width = metrics.right_side_bearing - metrics.left_side_bearing;
+    twin_path_move(path, -width, metrics.ascent - height / 2);
+    twin_path_utf8(path, text);
+    twin_paint_path(_apps_clock_pixmap(clock), APPS_CLOCK_WATER, path);
+    twin_path_destroy(path);
+}
+
 static twin_angle_t apps_clock_minute_angle(int min)
 {
     return min * TWIN_ANGLE_360 / 60;
@@ -104,33 +130,6 @@ static void _apps_clock_face(apps_clock_t *clock)
 
     twin_paint_stroke(_apps_clock_pixmap(clock), APPS_CLOCK_BORDER, path,
                       APPS_CLOCK_BORDER_WIDTH);
-
-    {
-        twin_state_t state = twin_path_save(path);
-        twin_text_metrics_t metrics;
-        twin_fixed_t height, width;
-        static char *label = "twin";
-
-        twin_path_empty(path);
-        twin_path_rotate(path, twin_degrees_to_angle(-11) + TWIN_ANGLE_90);
-        twin_path_set_font_size(path, D(0.5));
-        twin_path_set_font_style(path, TWIN_TEXT_UNHINTED | TWIN_TEXT_OBLIQUE);
-        twin_text_metrics_utf8(path, label, &metrics);
-        height = metrics.ascent + metrics.descent;
-        width = metrics.right_side_bearing - metrics.left_side_bearing;
-
-        twin_path_move(path, -width / 2, metrics.ascent - height / 2 + D(0.01));
-        twin_path_draw(path, width / 2, metrics.ascent - height / 2 + D(0.01));
-        twin_paint_stroke(_apps_clock_pixmap(clock), APPS_CLOCK_WATER_UNDER,
-                          path, D(0.02));
-        twin_path_empty(path);
-
-        twin_path_move(path, -width / 2 - metrics.left_side_bearing,
-                       metrics.ascent - height / 2);
-        twin_path_utf8(path, label);
-        twin_paint_path(_apps_clock_pixmap(clock), APPS_CLOCK_WATER, path);
-        twin_path_restore(path, &state);
-    }
 
     twin_path_set_font_size(path, D(0.2));
     twin_path_set_font_style(path, TWIN_TEXT_UNHINTED);
@@ -184,6 +183,8 @@ static void _apps_clock_paint(apps_clock_t *clock)
     localtime_r(&tv.tv_sec, &t);
 
     _apps_clock_face(clock);
+
+    _apps_clock_date(clock, &t);
 
     second_angle =
         ((t.tm_sec * 100 + tv.tv_usec / 10000) * TWIN_ANGLE_360) / 6000;

@@ -214,6 +214,7 @@ static int convert_font(char *in_name, int id)
     max_ucs4 = 0;
     printf("/* Derived from %s */\n\n", in_name);
     printf("#include \"twin_private.h\"\n\n");
+    printf("/* clang-format off */\n");
     printf("static const char outlines[] = {\n");
     for (ucs4 = FT_Get_First_Char(face, &gindex);
          gindex != 0 && ucs4 < MAX_UCS4;
@@ -230,7 +231,8 @@ static int convert_font(char *in_name, int id)
         command('e', &closure);
         printf("\n");
     }
-    printf("};\n\n");
+    printf("};\n");
+    printf("/* clang-format on */\n\n");
     printf("static const twin_charmap_t charmap[] = {\n");
     ncharmap = 0;
     for (ucs4 = FT_Get_First_Char(face, &gindex);
@@ -253,21 +255,30 @@ static int convert_font(char *in_name, int id)
         ncharmap++;
     }
     printf("};\n\n");
-    printf("const twin_font_t twin_%s = {\n", facename(face));
-    printf("    charmap, %d,\n", ncharmap);
-    printf("    outlines,\n");
-    printf("    ");
+    printf("twin_font_t twin_%s = {\n", facename(face));
+    printf("    .name = \"%s\",\n", face->family_name);
+    printf("    .style = \"%s\",\n", face->style_name);
+    printf("    .n_charmap = %d,\n", ncharmap);
+    printf("    .charmap = charmap,\n");
+    printf("    .outlines = outlines,\n");
+    printf("    .ascender = ");
     cpos(face->ascender, &closure);
+    printf("\n");
+    printf("    .descender = ");
     cpos(face->descender, &closure);
+    printf("\n");
+    printf("    .height = ");
     cpos(face->height, &closure);
     printf("\n");
-    printf("    \"%s\", \"%s\",\n", face->family_name, face->style_name);
     printf("};\n");
     return 1;
 }
 
 int main(int argc, char **argv)
 {
+    if (argc < 2)
+        return 1;
+
     convert_font(argv[1], 0);
     return 0;
 }

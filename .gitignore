@@ -2,3 +2,4 @@
 *.o.d
 demo-sdl
 libtwin.a
+tools/ttf/twin-ttf

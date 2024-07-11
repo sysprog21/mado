@@ -4,6 +4,8 @@
  * All rights reserved.
  */
 
+#include <stdlib.h>
+
 #include "twin_private.h"
 
 void _twin_queue_insert(twin_queue_t **head,

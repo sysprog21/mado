@@ -4,6 +4,8 @@
  * All rights reserved.
  */
 
+#include <stdlib.h>
+
 #if defined(__APPLE__)
 #include <machine/endian.h>
 #else

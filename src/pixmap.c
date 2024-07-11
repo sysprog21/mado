@@ -4,6 +4,8 @@
  * All rights reserved.
  */
 
+#include <stdlib.h>
+
 #include "twin_private.h"
 
 twin_pixmap_t *twin_pixmap_create(twin_format_t format,

@@ -4,6 +4,8 @@
  * All rights reserved.
  */
 
+#include <stdlib.h>
+
 #include "twin_private.h"
 
 typedef struct _twin_edge {

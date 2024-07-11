@@ -5,7 +5,9 @@
  */
 
 #include <stdio.h>
-#include <twin_private.h>
+#include <stdlib.h>
+
+#include "twin_private.h"
 
 #include "apps_line.h"
 

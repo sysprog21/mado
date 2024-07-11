@@ -4,6 +4,8 @@
  * All rights reserved.
  */
 
+#include <stdlib.h>
+
 #include "twin_private.h"
 
 twin_dispatch_result_t _twin_toplevel_dispatch(twin_widget_t *widget,

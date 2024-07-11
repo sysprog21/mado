@@ -9,7 +9,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 typedef uint8_t twin_a8_t;
 typedef uint16_t twin_a16_t;
@@ -77,7 +76,6 @@ typedef struct _twin_screen twin_screen_t;
 /*
  * Events
  */
-
 typedef enum _twin_event_kind {
     /* Mouse */
     TwinEventButtonDown = 0x0001,
@@ -264,7 +262,6 @@ struct _twin_screen {
 /*
  * A source operand
  */
-
 typedef enum { TWIN_SOLID, TWIN_PIXMAP } twin_source_t;
 
 typedef struct _twin_operand {
@@ -316,7 +313,6 @@ typedef struct _twin_state {
 /*
  * Text metrics
  */
-
 typedef struct _twin_text_metrics {
     twin_fixed_t left_side_bearing;
     twin_fixed_t right_side_bearing;
@@ -378,7 +374,6 @@ extern twin_font_t twin_Default_Font_Roman;
 /*
  * Windows
  */
-
 typedef enum _twin_window_style {
     TwinWindowPlain,
     TwinWindowApplication,
@@ -413,7 +408,6 @@ struct _twin_window {
 /*
  * Icons
  */
-
 typedef enum _twin_icon {
     TwinIconMenu,
     TwinIconMinimize,
@@ -426,7 +420,6 @@ typedef enum _twin_icon {
  * Timeout and work procs return TWIN_TRUE to remain in the queue,
  * timeout procs are called every 'delay' ms
  */
-
 typedef twin_time_t (*twin_timeout_proc_t)(twin_time_t now, void *closure);
 
 typedef bool (*twin_work_proc_t)(void *closure);
@@ -444,7 +437,6 @@ typedef struct _twin_file twin_file_t;
 /*
  * Widgets
  */
-
 typedef struct _twin_widget twin_widget_t;
 typedef struct _twin_box twin_box_t;
 
@@ -581,6 +573,7 @@ twin_button_t *twin_button_create(twin_box_t *parent,
 /*
  * convolve.c
  */
+
 void twin_path_convolve(twin_path_t *dest,
                         twin_path_t *stroke,
                         twin_path_t *pen);
@@ -588,6 +581,7 @@ void twin_path_convolve(twin_path_t *dest,
 /*
  * dispatch.c
  */
+
 void twin_dispatch(void);
 
 /*
@@ -671,6 +665,7 @@ void twin_text_metrics_ucs4(twin_path_t *path,
 void twin_text_metrics_utf8(twin_path_t *path,
                             const char *string,
                             twin_text_metrics_t *m);
+
 /*
  * hull.c
  */
@@ -842,6 +837,7 @@ void twin_paint_stroke(twin_pixmap_t *dst,
 /*
  * pattern.c
  */
+
 twin_pixmap_t *twin_make_pattern(void);
 
 /*
@@ -927,6 +923,7 @@ bool twin_pixmap_dispatch(twin_pixmap_t *pixmap, twin_event_t *event);
 /*
  * poly.c
  */
+
 void twin_fill_path(twin_pixmap_t *pixmap,
                     twin_path_t *path,
                     twin_coord_t dx,
@@ -1015,6 +1012,7 @@ twin_time_t twin_now(void);
 /*
  * toplevel.c
  */
+
 twin_toplevel_t *twin_toplevel_create(twin_screen_t *screen,
                                       twin_format_t format,
                                       twin_window_style_t style,

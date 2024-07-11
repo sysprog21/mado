@@ -5,6 +5,7 @@
  */
 
 #include <assert.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #ifdef USE_POLL

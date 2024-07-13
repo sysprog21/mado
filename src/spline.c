@@ -10,15 +10,26 @@ typedef struct _twin_spline {
     twin_spoint_t a, b, c, d;
 } twin_spline_t;
 
-static void _lerp_half(twin_spoint_t *a,
-                       twin_spoint_t *b,
-                       twin_spoint_t *result)
+/*
+ * Linearly interpolate between points 'a' and 'b' with a shift factor.
+ * The shift factor determines the position between 'a' and 'b'.
+ * The result is stored in 'result'.
+ */
+static void _lerp(twin_spoint_t *a,
+                  twin_spoint_t *b,
+                  int shift,
+                  twin_spoint_t *result)
 {
-    result->x = a->x + ((b->x - a->x) >> 1);
-    result->y = a->y + ((b->y - a->y) >> 1);
+    result->x = a->x + ((b->x - a->x) >> shift);
+    result->y = a->y + ((b->y - a->y) >> shift);
 }
 
+/*
+ * Perform the de Casteljau algorithm to split a spline at a given shift
+ * factor. The spline is split into two new splines 's1' and 's2'.
+ */
 static void _de_casteljau(twin_spline_t *spline,
+                          int shift,
                           twin_spline_t *s1,
                           twin_spline_t *s2)
 {
@@ -26,12 +37,12 @@ static void _de_casteljau(twin_spline_t *spline,
     twin_spoint_t abbc, bccd;
     twin_spoint_t final;
 
-    _lerp_half(&spline->a, &spline->b, &ab);
-    _lerp_half(&spline->b, &spline->c, &bc);
-    _lerp_half(&spline->c, &spline->d, &cd);
-    _lerp_half(&ab, &bc, &abbc);
-    _lerp_half(&bc, &cd, &bccd);
-    _lerp_half(&abbc, &bccd, &final);
+    _lerp(&spline->a, &spline->b, shift, &ab);
+    _lerp(&spline->b, &spline->c, shift, &bc);
+    _lerp(&spline->c, &spline->d, shift, &cd);
+    _lerp(&ab, &bc, shift, &abbc);
+    _lerp(&bc, &cd, shift, &bccd);
+    _lerp(&abbc, &bccd, shift, &final);
 
     s1->a = spline->a;
     s1->b = ab;
@@ -45,11 +56,9 @@ static void _de_casteljau(twin_spline_t *spline,
 }
 
 /*
- * Return an upper bound on the error (squared) that could
- * result from approximating a spline as a line segment
- * connecting the two endpoints
+ * Calculate the squared distance from point 'b' or 'c' to the line segment
+ * connecting 'a' and 'd'. Returns the larger of the two distances.
  */
-
 static twin_dfixed_t _twin_spline_error_squared(twin_spline_t *spline)
 {
     twin_dfixed_t berr, cerr;
@@ -63,21 +72,45 @@ static twin_dfixed_t _twin_spline_error_squared(twin_spline_t *spline)
 }
 
 /*
- * Pure recursive spline decomposition.
+ * Check if a spline is flat enough by comparing the error against the
+ * tolerance.
  */
+static bool is_flat(twin_spline_t *spline, twin_dfixed_t tolerance_squared)
+{
+    return _twin_spline_error_squared(spline) <= tolerance_squared;
+}
 
+/*
+ * Decomposes a spline into a series of flat segments and draws them to a path.
+ * Uses iterative approach to avoid deep recursion.
+ * See https://keithp.com/blogs/iterative-splines/
+ */
 static void _twin_spline_decompose(twin_path_t *path,
                                    twin_spline_t *spline,
                                    twin_dfixed_t tolerance_squared)
 {
-    if (_twin_spline_error_squared(spline) <= tolerance_squared) {
-        _twin_path_sdraw(path, spline->a.x, spline->a.y);
-    } else {
-        twin_spline_t s1, s2;
-        _de_casteljau(spline, &s1, &s2);
-        _twin_spline_decompose(path, &s1, tolerance_squared);
-        _twin_spline_decompose(path, &s2, tolerance_squared);
+    /* Draw starting point */
+    _twin_path_sdraw(path, spline->a.x, spline->a.y);
+
+    while (!is_flat(spline, tolerance_squared)) {
+        int shift = 1;
+        twin_spline_t left, right;
+
+        /* FIXME: Find the optimal shift value to decompose the spline */
+        do {
+            _de_casteljau(spline, shift, &left, &right);
+            shift++;
+        } while (!is_flat(&left, tolerance_squared));
+
+        /* Draw the left segment */
+        _twin_path_sdraw(path, left.a.x, left.a.y);
+
+        /* Update spline to the right segment */
+        memcpy(spline, &right, sizeof(twin_spline_t));
     }
+
+    /* Draw the ending point */
+    _twin_path_sdraw(path, spline->d.x, spline->d.y);
 }
 
 void _twin_path_scurve(twin_path_t *path,

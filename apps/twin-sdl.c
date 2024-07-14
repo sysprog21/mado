@@ -19,7 +19,6 @@
 #include "apps_hello.h"
 #include "apps_line.h"
 #include "apps_spline.h"
-#include "apps_text.h"
 
 #define WIDTH 640
 #define HEIGHT 480
@@ -31,7 +30,6 @@ int main(void)
     twin_screen_set_background(sdl->screen, twin_make_pattern());
 
     apps_demo_start(sdl->screen, "Demo", 100, 100, 400, 400);
-    apps_text_start(sdl->screen, "Gettysburg Address", 0, 0, 300, 300);
     apps_hello_start(sdl->screen, "Hello, World", 0, 0, 200, 200);
     apps_clock_start(sdl->screen, "Clock", 10, 10, 200, 200);
     apps_calc_start(sdl->screen, "Calculator", 100, 100, 200, 200);

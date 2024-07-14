@@ -42,7 +42,6 @@ APPS_SRCS = \
 	apps/clock.c \
 	apps/line.c \
 	apps/hello.c \
-	apps/text.c \
 	apps/demo.c
 
 APPS_OBJS = $(patsubst %.c, %.o, $(APPS_SRCS))

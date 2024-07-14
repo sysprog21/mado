@@ -4,8 +4,8 @@
  * All rights reserved.
  */
 
-#ifndef _TWININT_H_
-#define _TWININT_H_
+#ifndef _TWIN_PRIVATE_H_
+#define _TWIN_PRIVATE_H_
 
 #include <stdio.h>
 #include <string.h>
@@ -18,7 +18,6 @@
  * Post-transformed points are stored in 12.4 fixed point
  * values
  */
-
 typedef int16_t twin_sfixed_t; /* 12.4 format */
 typedef int32_t twin_dfixed_t; /* 24.8 format (12.4 * 12.4) */
 
@@ -50,7 +49,6 @@ typedef int32_t twin_dfixed_t; /* 24.8 format (12.4 * 12.4) */
 /*
  * Glyph coordinates are stored in 2.6 fixed point
  */
-
 typedef signed char twin_gfixed_t;
 
 #define TWIN_GFIXED_ONE (0x40)
@@ -113,7 +111,6 @@ typedef void twin_in_op_func(twin_pointer_t dst,
 typedef void twin_op_func(twin_pointer_t dst, twin_source_u src, int width);
 
 /* Geometrical objects */
-
 typedef struct _twin_spoint {
     twin_sfixed_t x, y;
 } twin_spoint_t;
@@ -133,7 +130,7 @@ typedef struct _twin_gpoint {
 } twin_gpoint_t;
 
 /*
- * This needs to be refactored to reduce the number of functions...
+ * FIXME: should be refactored to reduce the number of functions.
  */
 twin_in_op_func _twin_argb32_in_argb32_over_argb32;
 twin_in_op_func _twin_argb32_in_rgb16_over_argb32;
@@ -278,14 +275,12 @@ twin_argb32_t *_twin_fetch_argb32(twin_pixmap_t *pixmap,
 /*
  * Geometry helper functions
  */
-
 twin_dfixed_t _twin_distance_to_point_squared(twin_spoint_t *a,
                                               twin_spoint_t *b);
 
 twin_dfixed_t _twin_distance_to_line_squared(twin_spoint_t *p,
                                              twin_spoint_t *p1,
                                              twin_spoint_t *p2);
-
 
 /*
  * Polygon stuff
@@ -299,7 +294,6 @@ twin_sfixed_t _twin_sfixed_sqrt(twin_sfixed_t as);
 /*
  * Matrix stuff
  */
-
 twin_sfixed_t _twin_matrix_x(twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y);
 
 twin_sfixed_t _twin_matrix_y(twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y);
@@ -323,6 +317,7 @@ twin_sfixed_t _twin_matrix_len(twin_matrix_t *m,
                                twin_fixed_t dy);
 
 twin_point_t _twin_matrix_expand(twin_matrix_t *matrix);
+
 /*
  * Path stuff
  */
@@ -330,7 +325,6 @@ twin_point_t _twin_matrix_expand(twin_matrix_t *matrix);
 /*
  * A path
  */
-
 twin_spoint_t _twin_path_current_spoint(twin_path_t *path);
 
 twin_spoint_t _twin_path_subpath_first_spoint(twin_path_t *path);
@@ -371,7 +365,6 @@ void _twin_path_sfinish(twin_path_t *path);
 /*
  * dispatch stuff
  */
-
 typedef struct _twin_queue {
     struct _twin_queue *next;
     struct _twin_queue *order;
@@ -506,4 +499,4 @@ void _twin_button_init(twin_button_t *button,
                        twin_style_t font_style,
                        twin_dispatch_proc_t dispatch);
 
-#endif /* _TWININT_H_ */
+#endif /* _TWIN_PRIVATE_H_ */

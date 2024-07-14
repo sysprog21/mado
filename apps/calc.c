@@ -10,23 +10,28 @@
 #include "apps_calc.h"
 
 #define APPS_CALC_STACK 5
-#define APPS_CALC_ZERO 0
-#define APPS_CALC_ONE 1
-#define APPS_CALC_TWO 2
-#define APPS_CALC_THREE 3
-#define APPS_CALC_FOUR 4
-#define APPS_CALC_FIVE 5
-#define APPS_CALC_SIX 6
-#define APPS_CALC_SEVEN 7
-#define APPS_CALC_EIGHT 8
-#define APPS_CALC_NINE 9
-#define APPS_CALC_PLUS 10
-#define APPS_CALC_MINUS 11
-#define APPS_CALC_TIMES 12
-#define APPS_CALC_DIVIDE 13
-#define APPS_CALC_EQUAL 14
-#define APPS_CALC_CLEAR 15
-#define APPS_CALC_NBUTTON 16
+
+enum {
+#define _(x) APPS_CALC_##x
+    _(ZERO),
+    _(ONE),
+    _(TWO),
+    _(THREE),
+    _(FOUR),
+    _(FIVE),
+    _(SIX),
+    _(SEVEN),
+    _(EIGHT),
+    _(NINE),
+    _(PLUS),
+    _(MINUS),
+    _(TIMES),
+    _(DIVIDE),
+    _(EQUAL),
+    _(CLEAR),
+    _(N_BUTTONS),
+#undef _
+};
 
 /*
  * Layout:
@@ -42,10 +47,12 @@
 #define APPS_CALC_ROWS 4
 
 static const int calc_layout[APPS_CALC_ROWS][APPS_CALC_COLS] = {
-    {APPS_CALC_SEVEN, APPS_CALC_EIGHT, APPS_CALC_NINE, APPS_CALC_PLUS},
-    {APPS_CALC_FOUR, APPS_CALC_FIVE, APPS_CALC_SIX, APPS_CALC_MINUS},
-    {APPS_CALC_ONE, APPS_CALC_TWO, APPS_CALC_THREE, APPS_CALC_TIMES},
-    {APPS_CALC_ZERO, APPS_CALC_CLEAR, APPS_CALC_EQUAL, APPS_CALC_DIVIDE},
+#define _(x) APPS_CALC_##x
+    {_(SEVEN), _(EIGHT), _(NINE), _(PLUS)},
+    {_(FOUR), _(FIVE), _(SIX), _(MINUS)},
+    {_(ONE), _(TWO), _(THREE), _(TIMES)},
+    {_(ZERO), _(CLEAR), _(EQUAL), _(DIVIDE)},
+#undef _
 };
 
 typedef struct _twin_calc {
@@ -57,7 +64,7 @@ typedef struct _twin_calc {
     twin_box_t *keys;
     twin_box_t *cols[4];
     twin_label_t *display;
-    twin_button_t *buttons[APPS_CALC_NBUTTON];
+    twin_button_t *buttons[APPS_CALC_N_BUTTONS];
 } apps_calc_t;
 
 static const char *apps_calc_labels[] = {
@@ -76,9 +83,7 @@ static const char *apps_calc_labels[] = {
 
 static int _apps_calc_button_to_id(apps_calc_t *calc, twin_button_t *button)
 {
-    int i;
-
-    for (i = 0; i < APPS_CALC_NBUTTON; i++)
+    for (int i = 0; i < APPS_CALC_N_BUTTONS; i++)
         if (calc->buttons[i] == button)
             return i;
     return -1;
@@ -95,18 +100,15 @@ static void _apps_calc_update_value(apps_calc_t *calc)
 
 static void _apps_calc_push(apps_calc_t *calc)
 {
-    int i;
-
-    for (i = 0; i < APPS_CALC_STACK - 1; i++)
+    for (int i = 0; i < APPS_CALC_STACK - 1; i++)
         calc->stack[i + 1] = calc->stack[i];
     calc->pending_delete = true;
 }
 
 static int _apps_calc_pop(apps_calc_t *calc)
 {
-    int i;
     int v = calc->stack[0];
-    for (i = 0; i < APPS_CALC_STACK - 1; i++)
+    for (int i = 0; i < APPS_CALC_STACK - 1; i++)
         calc->stack[i] = calc->stack[i + 1];
     return v;
 }
@@ -126,37 +128,38 @@ static void _apps_calc_button_signal(twin_button_t *button,
                                      void *closure)
 {
     apps_calc_t *calc = closure;
-    int i;
     int a, b;
 
     if (signal != TwinButtonSignalDown)
         return;
-    i = _apps_calc_button_to_id(calc, button);
+    int i = _apps_calc_button_to_id(calc, button);
     if (i < 0)
         return;
+
     switch (i) {
-    case APPS_CALC_PLUS:
-    case APPS_CALC_MINUS:
-    case APPS_CALC_TIMES:
-    case APPS_CALC_DIVIDE:
+#define _(x) APPS_CALC_##x
+    case _(PLUS):
+    case _(MINUS):
+    case _(TIMES):
+    case _(DIVIDE):
         calc->pending_op = i;
         _apps_calc_push(calc);
         break;
-    case APPS_CALC_EQUAL:
+    case _(EQUAL):
         if (calc->pending_op != 0) {
             b = _apps_calc_pop(calc);
             a = _apps_calc_pop(calc);
             switch (calc->pending_op) {
-            case APPS_CALC_PLUS:
+            case _(PLUS):
                 a = a + b;
                 break;
-            case APPS_CALC_MINUS:
+            case _(MINUS):
                 a = a - b;
                 break;
-            case APPS_CALC_TIMES:
+            case _(TIMES):
                 a = a * b;
                 break;
-            case APPS_CALC_DIVIDE:
+            case _(DIVIDE):
                 if (!b)
                     a = 0;
                 else
@@ -170,13 +173,14 @@ static void _apps_calc_button_signal(twin_button_t *button,
         }
         calc->pending_delete = true;
         break;
-    case APPS_CALC_CLEAR:
+    case _(CLEAR):
         for (i = 0; i < APPS_CALC_STACK; i++)
             calc->stack[i] = 0;
         calc->pending_op = 0;
         calc->pending_delete = true;
         _apps_calc_update_value(calc);
         break;
+#undef _
     default:
         _apps_calc_digit(calc, i);
         break;
@@ -191,7 +195,6 @@ void apps_calc_start(twin_screen_t *screen,
                      int h)
 {
     apps_calc_t *calc = malloc(sizeof(apps_calc_t));
-    int i, j;
 
     calc->toplevel = twin_toplevel_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
@@ -202,9 +205,9 @@ void apps_calc_start(twin_screen_t *screen,
     calc->display->align = TwinAlignRight;
     calc->display->widget.shape = TwinShapeLozenge;
     calc->keys = twin_box_create(&calc->toplevel->box, TwinBoxHorz);
-    for (i = 0; i < APPS_CALC_COLS; i++) {
+    for (int i = 0; i < APPS_CALC_COLS; i++) {
         calc->cols[i] = twin_box_create(calc->keys, TwinBoxVert);
-        for (j = 0; j < APPS_CALC_ROWS; j++) {
+        for (int j = 0; j < APPS_CALC_ROWS; j++) {
             int b = calc_layout[j][i];
             calc->buttons[b] = twin_button_create(
                 calc->cols[i], apps_calc_labels[b], APPS_CALC_BUTTON_FG,
@@ -213,14 +216,14 @@ void apps_calc_start(twin_screen_t *screen,
                             APPS_CALC_BUTTON_BG);
             calc->buttons[b]->signal = _apps_calc_button_signal;
             calc->buttons[b]->closure = calc;
-            /*	    calc->buttons[b]->label.widget.shape = TwinShapeLozenge; */
+            calc->buttons[b]->label.widget.shape = TwinShapeEllipse;
             if (i || j)
                 calc->buttons[b]->label.widget.copy_geom =
                     &calc->buttons[calc_layout[0][0]]->label.widget;
         }
     }
 
-    for (i = 0; i < APPS_CALC_STACK; i++)
+    for (int i = 0; i < APPS_CALC_STACK; i++)
         calc->stack[i] = 0;
     calc->pending_delete = true;
     calc->pending_op = 0;

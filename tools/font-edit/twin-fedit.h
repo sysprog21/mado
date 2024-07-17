@@ -71,14 +71,6 @@ typedef struct _spline {
 
 spline_t fit(pt_t *p, int n);
 
-double min(double a, double b);
-
-double max(double a, double b);
-
-#define abs my_abs
-
-double abs(double a);
-
 pts_t *new_pts(void);
 
 void dispose_pts(pts_t *pts);

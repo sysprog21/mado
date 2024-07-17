@@ -1,5 +1,16 @@
 include mk/common.mk
 
+CFLAGS = \
+	-Wall -pipe -O2 \
+	-I include \
+	-I backend \
+	-I apps \
+	$(shell pkg-config --cflags libpng) \
+	$(SDL_CFLAGS)
+
+LDFLAGS = \
+	$(shell pkg-config --libs libpng)
+
 LIB_SRCS := \
 	src/box.c \
 	src/file.c \
@@ -27,6 +38,7 @@ LIB_SRCS := \
 	src/draw.c \
 	src/hull.c \
 	src/icon.c \
+	src/image-png.c \
 	src/pixmap.c \
 	src/timeout.c 
 
@@ -62,17 +74,10 @@ all: $(LIBTWIN) demo-sdl
 
 demo-sdl: $(LIBTWIN) $(APPS_OBJS) $(SDL_BACKEND_OBJS)
 	$(VECHO) "  LD\t$@\n"
-	$(Q)$(CC) -o $@ $^ $(SDL_LDFLAGS)
+	$(Q)$(CC) -o $@ $^ $(SDL_LDFLAGS) $(LDFLAGS)
 
 $(LIBTWIN): $(LIB_OBJS)
 	$(AR) -r $@ $?
-
-CFLAGS = \
-	-Wall -pipe -O2 \
-	-I include \
-	-I backend \
-	-I apps \
-	$(SDL_CFLAGS)
 
 %.o: %.c
 	$(VECHO) "  CC\t$@\n"

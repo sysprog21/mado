@@ -72,7 +72,7 @@ deps += $(SDL_BACKEND_OBJS:%.o=%.o.d)
 .PHONY: all
 all: $(LIBTWIN) demo-sdl
 
-demo-sdl: $(LIBTWIN) $(APPS_OBJS) $(SDL_BACKEND_OBJS)
+demo-sdl: $(APPS_OBJS) $(SDL_BACKEND_OBJS) $(LIBTWIN)
 	$(VECHO) "  LD\t$@\n"
 	$(Q)$(CC) -o $@ $^ $(SDL_LDFLAGS) $(LDFLAGS)
 

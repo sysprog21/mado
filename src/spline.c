@@ -56,8 +56,8 @@ static void _de_casteljau(twin_spline_t *spline,
 }
 
 /*
- * Calculate the squared distance from point 'b' or 'c' to the line segment
- * connecting 'a' and 'd'. Returns the larger of the two distances.
+ * Return an upper bound on the error (squared) that could result from
+ * approximating a spline with a line segment connecting the two endpoints.
  */
 static twin_dfixed_t _twin_spline_error_squared(twin_spline_t *spline)
 {

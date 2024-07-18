@@ -5,68 +5,68 @@ CFLAGS = \
 	-I include \
 	-I backend \
 	-I apps \
-	$(shell pkg-config --cflags libpng) \
-	$(SDL_CFLAGS)
+	$(shell pkg-config --cflags libpng)
 
 LDFLAGS = \
 	$(shell pkg-config --libs libpng)
 
-LIB_SRCS := \
-	src/box.c \
-	src/file.c \
-	src/poly.c \
-	src/toplevel.c \
-	src/button.c \
-	src/fixed.c \
-	src/label.c \
-	src/primitive.c \
-	src/trig.c \
-	src/convolve.c \
-	src/font.c \
-	src/matrix.c \
-	src/queue.c \
-	src/widget.c \
-	src/font_default.c \
-	src/path.c \
-	src/screen.c \
-	src/window.c \
-	src/dispatch.c \
-	src/geom.c \
-	src/pattern.c \
-	src/spline.c \
-	src/work.c \
-	src/draw.c \
-	src/hull.c \
-	src/icon.c \
-	src/image-png.c \
-	src/pixmap.c \
-	src/timeout.c 
+deps :=
 
-LIB_OBJS := $(patsubst %.c, %.o, $(LIB_SRCS))
-deps := $(LIB_OBJS:%.o=%.o.d)
+LIB_OBJS := \
+	src/box.o \
+	src/file.o \
+	src/poly.o \
+	src/toplevel.o \
+	src/button.o \
+	src/fixed.o \
+	src/label.o \
+	src/primitive.o \
+	src/trig.o \
+	src/convolve.o \
+	src/font.o \
+	src/matrix.o \
+	src/queue.o \
+	src/widget.o \
+	src/font_default.o \
+	src/path.o \
+	src/screen.o \
+	src/window.o \
+	src/dispatch.o \
+	src/geom.o \
+	src/pattern.o \
+	src/spline.o \
+	src/work.o \
+	src/draw.o \
+	src/hull.o \
+	src/icon.o \
+	src/image-png.o \
+	src/pixmap.o \
+	src/timeout.o
+
+deps += $(LIB_OBJS:%.o=%.o.d)
 
 LIBSUF ?= .a
 LIBTWIN := libtwin$(LIBSUF)
 
-APPS_SRCS = \
-	apps/calc.c \
-	apps/spline.c \
-	apps/clock.c \
-	apps/line.c \
-	apps/hello.c \
-	apps/demo.c
+APPS_OBJS := \
+	apps/calc.o \
+	apps/spline.o \
+	apps/clock.o \
+	apps/line.o \
+	apps/hello.o \
+	apps/demo.o
 
-APPS_OBJS = $(patsubst %.c, %.o, $(APPS_SRCS))
 deps += $(APPS_OBJS:%.o=%.o.d)
 
 SDL_CFLAGS := $(shell sdl2-config --cflags)
 SDL_LDFLAGS := $(shell sdl2-config --libs)
 
-SDL_BACKEND_SRCS = \
-	backend/sdl.c \
-	apps/twin-sdl.c
+CFLAGS += $(SDL_CFLAGS)
 
-SDL_BACKEND_OBJS := $(patsubst %.c, %.o, $(SDL_BACKEND_SRCS))
+SDL_BACKEND_OBJS := \
+	backend/sdl.o \
+	apps/twin-sdl.o
+
 deps += $(SDL_BACKEND_OBJS:%.o=%.o.d)
 
 .PHONY: all

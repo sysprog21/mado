@@ -2,6 +2,7 @@ include mk/common.mk
 
 CFLAGS = \
 	-Wall -pipe -O2 \
+	-I src \
 	-I include \
 	-I backend \
 	-I apps \

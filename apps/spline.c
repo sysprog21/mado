@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "twin_private.h"
+#include "util.h"
 
 #include "apps_spline.h"
 

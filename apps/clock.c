@@ -9,7 +9,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-#include "twin_private.h"
+#include "util.h"
 
 #include "apps_clock.h"
 

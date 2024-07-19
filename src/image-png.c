@@ -17,6 +17,25 @@ static void _twin_png_read(png_structp png, png_bytep data, png_size_t size)
         png_error(png, "end of file !\n");
 }
 
+/* FIXME: Utilize pixman or similar accelerated routine to convert */
+#if defined(__APPLE__)
+static void _convertBGRtoARGB(uint8_t *data, int width, int height)
+{
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int index = (y * width + x) * 4;
+            uint8_t b = data[index];
+            uint8_t g = data[index + 1];
+            uint8_t r = data[index + 2];
+            data[index] = 255; /* Alpha */
+            data[index + 1] = r;
+            data[index + 2] = g;
+            data[index + 3] = b;
+        }
+    }
+}
+#endif
+
 twin_pixmap_t *twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
 {
     uint8_t signature[8];
@@ -82,8 +101,7 @@ twin_pixmap_t *twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
         /* unsupported for now */
         goto bail_free;
     case TWIN_ARGB32:
-        if (ctype == PNG_COLOR_TYPE_RGB)
-            png_set_filler(png, 0xff, PNG_FILLER_BEFORE);
+        png_set_filler(png, 0xff, PNG_FILLER_AFTER);
         if (ctype == PNG_COLOR_TYPE_GRAY || ctype == PNG_COLOR_TYPE_GRAY_ALPHA)
             png_set_gray_to_rgb(png);
 
@@ -109,8 +127,13 @@ twin_pixmap_t *twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
 
     png_read_end(png, NULL);
 
-    if (fmt == TWIN_ARGB32)
+    if (fmt == TWIN_ARGB32) {
+        /* Convert from BGR to ARGB if necessary */
+#if defined(__APPLE__)
+        _convertBGRtoARGB(pix->p.b, width, height);
+#endif
         twin_premultiply_alpha(pix);
+    }
 
 bail_free:
     free(rowp);

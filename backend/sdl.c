@@ -47,8 +47,8 @@ static void _twin_sdl_put_span(twin_coord_t left,
     }
 }
 
-static bool twin_sdl_read_events(int maybe_unused file,
-                                 twin_file_op_t maybe_unused ops,
+static bool twin_sdl_read_events(int file maybe_unused,
+                                 twin_file_op_t ops maybe_unused,
                                  void *closure)
 {
     twin_sdl_t *tx = closure;
@@ -149,14 +149,14 @@ void twin_sdl_destroy(twin_sdl_t *tx)
     SDL_Quit();
 }
 
-void twin_sdl_damage(twin_sdl_t *tx, SDL_Event *ev)
+void twin_sdl_damage(twin_sdl_t *tx, SDL_Event *ev maybe_unused)
 {
     int width, height;
     SDL_GetWindowSize(tx->win, &width, &height);
     twin_screen_damage(tx->screen, 0, 0, width, height);
 }
 
-void twin_sdl_configure(twin_sdl_t *tx, SDL_Event *ev)
+void twin_sdl_configure(twin_sdl_t *tx, SDL_Event *ev maybe_unused)
 {
     int width, height;
     SDL_GetWindowSize(tx->win, &width, &height);

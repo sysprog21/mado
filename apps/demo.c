@@ -226,6 +226,7 @@ void apps_demo_start(twin_screen_t *screen,
                      int w,
                      int h)
 {
+    (void) name;
     apps_circletext_start(screen, x, y, w, h);
     apps_line_start(screen, x += 20, y += 20, w, h);
     apps_quickbrown_start(screen, x += 20, y += 20, w, h);

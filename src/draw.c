@@ -486,10 +486,10 @@ static void twin_pixmap_read_xform_8(twin_xform_t *xform, twin_coord_t line)
         _get_pix_8(pts[0], pix, sx, sy);
         _get_pix_8(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
         _get_pix_8(pts[2], pix, sx, sy + TWIN_FIXED_ONE);
-        _get_pix_8(pts[3], pix, sx, sy + TWIN_FIXED_ONE);
+        _get_pix_8(pts[3], pix, sx + TWIN_FIXED_ONE, sy + TWIN_FIXED_ONE);
         wx = sx & 0xffff;
         wy = sy & 0xffff;
-        *(dst++) = _pix_saucemix(pts[0], pts[1], pts[2], pts[4], wx, wy);
+        *(dst++) = _pix_saucemix(pts[0], pts[1], pts[2], pts[3], wx, wy);
     }
 }
 

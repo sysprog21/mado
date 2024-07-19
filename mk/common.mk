@@ -177,24 +177,24 @@ endif
 quiet_objects = $(CURDIR)/$$@
 quiet_objects = $$(subst __UPDIR__/,../,$(CURDIR)/$$@)
 
-# quiet
+# QUIET
 
-quiet_disp_depend.c         = echo "  CPP        $(quiet_objects)"
+quiet_disp_depend.c         = echo "  DEP        $(quiet_objects)"
 quiet_disp_compile.c        = echo "  CC         $(quiet_objects)"
 quiet_disp_link.c           = echo "  LINK       $(quiet_objects)"
 quiet_disp_link_so.c        = echo "  LINKSO     $(quiet_objects)"
 
-quiet_disp_depend.cxx       = echo "  CPP        $(quiet_objects)"
+quiet_disp_depend.cxx       = echo "  DEP        $(quiet_objects)"
 quiet_disp_compile.cxx      = echo "  CXX        $(quiet_objects)"
 quiet_disp_link.cxx         = echo "  LINK       $(quiet_objects)"
 quiet_disp_link_so.cxx      = echo "  LINKSO     $(quiet_objects)"
 
-quiet_disp_depend.c.host    = echo "  HOSTCPP    $(quiet_objects)"
+quiet_disp_depend.c.host    = echo "  HOSTDEP    $(quiet_objects)"
 quiet_disp_compile.c.host   = echo "  HOSTCC     $(quiet_objects)"
 quiet_disp_link.c.host      = echo "  HOSTLINK   $(quiet_objects)"
 quiet_disp_link_so.c.host   = echo "  HOSTLINKSO $(quiet_objects)"
 
-quiet_disp_depend.cxx.host  = echo "  HOSTCPP    $(quiet_objects)"
+quiet_disp_depend.cxx.host  = echo "  HOSTDEP    $(quiet_objects)"
 quiet_disp_compile.cxx.host = echo "  HOSTCXX    $(quiet_objects)"
 quiet_disp_link.cxx.host    = echo "  HOSTLINK   $(quiet_objects)"
 quiet_disp_link_so.cxx.host = echo "  HOSTLINKSO $(quiet_objects)"

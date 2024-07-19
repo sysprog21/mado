@@ -9,9 +9,9 @@ target.o-y :=
 TARGET_LIBS :=
 
 target.a-y = \
-	libtwin.a \
 	libbackend.a \
-	libapps.a
+	libapps.a \
+	libtwin.a
 
 # Core library
 

@@ -1,5 +1,14 @@
+# Generated
 *.o
 *.o.d
 demo-sdl
+.demo-sdl
 libtwin.a
+.libtwin.a
+libbackend.a
+.libbackend.a
+libapps.a
+.libapps.a
+
+# Tools
 tools/ttf/twin-ttf

@@ -1,92 +1,102 @@
+# FIXME: make these entries configurable
+CONFIG_BACKEND_SDL := y
+CONFIG_LOADER_PNG := y
+
+# Rules
+
+target-y :=
+target.o-y :=
+TARGET_LIBS :=
+
+target.a-y = \
+	libtwin.a \
+	libbackend.a \
+	libapps.a
+
+# Core library
+
+libtwin.a_files-y = \
+	src/box.c \
+	src/file.c \
+	src/poly.c \
+	src/toplevel.c \
+	src/button.c \
+	src/fixed.c \
+	src/label.c \
+	src/primitive.c \
+	src/trig.c \
+	src/convolve.c \
+	src/font.c \
+	src/matrix.c \
+	src/queue.c \
+	src/widget.c \
+	src/font_default.c \
+	src/path.c \
+	src/screen.c \
+	src/window.c \
+	src/dispatch.c \
+	src/geom.c \
+	src/pattern.c \
+	src/spline.c \
+	src/work.c \
+	src/draw.c \
+	src/hull.c \
+	src/icon.c \
+	src/pixmap.c \
+	src/timeout.c
+
+libtwin.a_includes-y := include
+
+# Image loaders
+
+ifeq ($(CONFIG_LOADER_PNG), y)
+target.o-y += src/image-png.o
+src/image-png.o_files-y = src/image-png.c
+src/image-png.o_includes-y := include
+src/image-png.o_cflags-y = $(shell pkg-config --cflags libpng)
+TARGET_LIBS += $(shell pkg-config --libs libpng)
+libtwin.a_files-y += src/image-png.o
+endif
+
+# Applications
+
+libapps.a_files-y = \
+	apps/calc.c \
+	apps/spline.c \
+	apps/clock.c \
+	apps/line.c \
+	apps/hello.c \
+	apps/demo.c
+
+libapps.a_includes-y := include
+
+# Graphical backends
+
+libbackend.a_files-y :=
+libbackend.a_cflags-y :=
+libbackend.a_includes-y := include
+
+ifeq ($(CONFIG_BACKEND_SDL), y)
+libbackend.a_files-y += backend/sdl.c
+libbackend.a_cflags-y += $(shell sdl2-config --cflags)
+TARGET_LIBS += $(shell sdl2-config --libs)
+endif
+
+# Platform-specific executables
+
+ifeq ($(CONFIG_BACKEND_SDL), y)
+target-y += demo-sdl
+
+demo-sdl_depends-y += $(target.a-y)
+demo-sdl_files-y = \
+	apps/twin-sdl.c
+
+demo-sdl_includes-y := include
+demo-sdl_includes-y += backend
+
+demo-sdl_cflags-y = $(shell sdl2-config --cflags)
+demo-sdl_ldflags-y := $(target.a-y)
+demo-sdl_ldflags-y += $(TARGET_LIBS)
+endif # CONFIG_BACKEND_SDL
+
 include mk/common.mk
-
-CFLAGS = \
-	-Wall -pipe -O2 \
-	-I include \
-	-I backend \
-	-I apps \
-	$(shell pkg-config --cflags libpng)
-
-LDFLAGS = \
-	$(shell pkg-config --libs libpng)
-
-deps :=
-
-LIB_OBJS := \
-	src/box.o \
-	src/file.o \
-	src/poly.o \
-	src/toplevel.o \
-	src/button.o \
-	src/fixed.o \
-	src/label.o \
-	src/primitive.o \
-	src/trig.o \
-	src/convolve.o \
-	src/font.o \
-	src/matrix.o \
-	src/queue.o \
-	src/widget.o \
-	src/font_default.o \
-	src/path.o \
-	src/screen.o \
-	src/window.o \
-	src/dispatch.o \
-	src/geom.o \
-	src/pattern.o \
-	src/spline.o \
-	src/work.o \
-	src/draw.o \
-	src/hull.o \
-	src/icon.o \
-	src/image-png.o \
-	src/pixmap.o \
-	src/timeout.o
-
-deps += $(LIB_OBJS:%.o=%.o.d)
-
-LIBSUF ?= .a
-LIBTWIN := libtwin$(LIBSUF)
-
-APPS_OBJS := \
-	apps/calc.o \
-	apps/spline.o \
-	apps/clock.o \
-	apps/line.o \
-	apps/hello.o \
-	apps/demo.o
-
-deps += $(APPS_OBJS:%.o=%.o.d)
-
-SDL_CFLAGS := $(shell sdl2-config --cflags)
-SDL_LDFLAGS := $(shell sdl2-config --libs)
-
-CFLAGS += $(SDL_CFLAGS)
-
-SDL_BACKEND_OBJS := \
-	backend/sdl.o \
-	apps/twin-sdl.o
-
-deps += $(SDL_BACKEND_OBJS:%.o=%.o.d)
-
-.PHONY: all
-all: $(LIBTWIN) demo-sdl
-
-demo-sdl: $(APPS_OBJS) $(SDL_BACKEND_OBJS) $(LIBTWIN)
-	$(VECHO) "  LD\t$@\n"
-	$(Q)$(CC) -o $@ $^ $(SDL_LDFLAGS) $(LDFLAGS)
-
-$(LIBTWIN): $(LIB_OBJS)
-	$(AR) -r $@ $?
-
-%.o: %.c
-	$(VECHO) "  CC\t$@\n"
-	$(Q)$(CC) $(CFLAGS) -o $@ -c -MMD -MF $@.d $<
-
-.PHONY: clean
-clean:
-	@rm -fv demo-sdl \
-		$(LIB_OBJS) $(APPS_OBJS) $(SDL_BACKEND_OBJS) $(deps) \
-		$(LIBTWIN) | xargs echo --
-
--include $(deps)

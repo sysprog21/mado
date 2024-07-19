@@ -18,6 +18,7 @@ static void _twin_png_read(png_structp png, png_bytep data, png_size_t size)
 }
 
 /* FIXME: Utilize pixman or similar accelerated routine to convert */
+#if defined(__APPLE__)
 static void _convertBGRtoARGB(uint8_t *data, int width, int height)
 {
     for (int y = 0; y < height; y++) {
@@ -33,6 +34,7 @@ static void _convertBGRtoARGB(uint8_t *data, int width, int height)
         }
     }
 }
+#endif
 
 twin_pixmap_t *twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
 {
@@ -127,7 +129,9 @@ twin_pixmap_t *twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
 
     if (fmt == TWIN_ARGB32) {
         /* Convert from BGR to ARGB if necessary */
+#if defined(__APPLE__)
         _convertBGRtoARGB(pix->p.b, width, height);
+#endif
         twin_premultiply_alpha(pix);
     }
 

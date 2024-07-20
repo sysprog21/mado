@@ -15,6 +15,8 @@ target.a-y = \
 
 # Core library
 
+libtwin.a_cflags-y :=
+
 libtwin.a_files-y = \
 	src/box.c \
 	src/file.c \
@@ -50,12 +52,9 @@ libtwin.a_includes-y := include
 # Image loaders
 
 ifeq ($(CONFIG_LOADER_PNG), y)
-target.o-y += src/image-png.o
-src/image-png.o_files-y = src/image-png.c
-src/image-png.o_includes-y := include
-src/image-png.o_cflags-y = $(shell pkg-config --cflags libpng)
+libtwin.a_files-y += src/image-png.c
+libtwin.a_cflags-y += $(shell pkg-config --cflags libpng)
 TARGET_LIBS += $(shell pkg-config --libs libpng)
-libtwin.a_files-y += src/image-png.o
 endif
 
 # Applications

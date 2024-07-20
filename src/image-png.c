@@ -1,3 +1,9 @@
+/*
+ * Twin - A Tiny Window System
+ * Copyright (c) 2024 National Cheng Kung University, Taiwan
+ * All rights reserved.
+ */
+
 #include <fcntl.h>
 #include <png.h>
 #include <stdlib.h>

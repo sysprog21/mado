@@ -116,7 +116,7 @@ MV         := mv
 RM         := rm -rf
 MKDIR      := mkdir -p
 
-__CFLAGS := -Wall -Wextra -pipe -g -O2
+__CFLAGS := -Wall -Wextra -pipe
 __CFLAGS += -O2 -g -pipe
 __CFLAGS += $(CFLAGS)
 
@@ -133,23 +133,21 @@ else
     TARGET_OS := UNKNOWN
 endif
 
-ifeq      ($(TARGET_OS),WINDOWS)
-    override __WINDOWS__  = y
-    override MFLAGS     += __WINDOWS__=y
-    __CFLAGS      += -D__WINDOWS__=1
-    __CFLAGS      += -D_POSIX=1
+ifeq ($(TARGET_OS),WINDOWS)
+    override __WINDOWS__ = y
+    override MFLAGS += __WINDOWS__=y
+    __CFLAGS += -D__WINDOWS__=1
+    __CFLAGS += -D_POSIX=1
 else ifeq ($(TARGET_OS),MACOS)
-    override __DARWIN__  = y
-    override MFLAGS     += __DARWIN__=y
-    __CFLAGS      += -D__DARWIN__=1
-    __CFLAGS      += -I/opt/local/include
-    #__CFLAGS     += -fassociative-math -fno-signed-zeros
-    override LDOPTS     += -keep_private_externs
+    override __DARWIN__ = y
+    override MFLAGS += __DARWIN__=y
+    __CFLAGS += -D__DARWIN__=1
+    __CFLAGS += -I/opt/local/include
+    override LDOPTS += -keep_private_externs
 else ifeq ($(TARGET_OS),LINUX)
-    override __LINUX__  = y
-    override MFLAGS     += __LINUX__=y
-    __CFLAGS      += -D__LINUX__=1
-    #__CFLAGS     += -fassociative-math -fno-signed-zeros
+    override __LINUX__ = y
+    override MFLAGS += __LINUX__=y
+    __CFLAGS += -D__LINUX__=1
 endif
 
 __CXXFLAGS := $(CXXFLAGS) $(EXTRA_CXXFLAGS) $(__CFLAGS)
@@ -160,7 +158,8 @@ __HOSTARCHFLAGS := $(HOSTARCHFLAGS)
 
 MAKE := CFLAGS="$(CFLAGS)" EXTRA_CFLAGS="$(EXTRA_CFLAGS)" CXXFLAGS="$(CXXFLAGS)" EXTRA_CXXFLAGS="$(EXTRA_CXXFLAGS)" \
         ARCHFLAGS="$(ARCHFLAGS)" HOSTARCHFLAGS="$(HOSTARCHFLAGS)" \
-        LDFLAGS="$(LDFLAGS)" EXTRA_LDFLAGS="$(EXTRA_LDFLAGS)" TOPDIR='$(TOPDIR)' uname_S=$(uname_S) TARGET_OS=$(TARGET_OS) \
+        LDFLAGS="$(LDFLAGS)" EXTRA_LDFLAGS="$(EXTRA_LDFLAGS)" \
+        TOPDIR='$(TOPDIR)' uname_S=$(uname_S) TARGET_OS=$(TARGET_OS) \
         $(MAKE) $(MFLAGS)
 
 all:
@@ -174,8 +173,7 @@ else
     MAKE += --no-print-directory
 endif
 
-quiet_objects = $(CURDIR)/$$@
-quiet_objects = $$(subst __UPDIR__/,../,$(CURDIR)/$$@)
+quiet_objects = $$(subst __UPDIR__/,../,$$@)
 
 # QUIET
 

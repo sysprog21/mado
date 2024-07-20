@@ -1,5 +1,7 @@
 # Mado: A Window System for Resource-Constrained Devices
 
+## Introduction
+
 With embedded systems now featuring high-resolution displays and powerful CPUs,
 the desire for sophisticated graphical user interfaces can be realized even in
 the smallest devices. Although CPU power within a given power budget has
@@ -26,45 +28,34 @@ originally developed by Keith Packard. 'Mado' means 'window' in the language of
 the [Tao people](https://en.wikipedia.org/wiki/Tao_people) (also known as Yami),
 an Austronesian ethnic group native to the tiny outlying Orchid Island of Taiwan.
 
-## Assumptions
+## Principles of design
 
-By focusing on specific hardware capabilities and limitations, the window
-system will more effectively utilize those limited resources. Of course,
-over-constraining the requirements can limit the potential target
-environments. Given the very general nature of existing window systems, it
-seems interesting to explore what happens when less variation is permitted.
+Focusing on specific hardware capabilities and limitations, `Mado` efficiently
+utilizes limited resources. Over-constraining requirements can limit potential
+target environments, but exploring reduced variation can be beneficial.
 
-The first assumption is that little-to-no graphics acceleration is available
-within the framebuffer and that the framebuffer is attached to the CPU through
-a relatively slow link. This combination means that most drawing should be done
-with the CPU in local memory, not directly to the framebuffer. This has the
-additional benefit of encouraging synchronized screen updates where intermediate
-rendering results are never made visible to the user. If the CPU has sufficient
-on-chip storage, this design can also reduce power consumption by minimizing
-off-chip data references.
+`Mado` assumes little-to-no graphics acceleration within the framebuffer, which
+is connected to the CPU via a slow link. Therefore, most drawing is done in
+local memory, not directly to the framebuffer, ensuring synchronized screen
+updates and potentially reducing power consumption by minimizing off-chip data
+references.
 
-The second limitation imposed is the requirement of a color screen with fixed
-color mapping. While this may appear purely beneficial to the user, the
-software advantages are numerous as well. Imprecise rendering operations can
-now generate small, nearly invisible errors instead of visibly incorrect
-results through the use of anti-aliased drawing. With smooth gradations of
-color available, there is no requirement for the system to support dithering
-or other color-approximating schemes.
+The system requires a color screen with fixed color mapping. This simplifies
+software by allowing anti-aliased drawing to generate nearly invisible errors
+instead of visibly incorrect results. Smooth color gradations eliminate the need
+for dithering or other color-approximating schemes.
 
-Finally, `Mado` assumes that the target machine provides respectable CPU
-performance. This reduces the need to cache intermediate rendering results,
-like glyph images for text. Having a uniformly performant target market means
-that `Mado` needs to support only one general performance class of drawing
-operations. For example, `Mado` supports only anti-aliased drawing;
-non-anti-aliased drawing would be faster, but the CPUs supported by `Mado` are
-required to be fast enough to make this irrelevant.
+Respectable CPU performance is expected, reducing the need to cache intermediate
+rendering results, such as glyph images for text. Supporting only one general
+performance class of drawing operations, `Mado` focuses on anti-aliased drawing,
+as supported CPUs are fast enough to make non-anti-aliased drawing irrelevant.
+Additionally, `Mado` does not rely on an FPU or heavy FPU emulations, using its
+own fixed-point arithmetic instead.
 
-The combined effect of these environmental limitations means that `Mado` can
-provide significant functionality with little wasted code. Window systems
-designed for a range of target platforms must often generalize functionality
-and expose applications to variability which will not, in practice, ever be
-experienced by them. Eliminating choice has benefits beyond the mere reduction
-of window system code; it reflects throughout the application stack.
+These environmental limitations enable `Mado` to provide significant
+functionality with minimal wasted code. Unlike window systems designed for
+varied platforms, `Mado` avoids unnecessary generalization and variability,
+benefiting the entire application stack.
 
 ## Build and Verify
 
@@ -89,5 +80,5 @@ Once the window appears, you should be able to move the windows and interact wit
 
 ## License
 
-Mado is available under a MIT-style license, permitting liberal commercial use.
+`Mado` is available under a MIT-style license, permitting liberal commercial use.
 Use of this source code is governed by a MIT license that can be found in the [LICENSE](LICENSE) file.

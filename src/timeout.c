@@ -5,8 +5,19 @@
  */
 
 #include <stdlib.h>
+#include <sys/time.h>
+#include <time.h>
 
 #include "twin_private.h"
+
+#define twin_time_compare(a, op, b) (((a) - (b)) op 0)
+
+static twin_time_t twin_now(void)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
 
 static twin_queue_t *head;
 static twin_time_t start;
@@ -81,14 +92,4 @@ twin_time_t _twin_timeout_delay(void)
         return thead->time - now;
     }
     return -1;
-}
-
-#include <sys/time.h>
-#include <time.h>
-
-twin_time_t twin_now(void)
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }

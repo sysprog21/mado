@@ -1005,15 +1005,11 @@ void twin_path_curve(twin_path_t *path,
  * timeout.c
  */
 
-#define twin_time_compare(a, op, b) (((a) - (b)) op 0)
-
 twin_timeout_t *twin_set_timeout(twin_timeout_proc_t timeout_proc,
                                  twin_time_t delay,
                                  void *closure);
 
 void twin_clear_timeout(twin_timeout_t *timeout);
-
-twin_time_t twin_now(void);
 
 /*
  * toplevel.c

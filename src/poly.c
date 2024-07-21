@@ -64,14 +64,11 @@ static int _twin_edge_build(twin_spoint_t *vertices,
                             twin_sfixed_t dy,
                             twin_sfixed_t top_y)
 {
-    int v, nv;
     int tv, bv;
-    int e;
-    twin_sfixed_t y;
 
-    e = 0;
-    for (v = 0; v < nvertices; v++) {
-        nv = v + 1;
+    int e = 0;
+    for (int v = 0; v < nvertices; v++) {
+        int nv = v + 1;
         if (nv == nvertices)
             nv = 0;
 
@@ -91,7 +88,7 @@ static int _twin_edge_build(twin_spoint_t *vertices,
         }
 
         /* snap top to first grid point in pixmap */
-        y = _twin_sfixed_grid_ceil(vertices[tv].y + dy);
+        twin_sfixed_t y = _twin_sfixed_grid_ceil(vertices[tv].y + dy);
         if (y < TWIN_POLY_START + top_y)
             y = TWIN_POLY_START + top_y;
 
@@ -233,14 +230,11 @@ static void _twin_edge_fill(twin_pixmap_t *pixmap,
                             int nedges)
 {
     twin_edge_t *active, *a, *n, **prev;
-    int e;
-    twin_sfixed_t y;
     twin_sfixed_t x0 = 0;
-    int w;
 
     qsort(edges, nedges, sizeof(twin_edge_t), _edge_compare_y);
-    e = 0;
-    y = edges[0].top;
+    int e = 0;
+    twin_sfixed_t y = edges[0].top;
     active = 0;
     for (;;) {
         /* add in new edges */
@@ -253,14 +247,13 @@ static void _twin_edge_fill(twin_pixmap_t *pixmap,
         }
 
         /* walk this y value marking coverage */
-        w = 0;
+        int w = 0;
         for (a = active; a; a = a->next) {
             if (w == 0)
                 x0 = a->x;
             w += a->winding;
-            if (w == 0) {
+            if (w == 0)
                 _span_fill(pixmap, y, x0, a->x);
-            }
         }
 
         /* step down, clipping to pixmap */
@@ -303,19 +296,14 @@ void twin_fill_path(twin_pixmap_t *pixmap,
                     twin_coord_t dx,
                     twin_coord_t dy)
 {
-    twin_edge_t *edges;
-    int nedges, n;
-    int nalloc;
-    int s;
-    int p;
     twin_sfixed_t sdx = twin_int_to_sfixed(dx + pixmap->origin_x);
     twin_sfixed_t sdy = twin_int_to_sfixed(dy + pixmap->origin_y);
 
-    nalloc = path->npoints + path->nsublen + 1;
-    edges = malloc(sizeof(twin_edge_t) * nalloc);
-    p = 0;
-    nedges = 0;
-    for (s = 0; s <= path->nsublen; s++) {
+    int nalloc = path->npoints + path->nsublen + 1;
+    twin_edge_t *edges = malloc(sizeof(twin_edge_t) * nalloc);
+    int p = 0;
+    int nedges = 0;
+    for (int s = 0; s <= path->nsublen; s++) {
         int sublen;
         int npoints;
 
@@ -325,7 +313,8 @@ void twin_fill_path(twin_pixmap_t *pixmap,
             sublen = path->sublen[s];
         npoints = sublen - p;
         if (npoints > 1) {
-            n = _twin_edge_build(path->points + p, npoints, edges + nedges, sdx,
+            int n =
+                _twin_edge_build(path->points + p, npoints, edges + nedges, sdx,
                                  sdy, twin_int_to_sfixed(pixmap->clip.top));
             p = sublen;
             nedges += n;

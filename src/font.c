@@ -330,7 +330,6 @@ void twin_path_ucs4(twin_path_t *path, twin_ucs4_t ucs4)
     twin_path_t *pen = NULL;
     twin_fixed_t width;
     twin_text_info_t info;
-    signed char op;
 
     _twin_text_compute_info(path, font, &info);
     if (info.snap)
@@ -346,6 +345,7 @@ void twin_path_ucs4(twin_path_t *path, twin_ucs4_t ucs4)
 
     x1 = y1 = 0;
     for (;;) {
+        signed char op;
         switch ((op = *g++)) {
         case 'm':
             x1 = FX(*g++, &info);

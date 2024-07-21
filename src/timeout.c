@@ -34,10 +34,9 @@ void _twin_run_timeout(void)
 {
     twin_time_t now = twin_now();
     twin_timeout_t *timeout;
-    twin_timeout_t *first;
     twin_time_t delay;
 
-    first = (twin_timeout_t *) _twin_queue_set_order(&head);
+    twin_timeout_t *first = (twin_timeout_t *) _twin_queue_set_order(&head);
     for (timeout = first; timeout && twin_time_compare(now, >=, timeout->time);
          timeout = (twin_timeout_t *) timeout->queue.order) {
         delay = (*timeout->proc)(now, timeout->closure);

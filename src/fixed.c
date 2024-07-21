@@ -12,18 +12,15 @@
 
 twin_fixed_t twin_fixed_sqrt(twin_fixed_t a)
 {
-    twin_fixed_t max, min, mid;
-    twin_fixed_t sqr;
+    twin_fixed_t max = a, min = 0;
 
-    max = a;
-    min = 0;
     while (max > min) {
-        mid = (max + min) >> 1;
+        twin_fixed_t mid = (max + min) >> 1;
         if (mid >= 181 * TWIN_FIXED_ONE) {
             max = mid - 1;
             continue;
         }
-        sqr = twin_fixed_mul(mid, mid);
+        twin_fixed_t sqr = twin_fixed_mul(mid, mid);
         if (sqr == a)
             return mid;
         if (sqr < a)
@@ -36,13 +33,12 @@ twin_fixed_t twin_fixed_sqrt(twin_fixed_t a)
 
 twin_sfixed_t _twin_sfixed_sqrt(twin_sfixed_t as)
 {
-    twin_dfixed_t max = as, min = 0, mid;
+    twin_dfixed_t max = as, min = 0;
     twin_dfixed_t a = twin_sfixed_to_dfixed(as);
-    twin_dfixed_t sqr;
 
     while (max > min) {
-        mid = (max + min) >> 1;
-        sqr = mid * mid;
+        twin_dfixed_t mid = (max + min) >> 1;
+        twin_dfixed_t sqr = mid * mid;
         if (sqr == a)
             return (twin_sfixed_t) mid;
         if (sqr < a)

@@ -4,6 +4,7 @@
  * All rights reserved.
  */
 
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include "twin_private.h"
@@ -16,7 +17,7 @@ typedef struct twin_slope {
 typedef struct _twin_hull {
     twin_spoint_t point;
     twin_slope_t slope;
-    int discard;
+    bool discard;
 } twin_hull_t;
 
 static void _twin_slope_init(twin_slope_t *slope,
@@ -29,23 +30,21 @@ static void _twin_slope_init(twin_slope_t *slope,
 
 static twin_hull_t *_twin_hull_create(twin_path_t *path, int *nhull)
 {
-    int i, j;
     int n = path->npoints;
     twin_spoint_t *p = path->points;
     twin_hull_t *hull;
-    int e;
 
-    e = 0;
-    for (i = 1; i < n; i++)
+    int e = 0;
+    for (int i = 1; i < n; i++)
         if (p[i].y < p[e].y || (p[i].y == p[e].y && p[i].x < p[e].x))
             e = i;
 
     hull = malloc(n * sizeof(twin_hull_t));
-    if (hull == NULL)
+    if (!hull)
         return NULL;
     *nhull = n;
 
-    for (i = 0; i < n; i++) {
+    for (int i = 0, j; i < n; i++) {
         /* place extremum first in array */
         if (i == 0)
             j = e;
@@ -59,9 +58,9 @@ static twin_hull_t *_twin_hull_create(twin_path_t *path, int *nhull)
 
         /* Discard all points coincident with the extremal point */
         if (i != 0 && hull[i].slope.dx == 0 && hull[i].slope.dy == 0)
-            hull[i].discard = 1;
+            hull[i].discard = true;
         else
-            hull[i].discard = 0;
+            hull[i].discard = false;
     }
 
     return hull;
@@ -102,9 +101,8 @@ static int _twin_hull_vertex_compare(const void *av, const void *bv)
 {
     twin_hull_t *a = (twin_hull_t *) av;
     twin_hull_t *b = (twin_hull_t *) bv;
-    int ret;
 
-    ret = _twin_slope_compare(&a->slope, &b->slope);
+    int ret = _twin_slope_compare(&a->slope, &b->slope);
 
     /* In the case of two vertices with identical slope from the
        extremal point discard the nearer point. */
@@ -116,10 +114,10 @@ static int _twin_hull_vertex_compare(const void *av, const void *bv)
         b_dist = ((twin_dfixed_t) b->slope.dx * b->slope.dx +
                   (twin_dfixed_t) b->slope.dy * b->slope.dy);
         if (a_dist < b_dist) {
-            a->discard = 1;
+            a->discard = true;
             ret = -1;
         } else {
-            b->discard = 1;
+            b->discard = true;
             ret = 1;
         }
     }
@@ -154,12 +152,11 @@ static int _twin_hull_next_valid(twin_hull_t *hull, int num_hull, int index)
 
 static void _twin_hull_eliminate_concave(twin_hull_t *hull, int num_hull)
 {
-    int i, j, k;
     twin_slope_t slope_ij, slope_jk;
 
-    i = 0;
-    j = _twin_hull_next_valid(hull, num_hull, i);
-    k = _twin_hull_next_valid(hull, num_hull, j);
+    int i = 0;
+    int j = _twin_hull_next_valid(hull, num_hull, i);
+    int k = _twin_hull_next_valid(hull, num_hull, j);
 
     do {
         _twin_slope_init(&slope_ij, &hull[i].point, &hull[j].point);
@@ -169,7 +166,7 @@ static void _twin_hull_eliminate_concave(twin_hull_t *hull, int num_hull)
         if (_twin_slope_compare(&slope_ij, &slope_jk) >= 0) {
             if (i == k)
                 break;
-            hull[j].discard = 1;
+            hull[j].discard = true;
             j = i;
             i = _twin_hull_prev_valid(hull, num_hull, j);
         } else {

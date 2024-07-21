@@ -193,42 +193,34 @@ void twin_path_arc(twin_path_t *path,
                    twin_angle_t extent)
 {
     twin_matrix_t save = twin_path_current_matrix(path);
-    twin_fixed_t max_radius;
-    int32_t sides;
-    int32_t n;
-    twin_angle_t a;
-    twin_angle_t first, last, step, inc;
-    twin_angle_t epsilon;
 
     twin_path_translate(path, x, y);
     twin_path_scale(path, x_radius, y_radius);
 
-    max_radius = _twin_matrix_max_radius(&path->state.matrix);
-    sides = max_radius / twin_sfixed_to_fixed(TWIN_SFIXED_TOLERANCE);
+    twin_fixed_t max_radius = _twin_matrix_max_radius(&path->state.matrix);
+    int32_t sides = max_radius / twin_sfixed_to_fixed(TWIN_SFIXED_TOLERANCE);
     if (sides > 1024)
         sides = 1024;
 
-    n = 2;
+    int32_t n = 2;
     while ((1 << n) < sides)
         n++;
 
-    sides = (1 << n);
-
-    step = TWIN_ANGLE_360 >> n;
-    inc = step;
-    epsilon = 1;
+    twin_angle_t step = TWIN_ANGLE_360 >> n;
+    twin_angle_t inc = step;
+    twin_angle_t epsilon = 1;
     if (extent < 0) {
         inc = -inc;
         epsilon = -1;
     }
 
-    first = (start + inc - epsilon) & ~(step - 1);
-    last = (start + extent - inc + epsilon) & ~(step - 1);
+    twin_angle_t first = (start + inc - epsilon) & ~(step - 1);
+    twin_angle_t last = (start + extent - inc + epsilon) & ~(step - 1);
 
     if (first != start)
         twin_path_draw(path, twin_cos(start), twin_sin(start));
 
-    for (a = first; a != last; a += inc)
+    for (twin_angle_t a = first; a != last; a += inc)
         twin_path_draw(path, twin_cos(a), twin_sin(a));
 
     if (last != start + extent)

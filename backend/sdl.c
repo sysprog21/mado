@@ -28,10 +28,8 @@ static void _twin_sdl_put_span(twin_coord_t left,
                                void *closure)
 {
     twin_sdl_t *tx = closure;
-    twin_coord_t ix;
-    twin_coord_t iy = top;
 
-    for (ix = left; ix < right; ix++) {
+    for (twin_coord_t ix = left, iy = top; ix < right; ix++) {
         twin_argb32_t pixel = *pixels++;
 
         if (tx->depth == 16)
@@ -105,7 +103,7 @@ static bool twin_sdl_work(void *closure)
 
 twin_sdl_t *twin_sdl_create(int width, int height)
 {
-    static char *argv[] = {"twin-sdl", 0};
+    static char *title = "twin-sdl";
 
     twin_sdl_t *tx = malloc(sizeof(twin_sdl_t));
     if (!tx)
@@ -113,7 +111,7 @@ twin_sdl_t *twin_sdl_create(int width, int height)
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
         printf("error : %s\n", SDL_GetError());
-    tx->win = SDL_CreateWindow(argv[0], SDL_WINDOWPOS_UNDEFINED,
+    tx->win = SDL_CreateWindow(title, SDL_WINDOWPOS_UNDEFINED,
                                SDL_WINDOWPOS_UNDEFINED, width, height,
                                SDL_WINDOW_SHOWN);
     if (!tx->win)

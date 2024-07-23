@@ -1,5 +1,6 @@
 # FIXME: make these entries configurable
 CONFIG_BACKEND_SDL := y
+CONFIG_LOADER_JPEG := y
 CONFIG_LOADER_PNG := y
 
 # Rules
@@ -50,6 +51,12 @@ libtwin.a_files-y = \
 libtwin.a_includes-y := include
 
 # Image loaders
+
+ifeq ($(CONFIG_LOADER_JPEG), y)
+libtwin.a_files-y += src/image-jpeg.c
+libtwin.a_cflags-y += $(shell pkg-config --cflags libjpeg)
+TARGET_LIBS += $(shell pkg-config --libs libjpeg)
+endif
 
 ifeq ($(CONFIG_LOADER_PNG), y)
 libtwin.a_files-y += src/image-png.c

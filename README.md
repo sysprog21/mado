@@ -62,9 +62,9 @@ benefiting the entire application stack.
 `Mado` is built with a minimalist design in mind. However, its verification
 relies on certain third-party packages for full functionality and access to all
 its features. To ensure proper operation, the development environment should
-have the [SDL2 library](https://www.libsdl.org/) and [libpng](https://github.com/pnggroup/libpng) installed.
-* macOS: `brew install sdl2 libpng`
-* Ubuntu Linux / Debian: `sudo apt install libsdl2-dev libpng-dev`
+have the [SDL2 library](https://www.libsdl.org/), [libjpeg](https://www.ijg.org/), and [libpng](https://github.com/pnggroup/libpng) installed.
+* macOS: `brew install sdl2 jpeg libpng`
+* Ubuntu Linux / Debian: `sudo apt install libsdl2-dev libjpeg-dev libpng-dev`
 
 Build the library and demo program.
 ```shell

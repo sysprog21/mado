@@ -4,8 +4,9 @@
  * All rights reserved.
  */
 
-#include <assert.h>
+#include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
@@ -66,22 +67,46 @@ static twin_pixmap_t *load_background(twin_screen_t *screen,
     return scaled_background;
 }
 
+static twin_context_t *tx = NULL;
+
+static void cleanup(void)
+{
+    twin_destroy(tx);
+    tx = NULL;
+}
+
+static void sigint_handler(int sig)
+{
+    (void) sig;
+    cleanup();
+    exit(1);
+}
+
 int main(void)
 {
-    twin_context_t *x = twin_create(WIDTH, HEIGHT);
+    tx = twin_create(WIDTH, HEIGHT);
+    if (!tx)
+        return 1;
+
+    /* Register the callback function to release allocated resources when SIGINT
+     * is caught or the program is about to exit.
+     * This is important for long-time execution of the main loop, from which
+     * the user usually exits with input events.
+     */
+    atexit(cleanup);
+    signal(SIGINT, sigint_handler);
 
     twin_screen_set_background(
-        x->screen, load_background(x->screen, ASSET_PATH "/tux.png"));
+        tx->screen, load_background(tx->screen, ASSET_PATH "/tux.png"));
 
-    apps_demo_start(x->screen, "Demo", 100, 100, 400, 400);
-    apps_hello_start(x->screen, "Hello, World", 0, 0, 200, 200);
-    apps_clock_start(x->screen, "Clock", 10, 10, 200, 200);
-    apps_calc_start(x->screen, "Calculator", 100, 100, 200, 200);
-    apps_line_start(x->screen, "Line", 0, 0, 200, 200);
-    apps_spline_start(x->screen, "Spline", 20, 20, 400, 400);
+    apps_demo_start(tx->screen, "Demo", 100, 100, 400, 400);
+    apps_hello_start(tx->screen, "Hello, World", 0, 0, 200, 200);
+    apps_clock_start(tx->screen, "Clock", 10, 10, 200, 200);
+    apps_calc_start(tx->screen, "Calculator", 100, 100, 200, 200);
+    apps_line_start(tx->screen, "Line", 0, 0, 200, 200);
+    apps_spline_start(tx->screen, "Spline", 20, 20, 400, 400);
 
     twin_dispatch();
 
-    twin_destroy(x);
     return 0;
 }

@@ -11,8 +11,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "twin_sdl.h"
-
 #include "apps_calc.h"
 #include "apps_clock.h"
 #include "apps_demo.h"
@@ -70,18 +68,20 @@ static twin_pixmap_t *load_background(twin_screen_t *screen,
 
 int main(void)
 {
-    twin_sdl_t *sdl = twin_sdl_create(WIDTH, HEIGHT);
+    twin_context_t *x = twin_create(WIDTH, HEIGHT);
 
     twin_screen_set_background(
-        sdl->screen, load_background(sdl->screen, ASSET_PATH "/tux.png"));
+        x->screen, load_background(x->screen, ASSET_PATH "/tux.png"));
 
-    apps_demo_start(sdl->screen, "Demo", 100, 100, 400, 400);
-    apps_hello_start(sdl->screen, "Hello, World", 0, 0, 200, 200);
-    apps_clock_start(sdl->screen, "Clock", 10, 10, 200, 200);
-    apps_calc_start(sdl->screen, "Calculator", 100, 100, 200, 200);
-    apps_line_start(sdl->screen, "Line", 0, 0, 200, 200);
-    apps_spline_start(sdl->screen, "Spline", 20, 20, 400, 400);
+    apps_demo_start(x->screen, "Demo", 100, 100, 400, 400);
+    apps_hello_start(x->screen, "Hello, World", 0, 0, 200, 200);
+    apps_clock_start(x->screen, "Clock", 10, 10, 200, 200);
+    apps_calc_start(x->screen, "Calculator", 100, 100, 200, 200);
+    apps_line_start(x->screen, "Line", 0, 0, 200, 200);
+    apps_spline_start(x->screen, "Spline", 20, 20, 400, 400);
 
     twin_dispatch();
+
+    twin_destroy(x);
     return 0;
 }

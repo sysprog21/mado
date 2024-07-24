@@ -1,12 +1,12 @@
-/*                                                                                                                                                            
+/*
  * Twin - A Tiny Window System
  * Copyright (c) 2024 National Cheng Kung University, Taiwan
  * All rights reserved.
  */
 
 #include <setjmp.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include <jpeglib.h>
 

@@ -1,7 +1,7 @@
 # FIXME: make these entries configurable
-CONFIG_BACKEND_SDL := y
-CONFIG_LOADER_JPEG := y
-CONFIG_LOADER_PNG := y
+CONFIG_BACKEND_SDL ?= y
+CONFIG_LOADER_JPEG ?= y
+CONFIG_LOADER_PNG ?= y
 
 # Rules
 
@@ -10,9 +10,9 @@ target.o-y :=
 TARGET_LIBS :=
 
 target.a-y = \
-	libbackend.a \
 	libapps.a \
-	libtwin.a
+	libtwin.a \
+	libbackend.a
 
 # Core library
 
@@ -46,7 +46,8 @@ libtwin.a_files-y = \
 	src/hull.c \
 	src/icon.c \
 	src/pixmap.c \
-	src/timeout.c
+	src/timeout.c \
+	src/api.c
 
 libtwin.a_includes-y := include
 
@@ -77,32 +78,28 @@ libapps.a_files-y = \
 libapps.a_includes-y := include
 
 # Graphical backends
+BACKEND := none
 
 libbackend.a_files-y :=
 libbackend.a_cflags-y :=
-libbackend.a_includes-y := include
+libbackend.a_includes-y := \
+	include \
+	src
 
 ifeq ($(CONFIG_BACKEND_SDL), y)
+BACKEND = sdl
 libbackend.a_files-y += backend/sdl.c
 libbackend.a_cflags-y += $(shell sdl2-config --cflags)
 TARGET_LIBS += $(shell sdl2-config --libs)
 endif
 
 # Platform-specific executables
-
-ifeq ($(CONFIG_BACKEND_SDL), y)
-target-y += demo-sdl
-
-demo-sdl_depends-y += $(target.a-y)
-demo-sdl_files-y = \
-	apps/twin-sdl.c
-
-demo-sdl_includes-y := include
-demo-sdl_includes-y += backend
-
-demo-sdl_cflags-y = $(shell sdl2-config --cflags)
-demo-sdl_ldflags-y := $(target.a-y)
-demo-sdl_ldflags-y += $(TARGET_LIBS)
-endif # CONFIG_BACKEND_SDL
+target-y += demo-$(BACKEND)
+demo-$(BACKEND)_depends-y += $(target.a-y)
+demo-$(BACKEND)_files-y = apps/main.c
+demo-$(BACKEND)_includes-y := include
+demo-$(BACKEND)_ldflags-y := \
+	$(target.a-y) \
+	$(TARGET_LIBS)
 
 include mk/common.mk

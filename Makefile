@@ -11,8 +11,7 @@ TARGET_LIBS :=
 
 target.a-y = \
 	libapps.a \
-	libtwin.a \
-	libbackend.a
+	libtwin.a
 
 # Core library
 
@@ -49,7 +48,9 @@ libtwin.a_files-y = \
 	src/timeout.c \
 	src/api.c
 
-libtwin.a_includes-y := include
+libtwin.a_includes-y := \
+	include \
+	src
 
 # Image loaders
 
@@ -80,16 +81,10 @@ libapps.a_includes-y := include
 # Graphical backends
 BACKEND := none
 
-libbackend.a_files-y :=
-libbackend.a_cflags-y :=
-libbackend.a_includes-y := \
-	include \
-	src
-
 ifeq ($(CONFIG_BACKEND_SDL), y)
 BACKEND = sdl
-libbackend.a_files-y += backend/sdl.c
-libbackend.a_cflags-y += $(shell sdl2-config --cflags)
+libtwin.a_files-y += backend/sdl.c
+libtwin.a_cflags-y += $(shell sdl2-config --cflags)
 TARGET_LIBS += $(shell sdl2-config --libs)
 endif
 

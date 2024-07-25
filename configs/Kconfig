@@ -1,0 +1,67 @@
+mainmenu "Mado System Configuration"
+
+config CONFIGURED
+    bool
+    default y
+
+choice
+    prompt "Backend Selection"
+    default BACKEND_SDL
+
+config BACKEND_FBDEV
+    bool "Linux framebuffer support"
+
+config BACKEND_SDL
+    bool "SDL video output support"
+
+endchoice
+
+menu "Image Loaders"
+
+config LOADER_PNG
+    bool "Enable PNG loader"
+    default y
+
+config LOADER_JPEG
+    bool "Enable JPEG loader"
+    default y
+
+endmenu
+
+menu "Demo Applications"
+
+config DEMO_APPLICATIONS
+    bool "Build demo applications"
+    default y
+
+config DEMO_MULTI
+    bool "Build multi demo"
+    default y
+    depends on DEMO_APPLICATIONS
+
+config DEMO_HELLO
+    bool "Build Hello world demo"
+    default y
+    depends on DEMO_APPLICATIONS
+
+config DEMO_CLOCK
+    bool "Build clock demo"
+    default y
+    depends on DEMO_APPLICATIONS
+
+config DEMO_CALCULATOR
+    bool "Build calculator demo"
+    default y
+    depends on DEMO_APPLICATIONS
+
+config DEMO_LINE
+    bool "Build line demo"
+    default y
+    depends on DEMO_APPLICATIONS
+
+config DEMO_SPLINE
+    bool "Build spline demp"
+    default y
+    depends on DEMO_APPLICATIONS 
+
+endmenu

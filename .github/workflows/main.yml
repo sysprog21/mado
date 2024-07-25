@@ -1,0 +1,61 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  detect-code-related-file-changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      has_code_related_changes: ${{ steps.set_has_code_related_changes.outputs.has_code_related_changes }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+      - name: Test changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+              .ci/**
+              mk/**
+              include/**
+              src/**
+              backend/**
+              apps/**
+              tools/**
+              .clang-format
+              Makefile
+      - name: Set has_code_related_changes
+        id: set_has_code_related_changes
+        run: |
+          if [[ ${{ steps.changed-files.outputs.any_changed }} == true ]]; then
+            echo "has_code_related_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_code_related_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+  host-x64:
+    needs: [detect-code-related-file-changes]
+    if: needs.detect-code-related-file-changes.outputs.has_code_related_changes == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+    - name: install-dependencies
+      run: |
+            sudo apt-get update -q -y
+            sudo apt install libsdl2-dev libjpeg-dev libpng-dev
+      shell: bash
+    - name: default build
+      run: make
+
+  coding-style:
+    needs: [detect-code-related-file-changes]
+    if: needs.detect-code-related-file-changes.outputs.has_code_related_changes == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+    - name: coding convention
+      run: |
+            sudo apt-get install -q -y clang-format-18
+            .ci/check-newline.sh
+            .ci/check-format.sh
+      shell: bash

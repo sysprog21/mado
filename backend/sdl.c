@@ -20,6 +20,7 @@ typedef struct {
     int image_y;
 } twin_sdl_t;
 
+#define SCREEN(x) ((twin_context_t *) x)->screen
 #define PRIV(x) ((twin_sdl_t *) ((twin_context_t *) x)->priv)
 
 static void _twin_sdl_put_begin(twin_coord_t left,
@@ -40,7 +41,7 @@ static void _twin_sdl_put_span(twin_coord_t left,
                                twin_argb32_t *pixels,
                                void *closure)
 {
-    twin_screen_t *screen = ((twin_context_t *) closure)->screen;
+    twin_screen_t *screen = SCREEN(closure);
     twin_sdl_t *tx = PRIV(closure);
 
     for (twin_coord_t ix = left, iy = top; ix < right; ix++) {
@@ -58,6 +59,8 @@ static void _twin_sdl_put_span(twin_coord_t left,
 static void _twin_sdl_destroy(twin_screen_t *screen, twin_sdl_t *tx)
 {
     twin_screen_destroy(screen);
+
+    SDL_DestroyTexture(tx->texture);
     SDL_DestroyRenderer(tx->render);
     SDL_DestroyWindow(tx->win);
     SDL_Quit();
@@ -74,7 +77,7 @@ static bool twin_sdl_read_events(int file maybe_unused,
                                  twin_file_op_t ops maybe_unused,
                                  void *closure)
 {
-    twin_screen_t *screen = ((twin_context_t *) closure)->screen;
+    twin_screen_t *screen = SCREEN(closure);
     twin_sdl_t *tx = PRIV(closure);
 
     SDL_Event ev;
@@ -121,7 +124,7 @@ static bool twin_sdl_read_events(int file maybe_unused,
 
 static bool twin_sdl_work(void *closure)
 {
-    twin_screen_t *screen = ((twin_context_t *) closure)->screen;
+    twin_screen_t *screen = SCREEN(closure);
 
     if (twin_screen_damaged(screen))
         twin_screen_update(screen);

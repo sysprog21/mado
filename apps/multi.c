@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "apps_demo.h"
+#include "apps_multi.h"
 
 #define D(x) twin_double_to_fixed(x)
 
@@ -219,12 +219,12 @@ static void apps_jelly_start(twin_screen_t *screen, int x, int y, int w, int h)
     twin_window_show(window);
 }
 
-void apps_demo_start(twin_screen_t *screen,
-                     const char *name,
-                     int x,
-                     int y,
-                     int w,
-                     int h)
+void apps_multi_start(twin_screen_t *screen,
+                      const char *name,
+                      int x,
+                      int y,
+                      int w,
+                      int h)
 {
     (void) name;
     apps_circletext_start(screen, x, y, w, h);

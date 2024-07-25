@@ -15,9 +15,9 @@
 
 #include "apps_calc.h"
 #include "apps_clock.h"
-#include "apps_demo.h"
 #include "apps_hello.h"
 #include "apps_line.h"
+#include "apps_multi.h"
 #include "apps_spline.h"
 
 #define WIDTH 640
@@ -105,7 +105,7 @@ int main(void)
         tx->screen, load_background(tx->screen, ASSET_PATH "/tux.png"));
 
 #if defined(CONFIG_DEMO_MULTI)
-    apps_demo_start(tx->screen, "Demo", 100, 100, 400, 400);
+    apps_multi_start(tx->screen, "Demo", 100, 100, 400, 400);
 #endif
 #if defined(CONFIG_DEMO_HELLO)
     apps_hello_start(tx->screen, "Hello, World", 0, 0, 200, 200);

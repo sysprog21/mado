@@ -9,6 +9,11 @@ libbackend.a
 .libbackend.a
 libapps.a
 .libapps.a
+.config
+.config.old
+config.h
+__pycache__
+*.pyc
 
 # Tools
 tools/ttf/twin-ttf

@@ -45,7 +45,10 @@ jobs:
             sudo apt install libsdl2-dev libjpeg-dev libpng-dev
       shell: bash
     - name: default build
-      run: make
+      run: |
+            tools/kconfig/defconfig.py --kconfig configs/Kconfig configs/defconfig
+            tools/kconfig/genconfig.py configs/Kconfig
+            make
 
   coding-style:
     needs: [detect-code-related-file-changes]

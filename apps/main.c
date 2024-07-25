@@ -1,5 +1,6 @@
 /*
  * Twin - A Tiny Window System
+ * Copyright (c) 2024 National Cheng Kung University, Taiwan
  * Copyright (c) 2004 Keith Packard <keithp@keithp.com>
  * All rights reserved.
  */
@@ -33,6 +34,7 @@
 static twin_pixmap_t *load_background(twin_screen_t *screen,
                                       const char *filename)
 {
+#if defined(CONFIG_LOADER_PNG)
     twin_pixmap_t *raw_background = twin_png_to_pixmap(filename, TWIN_ARGB32);
     if (!raw_background) /* Fallback to a default pattern */
         return twin_make_pattern();
@@ -65,6 +67,9 @@ static twin_pixmap_t *load_background(twin_screen_t *screen,
     twin_pixmap_destroy(raw_background);
 
     return scaled_background;
+#else
+    return twin_make_pattern();
+#endif
 }
 
 static twin_context_t *tx = NULL;
@@ -99,12 +104,24 @@ int main(void)
     twin_screen_set_background(
         tx->screen, load_background(tx->screen, ASSET_PATH "/tux.png"));
 
+#if defined(CONFIG_DEMO_MULTI)
     apps_demo_start(tx->screen, "Demo", 100, 100, 400, 400);
+#endif
+#if defined(CONFIG_DEMO_HELLO)
     apps_hello_start(tx->screen, "Hello, World", 0, 0, 200, 200);
+#endif
+#if defined(CONFIG_DEMO_CLOCK)
     apps_clock_start(tx->screen, "Clock", 10, 10, 200, 200);
+#endif
+#if defined(CONFIG_DEMO_CALCULATOR)
     apps_calc_start(tx->screen, "Calculator", 100, 100, 200, 200);
+#endif
+#if defined(CONFIG_DEMO_LINE)
     apps_line_start(tx->screen, "Line", 0, 0, 200, 200);
+#endif
+#if defined(CONFIG_DEMO_SPLINE)
     apps_spline_start(tx->screen, "Spline", 20, 20, 400, 400);
+#endif
 
     twin_dispatch();
 

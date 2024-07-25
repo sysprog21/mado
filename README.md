@@ -62,6 +62,11 @@ have the [SDL2 library](https://www.libsdl.org/), [libjpeg](https://www.ijg.org/
 * macOS: `brew install sdl2 jpeg libpng`
 * Ubuntu Linux / Debian: `sudo apt install libsdl2-dev libjpeg-dev libpng-dev`
 
+Configure via [Kconfiglib](https://pypi.org/project/kconfiglib/)
+```shell
+$ make config
+```
+
 Build the library and demo program.
 ```shell
 $ make

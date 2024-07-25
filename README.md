@@ -2,26 +2,22 @@
 
 ## Introduction
 
-With embedded systems now featuring high-resolution displays and powerful CPUs,
-the desire for sophisticated graphical user interfaces can be realized even in
-the smallest devices. Although CPU power within a given power budget has
-increased dramatically, these small systems still face severe memory
-constraints. This unique environment presents interesting challenges for
-graphical system design and implementation. To address these challenges,
-a new window system called `Mado` has been developed. Drawing from ideas used in
-modern window systems for larger environments, `Mado` provides overlapping
-translucent windows, anti-aliased graphics, and scalable fonts within a total
-memory budget of several kilobytes.
+MADO (Minimalistic Application Display Orchestrator) is an open-source library
+that brings advanced window system features to smaller devices. With embedded
+systems now featuring high-resolution displays and powerful CPUs, sophisticated
+graphical user interfaces can be realized even in the smallest devices. Although
+CPU power has increased dramatically within a given power budget, these small
+systems still face severe memory constraints. This unique environment presents
+interesting challenges for graphical system design and implementation.
 
-`Mado` embeds window management directly into the toolkit. Support for resizing,
-moving, and minimizing is not under the control of an external application.
-Instead, the toolkit automatically constructs suitable decorations for each
-window as regular toolkit objects, and the normal event dispatch mechanism
-directs window management activities.
-
-While external management is a valuable architectural feature in a
-heterogeneous desktop environment, the additional space, time, and complexity
-rule this out in diverse embedded systems.
+To address these challenges, `Mado` has been developed. Drawing from ideas used
+in modern window systems for larger environments, `Mado` provides overlapping
+translucent windows, anti-aliased graphics, and scalable fonts within a memory
+budget of several kilobytes. `Mado` embeds window management directly into the
+toolkit, supporting resizing, moving, and minimizing without external control.
+The toolkit automatically constructs suitable decorations for each window as
+regular toolkit objects, and the normal event dispatch mechanism directs window
+management activities.
 
 `Mado` is a continuation of the work on [TWIN](https://keithp.com/~keithp/talks/twin-ols2005/),
 originally developed by Keith Packard. 'Mado' means 'window' in the language of

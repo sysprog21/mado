@@ -338,7 +338,7 @@ static void draw_char(char_t *c)
                 cairo_set_source_rgb(cr, 0, .5, .5);
 
             cairo_move_to(cr, tx - 2, ty + 3);
-            sprintf(buf, "%d", i);
+            snprintf(buf, sizeof(buf) + 1, "%d", i);
             cairo_show_text(cr, buf);
             cairo_restore(cr);
         }

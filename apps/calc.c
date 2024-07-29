@@ -92,7 +92,7 @@ static int _apps_calc_button_to_id(apps_calc_t *calc, twin_button_t *button)
 static void _apps_calc_update_value(apps_calc_t *calc)
 {
     char v[20];
-    
+
     snprintf(v, sizeof(v) + 1, "%d", calc->stack[0]);
     twin_label_set(calc->display, v, APPS_CALC_VALUE_FG, APPS_CALC_VALUE_SIZE,
                    APPS_CALC_VALUE_STYLE);

@@ -101,6 +101,13 @@ int main(void)
     atexit(cleanup);
     signal(SIGINT, sigint_handler);
 
+#if defined(CONFIG_CURSOR)
+    int hx, hy;
+    twin_pixmap_t *cursor = twin_make_cursor(&hx, &hy);
+    if (cursor)
+        twin_screen_set_cursor(tx->screen, cursor, hx, hy);
+#endif
+
     twin_screen_set_background(
         tx->screen, load_background(tx->screen, ASSET_PATH "/tux.png"));
 

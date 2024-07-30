@@ -56,6 +56,9 @@ libtwin.a_includes-y := \
 	include \
 	src
 
+# Features
+libtwin.a_files-$(CONFIG_CURSOR) += src/cursor.c
+
 # Image loaders
 
 ifeq ($(CONFIG_LOADER_JPEG), y)

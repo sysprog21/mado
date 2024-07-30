@@ -16,6 +16,14 @@ config BACKEND_SDL
 
 endchoice
 
+menu "Features"
+
+config CURSOR
+    bool "Manipulate cursor"
+    default n
+
+endmenu
+
 menu "Image Loaders"
 
 config LOADER_PNG

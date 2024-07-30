@@ -210,9 +210,11 @@ void twin_screen_update(twin_screen_t *screen)
                 twin_screen_span_pixmap(screen, span, p, y, left, right, pop16,
                                         pop32);
 
+#if defined(CONFIG_CURSOR)
             if (screen->cursor)
                 twin_screen_span_pixmap(screen, span, screen->cursor, y, left,
                                         right, pop16, pop32);
+#endif
 
             (*screen->put_span)(left, y, right, span, screen->closure);
         }
@@ -253,6 +255,7 @@ twin_pixmap_t *twin_screen_get_background(twin_screen_t *screen)
     return screen->background;
 }
 
+#if defined(CONFIG_CURSOR)
 static void twin_screen_damage_cursor(twin_screen_t *screen)
 {
     twin_screen_damage(screen, screen->cursor->x, screen->cursor->y,
@@ -302,6 +305,7 @@ static void twin_screen_update_cursor(twin_screen_t *screen,
 
     twin_screen_enable_update(screen);
 }
+#endif /* CONFIG_CURSOR */
 
 static void _twin_adj_mouse_evt(twin_event_t *event, twin_pixmap_t *pixmap)
 {
@@ -320,9 +324,11 @@ bool twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
     case TwinEventMotion:
     case TwinEventButtonDown:
     case TwinEventButtonUp:
+#if defined(CONFIG_CURSOR)
         /* update mouse cursor */
         twin_screen_update_cursor(screen, event->u.pointer.screen_x,
                                   event->u.pointer.screen_y);
+#endif
 
         /* if target is tracking the mouse, check for mouse up, if not,
          * just pass the event along

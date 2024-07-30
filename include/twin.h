@@ -579,6 +579,12 @@ void twin_path_convolve(twin_path_t *dest,
                         twin_path_t *pen);
 
 /*
+ * cursor.c
+ */
+
+twin_pixmap_t *twin_make_cursor(int *hx, int *hy);
+
+/*
  * dispatch.c
  */
 

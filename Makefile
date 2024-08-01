@@ -50,6 +50,7 @@ libtwin.a_files-y = \
 	src/icon.c \
 	src/pixmap.c \
 	src/timeout.c \
+	src/image.c \
 	src/api.c
 
 libtwin.a_includes-y := \

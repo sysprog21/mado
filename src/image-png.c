@@ -42,7 +42,7 @@ static void _convertBGRtoARGB(uint8_t *data, int width, int height)
 }
 #endif
 
-twin_pixmap_t *twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
+twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
 {
     uint8_t signature[8];
     int rb = 0;

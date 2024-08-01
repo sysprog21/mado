@@ -687,16 +687,10 @@ void twin_icon_draw(twin_pixmap_t *pixmap,
                     twin_matrix_t matrix);
 
 /*
- * image-jpeg.c
+ * image.c
  */
 
-twin_pixmap_t *twin_jpeg_to_pixmap(const char *filepath, twin_format_t fmt);
-
-/*
- * image-png.c
- */
-
-twin_pixmap_t *twin_png_to_pixmap(const char *filepath, twin_format_t fmt);
+twin_pixmap_t *twin_pixmap_from_file(const char *path, twin_format_t fmt);
 
 /*
  * label.c

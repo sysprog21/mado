@@ -25,17 +25,13 @@
 
 #define ASSET_PATH "assets/"
 
-/**
+/*
  * Load the background pixmap from storage.
- * @filename: File name of a PNG background.
- *
- * Return a default pattern if the load of @filename fails.
+ * Return a default pattern if the load of @path or image loader fails.
  */
-static twin_pixmap_t *load_background(twin_screen_t *screen,
-                                      const char *filename)
+static twin_pixmap_t *load_background(twin_screen_t *screen, const char *path)
 {
-#if defined(CONFIG_LOADER_PNG)
-    twin_pixmap_t *raw_background = twin_png_to_pixmap(filename, TWIN_ARGB32);
+    twin_pixmap_t *raw_background = twin_pixmap_from_file(path, TWIN_ARGB32);
     if (!raw_background) /* Fallback to a default pattern */
         return twin_make_pattern();
 
@@ -67,9 +63,6 @@ static twin_pixmap_t *load_background(twin_screen_t *screen,
     twin_pixmap_destroy(raw_background);
 
     return scaled_background;
-#else
-    return twin_make_pattern();
-#endif
 }
 
 static twin_context_t *tx = NULL;

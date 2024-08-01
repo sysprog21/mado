@@ -41,7 +41,7 @@ static void twin_jpeg_error_exit(j_common_ptr cinfo)
     longjmp(jerr->jbuf, 1);
 }
 
-twin_pixmap_t *twin_jpeg_to_pixmap(const char *filepath, twin_format_t fmt)
+twin_pixmap_t *_twin_jpeg_to_pixmap(const char *filepath, twin_format_t fmt)
 {
     twin_pixmap_t *pix = NULL;
 

@@ -41,12 +41,17 @@ software by allowing anti-aliased drawing to generate nearly invisible errors
 instead of visibly incorrect results. Smooth color gradations eliminate the need
 for dithering or other color-approximating schemes.
 
-Respectable CPU performance is expected, reducing the need to cache intermediate
-rendering results, such as glyph images for text. Supporting only one general
-performance class of drawing operations, `Mado` focuses on anti-aliased drawing,
-as supported CPUs are fast enough to make non-anti-aliased drawing irrelevant.
-Additionally, `Mado` does not rely on an FPU or heavy FPU emulations, using its
-own fixed-point arithmetic instead.
+`Mado` is designed to ensure respectable CPU performance, which mitigates the
+need for caching intermediate rendering results like glyph images for text. It
+supports only a single, general performance class of drawing operations,
+focusing exclusively on anti-aliased drawing. This focus is practical because
+the CPUs that `Mado` supports are sufficiently fast, rendering non-anti-aliased
+drawing obsolete. Moreover, `Mado` avoids reliance on a floating point unit (FPU)
+or extensive FPU emulation by employing its own fixed-point arithmetic for all
+necessary computations. This approach extends to nearly all of `Mado`'s optional
+components as well. For specific tasks such as subpixel font layout and alpha
+blending, `Mado` utilizes fixed-point math, ensuring that it remains efficient
+even on CPUs without an FPU.
 
 These environmental limitations enable `Mado` to provide significant
 functionality with minimal wasted code. Unlike window systems designed for

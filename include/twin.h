@@ -1042,6 +1042,8 @@ twin_fixed_t twin_cos(twin_angle_t a);
 
 twin_fixed_t twin_tan(twin_angle_t a);
 
+void twin_sincos(twin_angle_t a, twin_fixed_t *sin, twin_fixed_t *cos);
+
 /*
  * widget.c
  */

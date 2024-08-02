@@ -55,29 +55,48 @@ benefiting the entire application stack.
 
 ## Build and Verify
 
+### Prerequisites
+
 `Mado` is built with a minimalist design in mind. However, its verification
 relies on certain third-party packages for full functionality and access to all
 its features. To ensure proper operation, the development environment should
-have the [SDL2 library](https://www.libsdl.org/), [libjpeg](https://www.ijg.org/), and [libpng](https://github.com/pnggroup/libpng) installed.
+have the [libjpeg](https://www.ijg.org/), and [libpng](https://github.com/pnggroup/libpng) installed.
+The [SDL2 library](https://www.libsdl.org/) is optional and only needed if you choose to use SDL as
+the backend over the Linux framebuffer.
 * macOS: `brew install sdl2 jpeg libpng`
 * Ubuntu Linux / Debian: `sudo apt install libsdl2-dev libjpeg-dev libpng-dev`
 
-Configure via [Kconfiglib](https://pypi.org/project/kconfiglib/)
+### Configure the demo program
+
+Configure via [Kconfiglib](https://pypi.org/project/kconfiglib/), you should select either SDL
+video output or the Linux framebuffer.
 ```shell
 $ make config
 ```
 
-Build the library and demo program.
+### Build the library and demo program
+
 ```shell
 $ make
 ```
 
-Run sample `Mado` program:
+### Run demo program with SDL backend
+
 ```shell
 $ ./demo-sdl
 ```
 
 Once the window appears, you should be able to move the windows and interact with the widgets.
+
+### Run demo program with the Linux framebuffer backend
+
+Normal users don't have access to `/dev/fb0` so use `sudo`:
+
+```shell
+$ sudo FRAMEBUFFER=/dev/fb0 MOUSE=/dev/input/mice ./demo-fbdev
+```
+
+Note that the framebuffer and mouse device files can be assigned via environment variable `$FRAMEBUFFER` and `$MOUSE`.
 
 ## License
 

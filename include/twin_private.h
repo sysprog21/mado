@@ -15,11 +15,40 @@
 #define maybe_unused __attribute__((unused))
 
 /*
- * Post-transformed points are stored in 12.4 fixed point
- * values
+ * Fixed-point type definitions
+ *
+ * "Qm.f" is a representation of a fixed-point type,
+ * where "m" bits are used for the integer part,
+ * "f" bits are used for the fractional part and 1 bit is used
+ * for the sign part. The total number of used bits is 1+m+f.
+ *
+ * twin_sfixed_t - A fixed-point type in the Q11.4 format.
+ *
+ *        Hex                 Binary   Decimal       Actual
+ * Max 0x7fff    0111 1111 1111 1111     32767    2047.9375
+ * Min 0x8000    1000 0000 0000 0000    -32768         2048
+ *
+ * twin_dfixed_t - A fixed-point type in the Q23.8 format.
+ *
+ *            Hex                                     Binary
+ * Max 0x7fffffff    0111 1111 1111 1111 1111 1111 1111 1111
+ * Min 0x80000000    1000 0000 0000 0000 0000 0000 0000 0000
+ *         Decimal           Actual
+ * Max  2147483647    8388607.99609
+ * Min -2147483648         -8388608
+ *
+ * twin_gfixed_t - A fixed-point type in the Q1.6 format.
+ *                 And used in Glyph coordinates.
+ *
+ *      Hex       Binary   Decimal      Actual
+ * Max 0x7f    0111 1111       127    1.984375
+ * Min 0x80    1000 0000      -128          -2
+ *
+ * All of the above tables are based on the two's complement.
  */
-typedef int16_t twin_sfixed_t; /* 12.4 format */
-typedef int32_t twin_dfixed_t; /* 24.8 format (12.4 * 12.4) */
+typedef int16_t twin_sfixed_t;
+typedef int32_t twin_dfixed_t;
+typedef int8_t twin_gfixed_t;
 
 #define twin_sfixed_floor(f) ((f) & ~0xf)
 #define twin_sfixed_trunc(f) ((f) >> 4)
@@ -46,10 +75,6 @@ typedef int32_t twin_dfixed_t; /* 24.8 format (12.4 * 12.4) */
 #define TWIN_SFIXED_MIN (-0x7fff)
 #define TWIN_SFIXED_MAX (0x7fff)
 
-/*
- * Glyph coordinates are stored in 2.6 fixed point
- */
-typedef signed char twin_gfixed_t;
 
 #define TWIN_GFIXED_ONE (0x40)
 

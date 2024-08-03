@@ -103,7 +103,7 @@ static void _twin_spline_decompose(twin_path_t *path,
         } while (!is_flat(&left, tolerance_squared));
 
         /* Draw the left segment */
-        _twin_path_sdraw(path, left.a.x, left.a.y);
+        _twin_path_sdraw(path, left.d.x, left.d.y);
 
         /* Update spline to the right segment */
         memcpy(spline, &right, sizeof(twin_spline_t));
@@ -132,7 +132,6 @@ void _twin_path_scurve(twin_path_t *path,
     };
     _twin_spline_decompose(path, &spline,
                            TWIN_SFIXED_TOLERANCE * TWIN_SFIXED_TOLERANCE);
-    _twin_path_sdraw(path, x3, y3);
 }
 
 void twin_path_curve(twin_path_t *path,

@@ -17,10 +17,9 @@
 /*
  * Fixed-point type definitions
  *
- * "Qm.f" is a representation of a fixed-point type,
- * where "m" bits are used for the integer part,
- * "f" bits are used for the fractional part and 1 bit is used
- * for the sign part. The total number of used bits is 1+m+f.
+ * "Qm.f" is a representation of a fixed-point type, where "m" bits are used
+ * for the integer part, "f" bits are used for the fractional part, and 1 bit
+ * is used for the sign. The total number of used bits is 1 + m + f.
  *
  * twin_sfixed_t - A fixed-point type in the Q11.4 format.
  *
@@ -37,14 +36,14 @@
  * Max  2147483647    8388607.99609
  * Min -2147483648         -8388608
  *
- * twin_gfixed_t - A fixed-point type in the Q1.6 format.
- *                 And used in Glyph coordinates.
+ * twin_gfixed_t - A fixed-point type in the Q1.6 format, used in Glyph
+ *                 coordinates.
  *
  *      Hex       Binary   Decimal      Actual
  * Max 0x7f    0111 1111       127    1.984375
  * Min 0x80    1000 0000      -128          -2
  *
- * All of the above tables are based on the two's complement.
+ * All of the above tables are based on two's complement representation.
  */
 typedef int16_t twin_sfixed_t;
 typedef int32_t twin_dfixed_t;
@@ -531,9 +530,6 @@ void _twin_button_init(twin_button_t *button,
 static inline int twin_clz(uint32_t v)
 {
     uint32_t leading_zero = 0;
-    /* Search from LSB to MSB for first set bit.
-     * Returns zero if no set bit is found.
-     */
     if (_BitScanReverse(&leading_zero, v))
         return 31 - leading_zero;
     return 32; /* undefined behavior */

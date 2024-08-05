@@ -29,7 +29,7 @@ twin_dfixed_t _twin_distance_to_line_squared(twin_spoint_t *p,
      * B = (x1 - x2)
      * C = (y1x2 - x1y2)
      *
-     * distance² = (AX + BC + C)² / (A² + B²)
+     * distance² = (AX + BY + C)² / (A² + B²)
      */
     twin_dfixed_t A = p2->y - p1->y;
     twin_dfixed_t B = p1->x - p2->x;

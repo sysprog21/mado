@@ -1,19 +1,32 @@
 # Generated
+*.d
 *.o
-*.o.d
-demo-sdl
-.demo-sdl
-libtwin.a
-.libtwin.a
-libbackend.a
-.libbackend.a
-libapps.a
-.libapps.a
+*.a
+demo-*
+.demo-*
+
+# Swap
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Vim session
+Session.vim
+Sessionx.vim
+
+# Tag files
+tags
+
+# Python
+__pycache__/
+*.pyc
+
+# Configuration
 .config
 .config.old
 config.h
-__pycache__
-*.pyc
 
 # Tools
 tools/ttf/twin-ttf

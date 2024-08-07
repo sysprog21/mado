@@ -11,38 +11,38 @@ typedef struct _twin_spline {
 } twin_spline_t;
 
 /*
- * Linearly interpolate between points 'a' and 'b' with a shift factor.
- * The shift factor determines the position between 'a' and 'b'.
+ * Linearly interpolate between points 'a' and 'b' with a 't' factor.
+ * The 't' factor determines the position between 'a' and 'b'.
  * The result is stored in 'result'.
  */
 static void _lerp(const twin_spoint_t *a,
                   const twin_spoint_t *b,
-                  int shift,
+                  twin_dfixed_t t,
                   twin_spoint_t *result)
 {
-    result->x = a->x + ((b->x - a->x) >> shift);
-    result->y = a->y + ((b->y - a->y) >> shift);
+    result->x = a->x + twin_dfixed_to_sfixed(twin_dfixed_mul(
+                           twin_sfixed_to_dfixed(b->x - a->x), t));
+    result->y = a->y + twin_dfixed_to_sfixed(twin_dfixed_mul(
+                           twin_sfixed_to_dfixed(b->y - a->y), t));
 }
 
 /*
- * Perform the de Casteljau algorithm to split a spline at a given shift
+ * Perform the de Casteljau algorithm to split a spline at a given 't'
  * factor. The spline is split into two new splines 's1' and 's2'.
  */
 static void _de_casteljau(twin_spline_t *spline,
-                          int shift,
+                          twin_dfixed_t t,
                           twin_spline_t *s1,
                           twin_spline_t *s2)
 {
-    twin_spoint_t ab, bc, cd;
-    twin_spoint_t abbc, bccd;
-    twin_spoint_t final;
+    twin_spoint_t ab, bc, cd, abbc, bccd, final;
 
-    _lerp(&spline->a, &spline->b, shift, &ab);
-    _lerp(&spline->b, &spline->c, shift, &bc);
-    _lerp(&spline->c, &spline->d, shift, &cd);
-    _lerp(&ab, &bc, shift, &abbc);
-    _lerp(&bc, &cd, shift, &bccd);
-    _lerp(&abbc, &bccd, shift, &final);
+    _lerp(&spline->a, &spline->b, t, &ab);
+    _lerp(&spline->b, &spline->c, t, &bc);
+    _lerp(&spline->c, &spline->d, t, &cd);
+    _lerp(&ab, &bc, t, &abbc);
+    _lerp(&bc, &cd, t, &bccd);
+    _lerp(&abbc, &bccd, t, &final);
 
     s1->a = spline->a;
     s1->b = ab;
@@ -56,10 +56,10 @@ static void _de_casteljau(twin_spline_t *spline,
 }
 
 /*
- * Return an upper bound on the error (squared) that could result from
+ * Return an upper bound on the distance (squared) that could result from
  * approximating a spline with a line segment connecting the two endpoints.
  */
-static twin_dfixed_t _twin_spline_error_squared(twin_spline_t *spline)
+static twin_dfixed_t _twin_spline_distance_squared(twin_spline_t *spline)
 {
     twin_dfixed_t berr, cerr;
 
@@ -72,12 +72,12 @@ static twin_dfixed_t _twin_spline_error_squared(twin_spline_t *spline)
 }
 
 /*
- * Check if a spline is flat enough by comparing the error against the
+ * Check if a spline is flat enough by comparing the distance against the
  * tolerance.
  */
 static bool is_flat(twin_spline_t *spline, twin_dfixed_t tolerance_squared)
 {
-    return _twin_spline_error_squared(spline) <= tolerance_squared;
+    return _twin_spline_distance_squared(spline) <= tolerance_squared;
 }
 
 /*
@@ -93,14 +93,45 @@ static void _twin_spline_decompose(twin_path_t *path,
     _twin_path_sdraw(path, spline->a.x, spline->a.y);
 
     while (!is_flat(spline, tolerance_squared)) {
-        int shift = 1;
+        twin_dfixed_t hi = TWIN_SFIXED_ONE * TWIN_SFIXED_ONE, lo = 0,
+                      t_optimal = 0, t, max_distance = 0, distance;
         twin_spline_t left, right;
 
-        /* FIXME: Find the optimal shift value to decompose the spline */
-        do {
-            _de_casteljau(spline, shift, &left, &right);
-            shift++;
-        } while (!is_flat(&left, tolerance_squared));
+        while (true) {
+            t = (hi + lo) >> 1;
+            if (t_optimal == t)
+                break;
+
+            _de_casteljau(spline, t, &left, &right);
+
+            distance = _twin_spline_distance_squared(&left);
+            if (distance < max_distance)
+                break;
+
+            /* The left segment is close enough to fit the original spline. */
+            if (distance <= tolerance_squared) {
+                max_distance = distance;
+                t_optimal = t;
+                /*
+                 * Try to find a better point such that the line segment
+                 * connecting it to the previous point can fit the spline, while
+                 * maximizing the distance from the spline as much as possible.
+                 */
+                lo = t;
+            } else {
+                /*
+                 * The line segment connecting the previous point to the
+                 * currently tested point with value 't' cannot fit the original
+                 * spline. The point with value 't_optimal' is sufficient to fit
+                 * the original spline.
+                 */
+                if (t_optimal)
+                    break;
+                hi = t;
+            }
+        }
+
+        _de_casteljau(spline, t_optimal, &left, &right);
 
         /* Draw the left segment */
         _twin_path_sdraw(path, left.d.x, left.d.y);

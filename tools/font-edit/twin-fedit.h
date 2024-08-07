@@ -42,7 +42,7 @@
  * @x: x-component
  * @y: y-component
  */
-typedef struct {
+typedef struct _pt {
     double x, y;
 } pt_t;
 
@@ -52,7 +52,7 @@ typedef struct {
  * @s: size of the storage
  * @pt: pointer of pt_ts
  */
-typedef struct _pts_t {
+typedef struct _pts {
     int n;
     int s;
     pt_t *pt;
@@ -71,7 +71,7 @@ typedef struct _spline {
 
 /* Command line tpyes */
 
-typedef enum _op { OpMove, OpLine, OpCurve, OpNoop } op_t;
+typedef enum { op_move, op_line, op_curve, op_noop } op_t;
 
 typedef struct _cmd {
     struct _cmd *next;

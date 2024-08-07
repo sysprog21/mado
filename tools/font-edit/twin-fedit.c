@@ -319,7 +319,7 @@ static void draw_char(char_t *c)
 
     for (cmd = c->cmd, i = 0; cmd; cmd = cmd->next, i++) {
         double tx, ty;
-        char buf[10];
+        char buf[11];
 
         if (cmd->op == op_curve) {
             tx = cmd->pt[2].x;
@@ -338,7 +338,7 @@ static void draw_char(char_t *c)
                 cairo_set_source_rgb(cr, 0, .5, .5);
 
             cairo_move_to(cr, tx - 2, ty + 3);
-            snprintf(buf, sizeof(buf) + 1, "%d", i);
+            snprintf(buf, sizeof(buf), "%d", i);
             cairo_show_text(cr, buf);
             cairo_restore(cr);
         }

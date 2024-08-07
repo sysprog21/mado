@@ -105,7 +105,7 @@ static cmd_t *insert_cmd(cmd_t **prev)
 {
     cmd_t *n = malloc(sizeof(cmd_t));
 
-    n->op = OpNoop;
+    n->op = op_noop;
     n->next = *prev;
     *prev = n;
     return n;
@@ -187,17 +187,17 @@ static char_t *read_char(void)
         switch (line[5]) {
         case 'm':
             cmd = append_cmd(c);
-            cmd->op = OpMove;
+            cmd->op = op_move;
             sscanf(line + 8, "%lf, %lf", &cmd->pt[0].x, &cmd->pt[0].y);
             break;
         case 'l':
             cmd = append_cmd(c);
-            cmd->op = OpLine;
+            cmd->op = op_line;
             sscanf(line + 8, "%lf, %lf", &cmd->pt[0].x, &cmd->pt[0].y);
             break;
         case 'c':
             cmd = append_cmd(c);
-            cmd->op = OpCurve;
+            cmd->op = op_curve;
             sscanf(line + 8, "%lf, %lf, %lf, %lf, %lf, %lf", &cmd->pt[0].x,
                    &cmd->pt[0].y, &cmd->pt[1].x, &cmd->pt[1].y, &cmd->pt[2].x,
                    &cmd->pt[2].y);
@@ -257,13 +257,13 @@ static void draw_char(char_t *c)
             alpha = 0.5;
 
         switch (cmd->op) {
-        case OpMove:
+        case op_move:
             dot(cr, cmd->pt[0].x, cmd->pt[0].y, 1, 1, 0, alpha);
             break;
-        case OpLine:
+        case op_line:
             dot(cr, cmd->pt[0].x, cmd->pt[0].y, 1, 0, 0, alpha);
             break;
-        case OpCurve:
+        case op_curve:
             dot(cr, cmd->pt[0].x, cmd->pt[0].y, 0, 0, 1, alpha);
             dot(cr, cmd->pt[1].x, cmd->pt[1].y, 0, 0, 1, alpha);
             dot(cr, cmd->pt[2].x, cmd->pt[2].y, 0, 1, 0, alpha);
@@ -280,13 +280,13 @@ static void draw_char(char_t *c)
             double alpha = 1;
 
             switch (cmd->op) {
-            case OpMove:
+            case op_move:
                 spot(cr, cmd->pt[0].x, cmd->pt[0].y, 1, 1, 0, alpha);
                 break;
-            case OpLine:
+            case op_line:
                 spot(cr, cmd->pt[0].x, cmd->pt[0].y, 1, 0, 0, alpha);
                 break;
-            case OpCurve:
+            case op_curve:
                 spot(cr, cmd->pt[0].x, cmd->pt[0].y, 0, 0, 1, alpha);
                 spot(cr, cmd->pt[1].x, cmd->pt[1].y, 0, 0, 1, alpha);
                 spot(cr, cmd->pt[2].x, cmd->pt[2].y, 0, 1, 0, alpha);
@@ -301,13 +301,13 @@ static void draw_char(char_t *c)
 
     for (cmd = c->cmd; cmd; cmd = cmd->next) {
         switch (cmd->op) {
-        case OpMove:
+        case op_move:
             cairo_move_to(cr, cmd->pt[0].x, cmd->pt[0].y);
             break;
-        case OpLine:
+        case op_line:
             cairo_line_to(cr, cmd->pt[0].x, cmd->pt[0].y);
             break;
-        case OpCurve:
+        case op_curve:
             cairo_curve_to(cr, cmd->pt[0].x, cmd->pt[0].y, cmd->pt[1].x,
                            cmd->pt[1].y, cmd->pt[2].x, cmd->pt[2].y);
             break;
@@ -321,7 +321,7 @@ static void draw_char(char_t *c)
         double tx, ty;
         char buf[10];
 
-        if (cmd->op == OpCurve) {
+        if (cmd->op == op_curve) {
             tx = cmd->pt[2].x;
             ty = cmd->pt[2].y;
         } else {
@@ -359,7 +359,7 @@ static cmd_t *pos_to_cmd(char_t *c, cmd_t *start, int ix, int iy)
 
     cmd = start;
     while (cmd) {
-        int i = cmd->op == OpCurve ? 2 : 0;
+        int i = cmd->op == op_curve ? 2 : 0;
         double dx = cmd->pt[i].x - x;
         double dy = cmd->pt[i].y - y;
         double err = sqrt(dx * dx + dy * dy);
@@ -404,7 +404,7 @@ static void replace_with_spline(char_t *c, cmd_t *first, cmd_t *last)
 
     order(&first, &last);
     for (cmd = first; cmd != last->next; cmd = cmd->next) {
-        int i = cmd->op == OpCurve ? 2 : 0;
+        int i = cmd->op == op_curve ? 2 : 0;
         add_pt(pts, &cmd->pt[i]);
     }
 
@@ -421,7 +421,7 @@ static void replace_with_spline(char_t *c, cmd_t *first, cmd_t *last)
 
     cmd = insert_cmd(&first->next);
 
-    cmd->op = OpCurve;
+    cmd->op = op_curve;
     cmd->pt[0] = s.b;
     cmd->pt[1] = s.c;
     cmd->pt[2] = s.d;
@@ -436,12 +436,12 @@ static void split(char_t *c, cmd_t *first, cmd_t *last)
 
     push(c);
     cmd = insert_cmd(&first->next);
-    cmd->op = OpLine;
+    cmd->op = op_line;
     cmd->pt[0] = lerp(&first->pt[0], &last->pt[0]);
-    if (last->op == OpMove) {
+    if (last->op == op_move) {
         cmd_t *extra = insert_cmd(&last->next);
 
-        extra->op = OpLine;
+        extra->op = op_line;
         extra->pt[0] = last->pt[0];
         last->pt[0] = cmd->pt[0];
     }
@@ -533,9 +533,9 @@ static void play(char_t *c)
                 }
             } else {
                 cmd_t *spline;
-                if (c->first && c->first->op == OpCurve)
+                if (c->first && c->first->op == op_curve)
                     spline = c->first;
-                else if (c->last && c->last->op == OpCurve)
+                else if (c->last && c->last->op == op_curve)
                     spline = c->last;
                 else
                     spline = 0;
@@ -586,15 +586,15 @@ static void write_char(char_t *c)
 
     for (cmd = c->cmd; cmd; cmd = cmd->next) {
         switch (cmd->op) {
-        case OpMove:
+        case op_move:
             printf("    'm', %g, %g,\n", cmd->pt[0].x, cmd->pt[0].y);
             offset += 3;
             break;
-        case OpLine:
+        case op_line:
             printf("    'l', %g, %g,\n", cmd->pt[0].x, cmd->pt[0].y);
             offset += 3;
             break;
-        case OpCurve:
+        case op_curve:
             printf("    'c', %g, %g, %g, %g, %g, %g,\n", cmd->pt[0].x,
                    cmd->pt[0].y, cmd->pt[1].x, cmd->pt[1].y, cmd->pt[2].x,
                    cmd->pt[2].y);

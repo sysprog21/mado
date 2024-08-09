@@ -95,7 +95,7 @@ double distance_to_line(pt_t *p, pt_t *p1, pt_t *p2)
      * B = (x1 - x2)
      * C = (y1x2 - x1y2)
      *
-     * distance² = (AX + BC + C)² / (A² + B²)
+     * distance² = (AX + BY + C)² / (A² + B²)
      */
     double A = p2->y - p1->y;
     double B = p1->x - p2->x;

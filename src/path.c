@@ -134,6 +134,13 @@ void twin_path_draw(twin_path_t *path, twin_fixed_t x, twin_fixed_t y)
                      _twin_matrix_y(&path->state.matrix, x, y));
 }
 
+static void twin_path_draw_polar(twin_path_t *path, twin_angle_t deg)
+{
+    twin_fixed_t s, c;
+    twin_sincos(deg, &s, &c);
+    twin_path_draw(path, c, s);
+}
+
 void twin_path_rdraw(twin_path_t *path, twin_fixed_t dx, twin_fixed_t dy)
 {
     twin_spoint_t here = _twin_path_current_spoint(path);
@@ -218,14 +225,13 @@ void twin_path_arc(twin_path_t *path,
     twin_angle_t last = (start + extent - inc + epsilon) & ~(step - 1);
 
     if (first != start)
-        twin_path_draw(path, twin_cos(start), twin_sin(start));
+        twin_path_draw_polar(path, start);
 
     for (twin_angle_t a = first; a != last; a += inc)
-        twin_path_draw(path, twin_cos(a), twin_sin(a));
+        twin_path_draw_polar(path, a);
 
     if (last != start + extent)
-        twin_path_draw(path, twin_cos(start + extent),
-                       twin_sin(start + extent));
+        twin_path_draw_polar(path, start + extent);
 
     twin_path_set_matrix(path, save);
 }

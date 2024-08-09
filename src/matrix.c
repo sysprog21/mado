@@ -100,8 +100,8 @@ twin_point_t _twin_matrix_expand(twin_matrix_t *matrix)
 void twin_matrix_rotate(twin_matrix_t *m, twin_angle_t a)
 {
     twin_matrix_t t;
-    twin_fixed_t c = twin_cos(a);
-    twin_fixed_t s = twin_sin(a);
+    twin_fixed_t c, s;
+    twin_sincos(a, &s, &c);
 
     t.m[0][0] = c;
     t.m[0][1] = s;

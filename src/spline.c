@@ -57,7 +57,10 @@ static void _de_casteljau(twin_spline_t *spline,
 
 /*
  * Return an upper bound on the distance (squared) that could result from
- * approximating a spline with a line segment connecting the two endpoints.
+ * approximating a spline with a line segment connecting the two endpoints,
+ * which is based on the Convex Hull Property of Bézier Curves: The Bézier Curve
+ * lies completely in the convex hull of the given control points. Therefore, we
+ * can use control points B and C to approximate the actual spline.
  */
 static twin_dfixed_t _twin_spline_distance_squared(twin_spline_t *spline)
 {

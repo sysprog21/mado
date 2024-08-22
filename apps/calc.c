@@ -119,6 +119,12 @@ static void _apps_calc_digit(apps_calc_t *calc, int digit)
         calc->stack[0] = 0;
         calc->pending_delete = false;
     }
+
+    /* When the length reaches 9 digits, pressing the digit button will not
+     * increase the number of digits. */
+    if (calc->stack[0] > 99999999)
+        return;
+
     calc->stack[0] = calc->stack[0] * 10 + digit;
     _apps_calc_update_value(calc);
 }

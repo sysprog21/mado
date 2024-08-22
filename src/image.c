@@ -31,27 +31,55 @@ typedef enum {
 #undef _
 } twin_image_format_t;
 
-/* FIXME: Check the header of the given images to determine the supported image
- * formats instead of parsing the filename without checking its content.
+/*
+ * Defines the headers of supported image formats.
+ * Each image format has a unique header, allowing the format to be determined
+ * by inspecting the file header.
+ * Supported formats: PNG, JPEG.
+ * Reference:
+ * - PNG:
+ * http://www.libpng.org/pub/png/spec/1.2/PNG-Rationale.html#R.PNG-file-signature
+ * - JPEG:
+ * https://www.file-recovery.com/jpg-signature-format.htm
  */
-static twin_image_format_t image_type_from_name(const char *path)
+#if __BYTE_ORDER == __BIG_ENDIAN
+static const uint8_t header_png[8] = {
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+};
+#else
+static const uint8_t header_png[8] = {
+    0x0A, 0x1A, 0x0A, 0x0D, 0x47, 0x4E, 0x50, 0x89,
+};
+#endif
+static const uint8_t header_jpeg[3] = {0xFF, 0xD8, 0xFF};
+
+static twin_image_format_t image_type_detect(const char *path)
 {
     twin_image_format_t type = IMAGE_TYPE_unknown;
-    const char *extname = strrchr(path, '.');
-    if (!extname)
+    FILE *file = fopen(path, "rb");
+    if (!file) {
+        fprintf(stderr, "Failed to open %s\n", path);
+        return IMAGE_TYPE_unknown;
+    }
+
+    uint8_t header[8];
+    size_t bytes_read = fread(header, 1, sizeof(header), file);
+    fclose(file);
+
+    if (bytes_read < 8) /* incomplete image file */
         return IMAGE_TYPE_unknown;
 #if LOADER_HAS(PNG)
-    else if (!strcasecmp(extname, ".png")) {
+    else if (!memcmp(header, header_png, sizeof(header_png))) {
         type = IMAGE_TYPE_png;
     }
 #endif
 #if LOADER_HAS(JPEG)
-    else if (!strcasecmp(extname, ".jpg") || !strcasecmp(extname, ".jpeg")) {
+    else if (!memcmp(header, header_jpeg, sizeof(header_jpeg))) {
         type = IMAGE_TYPE_jpeg;
     }
 #endif
-    /* otherwise, unsupported format */
 
+    /* otherwise, unsupported format */
     return type;
 }
 
@@ -74,7 +102,7 @@ static loader_func_t image_loaders[] = {
 
 twin_pixmap_t *twin_pixmap_from_file(const char *path, twin_format_t fmt)
 {
-    loader_func_t loader = image_loaders[image_type_from_name(path)];
+    loader_func_t loader = image_loaders[image_type_detect(path)];
     if (!loader)
         return NULL;
     return loader(path, fmt);

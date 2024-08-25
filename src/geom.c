@@ -19,8 +19,7 @@ twin_dfixed_t _twin_distance_to_line_squared(twin_spoint_t *p,
                                              twin_spoint_t *p1,
                                              twin_spoint_t *p2)
 {
-    /*
-     * Convert to normal form (AX + BY + C = 0)
+    /* Convert to normal form (AX + BY + C = 0)
      *
      * (X - x1) * (y2 - y1) = (Y - y1) * (x2 - x1)
      *

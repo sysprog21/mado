@@ -6,9 +6,7 @@
 
 #include "twin_private.h"
 
-/*
- * angles are measured from -2048 .. 2048
- */
+/* angles are measured from -2048 .. 2048 */
 
 twin_fixed_t twin_sin(twin_angle_t a)
 {
@@ -32,8 +30,7 @@ twin_fixed_t twin_tan(twin_angle_t a)
     if (c == 0) {
         if (s > 0)
             return TWIN_FIXED_MAX;
-        else
-            return TWIN_FIXED_MIN;
+        return TWIN_FIXED_MIN;
     }
     if (s == 0)
         return 0;

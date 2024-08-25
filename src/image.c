@@ -31,16 +31,14 @@ typedef enum {
 #undef _
 } twin_image_format_t;
 
-/*
- * Defines the headers of supported image formats.
+/* Define the headers of supported image formats.
  * Each image format has a unique header, allowing the format to be determined
  * by inspecting the file header.
- * Supported formats: PNG, JPEG.
- * Reference:
+ * Supported formats:
  * - PNG:
- * http://www.libpng.org/pub/png/spec/1.2/PNG-Rationale.html#R.PNG-file-signature
+ *   http://www.libpng.org/pub/png/spec/1.2/PNG-Rationale.html#R.PNG-file-signature
  * - JPEG:
- * https://www.file-recovery.com/jpg-signature-format.htm
+ *   https://www.file-recovery.com/jpg-signature-format.htm
  */
 #if __BYTE_ORDER == __BIG_ENDIAN
 static const uint8_t header_png[8] = {
@@ -83,6 +81,7 @@ static twin_image_format_t image_type_detect(const char *path)
     return type;
 }
 
+/* Function prototypes for implementations */
 #define _(x)                                                   \
     twin_pixmap_t *_twin_##x##_to_pixmap(const char *filepath, \
                                          twin_format_t fmt);

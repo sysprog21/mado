@@ -76,6 +76,7 @@ void _twin_path_smove(twin_path_t *path, twin_sfixed_t x, twin_sfixed_t y)
     switch (_twin_current_subpath_len(path)) {
     default:
         _twin_path_sfinish(path);
+        fallthrough;
     case 0:
         _twin_path_sdraw(path, x, y);
         break;

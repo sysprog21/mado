@@ -12,7 +12,35 @@
 
 #include "twin.h"
 
+/* Boilerplate for compiler compatibility */
+#ifndef __has_attribute
+#define __has_attribute(x) 0
+#endif
+
+/* since C23 */
+#ifndef __has_c_attribute
+#define __has_c_attribute(x) 0
+#endif
+
+#if defined(__clang__) || defined(__GNUC__)
 #define maybe_unused __attribute__((unused))
+#else
+#define maybe_unused
+#endif
+
+/* suppress warnings when intentional switch case fall-through is desired. */
+#if defined(__has_c_attribute) && __has_c_attribute(fallthrough) /* C23+ */
+#define fallthrough [[fallthrough]]
+#elif defined(__has_attribute) && __has_attribute(fallthrough)
+/* GNU-style attribute. The __has_attribute() macro was first available in Clang
+ * 2.9 and incorporated into GCC since GCC 9.
+ */
+#define fallthrough __attribute__((fallthrough))
+#elif defined(__GNUC__) && __GNUC__ >= 7
+#define fallthrough __attribute__((__fallthrough__))
+#else
+#define fallthrough ((void) 0)
+#endif
 
 /*
  * Fixed-point type definitions

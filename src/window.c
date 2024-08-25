@@ -435,6 +435,7 @@ bool twin_window_dispatch(twin_window_t *window, twin_event_t *event)
     case TwinEventButtonUp:
         window->screen->button_x = -1;
         window->screen->button_y = -1;
+        return true;
     case TwinEventMotion:
         if (window->screen->button_x >= 0) {
             twin_coord_t x, y;

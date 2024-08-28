@@ -34,6 +34,10 @@ config LOADER_JPEG
     bool "Enable JPEG loader"
     default y
 
+config LOADER_GIF
+    bool "Enable GIF loader"
+    default y
+
 endmenu
 
 menu "Demo Applications"
@@ -72,4 +76,8 @@ config DEMO_SPLINE
     default y
     depends on DEMO_APPLICATIONS 
 
+config DEMO_ANIMATION
+    bool "Build animation demo"
+    default y
+    depends on DEMO_APPLICATIONS 
 endmenu

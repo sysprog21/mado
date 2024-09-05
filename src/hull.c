@@ -21,17 +21,17 @@ typedef struct _twin_hull {
 } twin_hull_t;
 
 static void _twin_slope_init(twin_slope_t *slope,
-                             twin_spoint_t *a,
-                             twin_spoint_t *b)
+                             const twin_spoint_t *a,
+                             const twin_spoint_t *b)
 {
     slope->dx = b->x - a->x;
     slope->dy = b->y - a->y;
 }
 
-static twin_hull_t *_twin_hull_create(twin_path_t *path, int *nhull)
+static twin_hull_t *_twin_hull_create(const twin_path_t *path, int *nhull)
 {
     int n = path->npoints;
-    twin_spoint_t *p = path->points;
+    const twin_spoint_t *p = path->points;
     twin_hull_t *hull;
 
     int e = 0;
@@ -77,12 +77,10 @@ static twin_hull_t *_twin_hull_create(twin_path_t *path, int *nhull)
    == 0 => a equal to be
    >  0 => a more positive than b
 */
-static int _twin_slope_compare(twin_slope_t *a, twin_slope_t *b)
+static int _twin_slope_compare(const twin_slope_t *a, const twin_slope_t *b)
 {
-    twin_dfixed_t diff;
-
-    diff = ((twin_dfixed_t) a->dy * (twin_dfixed_t) b->dx -
-            (twin_dfixed_t) b->dy * (twin_dfixed_t) a->dx);
+    twin_dfixed_t diff = ((twin_dfixed_t) a->dy * (twin_dfixed_t) b->dx -
+                          (twin_dfixed_t) b->dy * (twin_dfixed_t) a->dx);
 
     if (diff > 0)
         return 1;
@@ -125,7 +123,7 @@ static int _twin_hull_vertex_compare(const void *av, const void *bv)
     return ret;
 }
 
-static int _twin_hull_prev_valid(twin_hull_t *hull,
+static int _twin_hull_prev_valid(const twin_hull_t *hull,
                                  int maybe_unused num_hull,
                                  int index)
 {
@@ -137,7 +135,9 @@ static int _twin_hull_prev_valid(twin_hull_t *hull,
     return index;
 }
 
-static int _twin_hull_next_valid(twin_hull_t *hull, int num_hull, int index)
+static int _twin_hull_next_valid(const twin_hull_t *hull,
+                                 int num_hull,
+                                 int index)
 {
     do {
         index = (index + 1) % num_hull;
@@ -180,7 +180,7 @@ static void _twin_hull_eliminate_concave(twin_hull_t *hull, int num_hull)
 /*
  * Convert the hull structure back to a simple path
  */
-static twin_path_t *_twin_hull_to_path(twin_hull_t *hull, int num_hull)
+static twin_path_t *_twin_hull_to_path(const twin_hull_t *hull, int num_hull)
 {
     twin_path_t *path = twin_path_create();
 

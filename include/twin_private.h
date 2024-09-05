@@ -327,9 +327,6 @@ twin_argb32_t *_twin_fetch_argb32(twin_pixmap_t *pixmap,
 /*
  * Geometry helper functions
  */
-twin_dfixed_t _twin_distance_to_point_squared(twin_spoint_t *a,
-                                              twin_spoint_t *b);
-
 twin_dfixed_t _twin_distance_to_line_squared(twin_spoint_t *p,
                                              twin_spoint_t *p1,
                                              twin_spoint_t *p2);

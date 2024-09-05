@@ -12,8 +12,7 @@ static twin_queue_t *head;
 
 static twin_order_t _twin_work_order(twin_queue_t *a, twin_queue_t *b)
 {
-    twin_work_t *aw = (twin_work_t *) a;
-    twin_work_t *bw = (twin_work_t *) b;
+    const twin_work_t *aw = (twin_work_t *) a, *bw = (twin_work_t *) b;
 
     if (aw->priority < bw->priority)
         return TWIN_BEFORE;

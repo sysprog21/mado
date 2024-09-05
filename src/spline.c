@@ -15,8 +15,8 @@ typedef struct _twin_spline {
  * The shift factor determines the position between 'a' and 'b'.
  * The result is stored in 'result'.
  */
-static void _lerp(twin_spoint_t *a,
-                  twin_spoint_t *b,
+static void _lerp(const twin_spoint_t *a,
+                  const twin_spoint_t *b,
                   int shift,
                   twin_spoint_t *result)
 {

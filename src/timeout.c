@@ -24,8 +24,8 @@ static twin_time_t start;
 
 static twin_order_t _twin_timeout_order(twin_queue_t *a, twin_queue_t *b)
 {
-    twin_timeout_t *at = (twin_timeout_t *) a;
-    twin_timeout_t *bt = (twin_timeout_t *) b;
+    const twin_timeout_t *at = (twin_timeout_t *) a;
+    const twin_timeout_t *bt = (twin_timeout_t *) b;
 
     if (twin_time_compare(at->time, <, bt->time))
         return TWIN_BEFORE;
@@ -85,7 +85,7 @@ void twin_clear_timeout(twin_timeout_t *timeout)
 twin_time_t _twin_timeout_delay(void)
 {
     if (head) {
-        twin_timeout_t *thead = (twin_timeout_t *) head;
+        const twin_timeout_t *thead = (twin_timeout_t *) head;
         twin_time_t now = twin_now();
         if (twin_time_compare(now, >=, thead->time))
             return 0;

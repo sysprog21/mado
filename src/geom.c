@@ -6,8 +6,8 @@
 
 #include "twin_private.h"
 
-twin_dfixed_t _twin_distance_to_point_squared(twin_spoint_t *a,
-                                              twin_spoint_t *b)
+static twin_dfixed_t _twin_distance_to_point_squared(const twin_spoint_t *a,
+                                                     const twin_spoint_t *b)
 {
     twin_dfixed_t dx = (b->x - a->x);
     twin_dfixed_t dy = (b->y - a->y);

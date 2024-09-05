@@ -307,7 +307,8 @@ static void twin_screen_update_cursor(twin_screen_t *screen,
 }
 #endif /* CONFIG_CURSOR */
 
-static void _twin_adj_mouse_evt(twin_event_t *event, twin_pixmap_t *pixmap)
+static void _twin_adj_mouse_evt(twin_event_t *event,
+                                const twin_pixmap_t *pixmap)
 {
     event->u.pointer.x = event->u.pointer.screen_x - pixmap->x;
     event->u.pointer.y = event->u.pointer.screen_y - pixmap->y;

@@ -26,7 +26,7 @@ typedef struct _twin_text_info {
 } twin_text_info_t;
 
 static void _twin_text_compute_info(twin_path_t *path,
-                                    twin_font_t *font,
+                                    const twin_font_t *font,
                                     twin_text_info_t *info)
 {
     twin_spoint_t origin = _twin_path_current_spoint(path);
@@ -175,7 +175,7 @@ static void _twin_text_compute_snap(twin_text_info_t *info,
         info->snap_y[s] = FY(snap[s], info);
 }
 
-static twin_path_t *_twin_text_compute_pen(twin_text_info_t *info)
+static twin_path_t *_twin_text_compute_pen(const twin_text_info_t *info)
 {
     twin_path_t *pen = twin_path_create();
 
@@ -184,7 +184,7 @@ static twin_path_t *_twin_text_compute_pen(twin_text_info_t *info)
     return pen;
 }
 
-static twin_fixed_t _twin_snap(twin_fixed_t v, twin_fixed_t *snap, int n)
+static twin_fixed_t _twin_snap(twin_fixed_t v, const twin_fixed_t *snap, int n)
 {
     for (int s = 0; s < n - 1; s++) {
         if (snap[s] <= v && v <= snap[s + 1]) {
@@ -309,7 +309,7 @@ void twin_text_metrics_ucs4(twin_path_t *path,
     m->font_descent = font_descent + margin_y;
 }
 
-static const signed char *twin_glyph_draw(twin_font_t *font,
+static const signed char *twin_glyph_draw(const twin_font_t *font,
                                           const signed char *b)
 {
     if (font->type == TWIN_FONT_TYPE_STROKE)

@@ -10,8 +10,8 @@
  * Find the point in path which is furthest left of the line
  */
 static int _twin_path_leftpoint(twin_path_t *path,
-                                twin_spoint_t *p1,
-                                twin_spoint_t *p2)
+                                const twin_spoint_t *p1,
+                                const twin_spoint_t *p2)
 {
     twin_spoint_t *points = path->points;
     int best = 0;
@@ -36,10 +36,10 @@ static int _twin_path_leftpoint(twin_path_t *path,
     return best;
 }
 
-static int _around_order(twin_spoint_t *a1,
-                         twin_spoint_t *a2,
-                         twin_spoint_t *b1,
-                         twin_spoint_t *b2)
+static int _around_order(const twin_spoint_t *a1,
+                         const twin_spoint_t *a2,
+                         const twin_spoint_t *b1,
+                         const twin_spoint_t *b2)
 {
     twin_dfixed_t adx = (a2->x - a1->x);
     twin_dfixed_t ady = (a2->y - a1->y);

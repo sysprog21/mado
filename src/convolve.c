@@ -162,7 +162,7 @@ static void _twin_subpath_convolve(twin_path_t *path,
             break;
         case TwinCapButt:
             p = ptarget - 1;
-            /* fall through … */
+            fallthrough;
         case TwinCapRound:
             while (p != ptarget) {
                 if (++p == np)

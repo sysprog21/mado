@@ -186,9 +186,7 @@ static twin_path_t *_twin_text_compute_pen(twin_text_info_t *info)
 
 static twin_fixed_t _twin_snap(twin_fixed_t v, twin_fixed_t *snap, int n)
 {
-    int s;
-
-    for (s = 0; s < n - 1; s++) {
+    for (int s = 0; s < n - 1; s++) {
         if (snap[s] <= v && v <= snap[s + 1]) {
             twin_fixed_t before = snap[s];
             twin_fixed_t after = snap[s + 1];

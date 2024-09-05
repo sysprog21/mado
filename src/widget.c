@@ -16,13 +16,14 @@ static twin_path_t *_twin_path_shape(twin_shape_t shape,
                                      twin_fixed_t radius)
 {
     twin_path_t *path = twin_path_create();
+    if (!path)
+        return NULL;
+
     twin_fixed_t x = twin_int_to_fixed(left);
     twin_fixed_t y = twin_int_to_fixed(top);
     twin_fixed_t w = twin_int_to_fixed(right - left);
     twin_fixed_t h = twin_int_to_fixed(bottom - top);
 
-    if (!path)
-        return 0;
     switch (shape) {
     case TwinShapeRectangle:
         twin_path_rectangle(path, x, y, w, h);

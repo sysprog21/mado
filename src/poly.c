@@ -305,13 +305,11 @@ void twin_fill_path(twin_pixmap_t *pixmap,
     int nedges = 0;
     for (int s = 0; s <= path->nsublen; s++) {
         int sublen;
-        int npoints;
-
         if (s == path->nsublen)
             sublen = path->npoints;
         else
             sublen = path->sublen[s];
-        npoints = sublen - p;
+        int npoints = sublen - p;
         if (npoints > 1) {
             int n =
                 _twin_edge_build(path->points + p, npoints, edges + nedges, sdx,

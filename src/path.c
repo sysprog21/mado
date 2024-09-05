@@ -410,10 +410,7 @@ void twin_path_bounds(twin_path_t *path, twin_rect_t *rect)
 
 void twin_path_append(twin_path_t *dst, twin_path_t *src)
 {
-    int p;
-    int s = 0;
-
-    for (p = 0; p < src->npoints; p++) {
+    for (int p = 0, s = 0; p < src->npoints; p++) {
         if (s < src->nsublen && p == src->sublen[s]) {
             _twin_path_sfinish(dst);
             s++;
@@ -463,22 +460,18 @@ void twin_composite_path(twin_pixmap_t *dst,
                          twin_operator_t operator)
 {
     twin_rect_t bounds;
-    twin_pixmap_t *mask;
-    twin_operand_t msk;
-    twin_coord_t width, height;
-
     twin_path_bounds(path, &bounds);
     if (bounds.left >= bounds.right || bounds.top >= bounds.bottom)
         return;
-    width = bounds.right - bounds.left;
-    height = bounds.bottom - bounds.top;
-    mask = twin_pixmap_create(TWIN_A8, width, height);
 
+    twin_coord_t width = bounds.right - bounds.left;
+    twin_coord_t height = bounds.bottom - bounds.top;
+    twin_pixmap_t *mask = twin_pixmap_create(TWIN_A8, width, height);
     if (!mask)
         return;
+
     twin_fill_path(mask, path, -bounds.left, -bounds.top);
-    msk.source_kind = TWIN_PIXMAP;
-    msk.u.pixmap = mask;
+    twin_operand_t msk = {.source_kind = TWIN_PIXMAP, .u.pixmap = mask};
     twin_composite(dst, bounds.left, bounds.top, src, src_x + bounds.left,
                    src_y + bounds.top, &msk, 0, 0, operator, width, height);
     twin_pixmap_destroy(mask);
@@ -486,10 +479,7 @@ void twin_composite_path(twin_pixmap_t *dst,
 
 void twin_paint_path(twin_pixmap_t *dst, twin_argb32_t argb, twin_path_t *path)
 {
-    twin_operand_t src;
-
-    src.source_kind = TWIN_SOLID;
-    src.u.argb = argb;
+    twin_operand_t src = {.source_kind = TWIN_SOLID, .u.argb = argb};
     twin_composite_path(dst, &src, 0, 0, path, TWIN_OVER);
 }
 
@@ -521,9 +511,6 @@ void twin_paint_stroke(twin_pixmap_t *dst,
                        twin_path_t *stroke,
                        twin_fixed_t pen_width)
 {
-    twin_operand_t src;
-
-    src.source_kind = TWIN_SOLID;
-    src.u.argb = argb;
+    twin_operand_t src = {.source_kind = TWIN_SOLID, .u.argb = argb};
     twin_composite_stroke(dst, &src, 0, 0, stroke, pen_width, TWIN_OVER);
 }

@@ -59,7 +59,7 @@ static inline twin_fixed_t sin_poly(twin_angle_t x)
     y = x * (y >> n);
     y = A1 - (y >> (p - q));
     y = x * (y >> n);
-    y = (y + (1UL << (q - A - 1))) >> (q - A);  // Rounding
+    y = (y + (1UL << (q - A - 1))) >> (q - A); /* Rounding */
     return y;
 }
 

@@ -61,9 +61,8 @@ void _twin_queue_delete(twin_queue_t **head, twin_queue_t *old)
 twin_queue_t *_twin_queue_set_order(twin_queue_t **head)
 {
     twin_queue_t *first = *head;
-    twin_queue_t *q;
 
-    for (q = first; q; q = q->next) {
+    for (twin_queue_t *q = first; q; q = q->next) {
         q->order = q->next;
         q->walking = true;
     }

@@ -84,11 +84,11 @@ twin_toplevel_t *twin_toplevel_create(twin_screen_t *screen,
         twin_window_create(screen, format, style, x, y, width, height);
 
     if (!window)
-        return 0;
+        return NULL;
     toplevel = malloc(sizeof(twin_toplevel_t) + strlen(name) + 1);
     if (!toplevel) {
         twin_window_destroy(window);
-        return 0;
+        return NULL;
     }
     _twin_toplevel_init(toplevel, _twin_toplevel_dispatch, window, name);
     return toplevel;

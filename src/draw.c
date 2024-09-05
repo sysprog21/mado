@@ -421,8 +421,7 @@ static twin_xform_t *twin_pixmap_init_xform(twin_pixmap_t *pixmap,
 
 static void twin_pixmap_free_xform(twin_xform_t *xform)
 {
-    if (xform)
-        free(xform);
+    free(xform);
 }
 
 #define FX(x) twin_int_to_fixed(x)

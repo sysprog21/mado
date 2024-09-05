@@ -76,8 +76,7 @@ void twin_window_destroy(twin_window_t *window)
 {
     twin_window_hide(window);
     twin_pixmap_destroy(window->pixmap);
-    if (window->name)
-        free(window->name);
+    free(window->name);
     free(window);
 }
 
@@ -149,8 +148,7 @@ void twin_window_style_size(twin_window_style_t style, twin_rect_t *size)
 
 void twin_window_set_name(twin_window_t *window, const char *name)
 {
-    if (window->name)
-        free(window->name);
+    free(window->name);
     window->name = malloc(strlen(name) + 1);
     if (window->name)
         strcpy(window->name, name);

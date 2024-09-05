@@ -450,10 +450,8 @@ twin_path_t *twin_path_create(void)
 
 void twin_path_destroy(twin_path_t *path)
 {
-    if (path->points)
-        free(path->points);
-    if (path->sublen)
-        free(path->sublen);
+    free(path->points);
+    free(path->sublen);
     free(path);
 }
 

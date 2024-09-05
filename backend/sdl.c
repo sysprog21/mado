@@ -137,8 +137,10 @@ twin_context_t *twin_sdl_init(int width, int height)
     if (!ctx)
         return NULL;
     ctx->priv = calloc(1, sizeof(twin_sdl_t));
-    if (!ctx->priv)
+    if (!ctx->priv) {
+        free(ctx);
         return NULL;
+    }
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("error : %s\n", SDL_GetError());

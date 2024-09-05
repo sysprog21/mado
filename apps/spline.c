@@ -129,7 +129,7 @@ static void _apps_spline_init(apps_spline_t *spline,
     _twin_widget_init(&spline->widget, parent, 0, preferred, dispatch);
     twin_widget_set(&spline->widget, 0xffffffff);
     spline->line_width = twin_int_to_fixed(100);
-    spline->cap_style = TwinCapButt;
+    spline->cap_style = TwinCapRound;
     spline->points[0].x = twin_int_to_fixed(100);
     spline->points[0].y = twin_int_to_fixed(100);
     spline->points[1].x = twin_int_to_fixed(300);

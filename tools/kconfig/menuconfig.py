@@ -1206,7 +1206,14 @@ def _leave_menu():
     # Jump to parent menu
     parent = _parent_menu(_cur_menu)
     _shown = _shown_nodes(parent)
-    _sel_node_i = _shown.index(_cur_menu)
+
+    try:
+        _sel_node_i = _shown.index(_cur_menu)
+    except ValueError:
+        # The parent actually does not contain the current menu (e.g., symbol
+        # search). So we jump to the first node instead.
+        _sel_node_i = 0
+
     _cur_menu = parent
 
     # Try to make the menu entry appear on the same row on the screen as it did

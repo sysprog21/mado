@@ -88,6 +88,37 @@ typedef int8_t twin_gfixed_t;
 #define twin_fixed_to_sfixed(f) ((twin_sfixed_t) ((f) >> 12))
 
 #define twin_sfixed_to_dfixed(s) (((twin_dfixed_t) (s)) << 4)
+#define twin_dfixed_to_sfixed(d) ((twin_sfixed_t) ((d) >> 4))
+
+/*
+ * twin_sfixed_t a = b'10100;
+ * twin_sfixed_t b = b'10000;
+ * exact a is 1*(2^0) + 1*(2^(-2)) = 1.25
+ * exact b is 1*(2^0) = 1
+ *
+ * The result of twin_sfixed_div(a, b) is of type twin_sfixed_t
+ * (a << 4) / (b) = (b'101000000) / (b'10000) = b'10100
+ * exact result is 1*(2^0) + 1*(2^(-2)) = 1.25
+ *
+ * twin_dfixed_t a = b'10100;
+ * twin_dfixed_t b = b'10000;
+ * exact a is 1*(2^(-4)) + 1*(2^(-6)) = 0.078125
+ * exact b is 1*(2^(-4)) = 0.0625
+ *
+ * The result of twin_dfixed_mul(a, b) is of type twin_dfixed_t
+ * (a * b) >> 8 = (b'101000000) >> 8 = b'1
+ * exact result is 1*(2^(-8)) = 0.00390625
+ */
+
+#define twin_sfixed_mul(a, b) \
+    ((((twin_sfixed_t) (a)) * ((twin_sfixed_t) (b))) >> 4)
+#define twin_sfixed_div(a, b) \
+    ((((twin_sfixed_t) (a)) << 4) / ((twin_sfixed_t) (b)))
+
+#define twin_dfixed_mul(a, b) \
+    ((((twin_dfixed_t) (a)) * ((twin_dfixed_t) (b))) >> 8)
+#define twin_dfixed_div(a, b) \
+    ((((twin_dfixed_t) (a)) << 8) / ((twin_dfixed_t) (b)))
 
 /*
  * 'double' is a no-no in any shipping code, but useful during

@@ -30,3 +30,6 @@ config.h
 
 # Tools
 tools/ttf/twin-ttf
+
+# CI pipeline
+expected-format

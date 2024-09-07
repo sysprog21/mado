@@ -211,7 +211,7 @@ void twin_path_arc(twin_path_t *path,
         sides = 1024;
 
     /* Calculate the nearest power of 2 that is >= sides. */
-    int32_t n = (sides > 1) ? (31 - twin_clz(sides - 1) + 1) : 2;
+    int32_t n = (sides > 1) ? (31 - twin_clz(sides) + 1) : 2;
 
     twin_angle_t step = TWIN_ANGLE_360 >> n;
     twin_angle_t inc = step;

@@ -33,6 +33,7 @@ twin_pixmap_t *twin_pixmap_create(twin_format_t format,
     pixmap->origin_x = pixmap->origin_y = 0;
     pixmap->stride = stride;
     pixmap->disable = 0;
+    pixmap->animation = NULL;
     pixmap->p.v = pixmap + 1;
     memset(pixmap->p.v, '\0', space);
     return pixmap;

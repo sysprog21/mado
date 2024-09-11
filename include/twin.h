@@ -72,6 +72,8 @@ typedef union _twin_pointer {
 
 typedef struct _twin_window twin_window_t;
 typedef struct _twin_screen twin_screen_t;
+typedef struct _twin_pixmap twin_pixmap_t;
+typedef struct _twin_animation twin_animation_t;
 
 /*
  * Events
@@ -133,6 +135,27 @@ typedef struct _twin_event_queue {
     twin_event_t event;
 } twin_event_queue_t;
 
+typedef struct _twin_animation_iter {
+    twin_animation_t *anim;
+    twin_count_t current_index;
+    twin_pixmap_t *current_frame;
+    twin_time_t current_delay;
+} twin_animation_iter_t;
+
+typedef struct _twin_animation {
+    /* Array of pixmaps representing each frame of the animation */
+    twin_pixmap_t **frames;
+    /* Number of frames in the animation */
+    twin_count_t n_frames;
+    /* Delay between frames in milliseconds */
+    twin_time_t *frame_delays;
+    /* Whether the animation should loop */
+    bool loop;
+    twin_animation_iter_t *iter;
+    twin_coord_t width;  /* pixels */
+    twin_coord_t height; /* pixels */
+} twin_animation_t;
+
 /*
  * A rectangular array of pixels
  */
@@ -171,6 +194,7 @@ typedef struct _twin_pixmap {
     /*
      * Pixels
      */
+    twin_animation_t *animation;
     twin_pointer_t p;
     /*
      * When representing a window, this point
@@ -693,6 +717,32 @@ void twin_icon_draw(twin_pixmap_t *pixmap,
 twin_pixmap_t *twin_pixmap_from_file(const char *path, twin_format_t fmt);
 
 /*
+ * animation.c
+ *
+ * Defines the interface for managing frame-based animations.
+ * It provides functions to control and manipulate animations such as getting
+ * the current frame, advancing the animation, and releasing resources.
+ */
+
+/* Get the number of milliseconds the current frame should be displayed. */
+twin_time_t twin_animation_get_current_delay(const twin_animation_t *anim);
+
+/* Get the current frame which should be displayed. */
+twin_pixmap_t *twin_animation_get_current_frame(const twin_animation_t *anim);
+
+/* Advances the animation to the next frame. If the animation is looping, it
+ * will return to the first frame after the last one. */
+void twin_animation_advance_frame(twin_animation_t *anim);
+
+/* Frees the memory allocated for the animation, including all associated
+ * frames. */
+void twin_animation_destroy(twin_animation_t *anim);
+
+twin_animation_iter_t *twin_animation_iter_init(twin_animation_t *anim);
+
+void twin_animation_iter_advance(twin_animation_iter_t *iter);
+
+/*
  * label.c
  */
 
@@ -855,6 +905,8 @@ twin_pixmap_t *twin_make_pattern(void);
 /*
  * pixmap.c
  */
+
+#define twin_pixmap_is_animated(pix) ((pix)->animation != NULL)
 
 twin_pixmap_t *twin_pixmap_create(twin_format_t format,
                                   twin_coord_t width,

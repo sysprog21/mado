@@ -13,6 +13,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "apps_animation.h"
 #include "apps_calc.h"
 #include "apps_clock.h"
 #include "apps_hello.h"
@@ -121,6 +122,10 @@ int main(void)
 #endif
 #if defined(CONFIG_DEMO_SPLINE)
     apps_spline_start(tx->screen, "Spline", 20, 20, 400, 400);
+#endif
+#if defined(CONFIG_DEMO_ANIMATION)
+    apps_animation_start(tx->screen, "Viewer", ASSET_PATH "nyancat.gif", 20,
+                         20);
 #endif
 
     twin_dispatch();

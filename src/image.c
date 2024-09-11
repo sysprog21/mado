@@ -11,6 +11,10 @@
 #define CONFIG_LOADER_JPEG 0
 #endif
 
+#if !defined(CONFIG_LOADER_GIF)
+#define CONFIG_LOADER_GIF 0
+#endif
+
 /* Feature test macro */
 #define LOADER_HAS(x) CONFIG_LOADER_##x
 
@@ -21,6 +25,9 @@
     )                           \
     IIF(LOADER_HAS(JPEG))(      \
         _(jpeg)                 \
+    )                           \
+    IIF(LOADER_HAS(GIF))(       \
+        _(gif)                  \
     )
 /* clang-format on */
 
@@ -39,6 +46,8 @@ typedef enum {
  *   http://www.libpng.org/pub/png/spec/1.2/PNG-Rationale.html#R.PNG-file-signature
  * - JPEG:
  *   https://www.file-recovery.com/jpg-signature-format.htm
+ * - GIF:
+ *   https://www.file-recovery.com/gif-signature-format.htm
  */
 #if __BYTE_ORDER == __BIG_ENDIAN
 static const uint8_t header_png[8] = {
@@ -50,6 +59,7 @@ static const uint8_t header_png[8] = {
 };
 #endif
 static const uint8_t header_jpeg[3] = {0xFF, 0xD8, 0xFF};
+static const uint8_t header_gif[4] = {0x47, 0x49, 0x46, 0x38};
 
 static twin_image_format_t image_type_detect(const char *path)
 {
@@ -74,6 +84,11 @@ static twin_image_format_t image_type_detect(const char *path)
 #if LOADER_HAS(JPEG)
     else if (!memcmp(header, header_jpeg, sizeof(header_jpeg))) {
         type = IMAGE_TYPE_jpeg;
+    }
+#endif
+#if LOADER_HAS(GIF)
+    else if (!memcmp(header, header_gif, sizeof(header_gif))) {
+        type = IMAGE_TYPE_gif;
     }
 #endif
 

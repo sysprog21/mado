@@ -51,6 +51,7 @@ libtwin.a_files-y = \
 	src/pixmap.c \
 	src/timeout.c \
 	src/image.c \
+	src/animation.c \
 	src/api.c
 
 libtwin.a_includes-y := \
@@ -74,6 +75,10 @@ libtwin.a_cflags-y += $(shell pkg-config --cflags libpng)
 TARGET_LIBS += $(shell pkg-config --libs libpng)
 endif
 
+ifeq ($(CONFIG_LOADER_GIF), y)
+libtwin.a_files-y += src/image-gif.c
+endif
+
 # Applications
 
 libapps.a_files-y := apps/dummy.c
@@ -83,6 +88,7 @@ libapps.a_files-$(CONFIG_DEMO_CLOCK) += apps/clock.c
 libapps.a_files-$(CONFIG_DEMO_CALCULATOR) += apps/calc.c
 libapps.a_files-$(CONFIG_DEMO_LINE) += apps/line.c
 libapps.a_files-$(CONFIG_DEMO_SPLINE) += apps/spline.c
+libapps.a_files-$(CONFIG_DEMO_ANIMATION) += apps/animation.c
 
 libapps.a_includes-y := include
 

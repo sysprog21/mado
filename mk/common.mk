@@ -117,7 +117,7 @@ RM         := rm -rf
 MKDIR      := mkdir -p
 
 __CFLAGS := -Wall -Wextra -pipe
-__CFLAGS += -Og -g -pipe
+__CFLAGS += -O2 -pipe
 __CFLAGS += $(CFLAGS)
 
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')

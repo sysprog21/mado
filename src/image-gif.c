@@ -261,8 +261,9 @@ static int interlaced_line_index(int h, int y)
 static int read_image_data(twin_gif_t *gif, int interlace)
 {
     uint8_t sub_len, shift, byte;
-    int init_key_size, key_size, table_t_is_full;
-    int frm_off, frm_size, str_len, i, p, x, y;
+    int init_key_size, key_size;
+    bool is_table_full = false;
+    int frm_off, frm_size, str_len = 0, i, p, x, y;
     uint16_t key, clear, stop;
     int ret;
     table_t *table_t;
@@ -292,8 +293,8 @@ static int read_image_data(twin_gif_t *gif, int interlace)
         if (key == clear) {
             key_size = init_key_size;
             table_t->n_entries = (1 << (key_size - 1)) + 2;
-            table_t_is_full = 0;
-        } else if (!table_t_is_full) {
+            is_table_full = false;
+        } else if (!is_table_full) {
             ret = add_entry_t(&table_t, str_len + 1, key, entry_t.suffix);
             if (ret == -1) {
                 free(table_t);
@@ -301,7 +302,7 @@ static int read_image_data(twin_gif_t *gif, int interlace)
             }
             if (table_t->n_entries == 0x1000) {
                 ret = 0;
-                table_t_is_full = 1;
+                is_table_full = true;
             }
         }
         key = get_key(gif, key_size, &sub_len, &shift, &byte);
@@ -327,7 +328,7 @@ static int read_image_data(twin_gif_t *gif, int interlace)
                 entry_t = table_t->entries[entry_t.prefix];
         }
         frm_off += str_len;
-        if (key < table_t->n_entries - 1 && !table_t_is_full)
+        if (key < table_t->n_entries - 1 && !is_table_full)
             table_t->entries[table_t->n_entries - 1].suffix = entry_t.suffix;
     }
     free(table_t);
@@ -513,7 +514,7 @@ static void _twin_gif_render_frame(twin_gif_t *gif, uint8_t *buffer)
     render_frame_rect(gif, buffer);
 }
 
-static int _twin_gif_is_bgcolor(twin_gif_t *gif, uint8_t color[3])
+static int _twin_gif_is_bgcolor(const twin_gif_t *gif, const uint8_t *color)
 {
     return !memcmp(&gif->palette->colors[gif->bgindex * 3], color, 3);
 }

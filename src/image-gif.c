@@ -3,7 +3,6 @@
  * Copyright (c) 2024 National Cheng Kung University, Taiwan
  * All rights reserved.
  *
- *
  * This file integrates the GIF decoder originally developed by Marcel Rodrigues
  * as part of the gifdec project. You can find the original gifdec project at:
  * https://github.com/lecram/gifdec
@@ -17,18 +16,18 @@
 #include "twin.h"
 #include "twin_private.h"
 
-typedef struct _twin_gif_palette {
+typedef struct {
     int size;
     uint8_t colors[0x100 * 3];
-} twin_gif_palette_t;
+} gif_palette_t;
 
-typedef struct _twin_gif_gce {
+typedef struct {
     uint16_t delay;
     uint8_t tindex;
     uint8_t disposal;
     int input;
     int transparency;
-} twin_gif_gce_t;
+} gif_gce_t;
 
 typedef struct _twin_gif {
     int fd;
@@ -36,9 +35,9 @@ typedef struct _twin_gif {
     twin_coord_t width, height;
     twin_coord_t depth;
     twin_count_t loop_count;
-    twin_gif_gce_t gce;
-    twin_gif_palette_t *palette;
-    twin_gif_palette_t lct, gct;
+    gif_gce_t gce;
+    gif_palette_t *palette;
+    gif_palette_t lct, gct;
     uint16_t fx, fy, fw, fh;
     uint8_t bgindex;
     uint8_t *canvas, *frame;
@@ -67,9 +66,8 @@ static uint16_t read_num(int fd)
     return bytes[0] + (((uint16_t) bytes[1]) << 8);
 }
 
-static twin_gif_t *_twin_gif_open(const char *fname)
+static twin_gif_t *gif_open(const char *fname)
 {
-    int fd;
     uint8_t sigver[3];
     uint16_t width, height, depth;
     uint8_t fdsz, bgidx, aspect;
@@ -78,7 +76,7 @@ static twin_gif_t *_twin_gif_open(const char *fname)
     int gct_sz;
     twin_gif_t *gif;
 
-    fd = open(fname, O_RDONLY);
+    int fd = open(fname, O_RDONLY);
     if (fd == -1)
         return NULL;
 #ifdef _WIN32
@@ -173,7 +171,7 @@ static table_t *table_new(int key_size)
     return table;
 }
 
-/* Add table_t entry_t. Return value:
+/* Add table entry. Return value:
  *  0 on success
  *  +1 if key size must be incremented after this addition
  *  -1 if could not realloc table
@@ -487,7 +485,7 @@ static void read_ext(twin_gif_t *gif)
 }
 
 /* Return 1 if got a frame; 0 if got GIF trailer; -1 if error. */
-static int _twin_gif_get_frame(twin_gif_t *gif)
+static int gif_get_frame(twin_gif_t *gif)
 {
     char sep;
 
@@ -507,23 +505,23 @@ static int _twin_gif_get_frame(twin_gif_t *gif)
     return 1;
 }
 
-static void _twin_gif_render_frame(twin_gif_t *gif, uint8_t *buffer)
+static void gif_render_frame(twin_gif_t *gif, uint8_t *buffer)
 {
     memcpy(buffer, gif->canvas, gif->width * gif->height * 3);
     render_frame_rect(gif, buffer);
 }
 
-static int _twin_gif_is_bgcolor(const twin_gif_t *gif, const uint8_t *color)
+static int gif_is_bgcolor(const twin_gif_t *gif, const uint8_t *color)
 {
     return !memcmp(&gif->palette->colors[gif->bgindex * 3], color, 3);
 }
 
-static void _twin_gif_rewind(twin_gif_t *gif)
+static void gif_rewind(twin_gif_t *gif)
 {
     lseek(gif->fd, gif->anim_start, SEEK_SET);
 }
 
-static void _twin_gif_close(twin_gif_t *gif)
+static void gif_close(twin_gif_t *gif)
 {
     close(gif->fd);
     free(gif->frame);
@@ -536,7 +534,7 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
     if (!anim)
         return NULL;
 
-    twin_gif_t *gif = _twin_gif_open(path);
+    twin_gif_t *gif = gif_open(path);
     if (!gif) {
         free(anim);
         return NULL;
@@ -550,20 +548,19 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
     anim->height = gif->height;
 
     int frame_count = 0;
-    while (_twin_gif_get_frame(gif)) {
+    while (gif_get_frame(gif))
         frame_count++;
-    }
 
     anim->n_frames = frame_count;
     anim->frames = malloc(sizeof(twin_pixmap_t *) * frame_count);
     anim->frame_delays = malloc(sizeof(twin_time_t) * frame_count);
 
-    _twin_gif_rewind(gif);
+    gif_rewind(gif);
     uint8_t *color, *frame;
     frame = malloc(gif->width * gif->height * 3);
     if (!frame) {
         free(anim);
-        _twin_gif_close(gif);
+        gif_close(gif);
         return NULL;
     }
     for (twin_count_t i = 0; i < frame_count; i++) {
@@ -571,12 +568,12 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
             twin_pixmap_create(TWIN_ARGB32, gif->width, gif->height);
         if (!anim->frames[i]) {
             free(anim);
-            _twin_gif_close(gif);
+            gif_close(gif);
             return NULL;
         }
         anim->frames[i]->format = TWIN_ARGB32;
 
-        _twin_gif_render_frame(gif, frame);
+        gif_render_frame(gif, frame);
         color = frame;
         twin_pointer_t p = twin_pixmap_pointer(anim->frames[i], 0, 0);
         twin_coord_t row = 0, col = 0;
@@ -584,7 +581,7 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
             uint8_t r = *(color++);
             uint8_t g = *(color++);
             uint8_t b = *(color++);
-            if (!_twin_gif_is_bgcolor(gif, color))
+            if (!gif_is_bgcolor(gif, color))
                 *(p.argb32++) = 0xFF000000U | (r << 16) | (g << 8) | b;
             /* Construct background */
             else if (((row >> 3) + (col >> 3)) & 1)
@@ -599,15 +596,15 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
         }
         /* GIF delay in units of 1/100 second */
         anim->frame_delays[i] = gif->gce.delay * 10;
-        _twin_gif_get_frame(gif);
+        gif_get_frame(gif);
     }
     anim->iter = twin_animation_iter_init(anim);
     if (!anim->iter) {
         free(anim);
-        _twin_gif_close(gif);
+        gif_close(gif);
         return NULL;
     }
-    _twin_gif_close(gif);
+    gif_close(gif);
     return anim;
 }
 

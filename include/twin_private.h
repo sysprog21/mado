@@ -12,6 +12,11 @@
 
 #include "twin.h"
 
+/* FIXME: Both twin_private.h and log.h are private header files. They should
+ * be moved to src/ directory.
+ */
+#include "../src/log.h"
+
 /* Boilerplate for compiler compatibility */
 #ifndef __has_attribute
 #define __has_attribute(x) 0

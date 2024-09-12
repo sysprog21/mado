@@ -51,7 +51,7 @@ twin_pixmap_t *_twin_jpeg_to_pixmap(const char *filepath, twin_format_t fmt)
 
     FILE *infile = fopen(filepath, "rb");
     if (!infile) {
-        fprintf(stderr, "Failed to open %s\n", filepath);
+        log_error("Failed to open %s", filepath);
         return NULL;
     }
 
@@ -61,7 +61,7 @@ twin_pixmap_t *_twin_jpeg_to_pixmap(const char *filepath, twin_format_t fmt)
     struct twin_jpeg_err_mgr jerr = {.mgr.error_exit = twin_jpeg_error_exit};
     cinfo.err = jpeg_std_error(&jerr.mgr);
     if (setjmp(jerr.jbuf)) {
-        fprintf(stderr, "Failed to decode %s\n", filepath);
+        log_error("Failed to decode %s", filepath);
         if (pix)
             twin_pixmap_destroy(pix);
         jpeg_destroy_decompress(&cinfo);

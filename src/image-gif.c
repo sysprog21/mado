@@ -85,13 +85,13 @@ static twin_gif_t *gif_open(const char *fname)
     /* Header */
     read(fd, sigver, 3);
     if (memcmp(sigver, "GIF", 3) != 0) {
-        fprintf(stderr, "invalid signature\n");
+        log_error("Invalid signature");
         goto fail;
     }
     /* Version */
     read(fd, sigver, 3);
     if (memcmp(sigver, "89a", 3) != 0) {
-        fprintf(stderr, "invalid version\n");
+        log_error("Invalid version");
         goto fail;
     }
     /* Width x Height */
@@ -101,7 +101,7 @@ static twin_gif_t *gif_open(const char *fname)
     read(fd, &fdsz, 1);
     /* Presence of GCT */
     if (!(fdsz & 0x80)) {
-        fprintf(stderr, "no global color table\n");
+        log_error("No global color table");
         goto fail;
     }
     /* Color Space's Depth */
@@ -480,7 +480,7 @@ static void read_ext(twin_gif_t *gif)
         read_application_ext(gif);
         break;
     default:
-        fprintf(stderr, "unknown extension: %02X\n", label);
+        log_error("Unknown extension: %02X", label);
     }
 }
 
@@ -617,7 +617,7 @@ twin_pixmap_t *_twin_gif_to_pixmap(const char *filepath, twin_format_t fmt)
         return NULL;
     FILE *infile = fopen(filepath, "rb");
     if (!infile) {
-        fprintf(stderr, "Failed to open %s\n", filepath);
+        log_error("Failed to open %s", filepath);
         return NULL;
     }
     twin_animation_t *gif = _twin_animation_from_gif_file(filepath);

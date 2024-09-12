@@ -18,6 +18,23 @@ endchoice
 
 menu "Features"
 
+config LOGGING
+    bool "Enable logging"
+    default y
+
+config LOGGING_COLOR
+    bool "Use colors for logging"
+    default y
+    depends on LOGGING
+
+config LOGGING_CALLBACK
+    bool "Enable callback functions"
+    default y
+    depends on LOGGING
+
+comment "Logging is disabled"
+    depends on !LOGGING
+
 config CURSOR
     bool "Manipulate cursor"
     default n

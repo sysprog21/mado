@@ -59,6 +59,7 @@ libtwin.a_includes-y := \
 	src
 
 # Features
+libtwin.a_files-$(CONFIG_LOGGING) += src/log.c
 libtwin.a_files-$(CONFIG_CURSOR) += src/cursor.c
 
 # Image loaders

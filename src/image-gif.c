@@ -578,9 +578,7 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
         twin_pointer_t p = twin_pixmap_pointer(anim->frames[i], 0, 0);
         twin_coord_t row = 0, col = 0;
         for (int j = 0; j < gif->width * gif->height; j++) {
-            uint8_t r = *(color++);
-            uint8_t g = *(color++);
-            uint8_t b = *(color++);
+            uint8_t r = color[0], g = color[1], b = color[2];
             if (!gif_is_bgcolor(gif, color))
                 *(p.argb32++) = 0xFF000000U | (r << 16) | (g << 8) | b;
             /* Construct background */
@@ -593,6 +591,8 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
                 row++;
                 col = 0;
             }
+            /* next palette */
+            color += 3;
         }
         /* GIF delay in units of 1/100 second */
         anim->frame_delays[i] = gif->gce.delay * 10;

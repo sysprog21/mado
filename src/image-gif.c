@@ -103,7 +103,7 @@ static twin_gif_t *_twin_gif_open(const char *fname)
     read(fd, &fdsz, 1);
     /* Presence of GCT */
     if (!(fdsz & 0x80)) {
-        fprintf(stderr, "no global color table_t\n");
+        fprintf(stderr, "no global color table\n");
         goto fail;
     }
     /* Color Space's Depth */
@@ -159,44 +159,42 @@ static void discard_sub_blocks(twin_gif_t *gif)
     } while (size);
 }
 
-static table_t *new_table_t(int key_size)
+static table_t *table_new(int key_size)
 {
-    int key;
     int init_bulk = MAX(1 << (key_size + 1), 0x100);
-    table_t *table_t = malloc(sizeof(*table_t) + sizeof(entry_t) * init_bulk);
-    if (table_t) {
-        table_t->bulk = init_bulk;
-        table_t->n_entries = (1 << key_size) + 2;
-        table_t->entries = (entry_t *) &table_t[1];
-        for (key = 0; key < (1 << key_size); key++)
-            table_t->entries[key] = (entry_t){1, 0xFFF, key};
+    table_t *table = malloc(sizeof(*table) + sizeof(entry_t) * init_bulk);
+    if (table) {
+        table->bulk = init_bulk;
+        table->n_entries = (1 << key_size) + 2;
+        table->entries = (entry_t *) &table[1];
+        for (int key = 0; key < (1 << key_size); key++)
+            table->entries[key] = (entry_t){1, 0xFFF, key};
     }
-    return table_t;
+    return table;
 }
 
 /* Add table_t entry_t. Return value:
  *  0 on success
  *  +1 if key size must be incremented after this addition
- *  -1 if could not realloc table_t
+ *  -1 if could not realloc table
  */
-static int add_entry_t(table_t **table_tp,
-                       uint16_t length,
-                       uint16_t prefix,
-                       uint8_t suffix)
+static int entry_add(table_t **table_p,
+                     uint16_t length,
+                     uint16_t prefix,
+                     uint8_t suffix)
 {
-    table_t *table_t = *table_tp;
-    if (table_t->n_entries == table_t->bulk) {
-        table_t->bulk *= 2;
-        table_t = realloc(table_t,
-                          sizeof(*table_t) + sizeof(entry_t) * table_t->bulk);
-        if (!table_t)
+    table_t *table = *table_p;
+    if (table->n_entries == table->bulk) {
+        table->bulk *= 2;
+        table = realloc(table, sizeof(*table) + sizeof(entry_t) * table->bulk);
+        if (!table)
             return -1;
-        table_t->entries = (entry_t *) &table_t[1];
-        *table_tp = table_t;
+        table->entries = (entry_t *) &table[1];
+        *table_p = table;
     }
-    table_t->entries[table_t->n_entries] = (entry_t){length, prefix, suffix};
-    table_t->n_entries++;
-    if ((table_t->n_entries & (table_t->n_entries - 1)) == 0)
+    table->entries[table->n_entries] = (entry_t){length, prefix, suffix};
+    table->n_entries++;
+    if ((table->n_entries & (table->n_entries - 1)) == 0)
         return 1;
     return 0;
 }
@@ -266,8 +264,8 @@ static int read_image_data(twin_gif_t *gif, int interlace)
     int frm_off, frm_size, str_len = 0, i, p, x, y;
     uint16_t key, clear, stop;
     int ret;
-    table_t *table_t;
-    entry_t entry_t;
+    table_t *table;
+    entry_t entry = {0};
     off_t start, end;
 
     read(gif->fd, &byte, 1);
@@ -281,7 +279,7 @@ static int read_image_data(twin_gif_t *gif, int interlace)
     lseek(gif->fd, start, SEEK_SET);
     clear = 1 << key_size;
     stop = clear + 1;
-    table_t = new_table_t(key_size);
+    table = table_new(key_size);
     key_size++;
     init_key_size = key_size;
     sub_len = shift = 0;
@@ -292,15 +290,15 @@ static int read_image_data(twin_gif_t *gif, int interlace)
     while (frm_off < frm_size) {
         if (key == clear) {
             key_size = init_key_size;
-            table_t->n_entries = (1 << (key_size - 1)) + 2;
+            table->n_entries = (1 << (key_size - 1)) + 2;
             is_table_full = false;
         } else if (!is_table_full) {
-            ret = add_entry_t(&table_t, str_len + 1, key, entry_t.suffix);
+            ret = entry_add(&table, str_len + 1, key, entry.suffix);
             if (ret == -1) {
-                free(table_t);
+                free(table);
                 return -1;
             }
-            if (table_t->n_entries == 0x1000) {
+            if (table->n_entries == 0x1000) {
                 ret = 0;
                 is_table_full = true;
             }
@@ -310,28 +308,29 @@ static int read_image_data(twin_gif_t *gif, int interlace)
             continue;
         if (key == stop || key == 0x1000)
             break;
+        if (key >= table->n_entries)
+            break;
         if (ret == 1)
             key_size++;
-        entry_t = table_t->entries[key];
-        str_len = entry_t.length;
+        entry = table->entries[key];
+        str_len = entry.length;
         for (i = 0; i < str_len; i++) {
-            p = frm_off + entry_t.length - 1;
+            p = frm_off + entry.length - 1;
             x = p % gif->fw;
             y = p / gif->fw;
             if (interlace)
                 y = interlaced_line_index((int) gif->fh, y);
-            gif->frame[(gif->fy + y) * gif->width + gif->fx + x] =
-                entry_t.suffix;
-            if (entry_t.prefix == 0xFFF)
+            gif->frame[(gif->fy + y) * gif->width + gif->fx + x] = entry.suffix;
+            if (entry.prefix == 0xFFF || entry.prefix >= table->n_entries)
                 break;
             else
-                entry_t = table_t->entries[entry_t.prefix];
+                entry = table->entries[entry.prefix];
         }
         frm_off += str_len;
-        if (key < table_t->n_entries - 1 && !is_table_full)
-            table_t->entries[table_t->n_entries - 1].suffix = entry_t.suffix;
+        if (key < table->n_entries - 1 && !is_table_full)
+            table->entries[table->n_entries - 1].suffix = entry.suffix;
     }
-    free(table_t);
+    free(table);
     if (key == stop)
         read(gif->fd, &sub_len, 1); /* Must be zero! */
     lseek(gif->fd, end, SEEK_SET);

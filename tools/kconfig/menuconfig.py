@@ -285,17 +285,17 @@ view the help of the selected item without leaving the dialog.
 
 _STYLES = {
     "default": """
-    path=fg:black,bg:white,bold
-    separator=fg:black,bg:yellow,bold
-    list=fg:black,bg:white
-    selection=fg:white,bg:blue,bold
+    path=fg:white,bg:back,bold
+    separator=fg:white,bg:blue,bold
+    list=fg:white,bg:black
+    selection=fg:black,bg:white,bold
     inv-list=fg:red,bg:white
     inv-selection=fg:red,bg:blue
     help=path
     show-help=list
-    frame=fg:black,bg:yellow,bold
+    frame=fg:white,bg:blue,bold
     body=fg:white,bg:black
-    edit=fg:white,bg:blue
+    edit=fg:black,bg:white
     jump-edit=edit
     text=list
     """,

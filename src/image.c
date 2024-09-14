@@ -66,7 +66,7 @@ static twin_image_format_t image_type_detect(const char *path)
     twin_image_format_t type = IMAGE_TYPE_unknown;
     FILE *file = fopen(path, "rb");
     if (!file) {
-        fprintf(stderr, "Failed to open %s\n", path);
+        log_error("Failed to open %s", path);
         return IMAGE_TYPE_unknown;
     }
 

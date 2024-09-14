@@ -143,7 +143,7 @@ twin_context_t *twin_sdl_init(int width, int height)
     }
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        printf("error : %s\n", SDL_GetError());
+        log_error("%s", SDL_GetError());
         goto bail;
     }
 
@@ -154,7 +154,7 @@ twin_context_t *twin_sdl_init(int width, int height)
                                SDL_WINDOWPOS_UNDEFINED, width, height,
                                SDL_WINDOW_SHOWN);
     if (!tx->win) {
-        printf("error : %s\n", SDL_GetError());
+        log_error("%s", SDL_GetError());
         goto bail;
     }
 
@@ -163,7 +163,7 @@ twin_context_t *twin_sdl_init(int width, int height)
 
     tx->render = SDL_CreateRenderer(tx->win, -1, SDL_RENDERER_ACCELERATED);
     if (!tx->render) {
-        printf("error : %s\n", SDL_GetError());
+        log_error("%s", SDL_GetError());
         goto bail_pixels;
     }
     SDL_SetRenderDrawColor(tx->render, 255, 255, 255, 255);

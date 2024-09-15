@@ -49,15 +49,9 @@ typedef enum {
  * - GIF:
  *   https://www.file-recovery.com/gif-signature-format.htm
  */
-#if __BYTE_ORDER == __BIG_ENDIAN
 static const uint8_t header_png[8] = {
     0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
 };
-#else
-static const uint8_t header_png[8] = {
-    0x0A, 0x1A, 0x0A, 0x0D, 0x47, 0x4E, 0x50, 0x89,
-};
-#endif
 static const uint8_t header_jpeg[3] = {0xFF, 0xD8, 0xFF};
 static const uint8_t header_gif[4] = {0x47, 0x49, 0x46, 0x38};
 

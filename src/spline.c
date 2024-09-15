@@ -97,7 +97,7 @@ static void _twin_spline_decompose(twin_path_t *path,
 
     while (!is_flat(spline, tolerance_squared)) {
         twin_dfixed_t hi = TWIN_SFIXED_ONE * TWIN_SFIXED_ONE, lo = 0,
-                      t_optimal = 0, t, max_distance = 0, distance;
+                      t_optimal = 0, t, max_distance = 0, left_dist, right_dist;
         twin_spline_t left, right;
 
         while (true) {
@@ -107,14 +107,15 @@ static void _twin_spline_decompose(twin_path_t *path,
 
             _de_casteljau(spline, t, &left, &right);
 
-            distance = _twin_spline_distance_squared(&left);
-            if (distance < max_distance)
-                break;
+            left_dist = _twin_spline_distance_squared(&left);
+            right_dist = _twin_spline_distance_squared(&right);
 
             /* The left segment is close enough to fit the original spline. */
-            if (distance <= tolerance_squared) {
-                max_distance = distance;
+            if (left_dist <= tolerance_squared) {
+                max_distance = left_dist;
                 t_optimal = t;
+                if (right_dist <= tolerance_squared)
+                    break;
                 /*
                  * Try to find a better point such that the line segment
                  * connecting it to the previous point can fit the spline, while

@@ -28,7 +28,7 @@ twin_pixmap_t *twin_pixmap_create(twin_format_t format,
     pixmap->height = height;
     twin_matrix_identity(&pixmap->transform);
     pixmap->clip.left = pixmap->clip.top = 0;
-    pixmap->clip.right = pixmap->width;
+    pixmap->clip.right = pixmap->width - 1;
     pixmap->clip.bottom = pixmap->height;
     pixmap->origin_x = pixmap->origin_y = 0;
     pixmap->stride = stride;
@@ -58,7 +58,7 @@ twin_pixmap_t *twin_pixmap_create_const(twin_format_t format,
     pixmap->height = height;
     twin_matrix_identity(&pixmap->transform);
     pixmap->clip.left = pixmap->clip.top = 0;
-    pixmap->clip.right = pixmap->width;
+    pixmap->clip.right = pixmap->width - 1;
     pixmap->clip.bottom = pixmap->height;
     pixmap->origin_x = pixmap->origin_y = 0;
     pixmap->stride = stride;
@@ -222,8 +222,8 @@ void twin_pixmap_clip(twin_pixmap_t *pixmap,
         pixmap->clip.left = 0;
     if (pixmap->clip.top < 0)
         pixmap->clip.top = 0;
-    if (pixmap->clip.right > pixmap->width)
-        pixmap->clip.right = pixmap->width;
+    if (pixmap->clip.right > pixmap->width - 1)
+        pixmap->clip.right = pixmap->width - 1;
     if (pixmap->clip.bottom > pixmap->height)
         pixmap->clip.bottom = pixmap->height;
 }
@@ -260,7 +260,7 @@ void twin_pixmap_reset_clip(twin_pixmap_t *pixmap)
 {
     pixmap->clip.left = 0;
     pixmap->clip.top = 0;
-    pixmap->clip.right = pixmap->width;
+    pixmap->clip.right = pixmap->width - 1;
     pixmap->clip.bottom = pixmap->height;
 }
 

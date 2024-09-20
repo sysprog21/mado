@@ -23,11 +23,8 @@
 #ifndef _TWIN_FEDIT_H_
 #define _TWIN_FEDIT_H_
 
-#include <X11/Xatom.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/keysym.h>
-#include <cairo-xlib.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_keycode.h>
 #include <cairo.h>
 #include <math.h>
 #include <stdio.h>

@@ -22,57 +22,51 @@
 
 #include "twin-fedit.h"
 
-static Display *dpy;
-static Window win;
-static Visual *visual;
-static int depth;
+#include <SDL.h>
+#include <SDL_keycode.h>
+#include <cairo.h>
+#include <stdbool.h>
+
+static SDL_Window *window;
+static cairo_t *cr;
+static cairo_surface_t *surface;
+
 static int width = 512;
 static int height = 512;
 static double scale = 8;
-static cairo_t *cr;
-static cairo_surface_t *surface;
 static int offset;
 
 static int offsets[1024];
 
+/*
+ * exit_window - bool. Control the life of the window.
+ * if the value is false, the window remains open;
+ * otherwise, the window closes.
+ */
+static bool exit_window = false;
+
 static int init(int argc, char **argv)
 {
-    int scr;
-    XSetWindowAttributes wa;
-    XTextProperty wm_name, icon_name;
-    XSizeHints sizeHints;
-    XWMHints wmHints;
-    Atom wm_delete_window;
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        printf("Failed to initialize SDL video. Reason: %s\n", SDL_GetError());
+        return 0;
+    }
 
-    dpy = XOpenDisplay(0);
-    scr = DefaultScreen(dpy);
-    visual = DefaultVisual(dpy, scr);
-    depth = DefaultDepth(dpy, scr);
+    window = SDL_CreateWindow("Font Editor", SDL_WINDOWPOS_CENTERED,
+                              SDL_WINDOWPOS_CENTERED, width, height,
+                              SDL_WINDOW_SHOWN);
+    if (!window) {
+        printf("Failed to create SDL window. Reason: %s\n", SDL_GetError());
+        return 0;
+    }
 
-    wa.background_pixel = WhitePixel(dpy, scr);
-    wa.event_mask =
-        (KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask |
-         PointerMotionMask | ExposureMask | StructureNotifyMask);
+    /* Create an SDL surface linked to the window */
+    SDL_Surface *sdl_surface = SDL_GetWindowSurface(window);
 
-    wm_name.value = (unsigned char *) argv[0];
-    wm_name.encoding = XA_STRING;
-    wm_name.format = 8;
-    wm_name.nitems = strlen((char *) wm_name.value) + 1;
-    icon_name = wm_name;
-
-    win =
-        XCreateWindow(dpy, RootWindow(dpy, scr), 0, 0, width, height, 0, depth,
-                      InputOutput, visual, CWBackPixel | CWEventMask, &wa);
-    sizeHints.flags = 0;
-    wmHints.flags = InputHint;
-    wmHints.input = True;
-    XSetWMProperties(dpy, win, &wm_name, &icon_name, argv, argc, &sizeHints,
-                     &wmHints, 0);
-    XSetWMProtocols(dpy, win, &wm_delete_window, 1);
-
-    XMapWindow(dpy, win);
-
-    surface = cairo_xlib_surface_create(dpy, win, visual, width, height);
+    /* Create Cairo surface based on the SDL surface */
+    surface = cairo_image_surface_create_for_data(
+        (unsigned char *) sdl_surface->pixels, CAIRO_FORMAT_ARGB32,
+        sdl_surface->w, sdl_surface->h, sdl_surface->pitch);
 
     cr = cairo_create(surface);
 
@@ -111,6 +105,15 @@ static cmd_t *insert_cmd(cmd_t **prev)
     return n;
 }
 
+static cmd_t *append_cmd(char_t *c)
+{
+    cmd_t **prev;
+
+    for (prev = &c->cmd; *prev; prev = &(*prev)->next)
+        ;
+    return insert_cmd(prev);
+}
+
 static void delete_cmd(cmd_t **head, cmd_t *cmd)
 {
     while (*head != cmd)
@@ -141,13 +144,16 @@ static void pop(char_t *c)
     free(s);
 }
 
-static cmd_t *append_cmd(char_t *c)
+static void delete_first_cmd(char_t *c, cmd_t *first)
 {
-    cmd_t **prev;
+    push(c);
+    delete_cmd(&c->cmd, first);
+    c->first = c->last = 0;
+}
 
-    for (prev = &c->cmd; *prev; prev = &(*prev)->next)
-        ;
-    return insert_cmd(prev);
+static void undo(char_t *c)
+{
+    pop(c);
 }
 
 static int commas(char *line)
@@ -160,7 +166,7 @@ static int commas(char *line)
     return n;
 }
 
-static char_t *read_char(void)
+static char_t *read_char(FILE *file)
 {
     char_t *c = malloc(sizeof(char_t));
     char line[1024];
@@ -170,7 +176,7 @@ static char_t *read_char(void)
     c->stack = 0;
     c->first = 0;
     c->last = 0;
-    while (fgets(line, sizeof(line), stdin)) {
+    while (fgets(line, sizeof(line), file)) {
         if (line[0] == '/') {
             int ucs4;
             if (sscanf(line + 5, "%x", &ucs4) == 1)
@@ -246,7 +252,14 @@ static void draw_char(char_t *c)
     cmd_stack_t *s;
     int i;
 
-    XClearArea(dpy, win, 0, 0, 0, 0, False);
+    /* Clear the SDL surface */
+    SDL_Surface *sdl_surface = SDL_GetWindowSurface(window);
+    /* Fill with white color to clear */
+    SDL_FillRect(sdl_surface, NULL,
+                 SDL_MapRGB(sdl_surface->format, 255, 255, 255));
+
+    /* Set up Cairo to draw on the surface */
+    cairo_save(cr);
 
     for (cmd = c->cmd; cmd; cmd = cmd->next) {
         double alpha;
@@ -328,21 +341,32 @@ static void draw_char(char_t *c)
             tx = cmd->pt[0].x;
             ty = cmd->pt[0].y;
         }
-        {
-            cairo_save(cr);
-            if (cmd == c->first)
-                cairo_set_source_rgb(cr, 0, .5, 0);
-            else if (cmd == c->last)
-                cairo_set_source_rgb(cr, 0, 0, .5);
-            else
-                cairo_set_source_rgb(cr, 0, .5, .5);
 
-            cairo_move_to(cr, tx - 2, ty + 3);
-            snprintf(buf, sizeof(buf), "%d", i);
-            cairo_show_text(cr, buf);
-            cairo_restore(cr);
+        /* Save state before rendering text */
+        cairo_save(cr);
+        if (cmd == c->first) {
+            /* Green for the first command */
+            cairo_set_source_rgb(cr, 0, .5, 0);
+        } else if (cmd == c->last) {
+            /* Blue for the last command */
+            cairo_set_source_rgb(cr, 0, 0, .5);
+        } else {
+            /* Cyan for intermediate commands */
+            cairo_set_source_rgb(cr, 0, .5, .5);
         }
+
+        cairo_move_to(cr, tx - 2, ty + 3);
+        /* Label with the index and draw */
+        snprintf(buf, sizeof(buf), "%d", i);
+        cairo_show_text(cr, buf);
+        /* Restore after text drawing */
+        cairo_restore(cr);
     }
+
+    cairo_restore(cr);
+
+    /* Finally, update the SDL surface with the new Cairo drawing */
+    SDL_UpdateWindowSurface(window);
 }
 
 static cmd_t *pos_to_cmd(char_t *c, cmd_t *start, int ix, int iy)
@@ -378,12 +402,12 @@ static cmd_t *pos_to_cmd(char_t *c, cmd_t *start, int ix, int iy)
     return best_cmd;
 }
 
-static int is_before(cmd_t *before, cmd_t *after)
+static bool is_before(cmd_t *before, cmd_t *after)
 {
     if (!before)
-        return 0;
+        return false;
     if (before->next == after)
-        return 1;
+        return true;
     return is_before(before->next, after);
 }
 
@@ -448,139 +472,152 @@ static void split(char_t *c, cmd_t *first, cmd_t *last)
     c->first = c->last = 0;
 }
 
-static void delete(char_t *c, cmd_t *first)
+static void tweak_spline(char_t *c,
+                         cmd_t *first,
+                         int is_2nd_point,
+                         double dx,
+                         double dy)
 {
-    push(c);
-    delete_cmd(&c->cmd, first);
-    c->first = c->last = 0;
-}
-
-static void tweak_spline(char_t *c, cmd_t *first, int p2, double dx, double dy)
-{
-    int i = p2 ? 1 : 0;
+    int i = !!is_2nd_point;
 
     push(c);
     first->pt[i].x += dx;
     first->pt[i].y += dy;
 }
 
-static void undo(char_t *c)
+static void button(char_t *c, SDL_MouseButtonEvent *bev)
 {
-    pop(c);
-}
-
-static void button(char_t *c, XButtonEvent *bev)
-{
-    cmd_t *first = bev->button == 1 ? c->first : c->last;
+    cmd_t *first = bev->button == SDL_BUTTON_LEFT ? c->first : c->last;
     cmd_t *where = pos_to_cmd(c, first, bev->x, bev->y);
 
     if (!where) {
-        XBell(dpy, 50);
+        SDL_Log("Button click outside target");
         return;
     }
     switch (bev->button) {
-    case 1:
+    case SDL_BUTTON_LEFT:
         c->first = where;
         break;
-    case 2:
-    case 3:
+    case SDL_BUTTON_RIGHT:
         c->last = where;
         break;
     }
-    draw_char(c);
 }
 
 static void play(char_t *c)
 {
-    XEvent ev;
-    char key_string[10];
+    /* Ensures that SDL only focuses on key events*/
+    SDL_StopTextInput();
 
-    XClearArea(dpy, win, 0, 0, 0, 0, True);
-    for (;;) {
-        XNextEvent(dpy, &ev);
-        switch (ev.type) {
-        case KeyPress:
-            if (XLookupString((XKeyEvent *) &ev, key_string, sizeof(key_string),
-                              0, 0) == 1) {
-                switch (key_string[0]) {
-                case 'q':
+    SDL_Event event;
+    SDL_Keycode key_event;
+
+    /* keep track of the selected spline */
+    cmd_t *spline = NULL;
+    draw_char(c);
+
+    while (!exit_window) {
+        if (SDL_PollEvent(&event)) {
+            switch (event.type) {
+            /* If SDL event is detected */
+            case SDL_QUIT:
+                /* Click the "X" on the top of the screen to exit the program */
+                exit_window = true;
+                break;
+            case SDL_KEYDOWN:
+                /* If any key event is detected */
+                key_event = event.key.keysym.sym;
+
+                switch (key_event) {
+                case SDLK_q:
+                    /* To exit play()
+                     * This allows the user to display the next character.
+                     */
                     return;
-                case 'c':
-                    XClearArea(dpy, ev.xkey.window, 0, 0, 0, 0, True);
-                    break;
-                case 's':
+                case SDLK_ESCAPE:
+                    /* To quit the program */
+                    exit_window = true;
+                    return;
+                case SDLK_s:
+                    /* To split the line or curve formed by two adjacent points
+                     * into two segments
+                     */
                     if (c->first && c->last) {
                         split(c, c->first, c->last);
-                        draw_char(c);
                     }
+                    draw_char(c);
                     break;
-                case 'u':
+                case SDLK_u:
+                    /* To undo the last operation */
                     undo(c);
                     draw_char(c);
                     break;
-                case 'f':
+                case SDLK_f:
+                    /* To replace a line or a curve with another spline */
                     if (c->first && c->last) {
                         replace_with_spline(c, c->first, c->last);
-                        draw_char(c);
                     }
+                    draw_char(c);
                     break;
-                case 'd':
+                case SDLK_d:
+                    /* To delete the first pointer */
                     if (c->first) {
-                        delete (c, c->first);
-                        draw_char(c);
+                        delete_first_cmd(c, c->first);
                     }
+                    draw_char(c);
+                    break;
+                /* Move the points */
+                case SDLK_LEFT:
+                    if (!spline)
+                        break;
+                    tweak_spline(c, spline, event.key.keysym.mod & KMOD_SHIFT,
+                                 -1, 0);
+                    draw_char(c);
+                    break;
+                case SDLK_RIGHT:
+                    if (!spline)
+                        break;
+
+                    tweak_spline(c, spline, event.key.keysym.mod & KMOD_SHIFT,
+                                 1, 0);
+                    draw_char(c);
+                    break;
+                case SDLK_UP:
+                    if (!spline)
+                        break;
+
+                    tweak_spline(c, spline, event.key.keysym.mod & KMOD_SHIFT,
+                                 0, -1);
+                    draw_char(c);
+                    break;
+                case SDLK_DOWN:
+                    if (!spline)
+                        break;
+
+                    tweak_spline(c, spline, event.key.keysym.mod & KMOD_SHIFT,
+                                 0, 1);
+                    draw_char(c);
                     break;
                 }
-            } else {
-                cmd_t *spline;
-                if (c->first && c->first->op == op_curve)
-                    spline = c->first;
-                else if (c->last && c->last->op == op_curve)
-                    spline = c->last;
-                else
-                    spline = 0;
-                if (spline) {
-                    int keysyms_keycode;
-                    KeySym *keysym = XGetKeyboardMapping(dpy, ev.xkey.keycode,
-                                                         1, &keysyms_keycode);
-                    switch (keysyms_keycode) {
-                    case XK_Left:
-                        tweak_spline(c, spline, ev.xkey.state & ShiftMask, -1,
-                                     0);
-                        draw_char(c);
-                        break;
-                    case XK_Right:
-                        tweak_spline(c, spline, ev.xkey.state & ShiftMask, 1,
-                                     0);
-                        draw_char(c);
-                        break;
-                    case XK_Up:
-                        tweak_spline(c, spline, ev.xkey.state & ShiftMask, 0,
-                                     -1);
-                        draw_char(c);
-                        break;
-                    case XK_Down:
-                        tweak_spline(c, spline, ev.xkey.state & ShiftMask, 0,
-                                     1);
-                        draw_char(c);
-                        break;
-                    }
-                    XFree(keysym);
-                }
-            }
-            break;
-        case Expose:
-            if (ev.xexpose.count == 0)
+                break;
+                /* End if key event detected */
+
+            case SDL_MOUSEBUTTONDOWN:
+                /* Redraw the content after mouse button interaction */
+                button(c, &event.button);
+                spline = c->first;
                 draw_char(c);
-            break;
-        case ButtonPress:
-            button(c, &ev.xbutton);
-            break;
+                break;
+            }
+            /* End if SDL event detected */
         }
+
+        /* Ensure the SDL window surface is updated */
+        SDL_UpdateWindowSurface(window);
     }
 }
 
-static void write_char(char_t *c)
+static void print_char(char_t *c)
 {
     cmd_t *cmd;
 
@@ -608,23 +645,42 @@ static void write_char(char_t *c)
     offset += 1;
 }
 
-int main(int argc, char **argv)
+static void generate_font_metrics(void)
 {
-    char_t *c;
     int ucs4;
-
-    if (!init(argc, argv))
-        exit(1);
-    while ((c = read_char())) {
-        play(c);
-        write_char(c);
-    }
     for (ucs4 = 0; ucs4 < 0x80; ucs4++) {
         if ((ucs4 & 7) == 0)
             printf("\n   ");
         printf(" %4d,", offsets[ucs4]);
     }
     printf("\n");
+}
+
+int main(int argc, char **argv)
+{
+    char_t *c;
+
+    if (argc < 2) {
+        printf("Usage: %s <filename>\n", argv[0]);
+        return 1;
+    }
+
+    FILE *file = fopen(argv[1], "r");
+    if (!file) {
+        printf("Failed to open file: %s\n", argv[1]);
+        return 2;
+    }
+
+    if (!init(argc, argv))
+        exit(1);
+    while ((c = read_char(file)) && !exit_window) {
+        play(c);
+        print_char(c);
+    }
+
+    fclose(file);
+
+    generate_font_metrics();
 
     return 0;
 }

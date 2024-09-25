@@ -28,9 +28,9 @@ static twin_order_t _twin_timeout_order(twin_queue_t *a, twin_queue_t *b)
     const twin_timeout_t *bt = (twin_timeout_t *) b;
 
     if (twin_time_compare(at->time, <, bt->time))
-        return TWIN_BEFORE;
-    if (twin_time_compare(at->time, >, bt->time))
         return TWIN_AFTER;
+    if (twin_time_compare(at->time, >, bt->time))
+        return TWIN_BEFORE;
     return TWIN_AT;
 }
 

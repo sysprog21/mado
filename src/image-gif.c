@@ -600,10 +600,12 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
     }
     anim->iter = twin_animation_iter_init(anim);
     if (!anim->iter) {
+        free(frame);
         free(anim);
         gif_close(gif);
         return NULL;
     }
+    free(frame);
     gif_close(gif);
     return anim;
 }

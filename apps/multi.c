@@ -216,6 +216,7 @@ static void apps_jelly_start(twin_screen_t *screen, int x, int y, int w, int h)
             twin_path_destroy(stroke);
         }
     }
+    twin_path_destroy(path);
     twin_window_show(window);
 }
 

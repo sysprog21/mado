@@ -56,7 +56,8 @@ static void _twin_sdl_put_span(twin_coord_t left,
     }
 }
 
-static void _twin_sdl_destroy(twin_screen_t *screen, twin_sdl_t *tx)
+static void _twin_sdl_destroy(twin_screen_t *screen maybe_unused,
+                              twin_sdl_t *tx)
 {
     SDL_DestroyTexture(tx->texture);
     SDL_DestroyRenderer(tx->render);

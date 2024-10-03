@@ -16,7 +16,6 @@ typedef uint16_t twin_rgb16_t;
 typedef uint32_t twin_argb32_t;
 typedef uint32_t twin_ucs4_t;
 typedef int16_t twin_coord_t;
-typedef int16_t twin_style_t;
 typedef int16_t twin_count_t;
 typedef int16_t twin_keysym_t;
 typedef uint8_t twin_js_number_t;
@@ -320,6 +319,14 @@ typedef struct _twin_point {
 } twin_point_t;
 
 typedef struct _twin_path twin_path_t;
+
+typedef enum _twin_style {
+    TwinStyleRoman = 0,
+    TwinStyleBold = 1,
+    TwinStyleOblique = 2,
+    TwinStyleBoldOblique = 3,
+    TwinStyleUnhinted = 4,
+} twin_style_t;
 
 typedef enum _twin_cap {
     TwinCapRound,
@@ -672,11 +679,6 @@ twin_fixed_t twin_fixed_sqrt(twin_fixed_t a);
  */
 
 bool twin_has_ucs4(twin_font_t *font, twin_ucs4_t ucs4);
-
-#define TWIN_TEXT_ROMAN 0
-#define TWIN_TEXT_BOLD 1
-#define TWIN_TEXT_OBLIQUE 2
-#define TWIN_TEXT_UNHINTED 4
 
 void twin_path_ucs4_stroke(twin_path_t *path, twin_ucs4_t ucs4);
 

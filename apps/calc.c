@@ -73,11 +73,11 @@ static const char *apps_calc_labels[] = {
 };
 
 #define APPS_CALC_VALUE_SIZE twin_int_to_fixed(29)
-#define APPS_CALC_VALUE_STYLE TWIN_TEXT_ROMAN
+#define APPS_CALC_VALUE_STYLE TwinStyleRoman
 #define APPS_CALC_VALUE_FG 0xff000000
 #define APPS_CALC_VALUE_BG 0x80808080
 #define APPS_CALC_BUTTON_SIZE twin_int_to_fixed(15)
-#define APPS_CALC_BUTTON_STYLE TWIN_TEXT_BOLD
+#define APPS_CALC_BUTTON_STYLE TwinStyleBold
 #define APPS_CALC_BUTTON_FG 0xff000000
 #define APPS_CALC_BUTTON_BG 0xc0808080
 

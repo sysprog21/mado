@@ -20,7 +20,7 @@ static twin_time_t _apps_hello_timeout(twin_time_t maybe_unused now,
 
     *strchr(t, '\n') = '\0';
     twin_label_set(labelb, t, 0xff008000, twin_int_to_fixed(12),
-                   TWIN_TEXT_OBLIQUE);
+                   TwinStyleOblique);
     return 1000;
 }
 
@@ -34,14 +34,14 @@ void apps_hello_start(twin_screen_t *screen,
     twin_toplevel_t *top = twin_toplevel_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
     twin_label_t *labela = twin_label_create(
-        &top->box, name, 0xff000080, twin_int_to_fixed(12), TWIN_TEXT_ROMAN);
+        &top->box, name, 0xff000080, twin_int_to_fixed(12), TwinStyleRoman);
     twin_widget_t *widget =
         twin_widget_create(&top->box, 0xff800000, 1, 2, 0, 0);
     twin_label_t *labelb = twin_label_create(
-        &top->box, name, 0xff008000, twin_int_to_fixed(12), TWIN_TEXT_OBLIQUE);
+        &top->box, name, 0xff008000, twin_int_to_fixed(12), TwinStyleOblique);
     twin_button_t *button = twin_button_create(
         &top->box, "Button", 0xff800000, twin_int_to_fixed(18),
-        TWIN_TEXT_BOLD | TWIN_TEXT_OBLIQUE);
+        TwinStyleBold | TwinStyleOblique);
     twin_widget_set(&labela->widget, 0xc0c0c0c0);
     (void) widget;
     twin_widget_set(&labelb->widget, 0xc0c0c0c0);

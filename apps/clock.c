@@ -103,7 +103,7 @@ static void _apps_clock_date(apps_clock_t *clock, struct tm *t)
     twin_path_rotate(path, TWIN_ANGLE_90);
     twin_path_translate(path, D(0.8), 0);
     twin_path_set_font_size(path, D(0.25));
-    twin_path_set_font_style(path, TWIN_TEXT_UNHINTED);
+    twin_path_set_font_style(path, TwinStyleUnhinted);
     twin_text_metrics_utf8(path, text, &metrics);
     height = metrics.ascent + metrics.descent;
     width = metrics.right_side_bearing - metrics.left_side_bearing;
@@ -133,7 +133,7 @@ static void _apps_clock_face(apps_clock_t *clock)
                       APPS_CLOCK_BORDER_WIDTH);
 
     twin_path_set_font_size(path, D(0.2));
-    twin_path_set_font_style(path, TWIN_TEXT_UNHINTED);
+    twin_path_set_font_style(path, TwinStyleUnhinted);
 
     for (m = 1; m <= 60; m++) {
         twin_state_t state = twin_path_save(path);

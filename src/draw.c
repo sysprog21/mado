@@ -692,12 +692,11 @@ static twin_argb32_t _twin_apply_alpha(twin_argb32_t v)
     );
 
     /* clear RGB data if alpha is zero */
-
     if (!alpha)
         return 0;
 
-        /* twin needs ARGB format */
 #if __BYTE_ORDER == __BIG_ENDIAN
+    /* twin needs ARGB format */
     return alpha << 24 | twin_int_mult(twin_get_8(v, 24), alpha, t1) << 16 |
            twin_int_mult(twin_get_8(v, 16), alpha, t2) << 8 |
            twin_int_mult(twin_get_8(v, 8), alpha, t3) << 0;

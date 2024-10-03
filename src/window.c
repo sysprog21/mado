@@ -199,7 +199,7 @@ static void twin_window_frame(twin_window_t *window)
     if (!name)
         name = "twin";
     twin_path_set_font_size(path, name_height);
-    twin_path_set_font_style(path, TWIN_TEXT_OBLIQUE | TWIN_TEXT_UNHINTED);
+    twin_path_set_font_style(path, TwinStyleOblique | TwinStyleUnhinted);
     text_width = twin_width_utf8(path, name);
 
     title_right = (text_x + text_width + bw + icon_size + bw + icon_size + bw +

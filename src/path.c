@@ -440,7 +440,7 @@ twin_path_t *twin_path_create(void)
     path->sublen = 0;
     twin_matrix_identity(&path->state.matrix);
     path->state.font_size = TWIN_FIXED_ONE * 15;
-    path->state.font_style = TWIN_TEXT_ROMAN;
+    path->state.font_style = TwinStyleRoman;
     path->state.cap_style = TwinCapRound;
     return path;
 }

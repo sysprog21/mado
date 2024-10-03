@@ -51,7 +51,7 @@ static void apps_circletext_start(twin_screen_t *screen,
     twin_fill(pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, wid, hei);
     twin_window_set_name(window, "circletext");
 
-    twin_path_set_font_style(path, TWIN_TEXT_UNHINTED);
+    twin_path_set_font_style(path, TwinStyleUnhinted);
     twin_path_circle(pen, 0, 0, D(1));
 
     twin_path_translate(path, D(200), D(200));
@@ -193,7 +193,7 @@ static void apps_jelly_start(twin_screen_t *screen, int x, int y, int w, int h)
         fy += D(s + 2);
         twin_path_move(path, fx, fy);
 #define TEXT "jelly text"
-        /*	twin_path_set_font_style (path, TWIN_TEXT_UNHINTED); */
+        /* twin_path_set_font_style (path, TwinStyleUnhinted); */
         twin_path_utf8(path, TEXT);
         twin_paint_path(pixmap, 0xff000000, path);
         twin_path_empty(path);

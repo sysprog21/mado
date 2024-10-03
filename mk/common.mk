@@ -90,23 +90,7 @@
 
 TOPDIR ?= $(CURDIR)
 
-CC         := $(CROSS_COMPILE)gcc $(SYSROOT)
-CXX        := $(CROSS_COMPILE)g++ $(SYSROOT)
-CPP        := $(CROSS_COMPILE)cpp $(SYSROOT)
-LD         := $(CROSS_COMPILE)ld
-AR         := $(CROSS_COMPILE)ar
-RANLIB     := $(CROSS_COMPILE)ranlib
-STRIP      := $(CROSS_COMPILE)strip -sx
-OBJCOPY    := $(CROSS_COMPILE)objcopy
-
-HOSTCC     := $(HOST_COMPILE)gcc
-HOSTCXX    := $(HOST_COMPILE)g++
-HOSTCPP    := $(HOST_COMPILE)cpp
-HOSTLD     := $(HOST_COMPILE)ld
-HOSTAR     := $(HOST_COMPILE)ar
-HOSTRANLIB := $(HOST_COMPILE)ranlib
-HOSTSTRIP  := $(HOST_COMPILE)strip
-HOSTOBJCOPY:= $(HOST_COMPILE)objcpy
+include mk/toolchain.mk
 
 SED        := sed
 
@@ -116,8 +100,8 @@ MV         := mv
 RM         := rm -rf
 MKDIR      := mkdir -p
 
-__CFLAGS := -Wall -Wextra -pipe
-__CFLAGS += -O2 -pipe
+__CFLAGS := -Wall -Wextra
+__CFLAGS += -O2
 __CFLAGS += $(CFLAGS)
 
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')

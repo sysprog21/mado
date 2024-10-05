@@ -448,7 +448,7 @@ typedef enum _twin_icon {
 } twin_icon_t;
 
 /*
- * Timeout and work procs return TWIN_TRUE to remain in the queue,
+ * Timeout and work procs return true to remain in the queue,
  * timeout procs are called every 'delay' ms
  */
 typedef twin_time_t (*twin_timeout_proc_t)(twin_time_t now, void *closure);

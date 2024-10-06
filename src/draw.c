@@ -723,6 +723,55 @@ void twin_premultiply_alpha(twin_pixmap_t *px)
     }
 }
 
+static twin_argb32_t _twin_apply_gaussian(twin_argb32_t v,
+                                          uint8_t wght,
+                                          twin_argb32_t *r,
+                                          twin_argb32_t *g,
+                                          twin_argb32_t *b)
+{
+    *r += ((((v & 0x00ff0000) >> 16) * (twin_argb32_t) wght) << 8) & 0x00ff0000;
+    *g += (((v & 0x0000ff00) >> 8) * (twin_argb32_t) wght) & 0x0000ff00;
+    *b += ((((v & 0x000000ff) >> 0) * (twin_argb32_t) wght) >> 8) & 0x000000ff;
+}
+
+void twin_gaussian_blur(twin_pixmap_t *px)
+{
+    if (px->format != TWIN_ARGB32)
+        return;
+
+    uint8_t kernel[5][5] = {{0x01, 0x04, 0x06, 0x04, 0x01},
+                            {0x04, 0x10, 0x18, 0x10, 0x04},
+                            {0x06, 0x18, 0x24, 0x18, 0x06},
+                            {0x04, 0x10, 0x18, 0x10, 0x04},
+                            {0x01, 0x04, 0x06, 0x04, 0x01}};
+    twin_pointer_t ptr, tmp_ptr;
+    twin_pixmap_t *tmp_px =
+        twin_pixmap_create(px->format, px->width, px->height);
+    memcpy(tmp_px->p.v, px->p.v,
+           px->width * px->height * twin_bytes_per_pixel(px->format));
+
+    int radius = 2, _y, _x;
+    twin_argb32_t r, g, b;
+    for (int screen_y = 0; screen_y < px->height; screen_y++)
+        for (int screen_x = 0; screen_x < px->width; screen_x++) {
+            r = 0, g = 0, b = 0;
+            ptr = twin_pixmap_pointer(px, screen_x, screen_y);
+            for (int y = -radius; y <= radius; y++) {
+                _y = min(max(screen_y + y, 0), px->height - 1);
+                for (int x = -radius; x <= radius; x++) {
+                    _x = min(max(screen_x + x, 0), px->width - 1);
+                    tmp_ptr = twin_pixmap_pointer(tmp_px, _x, _y);
+                    _twin_apply_gaussian(*tmp_ptr.argb32,
+                                         kernel[x + radius][y + radius], &r, &g,
+                                         &b);
+                }
+            }
+            *ptr.argb32 = (*ptr.argb32 & 0xff000000) | r | g | b;
+        }
+
+    twin_pixmap_destroy(tmp_px);
+}
+
 /*
  * array primary    index is OVER SOURCE
  * array secondary  index is ARGB32 RGB16 A8

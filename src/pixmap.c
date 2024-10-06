@@ -13,6 +13,10 @@ twin_pixmap_t *twin_pixmap_create(twin_format_t format,
                                   twin_coord_t height)
 {
     twin_coord_t stride = twin_bytes_per_pixel(format) * width;
+    /* Padding the stride to a multiple of 4 bytes */
+    if (stride % 4 != 0)
+        stride += (4 - stride % 4);
+
     twin_area_t space = (twin_area_t) stride * height;
     twin_area_t size = sizeof(twin_pixmap_t) + space;
     twin_pixmap_t *pixmap = malloc(size);

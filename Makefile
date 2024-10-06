@@ -104,6 +104,12 @@ libtwin.a_cflags-y += $(shell sdl2-config --cflags)
 TARGET_LIBS += $(shell sdl2-config --libs)
 endif
 
+ifeq ($(CONFIG_BACKEND_FBDEV), y)
+BACKEND = fbdev
+libtwin.a_files-y += backend/fbdev.c
+libtwin.a_files-y += backend/linux_input.c
+endif
+
 # Standalone application
 
 ifeq ($(CONFIG_DEMO_APPLICATIONS), y)

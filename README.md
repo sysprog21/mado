@@ -60,29 +60,53 @@ benefiting the entire application stack.
 
 ## Build and Verify
 
+### Prerequisites
+
 `Mado` is built with a minimalist design in mind. However, its verification
 relies on certain third-party packages for full functionality and access to all
-its features. To ensure proper operation, the development environment should
-have the [SDL2 library](https://www.libsdl.org/), [libjpeg](https://www.ijg.org/), and [libpng](https://github.com/pnggroup/libpng) installed.
+its features. We encourage the development environment to be installed with all optional
+packages, including [libjpeg](https://www.ijg.org/), [libpng](https://github.com/pnggroup/libpng),
+and the [SDL2 library](https://www.libsdl.org/).
 * macOS: `brew install sdl2 jpeg libpng`
 * Ubuntu Linux / Debian: `sudo apt install libsdl2-dev libjpeg-dev libpng-dev`
 
-Configure via [Kconfiglib](https://pypi.org/project/kconfiglib/)
+### Configuration
+
+Configure via [Kconfiglib](https://pypi.org/project/kconfiglib/), you should select either SDL
+video output or the Linux framebuffer.
 ```shell
 $ make config
 ```
 
-Build the library and demo program.
+### Build and execution
+
+Build the library and demo program:
+
 ```shell
 $ make
 ```
 
-Run sample `Mado` program:
+To run demo program with SDL backend:
+
 ```shell
 $ ./demo-sdl
 ```
 
 Once the window appears, you should be able to move the windows and interact with the widgets.
+
+To run demo program with the Linux framebuffer backend:
+
+```shell
+$ sudo ./demo-fbdev
+```
+
+Normal users don't have access to `/dev/fb0` so require `sudo`. Alternatively, you can add the user to the video group to avoid typing `sudo` every time:
+
+```shell
+$ sudo usermod -a -G video $USERNAME
+```
+
+In addition, the framebuffer device can be assigned via the environment variable `FRAMEBUFFER`.
 
 ## License
 

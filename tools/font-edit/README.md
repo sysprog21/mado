@@ -5,7 +5,7 @@ screens.
 
 ## Build Dependency
 ```shell
-sudo apt-get install libx11-dev libcairo2-dev
+sudo apt-get install libsdl2-dev libcairo2-dev
 ```
 
 ## Usage

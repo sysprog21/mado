@@ -65,10 +65,10 @@ benefiting the entire application stack.
 `Mado` is built with a minimalist design in mind. However, its verification
 relies on certain third-party packages for full functionality and access to all
 its features. We encourage the development environment to be installed with all optional
-packages, including [libjpeg](https://www.ijg.org/), [libpng](https://github.com/pnggroup/libpng),
-and the [SDL2 library](https://www.libsdl.org/).
-* macOS: `brew install sdl2 jpeg libpng`
-* Ubuntu Linux / Debian: `sudo apt install libsdl2-dev libjpeg-dev libpng-dev`
+packages, including [libjpeg](https://www.ijg.org/), [libpng](https://github.com/pnggroup/libpng), 
+[pixman](https://pixman.org/), and the [SDL2 library](https://www.libsdl.org/).
+* macOS: `brew install sdl2 jpeg libpng pixman`
+* Ubuntu Linux / Debian: `sudo apt install libsdl2-dev libjpeg-dev libpng-dev libpixman-1-dev`
 
 ### Configuration
 

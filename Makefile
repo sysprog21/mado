@@ -110,6 +110,18 @@ libtwin.a_files-y += backend/fbdev.c
 libtwin.a_files-y += backend/linux_input.c
 endif
 
+# Performance tester
+
+ifeq ($(CONFIG_PERFORMANCE_TEST), y)
+target-$(CONFIG_PERFORMANCE_TEST) += apps/mado-perf
+apps/mado-perf_depends-y += $(target.a-y)
+apps/mado-perf_files-y += apps/perf.c
+apps/mado-perf_includes-y := include
+apps/mado-perf_ldflags-y := \
+	$(target.a-y) \
+	$(TARGET_LIBS)
+endif
+
 # Standalone application
 
 ifeq ($(CONFIG_DEMO_APPLICATIONS), y)

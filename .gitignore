@@ -4,6 +4,8 @@
 *.a
 demo-*
 .demo-*
+mado-perf
+.mado-perf
 
 # Swap
 [._]*.s[a-v][a-z]

@@ -139,6 +139,7 @@ twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
         _convertBGRtoARGB(pix->p.b, width, height);
 #endif
         twin_premultiply_alpha(pix);
+        twin_gaussian_blur(pix);
     }
 
 bail_free:

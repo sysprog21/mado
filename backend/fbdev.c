@@ -56,9 +56,8 @@ static void _twin_fbdev_put_span(twin_coord_t left,
         return;
 
     twin_coord_t width = right - left;
-    off_t off = top * screen->width + left;
-    uint32_t *dest =
-        (uint32_t *) ((uintptr_t) tx->fb_base + (off * sizeof(uint32_t)));
+    off_t off = sizeof(uint32_t) * left + top * tx->fb_fix.line_length;
+    uint32_t *dest = (uint32_t *) ((uintptr_t) tx->fb_base + off);
     memcpy(dest, pixels, width * sizeof(uint32_t));
 }
 
@@ -104,6 +103,11 @@ static bool twin_fbdev_apply_config(twin_fbdev_t *tx)
         log_error("Failed to set framebuffer mode");
         return false;
     }
+
+    /* Set if the xoffset and yoffset are changed */
+    tx->fb_var.xoffset = 0;
+    tx->fb_var.yoffset = 0;
+    ioctl(tx->fb_fd, FBIOPAN_DISPLAY, &tx->fb_var);
 
     /* Read changable information of the framebuffer again */
     if (ioctl(tx->fb_fd, FBIOGET_VSCREENINFO, &tx->fb_var) < 0) {

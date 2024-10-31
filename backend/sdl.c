@@ -50,7 +50,7 @@ static void _twin_sdl_put_span(twin_coord_t left,
     }
     if ((top + 1 - tx->image_y) == tx->height) {
         SDL_UpdateTexture(tx->texture, NULL, tx->pixels,
-                          screen->width * sizeof(uint32_t));
+                          screen->width * sizeof(*pixels));
         SDL_RenderCopy(tx->render, tx->texture, NULL, NULL);
         SDL_RenderPresent(tx->render);
     }
@@ -157,8 +157,8 @@ twin_context_t *twin_sdl_init(int width, int height)
         goto bail;
     }
 
-    tx->pixels = malloc(width * height * sizeof(uint32_t));
-    memset(tx->pixels, 255, width * height * sizeof(uint32_t));
+    tx->pixels = malloc(width * height * sizeof(*tx->pixels));
+    memset(tx->pixels, 255, width * height * sizeof(*tx->pixels));
 
     tx->render = SDL_CreateRenderer(tx->win, -1, SDL_RENDERER_ACCELERATED);
     if (!tx->render) {

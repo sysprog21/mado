@@ -455,15 +455,10 @@ typedef twin_time_t (*twin_timeout_proc_t)(twin_time_t now, void *closure);
 
 typedef bool (*twin_work_proc_t)(void *closure);
 
-typedef enum _twin_file_op { TWIN_READ = 1, TWIN_WRITE = 2 } twin_file_op_t;
-
-typedef bool (*twin_file_proc_t)(int file, twin_file_op_t ops, void *closure);
-
 #define twin_time_compare(a, op, b) (((a) - (b)) op 0)
 
 typedef struct _twin_timeout twin_timeout_t;
 typedef struct _twin_work twin_work_t;
-typedef struct _twin_file twin_file_t;
 
 /*
  * Widgets
@@ -585,6 +580,11 @@ struct _twin_scroll {
     twin_widget_t widget;
 };
 
+typedef struct _twin_context {
+    twin_screen_t *screen;
+    void *priv;
+} twin_context_t;
+
 /*
  * box.c
  */
@@ -619,7 +619,7 @@ twin_pixmap_t *twin_make_cursor(int *hx, int *hy);
  * dispatch.c
  */
 
-void twin_dispatch(void);
+void twin_dispatch(twin_context_t *ctx);
 
 /*
  * draw.c
@@ -653,17 +653,6 @@ void twin_premultiply_alpha(twin_pixmap_t *px);
  */
 
 void twin_event_enqueue(const twin_event_t *event);
-
-/*
- * file.c
- */
-
-twin_file_t *twin_set_file(twin_file_proc_t file_proc,
-                           int file,
-                           twin_file_op_t ops,
-                           void *closure);
-
-void twin_clear_file(twin_file_t *file);
 
 /*
  * fixed.c
@@ -1169,11 +1158,6 @@ void twin_clear_work(twin_work_t *work);
 /*
  * backend
  */
-
-typedef struct _twin_context {
-    twin_screen_t *screen;
-    void *priv;
-} twin_context_t;
 
 twin_context_t *twin_create(int width, int height);
 

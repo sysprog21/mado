@@ -5,6 +5,7 @@
  */
 
 #include <fcntl.h>
+#include <libudev.h>
 #include <linux/input.h>
 #include <poll.h>
 #include <pthread.h>
@@ -21,6 +22,7 @@
 
 typedef struct {
     twin_screen_t *screen;
+    pthread_t udev_thread;
     pthread_t evdev_thread;
     int fd;
     int btns;
@@ -101,6 +103,94 @@ static void twin_linux_input_events(struct input_event *ev,
     }
 }
 
+static void *twin_linux_udev_thread(void *arg)
+{
+    struct udev *udev;
+    struct udev_monitor *mon;
+    struct udev_device *dev;
+    int fd;
+
+    /* Create udev object */
+    udev = udev_new();
+    if (!udev) {
+        fprintf(stderr, "Failed to create udev object\n");
+        return NULL;
+    }
+
+    /* Create a monitor for kernel events */
+    mon = udev_monitor_new_from_netlink(udev, "udev");
+    if (!mon) {
+        fprintf(stderr, "Failed to create udev monitor\n");
+        udev_unref(udev);
+        return NULL;
+    }
+
+    /* Filter for input subsystem (keyboard/mouse) */
+    udev_monitor_filter_add_match_subsystem_devtype(mon, "input", NULL);
+    udev_monitor_enable_receiving(mon);
+
+    /* File descriptor for the monitor */
+    fd = udev_monitor_get_fd(mon);
+
+    printf("Listening for keyboard and mouse events...\n");
+
+    while (1) {
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(fd, &fds);
+
+        int ret = select(fd + 1, &fds, NULL, NULL, NULL);
+        if (ret <= 0) {
+            continue;
+        }
+
+        /* Get the device that caused the event */
+        dev = udev_monitor_receive_device(mon);
+        if (dev) {
+            const char *action = udev_device_get_action(dev);
+            const char *devnode = udev_device_get_devnode(dev);
+            const char *subsystem = udev_device_get_subsystem(dev);
+            // const char *devtype = udev_device_get_devtype(dev);
+
+            if (action && devnode && subsystem &&
+                strcmp(subsystem, "input") == 0) {
+                /* Detect if it’s a keyboard or mouse */
+                const char *name =
+                    udev_device_get_property_value(dev, "ID_INPUT_KEYBOARD");
+                const char *mouse =
+                    udev_device_get_property_value(dev, "ID_INPUT_MOUSE");
+
+                if (name || mouse) {
+                    if (strcmp(action, "add") == 0) {
+                        printf("Device added: %s\n", devnode);
+
+                        /* Open device file to get file descriptor */
+                        int device_fd = open(devnode, O_RDONLY | O_NONBLOCK);
+                        if (device_fd >= 0) {
+                            printf("Opened device %s with file descriptor %d\n",
+                                   devnode, device_fd);
+                            /* You can keep the fd open for further use */
+                            close(device_fd); /* Close for now */
+                        } else {
+                            perror("Error opening device");
+                        }
+                    } else if (strcmp(action, "remove") == 0) {
+                        printf("Device removed: %s\n", devnode);
+                    }
+                }
+            }
+
+            udev_device_unref(dev);
+        }
+    }
+
+    /* Clean up */
+    udev_monitor_unref(mon);
+    udev_unref(udev);
+
+    return NULL;
+}
+
 static void *twin_linux_evdev_thread(void *arg)
 {
     twin_linux_input_t *tm = arg;
@@ -169,6 +259,12 @@ void *twin_linux_input_create(twin_screen_t *screen)
     /* Set file handler for reading input device file */
     twin_set_file(dummy, tm->fd, TWIN_READ, tm);
 #endif
+
+    /* Start event handling thread */
+    if (pthread_create(&tm->udev_thread, NULL, twin_linux_udev_thread, tm)) {
+        log_error("Failed to create udev thread");
+        return NULL;
+    }
 
     /* Start event handling thread */
     if (pthread_create(&tm->evdev_thread, NULL, twin_linux_evdev_thread, tm)) {

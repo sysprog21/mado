@@ -19,6 +19,8 @@ typedef struct twin_backend {
     /* FIXME: Refine the parameter list */
     void (*configure)(twin_context_t *ctx);
 
+    bool (*poll)(twin_context_t *ctx);
+
     /* Device cleanup when drawing is done */
     void (*exit)(twin_context_t *ctx);
 } twin_backend_t;

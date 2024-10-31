@@ -23,7 +23,6 @@ libtwin.a_cflags-y :=
 
 libtwin.a_files-y = \
 	src/box.c \
-	src/file.c \
 	src/poly.c \
 	src/toplevel.c \
 	src/button.c \

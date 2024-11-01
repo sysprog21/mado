@@ -58,6 +58,14 @@ config LOADER_GIF
 
 endmenu
 
+menu "Performance Testers"
+
+config PERFORMANCE_TEST
+    bool "Build composite tester"
+    default y
+
+endmenu
+
 menu "Demo Applications"
 
 config DEMO_APPLICATIONS

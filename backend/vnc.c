@@ -47,6 +47,9 @@ typedef struct {
     enum nvnc_button_mask prev_button;
 } twin_peer_t;
 
+#define CURSOR_WIDTH 14
+#define CURSOR_HEIGHT 20
+
 static void _twin_vnc_put_begin(twin_coord_t left,
                                 twin_coord_t top,
                                 twin_coord_t right,
@@ -147,6 +150,21 @@ static void _twin_vnc_pointer_event(struct nvnc_client *client,
     twin_screen_dispatch(tx->screen, &tev);
 }
 
+static struct nvnc_fb *_twin_vnc_create_cursor()
+{
+    struct nvnc_fb *fb = nvnc_fb_new(CURSOR_WIDTH, CURSOR_HEIGHT,
+                                     DRM_FORMAT_ARGB8888, CURSOR_WIDTH);
+    uint32_t *pixels = nvnc_fb_get_addr(fb);
+    for (int i = 0; i < CURSOR_WIDTH * CURSOR_HEIGHT; i++) {
+        uint32_t a = _twin_cursor_default[i * 4];
+        uint32_t r = _twin_cursor_default[i * 4 + 1];
+        uint32_t g = _twin_cursor_default[i * 4 + 2];
+        uint32_t b = _twin_cursor_default[i * 4 + 3];
+        pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
+    }
+    return fb;
+}
+
 twin_context_t *twin_vnc_init(int width, int height)
 {
     twin_context_t *ctx = calloc(1, sizeof(twin_context_t));
@@ -200,6 +218,10 @@ twin_context_t *twin_vnc_init(int width, int height)
     nvnc_set_pointer_fn(tx->server, _twin_vnc_pointer_event);
     nvnc_set_new_client_fn(tx->server, _twin_vnc_new_client);
     nvnc_set_userdata(tx->server, tx, NULL);
+    struct nvnc_fb *cursor = _twin_vnc_create_cursor();
+    nvnc_set_cursor(tx->server, cursor, CURSOR_WIDTH, CURSOR_HEIGHT, 0, 0,
+                    true);
+    nvnc_fb_unref(cursor);
 
     ctx->screen = twin_screen_create(width, height, _twin_vnc_put_begin,
                                      _twin_vnc_put_span, ctx);

@@ -41,6 +41,7 @@ comment "Logging is disabled"
 config CURSOR
     bool "Manipulate cursor"
     default n
+    depends on !BACKEND_VNC
 
 endmenu
 

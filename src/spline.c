@@ -11,8 +11,8 @@ typedef struct _twin_spline {
 } twin_spline_t;
 
 /*
- * Linearly interpolate between points 'a' and 'b' with a shift factor.
- * The shift factor determines the position between 'a' and 'b'.
+ * Linearly interpolate between points 'a' and 'b' with a 'shift' factor.
+ * The 'shift' factor determines the position between 'a' and 'b'.
  * The result is stored in 'result'.
  */
 static void _lerp(const twin_spoint_t *a,
@@ -25,7 +25,7 @@ static void _lerp(const twin_spoint_t *a,
 }
 
 /*
- * Perform the de Casteljau algorithm to split a spline at a given shift
+ * Perform the de Casteljau algorithm to split a spline at a given 'shift'
  * factor. The spline is split into two new splines 's1' and 's2'.
  */
 static void _de_casteljau(twin_spline_t *spline,
@@ -33,9 +33,7 @@ static void _de_casteljau(twin_spline_t *spline,
                           twin_spline_t *s1,
                           twin_spline_t *s2)
 {
-    twin_spoint_t ab, bc, cd;
-    twin_spoint_t abbc, bccd;
-    twin_spoint_t final;
+    twin_spoint_t ab, bc, cd, abbc, bccd, final;
 
     _lerp(&spline->a, &spline->b, shift, &ab);
     _lerp(&spline->b, &spline->c, shift, &bc);
@@ -56,28 +54,31 @@ static void _de_casteljau(twin_spline_t *spline,
 }
 
 /*
- * Return an upper bound on the error (squared) that could result from
- * approximating a spline with a line segment connecting the two endpoints.
+ * Return an upper bound on the distance (squared) that could result from
+ * approximating a spline with a line segment connecting the two endpoints,
+ * which is based on the Convex Hull Property of Bézier Curves: The Bézier Curve
+ * lies completely in the convex hull of the given control points. Therefore, we
+ * can use control points B and C to approximate the actual spline.
  */
-static twin_dfixed_t _twin_spline_error_squared(twin_spline_t *spline)
+static twin_dfixed_t _twin_spline_distance_squared(twin_spline_t *spline)
 {
-    twin_dfixed_t berr, cerr;
+    twin_dfixed_t bdist, cdist;
 
-    berr = _twin_distance_to_line_squared(&spline->b, &spline->a, &spline->d);
-    cerr = _twin_distance_to_line_squared(&spline->c, &spline->a, &spline->d);
+    bdist = _twin_distance_to_line_squared(&spline->b, &spline->a, &spline->d);
+    cdist = _twin_distance_to_line_squared(&spline->c, &spline->a, &spline->d);
 
-    if (berr > cerr)
-        return berr;
-    return cerr;
+    if (bdist > cdist)
+        return bdist;
+    return cdist;
 }
 
 /*
- * Check if a spline is flat enough by comparing the error against the
+ * Check if a spline is flat enough by comparing the distance against the
  * tolerance.
  */
 static bool is_flat(twin_spline_t *spline, twin_dfixed_t tolerance_squared)
 {
-    return _twin_spline_error_squared(spline) <= tolerance_squared;
+    return _twin_spline_distance_squared(spline) <= tolerance_squared;
 }
 
 /*
@@ -91,16 +92,30 @@ static void _twin_spline_decompose(twin_path_t *path,
 {
     /* Draw starting point */
     _twin_path_sdraw(path, spline->a.x, spline->a.y);
-
+    /*
+     * It on average requires over two shift attempts per iteration to find the
+     * optimal value. To reduce redundancy in shift 1, adjust the initial 't'
+     * value from 0.5 to 0.25 by applying an initial shift of 2. As spline
+     * rendering progresses, the shift amount decreases. Store the last shift
+     * value as a global variable to use directly in the next iteration,
+     * avoiding a reset to an initial shift of 2.
+     */
+    int shift = 2;
     while (!is_flat(spline, tolerance_squared)) {
-        int shift = 1;
         twin_spline_t left, right;
 
-        /* FIXME: Find the optimal shift value to decompose the spline */
-        do {
+        while (true) {
             _de_casteljau(spline, shift, &left, &right);
+            if (is_flat(&left, tolerance_squared)) {
+                /* Limiting the scope of 't' may overlook optimal points with
+                 * maximum curvature. Therefore, dynamically reduce the shift
+                 * amount to a minimum of 1. */
+                if (shift > 1)
+                    shift--;
+                break;
+            }
             shift++;
-        } while (!is_flat(&left, tolerance_squared));
+        }
 
         /* Draw the left segment */
         _twin_path_sdraw(path, left.d.x, left.d.y);

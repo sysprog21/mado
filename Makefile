@@ -45,7 +45,6 @@ libtwin.a_files-y = \
 	src/pattern.c \
 	src/spline.c \
 	src/work.c \
-	src/draw.c \
 	src/hull.c \
 	src/icon.c \
 	src/pixmap.c \
@@ -61,6 +60,15 @@ libtwin.a_includes-y := \
 # Features
 libtwin.a_files-$(CONFIG_LOGGING) += src/log.c
 libtwin.a_files-$(CONFIG_CURSOR) += src/cursor.c
+libtwin.a_files-$(CONFIG_RENDERER_BUILTIN) += src/draw.c
+
+## Pixman
+libtwin.a_files-$(CONFIG_RENDERER_PIXMAN) += src/pixman.c
+libtwin.a_cflags-$(CONFIG_RENDERER_PIXMAN) += $(shell pkg-config --cflags pixman-1)
+ifeq ($(CONFIG_RENDERER_PIXMAN), y)
+TARGET_LIBS += $(shell pkg-config --libs pixman-1)
+CFLAGS += $(shell pkg-config --cflags pixman-1)
+endif
 
 # Image loaders
 

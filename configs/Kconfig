@@ -19,6 +19,18 @@ config BACKEND_VNC
     bool "VNC server output support"
 endchoice
 
+choice
+    prompt "Renderer Selection"
+    default RENDERER_BUILTIN
+
+config RENDERER_BUILTIN
+    bool "Built-in pixel manipulation"
+
+config RENDERER_PIXMAN
+    bool "Pixman based rendering"
+
+endchoice
+
 menu "Features"
 
 config LOGGING

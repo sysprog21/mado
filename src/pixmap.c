@@ -8,11 +8,20 @@
 
 #include "twin_private.h"
 
+#define IS_ALIGNED(p, alignment) ((p % alignment) == 0)
+#define ALIGN_UP(sz, alignment)                            \
+    (((alignment) & ((alignment) - 1)) == 0                \
+         ? (((sz) + (alignment) - 1) & ~((alignment) - 1)) \
+         : ((((sz) + (alignment) - 1) / (alignment)) * (alignment)))
 twin_pixmap_t *twin_pixmap_create(twin_format_t format,
                                   twin_coord_t width,
                                   twin_coord_t height)
 {
     twin_coord_t stride = twin_bytes_per_pixel(format) * width;
+    /* Align stride to 4 bytes for proper uint32_t access in Pixman. */
+    if (!IS_ALIGNED(stride, 4))
+        stride = ALIGN_UP(stride, 4);
+
     twin_area_t space = (twin_area_t) stride * height;
     twin_area_t size = sizeof(twin_pixmap_t) + space;
     twin_pixmap_t *pixmap = malloc(size);

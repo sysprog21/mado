@@ -80,8 +80,7 @@ $ tools/build-neatvnc.sh
 
 ### Configuration
 
-Configure via [Kconfiglib](https://pypi.org/project/kconfiglib/), you should select either SDL
-video output or the Linux framebuffer.
+Configure via [Kconfiglib](https://pypi.org/project/kconfiglib/), you should select either SDL video, the Linux framebuffer, or VNC as the graphics backend.
 ```shell
 $ make config
 ```
@@ -116,13 +115,14 @@ $ sudo usermod -a -G video $USERNAME
 
 In addition, the framebuffer device can be assigned via the environment variable `FRAMEBUFFER`.
 
-To run demo program with the neat-vnc backend:
+To run demo program with the VNC backend:
 
 ```shell
 $ ./demo-vnc
 ```
 
-It would launch the vnc server. You could use any VNC client to connect with given IP address(default is "127.0.0.1") and port (default is 5900), you could assign the IP address via the environment variable `MADO_VNC_HOST` and the port via `MADO_VNC_PORT`
+This will start the VNC server. You can use any VNC client to connect using the specified IP address (default is `127.0.0.1`) and port (default is `5900`).
+The IP address can be set using the `MADO_VNC_HOST` environment variable, and the port can be configured using `MADO_VNC_PORT`.
 
 ## License
 

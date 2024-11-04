@@ -65,13 +65,16 @@ benefiting the entire application stack.
 `Mado` is built with a minimalist design in mind. However, its verification
 relies on certain third-party packages for full functionality and access to all
 its features. We encourage the development environment to be installed with all optional
-packages, including [libjpeg](https://www.ijg.org/), [libpng](https://github.com/pnggroup/libpng),
-and the [SDL2 library](https://www.libsdl.org/).
+packages, including [libjpeg](https://www.ijg.org/) and [libpng](https://github.com/pnggroup/libpng).
+
+In the meantime, ensure that you choose a graphics backend and install the necessary packages beforehand.
+
+For SDL backend, install the [SDL2 library](https://www.libsdl.org/).
 * macOS: `brew install sdl2 jpeg libpng`
 * Ubuntu Linux / Debian: `sudo apt install libsdl2-dev libjpeg-dev libpng-dev`
 
-Please note that the VNC backend is only tested on GNU/Linux, and the prebuilt [neatvnc](https://github.com/any1/neatvnc) package might be outdated. To ensure you have the latest versions, you can build the dependent packages from source by running the script:
-```bash
+For the VNC backend, please note that it has only been tested on GNU/Linux, and the prebuilt [neatvnc](https://github.com/any1/neatvnc) package might be outdated. To ensure you have the latest version, you can build the required packages from source by running the script:
+```shell
 $ tools/build-neatvnc.sh
 ```
 

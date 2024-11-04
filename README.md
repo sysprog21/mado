@@ -70,6 +70,11 @@ and the [SDL2 library](https://www.libsdl.org/).
 * macOS: `brew install sdl2 jpeg libpng`
 * Ubuntu Linux / Debian: `sudo apt install libsdl2-dev libjpeg-dev libpng-dev`
 
+Please note that the VNC backend is only tested on GNU/Linux, and the prebuilt [neatvnc](https://github.com/any1/neatvnc) package might be outdated. To ensure you have the latest versions, you can build the dependent packages from source by running the script:
+```bash
+$ tools/build-neatvnc.sh
+```
+
 ### Configuration
 
 Configure via [Kconfiglib](https://pypi.org/project/kconfiglib/), you should select either SDL
@@ -107,6 +112,14 @@ $ sudo usermod -a -G video $USERNAME
 ```
 
 In addition, the framebuffer device can be assigned via the environment variable `FRAMEBUFFER`.
+
+To run demo program with the neat-vnc backend:
+
+```shell
+$ ./demo-vnc
+```
+
+It would launch the vnc server. You could use any VNC client to connect with given IP address(default is "127.0.0.1") and port (default is 5900), you could assign the IP address via the environment variable `MADO_VNC_HOST` and the port via `MADO_VNC_PORT`
 
 ## License
 

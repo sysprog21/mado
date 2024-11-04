@@ -110,6 +110,14 @@ libtwin.a_files-y += backend/fbdev.c
 libtwin.a_files-y += backend/linux_input.c
 endif
 
+ifeq ($(CONFIG_BACKEND_VNC), y)
+BACKEND = vnc
+libtwin.a_files-y += backend/vnc.c
+libtwin.a_files-y += src/cursor.c
+libtwin.a_cflags-y += $(shell pkg-config --cflags neatvnc aml pixman-1)
+TARGET_LIBS += $(shell pkg-config --libs neatvnc aml pixman-1)
+endif
+
 # Standalone application
 
 ifeq ($(CONFIG_DEMO_APPLICATIONS), y)

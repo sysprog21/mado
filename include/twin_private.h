@@ -619,6 +619,8 @@ static inline int twin_clz(uint32_t v)
 }
 #endif
 
+extern const uint8_t _twin_cursor_default[];
+
 /* Pattern Matching for C macros.
  * https://github.com/pfultz2/Cloak/wiki/C-Preprocessor-tricks,-tips,-and-idioms
  */

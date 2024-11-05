@@ -65,14 +65,23 @@ benefiting the entire application stack.
 `Mado` is built with a minimalist design in mind. However, its verification
 relies on certain third-party packages for full functionality and access to all
 its features. We encourage the development environment to be installed with all optional
-packages, including [libjpeg](https://www.ijg.org/), [libpng](https://github.com/pnggroup/libpng)
-and [pixman](https://pixman.org/).
+packages, including [libjpeg](https://www.ijg.org/) and [libpng](https://github.com/pnggroup/libpng).
+* macOS: `brew install jpeg libpng`
+* Ubuntu Linux / Debian: `sudo apt install libjpeg-dev libpng-dev`
+
+The renderer implementation can either use the built-in pixel manipulation or be based on [Pixman](https://pixman.org/).
+The built-in renderer is simple and performs adequately on platforms without SIMD instructions,
+such as RISC-V processors without vector extensions.
+However, for modern CPU architectures with extensive ISA extensions, Pixman offers faster pixel manipulation.
+Install [Pixman](https://pixman.org/) before selecting the corresponding renderer implementation.
+* macOS: `brew install pixman`
+* Ubuntu Linux / Debian: `sudo apt install libpixman-1-dev`
 
 In the meantime, ensure that you choose a graphics backend and install the necessary packages beforehand.
 
 For SDL backend, install the [SDL2 library](https://www.libsdl.org/).
-* macOS: `brew install sdl2 jpeg libpng pixman`
-* Ubuntu Linux / Debian: `sudo apt install libsdl2-dev libjpeg-dev libpng-dev libpixman-1-dev`
+* macOS: `brew install sdl2`
+* Ubuntu Linux / Debian: `sudo apt install libsdl2-dev`
 
 For the VNC backend, please note that it has only been tested on GNU/Linux, and the prebuilt [neatvnc](https://github.com/any1/neatvnc) package might be outdated. To ensure you have the latest version, you can build the required packages from source by running the script:
 ```shell

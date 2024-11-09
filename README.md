@@ -88,6 +88,9 @@ For the VNC backend, please note that it has only been tested on GNU/Linux, and 
 $ tools/build-neatvnc.sh
 ```
 
+For Linux framebuffer backend, install `libudev` and `libuuid`:
+* Ubuntu Linux / Debian: `sudo apt install libudev-dev uuid-dev`
+
 ### Configuration
 
 Configure via [Kconfiglib](https://pypi.org/project/kconfiglib/), you should select either SDL video, the Linux framebuffer, or VNC as the graphics backend.

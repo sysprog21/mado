@@ -195,6 +195,15 @@ typedef struct _twin_pixmap {
      * Pixels
      */
     twin_animation_t *animation;
+
+#if defined(CONFIG_DROP_SHADOW)
+    /*
+     * When the pixel map is within the active window, it will have a drop
+     * shadow to enhance its visual distinction.
+     */
+    bool shadow;
+#endif
+
     twin_pointer_t p;
     /*
      * When representing a window, this point
@@ -423,6 +432,13 @@ typedef void (*twin_destroy_func_t)(twin_window_t *window);
 struct _twin_window {
     twin_screen_t *screen;
     twin_pixmap_t *pixmap;
+
+#if defined(CONFIG_DROP_SHADOW)
+    /* Set the shadow range for horizontal and vertical directions. */
+    twin_coord_t shadow_x;
+    twin_coord_t shadow_y;
+#endif
+
     twin_window_style_t style;
     twin_rect_t client;
     twin_rect_t damage;
@@ -652,7 +668,25 @@ void twin_fill(twin_pixmap_t *dst,
  * draw-common.c
  */
 
+/* Blur the specified area in the pixel map. */
+void twin_stack_blur(twin_pixmap_t *px,
+                     int radius,
+                     twin_coord_t left,
+                     twin_coord_t right,
+                     twin_coord_t top,
+                     twin_coord_t bottom);
+
 void twin_premultiply_alpha(twin_pixmap_t *px);
+
+/*
+ * Overwrite the original pixel values for a specified number of pixels in
+ * width.
+ */
+void twin_cover(twin_pixmap_t *dst,
+                twin_argb32_t color,
+                twin_coord_t x,
+                twin_coord_t y,
+                twin_coord_t width);
 
 /*
  * event.c

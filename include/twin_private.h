@@ -181,12 +181,50 @@ typedef int64_t twin_xfixed_t;
     (((t) = twin_get_8(d, i) + twin_get_8(s, i)), (twin_argb32_t) twin_sat(t) \
                                                       << (i))
 
+#define _twin_add_ARGB(s, d, i, t) (((t) = (s) + twin_get_8(d, i)))
+#define _twin_add(s, d, t) (((t) = (s) + (d)))
+#define _twin_div(d, den, i, t)                     \
+    (((t) = (d) / (den)), (t) = twin_get_8((t), 0), \
+     (twin_argb32_t) twin_sat(t) << (i))
+#define _twin_sub_ARGB(s, d, i, t) (((t) = (s) - twin_get_8(d, i)))
+#define _twin_sub(s, d, t) (((t) = (s) - (d)))
+#define twin_put_8(d, i, t) (((t) = (d) << (i)))
+
 #define twin_argb32_to_rgb16(s) \
     ((((s) >> 3) & 0x001f) | (((s) >> 5) & 0x07e0) | (((s) >> 8) & 0xf800))
 #define twin_rgb16_to_argb32(s)                       \
     (((((s) << 3) & 0xf8) | (((s) >> 2) & 0x7)) |     \
      ((((s) << 5) & 0xfc00) | (((s) >> 1) & 0x300)) | \
      ((((s) << 8) & 0xf80000) | (((s) << 3) & 0x70000)) | 0xff000000)
+
+#ifndef min
+#if defined(__GNUC__) || defined(__clang__)
+#define min(x, y)            \
+    ({                       \
+        typeof(x) _x = (x);  \
+        typeof(y) _y = (y);  \
+        (void) (&_x == &_y); \
+        _x < _y ? _x : _y;   \
+    })
+#else
+/* Generic implementation: potential side effects */
+#define min(x, y) ((x) < (y) ? (x) : (y))
+#endif
+#endif
+#ifndef max
+#if defined(__GNUC__) || defined(__clang__)
+#define max(x, y)            \
+    ({                       \
+        typeof(x) _x = (x);  \
+        typeof(y) _y = (y);  \
+        (void) (&_x == &_y); \
+        _x > _y ? _x : _y;   \
+    })
+#else
+/* Generic implementation: potential side effects */
+#define max(x, y) ((x) > (y) ? (x) : (y))
+#endif
+#endif
 
 typedef union {
     twin_pointer_t p;
@@ -468,7 +506,7 @@ void _twin_path_sfinish(twin_path_t *path);
 #define twin_glyph_snap_y(g) (twin_glyph_snap_x(g) + twin_glyph_n_snap_x(g))
 
 /*
- * dispatch stuff
+ * Dispatch stuff
  */
 typedef struct _twin_queue {
     struct _twin_queue *next;
@@ -592,6 +630,21 @@ void _twin_button_init(twin_button_t *button,
                        twin_fixed_t font_size,
                        twin_style_t font_style,
                        twin_dispatch_proc_t dispatch);
+
+/*
+ * Visual effect stuff
+ */
+
+#if defined(CONFIG_DROP_SHADOW)
+/*
+ * Add a shadow with the specified color, horizontal offset, and vertical
+ * offset.
+ */
+void twin_shadow_border(twin_pixmap_t *shadow,
+                        twin_argb32_t color,
+                        twin_coord_t shift_x,
+                        twin_coord_t shift_y);
+#endif
 
 /* utility */
 

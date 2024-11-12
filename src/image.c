@@ -39,7 +39,7 @@
     IIF(LOADER_HAS(GIF))(       \
         _(gif)                  \
     )                           \
-    IIF(LOADER_HAS(TVG))(    \
+    IIF(LOADER_HAS(TVG))(       \
         _(tvg)                  \
     )
 /* clang-format on */

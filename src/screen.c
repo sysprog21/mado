@@ -134,7 +134,7 @@ static void twin_screen_span_pixmap(twin_screen_t maybe_unused *screen,
         return;
     if (p->y + p->height <= y)
         return;
-    /* bounds check in x*/
+    /* bounds check in x */
     p_left = left;
     if (p_left < p->x)
         p_left = p->x;
@@ -183,6 +183,91 @@ void twin_screen_update(twin_screen_t *screen)
 
         if (screen->put_begin)
             (*screen->put_begin)(left, top, right, bottom, screen->closure);
+        /* Handle drop shadow. */
+
+        twin_pixmap_t *shadow = NULL;
+        twin_pointer_t dst;
+
+        /*
+         * The shadow effect of the test window only becomes visible when it is
+         * on the top layer.
+         */
+        for (p = screen->bottom; p; p = p->up)
+            /* Locate the drop shadow on the topmost layer. */
+            if (p->shadow) {
+                shadow = p;
+                shadow->visible = false;
+            }
+
+        if (shadow) {
+            shadow->visible = true;
+            twin_fill(shadow, 0x00000000, TWIN_SOURCE, 0, 0, shadow->width,
+                      shadow->height);
+            for (y = 0; y < (*shadow).height; y++) {
+                twin_pointer_t dst;
+                twin_source_u src;
+                twin_coord_t p_start, shadow_start, start, end,
+                    overlapped_width, src_y;
+                int i = 0;
+                bool is_p_greater;
+                /*
+                 * Take the screen's background as the bottom layer of the
+                 * shadow.
+                 */
+                if (screen->background) {
+                    p = screen->background;
+                    start = (*shadow).x;
+                    end = (*shadow).x + (*shadow).width;
+                    overlapped_width = end - start;
+                    src_y = (*shadow).y + y;
+                    if (src_y > 0 && src_y < (*p).height - 1) {
+                        dst = twin_pixmap_pointer(shadow, 0, y);
+                        src.p = twin_pixmap_pointer(p, (*shadow).x, src_y);
+                        pop32(dst, src, overlapped_width);
+                    }
+                }
+                /*
+                 * Render each layer of the pixmap under the shadow pixel map
+                 * onto the shadow.
+                 */
+                for (p = screen->bottom; p; p = p->up) {
+                    /* Do not render invisible drop shadow pixel maps. */
+                    if (p->shadow && !p->visible)
+                        continue;
+                    /*
+                     * Only render pixel maps beneath the visible drop shadow.
+                     */
+                    if (p->window->shadow_pixmap &&
+                        p->window->shadow_pixmap->visible)
+                        break;
+
+                    /*
+                     * Identify the areas where the current pixel map overlaps
+                     * with the drop shadow pixel map.
+                     */
+                    src_y = (*shadow).y + y - (*p).y;
+                    if (src_y < 0 || src_y >= (*p).height)
+                        continue;
+
+                    is_p_greater = (*p).x > (*shadow).x;
+                    p_start = is_p_greater ? 0 : (*shadow).x - (*p).x;
+                    shadow_start = is_p_greater ? (*p).x - (*shadow).x : 0;
+                    start = is_p_greater ? (*p).x : (*shadow).x;
+                    end = ((*p).x + (*p).width > (*shadow).x + (*shadow).width)
+                              ? (*shadow).x + (*shadow).width
+                              : (*p).x + (*p).width;
+                    if (start >= end)
+                        continue;
+                    overlapped_width = end - start;
+                    dst = twin_pixmap_pointer(shadow, shadow_start, y);
+                    src.p = twin_pixmap_pointer(p, p_start, src_y);
+                    pop32(dst, src, overlapped_width);
+                }
+            }
+            /* Add a frosted glass effect to the shadow pixmap. */
+            twin_stack_blur(shadow, 2, 0, shadow->width, 0, shadow->height);
+        }
+
         for (y = top; y < bottom; y++) {
             if (screen->background) {
                 twin_pointer_t dst;
@@ -206,14 +291,22 @@ void twin_screen_update(twin_screen_t *screen)
             } else
                 memset(span, 0xff, width * sizeof(twin_argb32_t));
 
-            for (p = screen->bottom; p; p = p->up)
+            for (p = screen->bottom; p; p = p->up) {
+                /* Do not render invisible drop shadow pixel maps. */
+                if (p->shadow && !p->visible)
+                    continue;
                 twin_screen_span_pixmap(screen, span, p, y, left, right, pop16,
                                         pop32);
+            }
 
 #if defined(CONFIG_CURSOR)
-            if (screen->cursor)
+            if (screen->cursor) {
+                /* Do not render invisible drop shadow pixel maps. */
+                if (p->shadow && !p->visible)
+                    continue;
                 twin_screen_span_pixmap(screen, span, screen->cursor, y, left,
                                         right, pop16, pop32);
+            }
 #endif
 
             (*screen->put_span)(left, y, right, span, screen->closure);
@@ -356,7 +449,9 @@ bool twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
                 evt = *event;
                 evt.kind = TwinEventLeave;
                 _twin_adj_mouse_evt(&evt, pixmap);
-                twin_pixmap_dispatch(pixmap, &evt);
+                /* Trigger event only when the pixel map isn't shadow. */
+                if (!pixmap->shadow)
+                    twin_pixmap_dispatch(pixmap, &evt);
             }
 
             pixmap = screen->target = ntarget;
@@ -365,7 +460,9 @@ bool twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
                 evt = *event;
                 _twin_adj_mouse_evt(&evt, pixmap);
                 evt.kind = TwinEventEnter;
-                twin_pixmap_dispatch(pixmap, &evt);
+                /* Trigger event only when the pixel map isn't shadow. */
+                if (!pixmap->shadow)
+                    twin_pixmap_dispatch(pixmap, &evt);
             }
         }
 
@@ -389,7 +486,8 @@ bool twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
         pixmap = NULL;
         break;
     }
-    if (pixmap)
+    /* Trigger event only when the pixel map isn't shadow. */
+    if (pixmap && !pixmap->shadow)
         return twin_pixmap_dispatch(pixmap, event);
     return false;
 }

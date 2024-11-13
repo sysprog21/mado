@@ -6,8 +6,6 @@
 
 #include <fcntl.h>
 #include <linux/fb.h>
-#include <linux/kd.h>
-#include <linux/vt.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -15,6 +13,7 @@
 #include <unistd.h>
 
 #include "linux_input.h"
+#include "linux_vt.h"
 #include "twin_backend.h"
 #include "twin_private.h"
 
@@ -31,8 +30,6 @@ typedef struct {
 
     /* Linux virtual terminal (VT) */
     int vt_fd;
-    int vt_num;
-    bool vt_active;
 
     /* Linux framebuffer */
     int fb_fd;
@@ -139,51 +136,6 @@ static bool twin_fbdev_apply_config(twin_fbdev_t *tx)
     return true;
 }
 
-static int twin_vt_open(int vt_num)
-{
-    int fd;
-
-    char vt_dev[30] = {0};
-    snprintf(vt_dev, 30, "/dev/tty%d", vt_num);
-
-    fd = open(vt_dev, O_RDWR);
-    if (fd < 0) {
-        log_error("Failed to open %s", vt_dev);
-    }
-
-    return fd;
-}
-
-static bool twin_vt_setup(twin_fbdev_t *tx)
-{
-    /* Open VT0 to inquire information */
-    if ((tx->vt_fd = twin_vt_open(0)) < -1) {
-        log_error("Failed to open VT0");
-        return false;
-    }
-
-    /* Inquire for current VT number */
-    struct vt_stat vt;
-    if (ioctl(tx->vt_fd, VT_GETSTATE, &vt) == -1) {
-        log_error("Failed to get VT number");
-        return false;
-    }
-    tx->vt_num = vt.v_active;
-
-    /* Open the VT */
-    if ((tx->vt_fd = twin_vt_open(tx->vt_num)) < -1) {
-        return false;
-    }
-
-    /* Set VT to graphics mode to inhibit command-line text */
-    if (ioctl(tx->vt_fd, KDSETMODE, KD_GRAPHICS) < 0) {
-        log_error("Failed to set KD_GRAPHICS mode");
-        return false;
-    }
-
-    return true;
-}
-
 twin_context_t *twin_fbdev_init(int width, int height)
 {
     char *fbdev_path = getenv(FBDEV_NAME);
@@ -210,7 +162,7 @@ twin_context_t *twin_fbdev_init(int width, int height)
     }
 
     /* Set up virtual terminal environment */
-    if (!twin_vt_setup(tx)) {
+    if (!twin_vt_setup(&tx->vt_fd)) {
         goto bail_fb_fd;
     }
 
@@ -262,7 +214,7 @@ static void twin_fbdev_exit(twin_context_t *ctx)
         return;
 
     twin_fbdev_t *tx = PRIV(ctx);
-    ioctl(tx->vt_fd, KDSETMODE, KD_TEXT);
+    twin_vt_mode(tx->vt_fd, KD_TEXT);
     munmap(tx->fb_base, tx->fb_len);
     twin_linux_input_destroy(tx->input);
     close(tx->vt_fd);

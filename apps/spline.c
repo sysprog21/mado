@@ -116,7 +116,6 @@ static void _apps_spline_button_signal(maybe_unused twin_button_t *button,
     _twin_widget_queue_paint(&spline->widget);
 }
 
-#define D(x) twin_double_to_fixed(x)
 static twin_dispatch_result_t _apps_spline_update_pos(apps_spline_t *spline,
                                                       twin_event_t *event)
 {

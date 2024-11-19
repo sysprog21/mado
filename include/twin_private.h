@@ -76,11 +76,21 @@
  * Max 0x7f    0111 1111       127    1.984375
  * Min 0x80    1000 0000      -128          -2
  *
+ * twin_xfixed_t - A fixed-point type in the Q31.32 format.
+ *
+ *        Hex                 Binary
+ * Max 0x7fffffff    0111 1111 1111 1111  1111 1111 1111 1111
+ * Min 0x80000000    1000 0000 0000 0000  0000 0000 0000 0000
+ *             Decimal                     Actual
+ * Max 9,223,372,036,854,775,807       1,073,741,823.9999999997
+ * Min -9,223,372,036,854,775,808     -1,073,741,824
+ *
  * All of the above tables are based on two's complement representation.
  */
 typedef int16_t twin_sfixed_t;
 typedef int32_t twin_dfixed_t;
 typedef int8_t twin_gfixed_t;
+typedef int64_t twin_xfixed_t;
 
 #define twin_sfixed_floor(f) ((f) & ~0xf)
 #define twin_sfixed_trunc(f) ((f) >> 4)
@@ -94,6 +104,9 @@ typedef int8_t twin_gfixed_t;
 
 #define twin_sfixed_to_dfixed(s) (((twin_dfixed_t) (s)) << 4)
 #define twin_dfixed_to_sfixed(d) ((twin_sfixed_t) ((d) >> 4))
+
+#define twin_xfixed_to_fixed(x) ((twin_fixed_t) ((x) >> 16))
+#define twin_fixed_to_xfixed(f) (((twin_xfixed_t) (f)) << 16)
 
 /*
  * twin_sfixed_t a = b'10100;
@@ -116,14 +129,19 @@ typedef int8_t twin_gfixed_t;
  */
 
 #define twin_sfixed_mul(a, b) \
-    ((((twin_sfixed_t) (a)) * ((twin_sfixed_t) (b))) >> 4)
+    (twin_sfixed_t)((((int32_t) (a)) * ((int32_t) (b))) >> 4)
 #define twin_sfixed_div(a, b) \
-    ((((twin_sfixed_t) (a)) << 4) / ((twin_sfixed_t) (b)))
+    (twin_sfixed_t)((((int32_t) (a)) << 4) / ((int32_t) (b)))
 
 #define twin_dfixed_mul(a, b) \
-    ((((twin_dfixed_t) (a)) * ((twin_dfixed_t) (b))) >> 8)
+    (twin_dfixed_t)((((int64_t) (a)) * ((int64_t) (b))) >> 8)
 #define twin_dfixed_div(a, b) \
-    ((((twin_dfixed_t) (a)) << 8) / ((twin_dfixed_t) (b)))
+    (twin_dfixed_t)((((int64_t) (a)) << 8) / ((int64_t) (b)))
+
+#define twin_xfixed_mul(a, b) \
+    (twin_xfixed_t)((((__int128_t) (a)) * ((__int128_t) (b))) >> 32)
+#define twin_xfixed_div(a, b) \
+    (twin_xfixed_t)((((__int128_t) (a)) << 32) / ((__int128_t) (b)))
 
 /*
  * 'double' is a no-no in any shipping code, but useful during
@@ -141,6 +159,7 @@ typedef int8_t twin_gfixed_t;
 
 #define TWIN_GFIXED_ONE (0x40)
 
+#define TWIN_XFIXED_ONE (0x100000000)
 /*
  * Compositing stuff
  */
@@ -375,7 +394,7 @@ twin_dfixed_t _twin_distance_to_line_squared(twin_spoint_t *p,
  * Fixed point helper functions
  */
 twin_sfixed_t _twin_sfixed_sqrt(twin_sfixed_t as);
-
+twin_xfixed_t _twin_xfixed_sqrt(twin_xfixed_t a);
 /*
  * Matrix stuff
  */
@@ -595,10 +614,21 @@ static inline int twin_clz(uint32_t v)
         return 31 - leading_zero;
     return 32; /* undefined behavior */
 }
+static inline int twin_clzll(uint64_t v)
+{
+    uint32_t leading_zero = 0;
+    if (_BitScanReverse64(&leading_zero, v))
+        return 63 - leading_zero;
+    return 64; /* undefined behavior */
+}
 #elif defined(__GNUC__) || defined(__clang__)
 static inline int twin_clz(uint32_t v)
 {
     return __builtin_clz(v);
+}
+static inline int twin_clzll(uint64_t v)
+{
+    return __builtin_clzll(v);
 }
 #else /* generic implementation */
 static inline int twin_clz(uint32_t v)
@@ -616,6 +646,26 @@ static inline int twin_clz(uint32_t v)
     v |= v >> 16;
 
     return mul_debruijn[(uint32_t) (v * 0x07C4ACDDU) >> 27];
+}
+static inline int twin_clzll(uint64_t v)
+{
+    /* https://stackoverflow.com/questions/21888140/de-bruijn-algorithm-binary-digit-count-64bits-c-sharp
+     */
+    static const uint8_t mul_debruijn[] = {
+        0,  1,  2,  53, 3,  7,  54, 27, 4,  38, 41, 8,  34, 55, 48, 28,
+        62, 5,  39, 46, 44, 42, 22, 9,  24, 35, 59, 56, 49, 18, 29, 11,
+        63, 52, 6,  26, 37, 40, 33, 47, 61, 45, 43, 21, 23, 58, 17, 10,
+        51, 25, 36, 32, 60, 20, 57, 16, 50, 31, 19, 15, 30, 14, 13, 12,
+    };
+
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v |= v >> 32;
+
+    return mul_debruijn[(uint64_t) (v * 0x022fdd63cc95386dUL) >> 58];
 }
 #endif
 

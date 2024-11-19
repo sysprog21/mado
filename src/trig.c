@@ -97,3 +97,81 @@ void twin_sincos(twin_angle_t a, twin_fixed_t *sin, twin_fixed_t *cos)
         *cos = cos_val;
     }
 }
+
+static const twin_angle_t atan_table[] = {
+    0x0200, /* arctan(2^0)  = 45° -> 512     */
+    0x012E, /* arctan(2^-1) = 26.565° -> 302 */
+    0x00A0, /* arctan(2^-2) = 14.036° -> 160 */
+    0x0051, /* arctan(2^-3) = 7.125° -> 81   */
+    0x0029, /* arctan(2^-4) = 3.576° -> 41   */
+    0x0014, /* arctan(2^-5) = 1.790° -> 20   */
+    0x000A, /* arctan(2^-6) = 0.895° -> 10   */
+    0x0005, /* arctan(2^-7) = 0.448° -> 5    */
+    0x0003, /* arctan(2^-8) = 0.224° -> 3    */
+    0x0001, /* arctan(2^-9) = 0.112° -> 1    */
+    0x0001, /* arctan(2^-10) = 0.056° -> 1   */
+    0x0000, /* arctan(2^-11) = 0.028° -> 0   */
+};
+
+static twin_angle_t twin_atan2_first_quadrant(twin_fixed_t y, twin_fixed_t x)
+{
+    if (x == 0 && y == 0)
+        return TWIN_ANGLE_0;
+    if (x == 0)
+        return TWIN_ANGLE_90;
+    if (y == 0)
+        return TWIN_ANGLE_0;
+    twin_angle_t angle = TWIN_ANGLE_0;
+    /* CORDIC iteration */
+    for (int i = 0; i < 12; i++) {
+        twin_fixed_t temp_x = x;
+        if (y > 0) {
+            x += (y >> i);
+            y -= (temp_x >> i);
+            angle += atan_table[i];
+        } else {
+            x -= (y >> i);
+            y += (temp_x >> i);
+            angle -= atan_table[i];
+        }
+    }
+    return angle;
+}
+
+twin_angle_t twin_atan2(twin_fixed_t y, twin_fixed_t x)
+{
+    if (x == 0 && y == 0)
+        return TWIN_ANGLE_0;
+    if (x == 0)
+        return (y > 0) ? TWIN_ANGLE_90 : TWIN_ANGLE_270;
+    if (y == 0)
+        return (x > 0) ? TWIN_ANGLE_0 : TWIN_ANGLE_180;
+    twin_fixed_t x_sign_mask = x >> 31;
+    twin_fixed_t abs_x = (x ^ x_sign_mask) - x_sign_mask;
+    twin_fixed_t y_sign_mask = y >> 31;
+    twin_fixed_t abs_y = (y ^ y_sign_mask) - y_sign_mask;
+    twin_fixed_t m = ((~x_sign_mask & ~y_sign_mask) * 0) +
+                     ((x_sign_mask & ~y_sign_mask) * 1) +
+                     ((x_sign_mask & y_sign_mask) * 1) +
+                     ((~x_sign_mask & y_sign_mask) * 2);
+    twin_fixed_t sign = 1 - 2 * (x_sign_mask ^ y_sign_mask);
+    twin_angle_t angle = twin_atan2_first_quadrant(abs_y, abs_x);
+    /* First quadrant  : angle
+     * Second quadrant : 180 - angle
+     * Third quadrant  : 180 + angle
+     * Fourth quadrant : 360 - angle
+     */
+    return TWIN_ANGLE_180 * m + sign * angle;
+}
+
+twin_angle_t twin_acos(twin_fixed_t x)
+{
+    if (x <= -TWIN_FIXED_ONE)
+        return TWIN_ANGLE_180;
+    if (x >= TWIN_FIXED_ONE)
+        return TWIN_ANGLE_0;
+    twin_fixed_t y = twin_fixed_sqrt(TWIN_FIXED_ONE - twin_fixed_mul(x, x));
+    if (x < 0)
+        return TWIN_ANGLE_180 - twin_atan2_first_quadrant(y, -x);
+    return twin_atan2_first_quadrant(y, x);
+}

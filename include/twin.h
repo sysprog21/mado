@@ -670,7 +670,7 @@ void twin_clear_file(twin_file_t *file);
  */
 
 #define twin_fixed_mul(a, b) ((twin_fixed_t) (((int64_t) (a) * (b)) >> 16))
-#define twin_fixed_div(a, b) ((twin_fixed_t) ((((int64_t) (a)) << 16) / b))
+#define twin_fixed_div(a, b) ((twin_fixed_t) ((((int64_t) (a)) << 16) / (b)))
 
 twin_fixed_t twin_fixed_sqrt(twin_fixed_t a);
 
@@ -800,6 +800,7 @@ void twin_path_ellipse(twin_path_t *path,
                        twin_fixed_t y,
                        twin_fixed_t x_radius,
                        twin_fixed_t y_radius);
+
 void twin_path_arc(twin_path_t *path,
                    twin_fixed_t x,
                    twin_fixed_t y,
@@ -807,6 +808,26 @@ void twin_path_arc(twin_path_t *path,
                    twin_fixed_t y_radius,
                    twin_angle_t start,
                    twin_angle_t extent);
+
+void twin_path_arc_ellipse(twin_path_t *path,
+                           bool large_arc,
+                           bool sweep,
+                           twin_fixed_t radius_x,
+                           twin_fixed_t radius_y,
+                           twin_fixed_t cur_x,
+                           twin_fixed_t cur_y,
+                           twin_fixed_t target_x,
+                           twin_fixed_t target_y,
+                           twin_angle_t rotation);
+
+void twin_path_arc_circle(twin_path_t *path,
+                          bool large_arc,
+                          bool sweep,
+                          twin_fixed_t radius,
+                          twin_fixed_t cur_x,
+                          twin_fixed_t cur_y,
+                          twin_fixed_t target_x,
+                          twin_fixed_t target_y);
 
 void twin_path_rectangle(twin_path_t *path,
                          twin_fixed_t x,
@@ -1103,6 +1124,10 @@ twin_fixed_t twin_cos(twin_angle_t a);
 twin_fixed_t twin_tan(twin_angle_t a);
 
 void twin_sincos(twin_angle_t a, twin_fixed_t *sin, twin_fixed_t *cos);
+
+twin_angle_t twin_atan2(twin_fixed_t y, twin_fixed_t x);
+
+twin_angle_t twin_acos(twin_fixed_t x);
 
 /*
  * widget.c

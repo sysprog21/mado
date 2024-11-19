@@ -236,6 +236,154 @@ void twin_path_arc(twin_path_t *path,
     twin_path_set_matrix(path, save);
 }
 
+static twin_angle_t vector_angle(twin_fixed_t ux,
+                                 twin_fixed_t uy,
+                                 twin_fixed_t vx,
+                                 twin_fixed_t vy)
+{
+    twin_fixed_t dot = twin_fixed_mul(ux, vx) + twin_fixed_mul(uy, vy);
+
+    twin_fixed_t ua =
+        twin_fixed_sqrt(twin_fixed_mul(ux, ux) + twin_fixed_mul(uy, uy));
+    twin_fixed_t va =
+        twin_fixed_sqrt(twin_fixed_mul(vx, vx) + twin_fixed_mul(vy, vy));
+
+    /* cos(theta) = (u ⋅ v) / (|u| * |v|) */
+    twin_fixed_t cos_theta = twin_fixed_div(dot, twin_fixed_mul(ua, va));
+    twin_fixed_t cross = twin_fixed_mul(ux, vy) - twin_fixed_mul(uy, vx);
+    twin_angle_t angle = twin_acos(cos_theta);
+    return (cross < 0) ? -angle : angle;
+}
+
+typedef struct {
+    twin_fixed_t cx, cy;
+    twin_angle_t start, extent;
+} twin_ellipse_param_t;
+
+static twin_ellipse_param_t get_center_parameters(twin_fixed_t x1,
+                                                  twin_fixed_t y1,
+                                                  twin_fixed_t x2,
+                                                  twin_fixed_t y2,
+                                                  bool fa,
+                                                  bool fs,
+                                                  twin_fixed_t rx,
+                                                  twin_fixed_t ry,
+                                                  twin_angle_t phi)
+{
+    twin_fixed_t sin_phi, cos_phi;
+    twin_sincos(phi, &sin_phi, &cos_phi);
+    /* Simplify through translation/rotation */
+    twin_fixed_t x =
+        twin_fixed_mul(cos_phi, twin_fixed_mul(x1 - x2, TWIN_FIXED_HALF)) +
+        twin_fixed_mul(sin_phi, twin_fixed_mul(y1 - y2, TWIN_FIXED_HALF));
+
+    twin_fixed_t y =
+        twin_fixed_mul(-sin_phi, twin_fixed_mul(x1 - x2, TWIN_FIXED_HALF)) +
+        twin_fixed_mul(cos_phi, twin_fixed_mul(y1 - y2, TWIN_FIXED_HALF));
+
+    twin_xfixed_t x_x = twin_fixed_to_xfixed(x);
+    twin_xfixed_t y_x = twin_fixed_to_xfixed(y);
+    twin_xfixed_t rx_x = twin_fixed_to_xfixed(rx);
+    twin_xfixed_t ry_x = twin_fixed_to_xfixed(ry);
+    twin_xfixed_t px_x = twin_xfixed_mul(x_x, x_x);
+    twin_xfixed_t py_x = twin_xfixed_mul(y_x, y_x);
+    twin_xfixed_t prx_x = twin_xfixed_mul(rx_x, rx_x);
+    twin_xfixed_t pry_x = twin_xfixed_mul(ry_x, ry_x);
+    twin_xfixed_t p_ry_divided_rx_x = twin_xfixed_div(pry_x, prx_x);
+    twin_xfixed_t p_rx_divided_ry_x = twin_xfixed_div(prx_x, pry_x);
+    /* Correct out-of-range radii */
+    twin_fixed_t L = twin_xfixed_to_fixed(twin_xfixed_div(px_x, prx_x) +
+                                          twin_xfixed_div(py_x, pry_x));
+    if (L > TWIN_FIXED_ONE) {
+        twin_fixed_t sqrt_L = twin_fixed_sqrt(L);
+        rx = twin_fixed_mul(sqrt_L, twin_fixed_abs(rx));
+        ry = twin_fixed_mul(sqrt_L, twin_fixed_abs(ry));
+    } else {
+        rx = twin_fixed_abs(rx);
+        ry = twin_fixed_abs(ry);
+    }
+
+    /* Compute center */
+    twin_fixed_t sign = (fa != fs) ? -1 : 1;
+    /* A = (ry^2)/(y^2 + (ry^2/rx^2)．x^2) */
+    twin_xfixed_t A =
+        twin_xfixed_div(pry_x, py_x + twin_xfixed_mul(p_ry_divided_rx_x, px_x));
+    /* B = (y^2)/(y^2 + (ry^2/rx^2)．x^2) */
+    twin_xfixed_t B =
+        twin_xfixed_div(py_x, py_x + twin_xfixed_mul(p_ry_divided_rx_x, px_x));
+    /* C = (x^2)/(x^2 + (rx^2/ry^2)．y^2) */
+    twin_xfixed_t C =
+        twin_xfixed_div(px_x, px_x + twin_xfixed_mul(p_rx_divided_ry_x, py_x));
+    twin_xfixed_t pM = A - B - C;
+    twin_fixed_t M = sign * twin_xfixed_to_fixed(_twin_xfixed_sqrt(pM));
+    twin_fixed_t _cx =
+        twin_fixed_mul(M, twin_fixed_div(twin_fixed_mul(rx, y), ry));
+    twin_fixed_t _cy =
+        twin_fixed_mul(M, twin_fixed_div(twin_fixed_mul(-ry, x), rx));
+
+    twin_ellipse_param_t ret;
+    ret.cx = twin_fixed_mul(cos_phi, _cx) - twin_fixed_mul(sin_phi, _cy) +
+             twin_fixed_mul(x1 + x2, TWIN_FIXED_HALF);
+
+    ret.cy = twin_fixed_mul(sin_phi, _cx) + twin_fixed_mul(cos_phi, _cy) +
+             twin_fixed_mul(y1 + y2, TWIN_FIXED_HALF);
+
+    /* Compute θ and dθ */
+    ret.start = vector_angle(TWIN_FIXED_ONE, 0, twin_fixed_div(x - _cx, rx),
+                             twin_fixed_div(y - _cy, ry));
+    twin_angle_t extent = vector_angle(
+        twin_fixed_div(x - _cx, rx), twin_fixed_div(y - _cy, ry),
+        twin_fixed_div(-x - _cx, rx), twin_fixed_div(-y - _cy, ry));
+
+    if (fs && extent > TWIN_ANGLE_0)
+        extent -= TWIN_ANGLE_360;
+    if (!fs && extent < TWIN_ANGLE_0)
+        extent += TWIN_ANGLE_360;
+    ret.start %= TWIN_ANGLE_360;
+    extent %= TWIN_ANGLE_360;
+
+    ret.extent = extent;
+    return ret;
+}
+
+void twin_path_arc_ellipse(twin_path_t *path,
+                           bool large_arc,
+                           bool sweep,
+                           twin_fixed_t radius_x,
+                           twin_fixed_t radius_y,
+                           twin_fixed_t cur_x,
+                           twin_fixed_t cur_y,
+                           twin_fixed_t target_x,
+                           twin_fixed_t target_y,
+                           twin_angle_t rotation)
+{
+    twin_ellipse_param_t param;
+    param = get_center_parameters(cur_x, cur_y, target_x, target_y, large_arc,
+                                  sweep, radius_x, radius_y, rotation);
+    twin_matrix_t save = twin_path_current_matrix(path);
+
+    twin_path_translate(path, param.cx, param.cy);
+    twin_path_rotate(path, rotation);
+    twin_path_translate(path, -param.cx, -param.cy);
+    twin_path_arc(path, param.cx, param.cy, radius_x, radius_y, param.start,
+                  param.extent);
+
+    twin_path_set_matrix(path, save);
+}
+
+void twin_path_arc_circle(twin_path_t *path,
+                          bool large_arc,
+                          bool sweep,
+                          twin_fixed_t radius,
+                          twin_fixed_t cur_x,
+                          twin_fixed_t cur_y,
+                          twin_fixed_t target_x,
+                          twin_fixed_t target_y)
+{
+    twin_path_arc_ellipse(path, large_arc, sweep, radius, radius, cur_x, cur_y,
+                          target_x, target_y, TWIN_ANGLE_0);
+}
+
 void twin_path_rectangle(twin_path_t *path,
                          twin_fixed_t x,
                          twin_fixed_t y,

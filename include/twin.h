@@ -1061,6 +1061,12 @@ void twin_path_curve(twin_path_t *path,
                      twin_fixed_t x3,
                      twin_fixed_t y3);
 
+void twin_path_quadratic_curve(twin_path_t *path,
+                               twin_fixed_t x1,
+                               twin_fixed_t y1,
+                               twin_fixed_t x2,
+                               twin_fixed_t y2);
+
 /*
  * timeout.c
  */

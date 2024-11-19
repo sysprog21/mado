@@ -164,3 +164,32 @@ void twin_path_curve(twin_path_t *path,
                              _twin_matrix_x(&path->state.matrix, x3, y3),
                              _twin_matrix_y(&path->state.matrix, x3, y3));
 }
+
+void twin_path_quadratic_curve(twin_path_t *path,
+                               twin_fixed_t x1,
+                               twin_fixed_t y1,
+                               twin_fixed_t x2,
+                               twin_fixed_t y2)
+{
+    /* Convert quadratic to cubic control point */
+    twin_spoint_t p0 = _twin_path_current_spoint(path);
+    twin_sfixed_t x1s = _twin_matrix_x(&path->state.matrix, x1, y1);
+    twin_sfixed_t y1s = _twin_matrix_y(&path->state.matrix, x1, y1);
+    twin_sfixed_t x2s = _twin_matrix_x(&path->state.matrix, x2, y2);
+    twin_sfixed_t y2s = _twin_matrix_y(&path->state.matrix, x2, y2);
+    /* CP1 = P0 + 2/3 * (P1 - P0) */
+    twin_sfixed_t dx1 = x1s - p0.x;
+    twin_sfixed_t dy1 = y1s - p0.y;
+    twin_sfixed_t cx1 =
+        p0.x + twin_sfixed_mul(twin_double_to_sfixed(2.0 / 3.0), dx1);
+    twin_sfixed_t cy1 =
+        p0.y + twin_sfixed_mul(twin_double_to_sfixed(2.0 / 3.0), dy1);
+    /* CP2 = P2 + 2/3 * (P1 - P2) */
+    twin_sfixed_t dx2 = x1s - x2s;
+    twin_sfixed_t dy2 = y1s - y2s;
+    twin_sfixed_t cx2 =
+        x2s + twin_sfixed_mul(twin_double_to_sfixed(2.0 / 3.0), dx2);
+    twin_sfixed_t cy2 =
+        y2s + twin_sfixed_mul(twin_double_to_sfixed(2.0 / 3.0), dy2);
+    _twin_path_scurve(path, cx1, cy1, cx2, cy2, x2s, y2s);
+}

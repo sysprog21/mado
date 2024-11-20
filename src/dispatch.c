@@ -4,14 +4,21 @@
  * All rights reserved.
  */
 
+#include <unistd.h>
+
+#include "twin_backend.h"
 #include "twin_private.h"
 
-void twin_dispatch(void)
+extern twin_backend_t g_twin_backend;
+
+void twin_dispatch(twin_context_t *ctx)
 {
     for (;;) {
         _twin_run_timeout();
         _twin_run_work();
-        if (!_twin_run_file(_twin_timeout_delay()))
+        if (g_twin_backend.poll && !g_twin_backend.poll(ctx)) {
+            usleep(_twin_timeout_delay() * 1000);
             break;
+        }
     }
 }

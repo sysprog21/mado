@@ -72,55 +72,6 @@ static void twin_sdl_damage(twin_screen_t *screen, twin_sdl_t *tx)
     twin_screen_damage(screen, 0, 0, width, height);
 }
 
-static bool twin_sdl_read_events(int file maybe_unused,
-                                 twin_file_op_t ops maybe_unused,
-                                 void *closure)
-{
-    twin_screen_t *screen = SCREEN(closure);
-    twin_sdl_t *tx = PRIV(closure);
-
-    SDL_Event ev;
-    while (SDL_PollEvent(&ev)) {
-        twin_event_t tev;
-        switch (ev.type) {
-        case SDL_WINDOWEVENT:
-            if (ev.window.event == SDL_WINDOWEVENT_EXPOSED ||
-                ev.window.event == SDL_WINDOWEVENT_SHOWN) {
-                twin_sdl_damage(screen, tx);
-            }
-            break;
-        case SDL_QUIT:
-            _twin_sdl_destroy(screen, tx);
-            return false;
-        case SDL_MOUSEBUTTONDOWN:
-        case SDL_MOUSEBUTTONUP:
-            tev.u.pointer.screen_x = ev.button.x;
-            tev.u.pointer.screen_y = ev.button.y;
-            tev.u.pointer.button =
-                ((ev.button.state >> 8) | (1 << (ev.button.button - 1)));
-            tev.kind = ((ev.type == SDL_MOUSEBUTTONDOWN) ? TwinEventButtonDown
-                                                         : TwinEventButtonUp);
-            twin_screen_dispatch(screen, &tev);
-            break;
-        case SDL_KEYDOWN:
-        case SDL_KEYUP:
-            tev.u.key.key = ev.key.keysym.sym;
-            tev.kind = ((ev.key.type == SDL_KEYDOWN) ? TwinEventKeyDown
-                                                     : TwinEventKeyUp);
-            twin_screen_dispatch(screen, &tev);
-            break;
-        case SDL_MOUSEMOTION:
-            tev.u.pointer.screen_x = ev.motion.x;
-            tev.u.pointer.screen_y = ev.motion.y;
-            tev.kind = TwinEventMotion;
-            tev.u.pointer.button = ev.motion.state;
-            twin_screen_dispatch(screen, &tev);
-            break;
-        }
-    }
-    return true;
-}
-
 static bool twin_sdl_work(void *closure)
 {
     twin_screen_t *screen = SCREEN(closure);
@@ -174,8 +125,6 @@ twin_context_t *twin_sdl_init(int width, int height)
     ctx->screen = twin_screen_create(width, height, _twin_sdl_put_begin,
                                      _twin_sdl_put_span, ctx);
 
-    twin_set_file(twin_sdl_read_events, 0, TWIN_READ, ctx);
-
     twin_set_work(twin_sdl_work, TWIN_WORK_REDISPLAY, ctx);
 
     return ctx;
@@ -195,6 +144,53 @@ static void twin_sdl_configure(twin_context_t *ctx)
     twin_screen_resize(ctx->screen, width, height);
 }
 
+static bool twin_sdl_poll(twin_context_t *ctx)
+{
+    twin_screen_t *screen = SCREEN(ctx);
+    twin_sdl_t *tx = PRIV(ctx);
+
+    SDL_Event ev;
+    while (SDL_PollEvent(&ev)) {
+        twin_event_t tev;
+        switch (ev.type) {
+        case SDL_WINDOWEVENT:
+            if (ev.window.event == SDL_WINDOWEVENT_EXPOSED ||
+                ev.window.event == SDL_WINDOWEVENT_SHOWN) {
+                twin_sdl_damage(screen, tx);
+            }
+            break;
+        case SDL_QUIT:
+            _twin_sdl_destroy(screen, tx);
+            return false;
+        case SDL_MOUSEBUTTONDOWN:
+        case SDL_MOUSEBUTTONUP:
+            tev.u.pointer.screen_x = ev.button.x;
+            tev.u.pointer.screen_y = ev.button.y;
+            tev.u.pointer.button =
+                ((ev.button.state >> 8) | (1 << (ev.button.button - 1)));
+            tev.kind = ((ev.type == SDL_MOUSEBUTTONDOWN) ? TwinEventButtonDown
+                                                         : TwinEventButtonUp);
+            twin_screen_dispatch(screen, &tev);
+            break;
+        case SDL_KEYDOWN:
+        case SDL_KEYUP:
+            tev.u.key.key = ev.key.keysym.sym;
+            tev.kind = ((ev.key.type == SDL_KEYDOWN) ? TwinEventKeyDown
+                                                     : TwinEventKeyUp);
+            twin_screen_dispatch(screen, &tev);
+            break;
+        case SDL_MOUSEMOTION:
+            tev.u.pointer.screen_x = ev.motion.x;
+            tev.u.pointer.screen_y = ev.motion.y;
+            tev.kind = TwinEventMotion;
+            tev.u.pointer.button = ev.motion.state;
+            twin_screen_dispatch(screen, &tev);
+            break;
+        }
+    }
+    return true;
+}
+
 static void twin_sdl_exit(twin_context_t *ctx)
 {
     if (!ctx)
@@ -209,5 +205,6 @@ static void twin_sdl_exit(twin_context_t *ctx)
 const twin_backend_t g_twin_backend = {
     .init = twin_sdl_init,
     .configure = twin_sdl_configure,
+    .poll = twin_sdl_poll,
     .exit = twin_sdl_exit,
 };

@@ -108,14 +108,6 @@ static void _twin_vnc_new_client(struct nvnc_client *client)
     nvnc_set_userdata(client, peer, NULL);
 }
 
-static bool _twin_vnc_read_events(int fd, twin_file_op_t op, void *closure)
-{
-    (void) fd;
-    (void) op;
-    (void) closure;
-    return true;
-}
-
 static void _twin_vnc_pointer_event(struct nvnc_client *client,
                                     uint16_t x,
                                     uint16_t y,
@@ -240,8 +232,6 @@ twin_context_t *twin_vnc_init(int width, int height)
         log_error("Failed to init VNC framebuffer");
         goto bail_framebuffer;
     }
-    int aml_fd = aml_get_fd(tx->aml);
-    twin_set_file(_twin_vnc_read_events, aml_fd, TWIN_READ, tx);
 
     twin_set_work(_twin_vnc_work, TWIN_WORK_REDISPLAY, ctx);
     tx->screen = ctx->screen;

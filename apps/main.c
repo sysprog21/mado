@@ -128,7 +128,7 @@ int main(void)
                          20);
 #endif
 
-    twin_dispatch();
+    twin_dispatch(tx);
 
     return 0;
 }

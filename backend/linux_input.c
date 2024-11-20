@@ -284,11 +284,6 @@ static void *twin_linux_evdev_thread(void *arg)
     return NULL;
 }
 
-static bool dummy(int file, twin_file_op_t ops, void *closure)
-{
-    return true;
-}
-
 void *twin_linux_input_create(twin_screen_t *screen)
 {
     /* Create object for handling Linux input system */
@@ -301,14 +296,6 @@ void *twin_linux_input_create(twin_screen_t *screen)
     /* Centering the cursor position */
     tm->x = screen->width / 2;
     tm->y = screen->height / 2;
-
-#if 1
-    /* FIXME: Need to fix the unexpected termination of the program.
-     * Hooking a dummy function here is only a hack*/
-
-    /* Set file handler for reading input device file */
-    twin_set_file(dummy, tm->fd, TWIN_READ, tm);
-#endif
 
     /* Start event handling thread */
     if (pthread_create(&tm->evdev_thread, NULL, twin_linux_evdev_thread, tm)) {

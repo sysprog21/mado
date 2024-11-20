@@ -472,14 +472,6 @@ struct _twin_work {
     void *closure;
 };
 
-struct _twin_file {
-    twin_queue_t queue;
-    int file;
-    twin_file_op_t ops;
-    twin_file_proc_t proc;
-    void *closure;
-};
-
 typedef enum _twin_order {
     TWIN_BEFORE = -1,
     TWIN_AT = 0,
@@ -503,8 +495,6 @@ void _twin_queue_delete(twin_queue_t **head, twin_queue_t *old);
 twin_queue_t *_twin_queue_set_order(twin_queue_t **head);
 
 void _twin_queue_review_order(twin_queue_t *first);
-
-int _twin_run_file(twin_time_t delay);
 
 void _twin_run_timeout(void);
 

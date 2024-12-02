@@ -81,7 +81,7 @@ twin_toplevel_t *twin_toplevel_create(twin_screen_t *screen,
 {
     twin_toplevel_t *toplevel;
     twin_window_t *window =
-        twin_window_create(screen, format, style, x, y, width, height);
+        twin_window_create(screen, format, style, x, y, width, height, false);
 
     if (!window)
         return NULL;

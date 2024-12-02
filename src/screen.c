@@ -356,7 +356,8 @@ bool twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
                 evt = *event;
                 evt.kind = TwinEventLeave;
                 _twin_adj_mouse_evt(&evt, pixmap);
-                twin_pixmap_dispatch(pixmap, &evt);
+                if (!pixmap->shadow)
+                    twin_pixmap_dispatch(pixmap, &evt);
             }
 
             pixmap = screen->target = ntarget;
@@ -365,7 +366,8 @@ bool twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
                 evt = *event;
                 _twin_adj_mouse_evt(&evt, pixmap);
                 evt.kind = TwinEventEnter;
-                twin_pixmap_dispatch(pixmap, &evt);
+                if (!pixmap->shadow)
+                    twin_pixmap_dispatch(pixmap, &evt);
             }
         }
 
@@ -389,7 +391,7 @@ bool twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
         pixmap = NULL;
         break;
     }
-    if (pixmap)
+    if (pixmap && !pixmap->shadow)
         return twin_pixmap_dispatch(pixmap, event);
     return false;
 }

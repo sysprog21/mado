@@ -302,6 +302,153 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
 #define operand_index(o) \
     ((o)->source_kind == TWIN_SOLID ? 3 : o->u.pixmap->format)
 
+#define _twin_add_ARGB(s, d, i, t) (((t) = (s) + twin_get_8(d, i)))
+#define _twin_add(s, d, t) (((t) = (s) + (d)))
+#define _twin_div(d, den, i, t)                     \
+    (((t) = (d) / (den)), (t) = twin_get_8((t), 0), \
+     (twin_argb32_t) twin_sat(t) << (i))
+#define _twin_sub_ARGB(s, d, i, t) (((t) = (s) - twin_get_8(d, i)))
+#define _twin_sub(s, d, t) (((t) = (s) - (d)))
+#define twin_put_8(d, i, t) (((t) = (d) << (i)))
+
+#define min(x, y)            \
+    ({                       \
+        typeof(x) _x = (x);  \
+        typeof(y) _y = (y);  \
+        (void) (&_x == &_y); \
+        _x < _y ? _x : _y;   \
+    })
+#define max(x, y)            \
+    ({                       \
+        typeof(x) _x = (x);  \
+        typeof(y) _y = (y);  \
+        (void) (&_x == &_y); \
+        _x > _y ? _x : _y;   \
+    })
+
+void twin_stack(twin_pixmap_t *trg_px,
+                twin_pixmap_t *src_px,
+                int radius,
+                int first_str,
+                int first_end,
+                int second_str,
+                int second_end,
+                bool horiz_span)
+{
+    int den = (radius + 1) * (radius + 1);
+    twin_pointer_t src_ptr, trg_ptr, old_ptr, new_ptr;
+    twin_argb32_t sumInR, sumOutR, sumR, sumInG, sumOutG, sumG, sumInB, sumOutB,
+        sumB, _cur, _old, _new, _src;
+    uint16_t t1, t2, t3;
+    for (int first = first_str; first < first_end; first++) {
+        sumInR = sumOutR = sumR = sumInG = sumOutG = sumG = sumInB = sumOutB =
+            sumB = 0x00000000;
+
+        /* Initialize SumOut by padding */
+        if (horiz_span)
+            src_ptr = twin_pixmap_pointer(src_px, second_str, first);
+        else
+            src_ptr = twin_pixmap_pointer(src_px, first, second_str);
+        _src = *src_ptr.argb32;
+
+        for (int i = second_str; i < second_str + radius; i++) {
+            sumOutR = _twin_add_ARGB(sumOutR, _src, 0, t1);
+            sumOutG = _twin_add_ARGB(sumOutG, _src, 8, t2);
+            sumOutB = _twin_add_ARGB(sumOutB, _src, 16, t3);
+            for (int j = 0; j < (i - second_str) + 1; j++) {
+                sumR = _twin_add_ARGB(sumR, _src, 0, t1);
+                sumG = _twin_add_ARGB(sumG, _src, 8, t2);
+                sumB = _twin_add_ARGB(sumB, _src, 16, t3);
+            }
+        }
+
+        /* Initialize SumIn */
+        for (int i = second_str; i < second_str + radius; i++) {
+            if (horiz_span)
+                src_ptr = twin_pixmap_pointer(src_px, i, first);
+            else
+                src_ptr = twin_pixmap_pointer(src_px, first, i);
+            _src = *src_ptr.argb32;
+            sumInR = _twin_add_ARGB(sumInR, _src, 0, t1);
+            sumInG = _twin_add_ARGB(sumInG, _src, 8, t2);
+            sumInB = _twin_add_ARGB(sumInB, _src, 16, t3);
+            for (int j = 0; j < radius - (i - second_str); j++) {
+                sumR = _twin_add_ARGB(sumR, _src, 0, t1);
+                sumG = _twin_add_ARGB(sumG, _src, 8, t2);
+                sumB = _twin_add_ARGB(sumB, _src, 16, t3);
+            }
+        }
+
+        for (int cur = second_str; cur < second_end; cur++) {
+            if (horiz_span) {
+                src_ptr = twin_pixmap_pointer(src_px, cur, first);
+                trg_ptr = twin_pixmap_pointer(trg_px, cur, first);
+                old_ptr = twin_pixmap_pointer(
+                    src_px, max(cur - radius, second_str), first);
+                new_ptr = twin_pixmap_pointer(
+                    src_px, min(cur + radius, second_end - 1), first);
+            } else {
+                src_ptr = twin_pixmap_pointer(src_px, first, cur);
+                trg_ptr = twin_pixmap_pointer(trg_px, first, cur);
+                old_ptr = twin_pixmap_pointer(src_px, first,
+                                              max(cur - radius, second_str));
+                new_ptr = twin_pixmap_pointer(
+                    src_px, first, min(cur + radius, second_end - 1));
+            }
+            _cur = *src_ptr.argb32;
+            _old = *old_ptr.argb32;
+            _new = *new_ptr.argb32;
+            /* STEP 1 : sum_out + current */
+            sumOutR = _twin_add_ARGB(sumOutR, _cur, 0, t1);
+            sumOutG = _twin_add_ARGB(sumOutG, _cur, 8, t2);
+            sumOutB = _twin_add_ARGB(sumOutB, _cur, 16, t3);
+            /* STEP 2 : sum_in + new */
+            sumInR = _twin_add_ARGB(sumInR, _new, 0, t1);
+            sumInG = _twin_add_ARGB(sumInG, _new, 8, t2);
+            sumInB = _twin_add_ARGB(sumInB, _new, 16, t3);
+            /* STEP 3 : sum + sum_in */
+            sumR = _twin_add(sumR, sumInR, t1);
+            sumG = _twin_add(sumG, sumInG, t2);
+            sumB = _twin_add(sumB, sumInB, t3);
+            /* STEP 4 : sum / denominator */
+            *trg_ptr.argb32 =
+                (_twin_div(sumR, den, 0, t1) | _twin_div(sumG, den, 8, t2) |
+                 _twin_div(sumB, den, 16, t3) | (*src_ptr.argb32 & 0xff000000));
+            /* STEP 5 : sum - sum_out */
+            sumR = _twin_sub(sumR, sumOutR, t1);
+            sumG = _twin_sub(sumG, sumOutG, t2);
+            sumB = _twin_sub(sumB, sumOutB, t3);
+            /* STEP 6 : sum_out - old */
+            sumOutR = _twin_sub_ARGB(sumOutR, _old, 0, t1);
+            sumOutG = _twin_sub_ARGB(sumOutG, _old, 8, t2);
+            sumOutB = _twin_sub_ARGB(sumOutB, _old, 16, t3);
+            /* STEP 7 : sum_in - current */
+            sumInR = _twin_sub_ARGB(sumInR, _cur, 0, t1);
+            sumInG = _twin_sub_ARGB(sumInG, _cur, 8, t2);
+            sumInB = _twin_sub_ARGB(sumInB, _cur, 16, t3);
+        }
+    }
+}
+
+void twin_stack_blur(twin_pixmap_t *px,
+                     int radius,
+                     twin_coord_t left,
+                     twin_coord_t right,
+                     twin_coord_t top,
+                     twin_coord_t bottom)
+{
+    if (px->format != TWIN_ARGB32)
+        return;
+    twin_pixmap_t *tmp_px =
+        twin_pixmap_create(px->format, px->width, px->height);
+    memcpy(tmp_px->p.v, px->p.v,
+           px->width * px->height * twin_bytes_per_pixel(px->format));
+    twin_stack(tmp_px, px, radius, top, bottom, left, right, true);
+    twin_stack(px, tmp_px, radius, left, right, top, bottom, false);
+    twin_pixmap_destroy(tmp_px);
+    return;
+}
+
 /* FIXME: source clipping is busted */
 static void _twin_composite_simple(twin_pixmap_t *dst,
                                    twin_coord_t dst_x,

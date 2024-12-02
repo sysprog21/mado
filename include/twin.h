@@ -194,6 +194,7 @@ typedef struct _twin_pixmap {
      * Pixels
      */
     twin_animation_t *animation;
+    bool shadow;
     twin_pointer_t p;
     /*
      * When representing a window, this point
@@ -422,6 +423,11 @@ typedef void (*twin_destroy_func_t)(twin_window_t *window);
 struct _twin_window {
     twin_screen_t *screen;
     twin_pixmap_t *pixmap;
+    bool shadow;
+    twin_pixmap_t *shadow_pixmap;
+    twin_coord_t shadow_offset_x;
+    twin_coord_t shadow_offset_y;
+    twin_argb32_t shadow_color;
     twin_window_style_t style;
     twin_rect_t client;
     twin_rect_t damage;
@@ -647,6 +653,13 @@ void twin_fill(twin_pixmap_t *dst,
                twin_coord_t bottom);
 
 void twin_premultiply_alpha(twin_pixmap_t *px);
+
+void twin_stack_blur(twin_pixmap_t *px,
+                     int radius,
+                     twin_coord_t left,
+                     twin_coord_t right,
+                     twin_coord_t top,
+                     twin_coord_t bottom);
 
 /*
  * event.c
@@ -1110,13 +1123,16 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
                                   twin_coord_t x,
                                   twin_coord_t y,
                                   twin_coord_t width,
-                                  twin_coord_t height);
+                                  twin_coord_t height,
+                                  bool shadow);
 
 void twin_window_destroy(twin_window_t *window);
 
 void twin_window_show(twin_window_t *window);
 
 void twin_window_hide(twin_window_t *window);
+
+void twin_shadow_visible(twin_pixmap_t *pixmap, twin_window_t *window);
 
 void twin_window_configure(twin_window_t *window,
                            twin_window_style_t style,

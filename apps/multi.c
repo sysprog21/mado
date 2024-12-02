@@ -7,11 +7,12 @@
 #include "apps_multi.h"
 
 #define D(x) twin_double_to_fixed(x)
+#define ASSET_PATH "assets/"
 
 static void apps_line_start(twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t *window = twin_window_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
+        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, false);
     twin_pixmap_t *pixmap = window->pixmap;
     twin_path_t *stroke = twin_path_create();
     twin_fixed_t fy;
@@ -38,7 +39,7 @@ static void apps_circletext_start(twin_screen_t *screen,
                                   int h)
 {
     twin_window_t *window = twin_window_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
+        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, false);
     int wid = window->client.right - window->client.left;
     int hei = window->client.bottom - window->client.top;
     twin_pixmap_t *pixmap = window->pixmap;
@@ -83,7 +84,7 @@ static void apps_quickbrown_start(twin_screen_t *screen,
                                   int h)
 {
     twin_window_t *window = twin_window_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
+        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, false);
     int wid = window->client.right - window->client.left;
     int hei = window->client.bottom - window->client.top;
     twin_pixmap_t *pixmap = window->pixmap;
@@ -126,7 +127,7 @@ static void apps_quickbrown_start(twin_screen_t *screen,
 static void apps_ascii_start(twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t *window = twin_window_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
+        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, false);
     int wid = window->client.right - window->client.left;
     int hei = window->client.bottom - window->client.top;
     twin_pixmap_t *pixmap = window->pixmap;
@@ -174,7 +175,7 @@ static void apps_ascii_start(twin_screen_t *screen, int x, int y, int w, int h)
 static void apps_jelly_start(twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t *window = twin_window_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
+        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, false);
     int wid = window->client.right - window->client.left;
     int hei = window->client.bottom - window->client.top;
     twin_pixmap_t *pixmap = window->pixmap;
@@ -220,6 +221,49 @@ static void apps_jelly_start(twin_screen_t *screen, int x, int y, int w, int h)
     twin_window_show(window);
 }
 
+static void apps_test(twin_screen_t *screen, int x, int y, int w, int h)
+{
+    twin_pixmap_t *raw_background =
+        twin_pixmap_from_file(ASSET_PATH "tux.png", TWIN_ARGB32);
+    twin_window_t *window = twin_window_create(
+        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, true);
+    twin_window_set_name(window, "Test");
+    twin_pixmap_t *scaled_background = twin_pixmap_create(
+        TWIN_ARGB32, window->pixmap->width, window->pixmap->height);
+    twin_fixed_t sx, sy;
+    sx = twin_fixed_div(
+        twin_int_to_fixed(raw_background->width),
+        twin_int_to_fixed(window->client.right - window->client.left));
+    sy = twin_fixed_div(
+        twin_int_to_fixed(raw_background->height),
+        twin_int_to_fixed(window->client.bottom - window->client.top));
+
+    twin_matrix_scale(&raw_background->transform, sx, sy);
+    twin_operand_t srcop = {
+        .source_kind = TWIN_PIXMAP,
+        .u.pixmap = raw_background,
+    };
+
+    twin_composite(scaled_background, 0, 0, &srcop, 0, 0, 0, 0, 0, TWIN_SOURCE,
+                   screen->width, screen->height);
+
+    twin_pointer_t src, dst;
+    for (int y = window->client.top; y < window->client.bottom; y++)
+        for (int x = window->client.left; x < window->client.right; x++) {
+            src =
+                twin_pixmap_pointer(scaled_background, x - window->client.left,
+                                    y - window->client.top);
+            dst = twin_pixmap_pointer(window->pixmap, x, y);
+            *dst.argb32 = *src.argb32 | 0xff000000;
+        }
+
+    twin_stack_blur(window->pixmap, 5, window->client.left,
+                    window->client.right, window->client.top,
+                    window->client.bottom);
+    twin_window_show(window);
+    twin_pixmap_destroy(scaled_background);
+}
+
 void apps_multi_start(twin_screen_t *screen,
                       const char *name,
                       int x,
@@ -233,4 +277,5 @@ void apps_multi_start(twin_screen_t *screen,
     apps_quickbrown_start(screen, x += 20, y += 20, w, h);
     apps_ascii_start(screen, x += 20, y += 20, w, h);
     apps_jelly_start(screen, x += 20, y += 20, w / 2, h);
+    apps_test(screen, x, y, w, h);
 }

@@ -10,6 +10,7 @@ while IFS= read -rd '' f; do
         tail -c1 < "$f" | read -r _ || show=1
         if [ $show -eq 1 ]; then
             echo "Warning: No newline at end of file $f"
+            echo "See https://stackoverflow.com/questions/729692/why-should-text-files-end-with-a-newline"
             ret=1
             show=0
         fi

@@ -99,18 +99,21 @@ void twin_sincos(twin_angle_t a, twin_fixed_t *sin, twin_fixed_t *cos)
 }
 
 static const twin_angle_t atan_table[] = {
-    0x0200, /* arctan(2^0)  = 45° -> 512     */
-    0x012E, /* arctan(2^-1) = 26.565° -> 302 */
-    0x00A0, /* arctan(2^-2) = 14.036° -> 160 */
-    0x0051, /* arctan(2^-3) = 7.125° -> 81   */
-    0x0029, /* arctan(2^-4) = 3.576° -> 41   */
-    0x0014, /* arctan(2^-5) = 1.790° -> 20   */
-    0x000A, /* arctan(2^-6) = 0.895° -> 10   */
-    0x0005, /* arctan(2^-7) = 0.448° -> 5    */
-    0x0003, /* arctan(2^-8) = 0.224° -> 3    */
-    0x0001, /* arctan(2^-9) = 0.112° -> 1    */
-    0x0001, /* arctan(2^-10) = 0.056° -> 1   */
-    0x0000, /* arctan(2^-11) = 0.028° -> 0   */
+    0x1000, /* arctan(2^0)  = 45°    -> 4096  */
+    0x0972, /* arctan(2^-1) = 26.565° -> 2418 */
+    0x04fe, /* arctan(2^-2) = 14.036° -> 1278 */
+    0x0289, /* arctan(2^-3) = 7.125°  -> 649  */
+    0x0146, /* arctan(2^-4) = 3.576°  -> 326  */
+    0x00a3, /* arctan(2^-5) = 1.790°  -> 163  */
+    0x0051, /* arctan(2^-6) = 0.895°  -> 81   */
+    0x0029, /* arctan(2^-7) = 0.448°  -> 41   */
+    0x0014, /* arctan(2^-8) = 0.224°  -> 20   */
+    0x000a, /* arctan(2^-9) = 0.112°  -> 10   */
+    0x0005, /* arctan(2^-10) = 0.056° -> 5    */
+    0x0003, /* arctan(2^-11) = 0.028° -> 3    */
+    0x0001, /* arctan(2^-12) = 0.014° -> 1    */
+    0x0001, /* arctan(2^-13) = 0.007° -> 1    */
+    0x0000, /* arctan(2^-14) = 0.0035° -> 0   */
 };
 
 static twin_angle_t twin_atan2_first_quadrant(twin_fixed_t y, twin_fixed_t x)
@@ -121,9 +124,14 @@ static twin_angle_t twin_atan2_first_quadrant(twin_fixed_t y, twin_fixed_t x)
         return TWIN_ANGLE_90;
     if (y == 0)
         return TWIN_ANGLE_0;
-    twin_angle_t angle = TWIN_ANGLE_0;
+    twin_angle_t angle = 0;
     /* CORDIC iteration */
-    for (int i = 0; i < 12; i++) {
+    /*
+     * To enhance accuracy, the angle is mapped from the range 0-360 degrees to
+     * 0-32768. Allows for finer resolution to additional CORDIC iterations for
+     * more precise calculations.
+     */
+    for (int i = 0; i < 15; i++) {
         twin_fixed_t temp_x = x;
         if (y > 0) {
             x += (y >> i);
@@ -135,7 +143,7 @@ static twin_angle_t twin_atan2_first_quadrant(twin_fixed_t y, twin_fixed_t x)
             angle -= atan_table[i];
         }
     }
-    return angle;
+    return (twin_angle_t) (double) angle / (32768.0) * TWIN_ANGLE_360;
 }
 
 twin_angle_t twin_atan2(twin_fixed_t y, twin_fixed_t x)

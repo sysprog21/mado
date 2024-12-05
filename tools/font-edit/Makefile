@@ -1,7 +1,7 @@
 TARGET = twin-fedit
 
-CFLAGS = $(shell pkg-config --cflags cairo x11) -g -Wall
-LIBS = $(shell pkg-config --libs cairo x11)
+CFLAGS = $(shell pkg-config --cflags cairo) $(shell sdl2-config --cflags) -g -Wall
+LIBS = $(shell pkg-config --libs cairo) $(shell sdl2-config --libs)
 
 OBJS = \
 	twin-fedit.o \

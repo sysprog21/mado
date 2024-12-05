@@ -71,6 +71,10 @@ config LOADER_GIF
     bool "Enable GIF loader"
     default y
 
+config LOADER_TVG
+    bool "Enable TinyVG (TVG) loader"
+    default y
+
 endmenu
 
 menu "Demo Applications"
@@ -111,6 +115,12 @@ config DEMO_SPLINE
 
 config DEMO_ANIMATION
     bool "Build animation demo"
+    default y
+    depends on DEMO_APPLICATIONS 
+
+config DEMO_IMAGE
+    bool "Build scalable image demo"
+    select LOADER_TVG
     default y
     depends on DEMO_APPLICATIONS 
 endmenu

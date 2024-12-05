@@ -17,7 +17,9 @@ void twin_dispatch(twin_context_t *ctx)
         _twin_run_timeout();
         _twin_run_work();
         if (g_twin_backend.poll && !g_twin_backend.poll(ctx)) {
-            usleep(_twin_timeout_delay() * 1000);
+            twin_time_t delay = _twin_timeout_delay();
+            if (delay > 0)
+                usleep(delay * 1000);
             break;
         }
     }

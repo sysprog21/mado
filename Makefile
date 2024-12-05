@@ -86,6 +86,10 @@ ifeq ($(CONFIG_LOADER_GIF), y)
 libtwin.a_files-y += src/image-gif.c
 endif
 
+ifeq ($(CONFIG_LOADER_TVG), y)
+libtwin.a_files-y += src/image-tvg.c
+endif
+
 # Applications
 
 libapps.a_files-y := apps/dummy.c
@@ -96,6 +100,7 @@ libapps.a_files-$(CONFIG_DEMO_CALCULATOR) += apps/calc.c
 libapps.a_files-$(CONFIG_DEMO_LINE) += apps/line.c
 libapps.a_files-$(CONFIG_DEMO_SPLINE) += apps/spline.c
 libapps.a_files-$(CONFIG_DEMO_ANIMATION) += apps/animation.c
+libapps.a_files-$(CONFIG_DEMO_IMAGE) += apps/image.c
 
 libapps.a_includes-y := include
 

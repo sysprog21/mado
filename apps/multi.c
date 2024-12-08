@@ -39,7 +39,7 @@ static void apps_circletext_start(twin_screen_t *screen,
 {
     twin_window_t *window = twin_window_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
-    int wid = window->client.right - window->client.left;
+    int wid = window->client.right - window->client.left + 1;
     int hei = window->client.bottom - window->client.top;
     twin_pixmap_t *pixmap = window->pixmap;
     twin_path_t *path = twin_path_create();
@@ -84,7 +84,7 @@ static void apps_quickbrown_start(twin_screen_t *screen,
 {
     twin_window_t *window = twin_window_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
-    int wid = window->client.right - window->client.left;
+    int wid = window->client.right - window->client.left + 1;
     int hei = window->client.bottom - window->client.top;
     twin_pixmap_t *pixmap = window->pixmap;
     twin_path_t *path = twin_path_create();
@@ -127,7 +127,7 @@ static void apps_ascii_start(twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t *window = twin_window_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
-    int wid = window->client.right - window->client.left;
+    int wid = window->client.right - window->client.left + 1;
     int hei = window->client.bottom - window->client.top;
     twin_pixmap_t *pixmap = window->pixmap;
     twin_path_t *path = twin_path_create();

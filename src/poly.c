@@ -213,7 +213,7 @@ static void _span_fill(twin_pixmap_t *pixmap,
     }
 
     /* last pixel */
-    if (right & TWIN_POLY_MASK) {
+    if (right & TWIN_POLY_MASK && x != right) {
         w = 0;
         col = 0;
         while (x < right) {

@@ -19,7 +19,6 @@ void _twin_queue_insert(twin_queue_t **head,
             break;
     new->next = *prev;
     new->order = 0;
-    new->walking = false;
     new->deleted = false;
     *prev = new;
 }
@@ -54,8 +53,6 @@ void _twin_queue_delete(twin_queue_t **head, twin_queue_t *old)
 {
     _twin_queue_remove(head, old);
     old->deleted = true;
-    if (!old->walking)
-        free(old);
 }
 
 twin_queue_t *_twin_queue_set_order(twin_queue_t **head)
@@ -64,7 +61,6 @@ twin_queue_t *_twin_queue_set_order(twin_queue_t **head)
 
     for (twin_queue_t *q = first; q; q = q->next) {
         q->order = q->next;
-        q->walking = true;
     }
     return first;
 }
@@ -76,7 +72,6 @@ void _twin_queue_review_order(twin_queue_t *first)
     for (q = first; q; q = o) {
         o = q->order;
         q->order = 0;
-        q->walking = false;
         if (q->deleted)
             free(q);
     }

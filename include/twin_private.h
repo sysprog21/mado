@@ -472,7 +472,6 @@ void _twin_path_sfinish(twin_path_t *path);
 typedef struct _twin_queue {
     struct _twin_queue *next;
     struct _twin_queue *order;
-    bool walking;
     bool deleted;
 } twin_queue_t;
 

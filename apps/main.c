@@ -17,6 +17,7 @@
 #include "apps_calc.h"
 #include "apps_clock.h"
 #include "apps_hello.h"
+#include "apps_image.h"
 #include "apps_line.h"
 #include "apps_multi.h"
 #include "apps_spline.h"
@@ -126,6 +127,9 @@ int main(void)
 #if defined(CONFIG_DEMO_ANIMATION)
     apps_animation_start(tx->screen, "Viewer", ASSET_PATH "nyancat.gif", 20,
                          20);
+#endif
+#if defined(CONFIG_DEMO_IMAGE)
+    apps_image_start(tx->screen, "Viewer", 20, 20);
 #endif
 
     twin_dispatch(tx);

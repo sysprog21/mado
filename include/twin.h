@@ -660,6 +660,7 @@ void twin_event_enqueue(const twin_event_t *event);
 
 #define twin_fixed_mul(a, b) ((twin_fixed_t) (((int64_t) (a) * (b)) >> 16))
 #define twin_fixed_div(a, b) ((twin_fixed_t) ((((int64_t) (a)) << 16) / (b)))
+#define twin_fixed_abs(f) ((f) < 0 ? -(f) : (f))
 
 twin_fixed_t twin_fixed_sqrt(twin_fixed_t a);
 

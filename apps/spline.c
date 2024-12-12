@@ -132,8 +132,6 @@ static twin_dispatch_result_t _apps_spline_update_pos(apps_spline_t *spline,
     return TwinDispatchDone;
 }
 
-#define twin_fixed_abs(f) ((f) < 0 ? -(f) : (f))
-
 static int _apps_spline_hit(apps_spline_t *spline,
                             twin_fixed_t x,
                             twin_fixed_t y)

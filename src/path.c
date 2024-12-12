@@ -184,8 +184,6 @@ void twin_path_ellipse(twin_path_t *path,
     twin_path_close(path);
 }
 
-#define twin_fixed_abs(f) ((f) < 0 ? -(f) : (f))
-
 static twin_fixed_t _twin_matrix_max_radius(twin_matrix_t *m)
 {
     return (twin_fixed_abs(m->m[0][0]) + twin_fixed_abs(m->m[0][1]) +

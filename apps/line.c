@@ -50,8 +50,6 @@ static twin_dispatch_result_t _apps_line_update_pos(apps_line_t *line,
     return TwinDispatchDone;
 }
 
-#define twin_fixed_abs(f) ((f) < 0 ? -(f) : (f))
-
 static int _apps_line_hit(apps_line_t *line, twin_fixed_t x, twin_fixed_t y)
 {
     int i;

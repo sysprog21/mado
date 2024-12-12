@@ -203,7 +203,7 @@ static void _apps_spline_init(apps_spline_t *spline,
     spline->n_points = n_points;
     _init_control_point(spline);
     twin_button_t *button =
-        twin_button_create(parent, "SwitchCurve", 0xffae0000, D(10),
+        twin_button_create(parent, "Switch curve", 0xffae0000, D(10),
                            TwinStyleBold | TwinStyleOblique);
     twin_widget_set(&button->label.widget, 0xc0808080);
     button->signal = _apps_spline_button_signal;

@@ -268,6 +268,7 @@ static void apps_flower_start(twin_screen_t *screen, int x, int y, int w, int h)
     draw_flower(path, D(3), 5);
     twin_paint_path(pixmap, 0xffe2d2d2, path);
     twin_path_destroy(stroke);
+    twin_path_destroy(path);
     twin_window_show(window);
 }
 

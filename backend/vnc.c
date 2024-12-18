@@ -102,10 +102,18 @@ static bool _twin_vnc_work(void *closure)
     return true;
 }
 
+static void _twin_vnc_client_cleanup(struct nvnc_client *client)
+{
+    twin_peer_t *peer = nvnc_get_userdata(client);
+    free(peer);
+    nvnc_set_userdata(client, NULL, NULL);
+}
+
 static void _twin_vnc_new_client(struct nvnc_client *client)
 {
     twin_peer_t *peer = malloc(sizeof(twin_peer_t));
     nvnc_set_userdata(client, peer, NULL);
+    nvnc_set_client_cleanup_fn(client, _twin_vnc_client_cleanup);
 }
 
 static void _twin_vnc_pointer_event(struct nvnc_client *client,
@@ -268,11 +276,12 @@ static void twin_vnc_exit(twin_context_t *ctx)
         return;
 
     twin_vnc_t *tx = PRIV(ctx);
-
+    nvnc_fb_unref(tx->current_fb);
     nvnc_display_unref(tx->display);
     nvnc_close(tx->server);
     aml_unref(tx->aml);
 
+    free(tx->framebuffer);
     free(ctx->priv);
     free(ctx);
 }

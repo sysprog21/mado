@@ -610,7 +610,7 @@ void twin_composite_path(twin_pixmap_t *dst,
     if (bounds.left >= bounds.right || bounds.top >= bounds.bottom)
         return;
 
-    twin_coord_t width = bounds.right - bounds.left;
+    twin_coord_t width = bounds.right - bounds.left + 1;
     twin_coord_t height = bounds.bottom - bounds.top;
     twin_pixmap_t *mask = twin_pixmap_create(TWIN_A8, width, height);
     if (!mask)

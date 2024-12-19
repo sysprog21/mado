@@ -1188,6 +1188,15 @@ twin_work_t *twin_set_work(twin_work_proc_t work_proc,
 void twin_clear_work(twin_work_t *work);
 
 /*
+ * image-tvg.c
+ */
+
+twin_pixmap_t *twin_tvg_to_pixmap_scale(const char *filepath,
+                                        twin_format_t fmt,
+                                        twin_coord_t w,
+                                        twin_coord_t h);
+
+/*
  * backend
  */
 

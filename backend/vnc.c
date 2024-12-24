@@ -75,16 +75,8 @@ static void _twin_vnc_put_span(twin_coord_t left,
     size_t span_width = right - left;
 
     memcpy(fb_pixels, pixels, span_width * sizeof(*fb_pixels));
-
-    pixman_region_init_rect(&tx->damage_region, left, top, span_width, 1);
-
-    if (pixman_region_not_empty(&tx->damage_region)) {
-        nvnc_display_feed_buffer(tx->display, tx->current_fb,
-                                 &tx->damage_region);
-        pixman_region_clear(&tx->damage_region);
-    }
-    aml_poll(tx->aml, 0);
-    aml_dispatch(tx->aml);
+    pixman_region_union_rect(&tx->damage_region, &tx->damage_region, left, top,
+                             span_width, 1);
 }
 
 static void twin_vnc_get_screen_size(twin_vnc_t *tx, int *width, int *height)
@@ -96,9 +88,13 @@ static void twin_vnc_get_screen_size(twin_vnc_t *tx, int *width, int *height)
 static bool _twin_vnc_work(void *closure)
 {
     twin_screen_t *screen = SCREEN(closure);
-
-    if (twin_screen_damaged(screen))
+    twin_vnc_t *tx = PRIV(closure);
+    if (twin_screen_damaged(screen)) {
+        pixman_region_clear(&tx->damage_region);
         twin_screen_update(screen);
+        nvnc_display_feed_buffer(tx->display, tx->current_fb,
+                                 &tx->damage_region);
+    }
     return true;
 }
 
@@ -262,6 +258,14 @@ bail_priv:
     return NULL;
 }
 
+static bool twin_vnc_poll(twin_context_t *ctx)
+{
+    twin_vnc_t *tx = PRIV(ctx);
+    aml_poll(tx->aml, 0);
+    aml_dispatch(tx->aml);
+    return true;
+}
+
 static void twin_vnc_configure(twin_context_t *ctx)
 {
     int width, height;
@@ -288,6 +292,7 @@ static void twin_vnc_exit(twin_context_t *ctx)
 
 const twin_backend_t g_twin_backend = {
     .init = twin_vnc_init,
+    .poll = twin_vnc_poll,
     .configure = twin_vnc_configure,
     .exit = twin_vnc_exit,
 };

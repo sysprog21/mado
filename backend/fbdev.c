@@ -30,6 +30,8 @@ typedef struct {
 
     /* Linux virtual terminal (VT) */
     int vt_fd;
+    bool vt_active;
+    struct vt_mode old_vtm;
 
     /* Linux framebuffer */
     int fb_fd;
@@ -84,22 +86,6 @@ static void twin_fbdev_get_screen_size(twin_fbdev_t *tx,
     ioctl(tx->fb_fd, FBIOGET_VSCREENINFO, &info);
     *width = info.xres;
     *height = info.yres;
-}
-
-static void twin_fbdev_damage(twin_screen_t *screen, twin_fbdev_t *tx)
-{
-    int width, height;
-    twin_fbdev_get_screen_size(tx, &width, &height);
-    twin_screen_damage(tx->screen, 0, 0, width, height);
-}
-
-static bool twin_fbdev_work(void *closure)
-{
-    twin_screen_t *screen = SCREEN(closure);
-
-    if (twin_screen_damaged(screen))
-        twin_screen_update(screen);
-    return true;
 }
 
 static inline bool twin_fbdev_is_rgb565(twin_fbdev_t *tx)
@@ -192,6 +178,50 @@ static bool twin_fbdev_apply_config(twin_fbdev_t *tx)
     return true;
 }
 
+static void twin_fbdev_damage(twin_fbdev_t *tx)
+{
+    int width, height;
+    twin_fbdev_get_screen_size(tx, &width, &height);
+    twin_screen_damage(tx->screen, 0, 0, width, height);
+}
+
+static bool twin_fbdev_update_damage(void *closure)
+{
+    twin_fbdev_t *tx = PRIV(closure);
+    twin_screen_t *screen = SCREEN(closure);
+
+    if (!tx->vt_active && twin_screen_damaged(screen))
+        twin_screen_update(screen);
+
+    return true;
+}
+
+static bool twin_fbdev_work(void *closure)
+{
+    twin_fbdev_t *tx = PRIV(closure);
+    twin_screen_t *screen = SCREEN(closure);
+
+    if (tx->vt_active && (tx->fb_base != MAP_FAILED)) {
+        /* Unmap the fbdev */
+        munmap(tx->fb_base, tx->fb_len);
+        tx->fb_base = MAP_FAILED;
+    }
+
+    if (!tx->vt_active && (tx->fb_base == MAP_FAILED)) {
+        /* Restore the fbdev settings */
+        if (!twin_fbdev_apply_config(tx))
+            log_error("Failed to apply configurations to the fbdev");
+
+        /* Mark entire screen for refresh */
+        twin_screen_damage(screen, 0, 0, screen->width, screen->height);
+    }
+
+    if (!tx->vt_active && twin_screen_damaged(screen))
+        twin_screen_update(screen);
+
+    return true;
+}
+
 twin_context_t *twin_fbdev_init(int width, int height)
 {
     char *fbdev_path = getenv(FBDEV_NAME);
@@ -218,9 +248,12 @@ twin_context_t *twin_fbdev_init(int width, int height)
     }
 
     /* Set up virtual terminal environment */
-    if (!twin_vt_setup(&tx->vt_fd)) {
+    if (!twin_vt_setup(&tx->vt_fd, &tx->old_vtm, &tx->vt_active)) {
         goto bail_fb_fd;
     }
+
+    /* Set up signal handlers for switching TTYs */
+    twin_vt_setup_signal_handler();
 
     /* Apply configurations to the framebuffer device */
     if (!twin_fbdev_apply_config(tx)) {
@@ -253,6 +286,9 @@ twin_context_t *twin_fbdev_init(int width, int height)
 
     /* Setup file handler and work functions */
     twin_set_work(twin_fbdev_work, TWIN_WORK_REDISPLAY, ctx);
+
+    /* Register a callback function to handle damaged rendering */
+    twin_screen_register_damaged(ctx->screen, twin_fbdev_update_damage, ctx);
 
     return ctx;
 
@@ -292,7 +328,6 @@ static void twin_fbdev_exit(twin_context_t *ctx)
 }
 
 /* Register the Linux framebuffer backend */
-
 const twin_backend_t g_twin_backend = {
     .init = twin_fbdev_init,
     .configure = twin_fbdev_configure,

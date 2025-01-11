@@ -425,6 +425,7 @@ struct _twin_window {
     twin_window_style_t style;
     twin_rect_t client;
     twin_rect_t damage;
+    bool active;
     bool client_grab;
     bool want_focus;
     bool draw_queued;

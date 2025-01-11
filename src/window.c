@@ -9,9 +9,10 @@
 #include "twin_private.h"
 
 #define TWIN_ACTIVE_BG 0xd03b80ae
-#define TWIN_INACTIVE_BG 0xff808080
+#define TWIN_INACTIVE_BG 0xffb0b0b0
 #define TWIN_FRAME_TEXT 0xffffffff
 #define TWIN_ACTIVE_BORDER 0xff606060
+#define TWIN_INACTIVE_BORDER 0xff909090
 #define TWIN_BW 0
 #define TWIN_TITLE_HEIGHT 20
 #define TWIN_RESIZE_SIZE ((TWIN_TITLE_HEIGHT + 4) / 5)
@@ -32,6 +33,7 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
         return NULL;
     window->screen = screen;
     window->style = style;
+    window->active = false;
     switch (window->style) {
     case TwinWindowApplication:
         left = TWIN_BW;
@@ -226,9 +228,13 @@ static void twin_window_frame(twin_window_t *window)
                     c_left, c_top);
     twin_path_close(path);
 
-    twin_paint_path(pixmap, TWIN_ACTIVE_BG, path);
-
-    twin_paint_stroke(pixmap, TWIN_ACTIVE_BORDER, path, bw_2 * 2);
+    if (window->active) {
+        twin_paint_path(pixmap, TWIN_ACTIVE_BG, path);
+        twin_paint_stroke(pixmap, TWIN_ACTIVE_BORDER, path, bw_2 * 2);
+    } else {
+        twin_paint_path(pixmap, TWIN_INACTIVE_BG, path);
+        twin_paint_stroke(pixmap, TWIN_INACTIVE_BORDER, path, bw_2 * 2);
+    }
 
     twin_path_empty(path);
 

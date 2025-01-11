@@ -151,6 +151,25 @@ static void twin_screen_span_pixmap(twin_screen_t maybe_unused *screen,
         op32(dst, src, p_right - p_left);
 }
 
+static twin_pixmap_t *twin_active_pixmap(twin_screen_t *screen,
+                                         twin_pixmap_t **active_pix)
+{
+    twin_pixmap_t *p = NULL, *prev_active_pix = NULL;
+    /*
+     * Identify the previously active pixel map and the currently active pixel
+     * map, which is on the topmost layer.
+     */
+    for (p = screen->bottom; p; p = p->up) {
+        if (p->window->active == true) {
+            prev_active_pix = p;
+            prev_active_pix->window->active = false;
+        }
+        (*active_pix) = p;
+    }
+    (*active_pix)->window->active = true;
+    return prev_active_pix;
+}
+
 void twin_screen_update(twin_screen_t *screen)
 {
     twin_coord_t left = screen->damage.left;
@@ -170,7 +189,7 @@ void twin_screen_update(twin_screen_t *screen)
 
     if (!screen->disable && left < right && top < bottom) {
         twin_argb32_t *span;
-        twin_pixmap_t *p;
+        twin_pixmap_t *p, *active_pix = NULL, *prev_active_pix = NULL;
         twin_coord_t y;
         twin_coord_t width = right - left;
 
@@ -183,6 +202,24 @@ void twin_screen_update(twin_screen_t *screen)
 
         if (screen->put_begin)
             (*screen->put_begin)(left, top, right, bottom, screen->closure);
+
+        prev_active_pix = twin_active_pixmap(screen, &active_pix);
+
+        /*
+         * Mark the previously active pixel map as damaged to update its
+         * changes.
+         */
+        if (prev_active_pix && active_pix != prev_active_pix) {
+            twin_pixmap_damage(prev_active_pix, 0, 0, prev_active_pix->width,
+                               prev_active_pix->height);
+            twin_window_draw(prev_active_pix->window);
+        }
+
+        /* Mark the active pixel map as damaged to update its changes. */
+        twin_pixmap_damage(active_pix, 0, 0, active_pix->width,
+                           active_pix->height);
+        twin_window_draw(active_pix->window);
+
         for (y = top; y < bottom; y++) {
             if (screen->background) {
                 twin_pointer_t dst;

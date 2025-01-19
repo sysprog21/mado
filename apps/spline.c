@@ -129,6 +129,7 @@ static twin_dispatch_result_t _apps_spline_update_pos(apps_spline_t *spline,
     spline->points[spline->which].y = twin_sfixed_to_fixed(
         _twin_matrix_y(&(spline->inverse_transition), x, y));
     _twin_widget_queue_paint(&spline->widget);
+    twin_widget_children_paint((spline->widget).parent);
     return TwinDispatchDone;
 }
 

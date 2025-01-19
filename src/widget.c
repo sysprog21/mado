@@ -200,6 +200,13 @@ void _twin_widget_bevel(twin_widget_t *widget, twin_fixed_t b, bool down)
     }
 }
 
+void twin_widget_children_paint(twin_box_t *box)
+{
+    /* Paint the widget children of the box. */
+    for (twin_widget_t *child = box->children; child; child = child->next)
+        _twin_widget_queue_paint(child);
+}
+
 twin_widget_t *twin_widget_create(twin_box_t *parent,
                                   twin_argb32_t background,
                                   twin_coord_t width,

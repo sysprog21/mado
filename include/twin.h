@@ -1124,6 +1124,9 @@ twin_angle_t twin_acos(twin_fixed_t x);
  * widget.c
  */
 
+/* Paint the widget children of the box. */
+void twin_widget_children_paint(twin_box_t *box);
+
 twin_widget_t *twin_widget_create(twin_box_t *parent,
                                   twin_argb32_t background,
                                   twin_coord_t width,

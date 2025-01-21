@@ -163,6 +163,7 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
     case TwinEventConfigure:
         return _twin_box_configure(box);
     case TwinEventButtonDown:
+        twin_window_show(widget->window);
         box->button_down =
             _twin_box_xy_to_widget(box, event->u.pointer.x, event->u.pointer.y);
         if (box->button_down && box->button_down->want_focus)

@@ -12,6 +12,10 @@ config BACKEND_FBDEV
     bool "Linux framebuffer support"
     select CURSOR
 
+config BACKEND_DRM
+    bool "Linux DRM support"
+    select CURSOR
+
 config BACKEND_SDL
     bool "SDL video output support"
 

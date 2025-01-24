@@ -387,6 +387,20 @@ bool twin_window_dispatch(twin_window_t *window, twin_event_t *event)
 
     switch (ev.kind) {
     case TwinEventButtonDown:
+    case TwinEventActivate:
+        /* Set window active. */
+        /*
+         * When the box is trigger by TwinEventButtonDown, its window's title
+         * bar needs to change color and be put onto the toppest layer.
+         */
+        if (!window->active) {
+            window->active = true;
+            twin_window_frame(window);
+            if (window != window->screen->top->window) {
+                window->screen->top->window->active = false;
+                twin_window_frame(window->screen->top->window);
+            }
+        }
         if (window->client.left <= ev.u.pointer.x &&
             ev.u.pointer.x < window->client.right &&
             window->client.top <= ev.u.pointer.y &&

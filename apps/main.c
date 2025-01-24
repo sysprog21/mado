@@ -132,6 +132,7 @@ int main(void)
     apps_image_start(tx->screen, "Viewer", 20, 20);
 #endif
 
+    twin_screen_set_active(tx->screen, tx->screen->top);
     twin_dispatch(tx);
 
     return 0;

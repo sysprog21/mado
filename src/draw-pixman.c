@@ -90,20 +90,38 @@ void twin_composite(twin_pixmap_t *_dst,
     pixman_image_t *dst = create_pixman_image_from_twin_pixmap(_dst);
 
     /* Set origin */
-    twin_coord_t ox, oy;
+    twin_coord_t ox, oy, offset_x = 0, offset_y = 0;
     twin_pixmap_get_origin(_dst, &ox, &oy);
     ox += dst_x;
     oy += dst_y;
 
+    if (ox < _dst->clip.left) {
+        offset_x = _dst->clip.left - ox;
+        ox = _dst->clip.left;
+    }
+    if (oy < _dst->clip.top) {
+        offset_y = _dst->clip.top - oy;
+        oy = _dst->clip.top;
+    }
+    if (ox + width > _dst->clip.right)
+        width = _dst->clip.right - ox;
+    if (oy + height > _dst->clip.bottom)
+        height = _dst->clip.bottom - oy;
+
+    if (width < 0 || height < 0)
+        return;
+
     if (!_msk) {
         pixman_image_composite(twin_to_pixman_op(operator), src, NULL, dst,
-                               src_x, src_y, 0, 0, ox, oy, width, height);
+                               src_x + offset_x, src_y + offset_y, offset_x,
+                               offset_y, ox, oy, width, height);
     } else {
         pixman_image_t *msk =
             create_pixman_image_from_twin_pixmap(_msk->u.pixmap);
         pixman_image_composite(twin_to_pixman_op(operator), src, msk, dst,
-                               src_x, src_y, msk_x, msk_y, ox, oy, width,
-                               height);
+                               src_x + offset_x, src_y + offset_y,
+                               msk_x + offset_x, msk_y + offset_y, ox, oy,
+                               width, height);
         pixman_image_unref(msk);
     }
 
@@ -134,6 +152,8 @@ void twin_fill(twin_pixmap_t *_dst,
         top = _dst->clip.top;
     if (bottom > _dst->clip.bottom)
         bottom = _dst->clip.bottom;
+    if (left >= right || top >= bottom)
+        return;
 
     pixman_image_t *dst = create_pixman_image_from_twin_pixmap(_dst);
     pixman_color_t color;

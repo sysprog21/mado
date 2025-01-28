@@ -381,8 +381,9 @@ bool twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
 
         /* check who the mouse is over now */
         for (ntarget = screen->top; ntarget; ntarget = ntarget->down)
-            if (!twin_pixmap_transparent(ntarget, event->u.pointer.screen_x,
-                                         event->u.pointer.screen_y))
+            if (twin_window_valid_range(ntarget->window,
+                                        event->u.pointer.screen_x,
+                                        event->u.pointer.screen_y))
                 break;
 
         /* ah, somebody new ... send leave/enter events and set new target */

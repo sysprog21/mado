@@ -1161,9 +1161,14 @@ void twin_window_configure(twin_window_t *window,
                            twin_coord_t width,
                            twin_coord_t height);
 
-void twin_window_set_name(twin_window_t *window, const char *name);
+/* Check if the coordinates are within the window's range. */
+bool twin_window_valid_range(twin_window_t *window,
+                             twin_coord_t x,
+                             twin_coord_t y);
 
 void twin_window_style_size(twin_window_style_t style, twin_rect_t *size);
+
+void twin_window_set_name(twin_window_t *window, const char *name);
 
 void twin_window_draw(twin_window_t *window);
 

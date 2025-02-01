@@ -132,6 +132,32 @@ void twin_window_configure(twin_window_t *window,
     twin_pixmap_enable_update(window->pixmap);
 }
 
+bool twin_window_valid_range(twin_window_t *window,
+                             twin_coord_t x,
+                             twin_coord_t y)
+{
+    switch (window->style) {
+    case TwinWindowPlain:
+    default:
+        if (window->pixmap->x <= x &&
+            x < window->pixmap->x + window->pixmap->width &&
+            window->pixmap->y <= y &&
+            y < window->pixmap->y + window->pixmap->height)
+            return true;
+        return false;
+    case TwinWindowApplication:
+        if (window->pixmap->x <= x &&
+            x < window->pixmap->x + window->pixmap->width &&
+            window->pixmap->y <= y &&
+            y < window->pixmap->y + window->pixmap->height) {
+            if (y < window->pixmap->y + (window->client.top))
+                return !twin_pixmap_transparent(window->pixmap, x, y);
+            return true;
+        }
+        return false;
+    }
+}
+
 void twin_window_style_size(twin_window_style_t style, twin_rect_t *size)
 {
     switch (style) {

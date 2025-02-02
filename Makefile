@@ -117,7 +117,7 @@ endif
 
 ifeq ($(CONFIG_BACKEND_FBDEV), y)
 BACKEND = fbdev
-TARGET_LIBS += -ludev
+TARGET_LIBS += -ludev -pthread
 libtwin.a_files-y += backend/fbdev.c
 libtwin.a_files-y += backend/linux_input.c
 endif

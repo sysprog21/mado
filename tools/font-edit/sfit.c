@@ -20,7 +20,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "twin-fedit.h"
+#include "font-edit.h"
 
 static double min(double a, double b)
 {

@@ -123,4 +123,18 @@ config DEMO_IMAGE
     select LOADER_TVG
     default y
     depends on DEMO_APPLICATIONS 
+
+endmenu
+
+menu "Tools"
+
+config TOOLS
+    bool "Build tools"
+    default y
+
+config TOOL_FONTEDIT
+    bool "Build scalable font editor"
+    default y
+    depends on TOOLS
+
 endmenu

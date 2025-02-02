@@ -1,5 +1,5 @@
-# twin-fedit
-`twin-fedit` is a tool allowing users to edit specific scalable fonts
+# font-edit
+`font-edit` is a tool allowing users to edit specific scalable fonts
 which are expected to fit the requirements of embedded systems with larger screens.
 
 <p align="center">
@@ -13,14 +13,13 @@ sudo apt-get install libsdl2-dev libcairo2-dev
 
 ## Usage
 ```shell
-make
-./twin-fedit nchars
+./font-edit nchars
 ```
 
 ## Background
-The glyphs in `twin-fedit` is originated from [Hershey vector fonts](https://en.wikipedia.org/wiki/Hershey_fonts), which were created by Dr. A. V. Hershey while working at the U. S. National Bureau of Standards.
+The glyphs in `font-edit` is originated from [Hershey vector fonts](https://en.wikipedia.org/wiki/Hershey_fonts), which were created by Dr. A. V. Hershey while working at the U. S. National Bureau of Standards.
 
-The Hershey vector fonts set of `twin-fedit` is [`nchars`](nchars), for example, the interpolation points and operations used to draw the glyph `1` are as follows
+The Hershey vector fonts set of `font-edit` is [`nchars`](nchars), for example, the interpolation points and operations used to draw the glyph `1` are as follows
 ```
 /* 0x31 '1'  offset 666 */
     0, 10, 42, 0, 2, 3,
@@ -51,7 +50,7 @@ According to the steps outlined above for drawing glyph `1`, it can be split int
 3. `'l' 10,0`: Starting from `10,-42` and ending at `10,0`, draw a straight line.  
 4. `'e'`: End the drawing of glyph `1`.
 
-Each point seen in `twin-fedit` corresponds to an operation. By selecting a point in `twin-fedit`, you can modify the coordinates to edit any glyph.
+Each point seen in `font-edit` corresponds to an operation. By selecting a point in `font-edit`, you can modify the coordinates to edit any glyph.
 
 ## Quick Guide
 For each glyph, there are the following shortcut keys used for editing the glyph.

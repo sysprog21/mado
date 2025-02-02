@@ -142,6 +142,20 @@ demo-$(BACKEND)_ldflags-y := \
 	$(TARGET_LIBS)
 endif
 
+ifeq ($(CONFIG_TOOLS), y)
+target-$(CONFIG_TOOL_FONTEDIT) += font-edit
+font-edit_files-y = \
+    tools/font-edit/sfit.c \
+    tools/font-edit/font-edit.c
+font-edit_includes-y := tools/font-edit
+font-edit_cflags-y := \
+    $(shell pkg-config --cflags cairo) \
+    $(shell sdl2-config --cflags)
+font-edit_ldflags-y := \
+    $(shell pkg-config --libs cairo) \
+    $(shell sdl2-config --libs)
+endif
+
 CFLAGS += -include config.h
 
 check_goal := $(strip $(MAKECMDGOALS))

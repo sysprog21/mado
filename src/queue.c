@@ -1,6 +1,7 @@
 /*
  * Twin - A Tiny Window System
  * Copyright (c) 2004 Keith Packard <keithp@keithp.com>
+ * Copyright (c) 2024 National Cheng Kung University, Taiwan
  * All rights reserved.
  */
 
@@ -17,6 +18,7 @@ void _twin_queue_insert(twin_queue_t **head,
     for (prev = head; (q = *prev); prev = &q->next)
         if ((*proc)(new, q) == TWIN_AFTER)
             break;
+
     new->next = *prev;
     new->order = 0;
     new->deleted = false;
@@ -59,9 +61,8 @@ twin_queue_t *_twin_queue_set_order(twin_queue_t **head)
 {
     twin_queue_t *first = *head;
 
-    for (twin_queue_t *q = first; q; q = q->next) {
+    for (twin_queue_t *q = first; q; q = q->next)
         q->order = q->next;
-    }
     return first;
 }
 

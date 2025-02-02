@@ -1,6 +1,7 @@
 /*
  * Twin - A Tiny Window System
  * Copyright (c) 2004 Keith Packard <keithp@keithp.com>
+ * Copyright (c) 2024 National Cheng Kung University, Taiwan
  * All rights reserved.
  */
 
@@ -11,9 +12,9 @@ void twin_matrix_multiply(twin_matrix_t *result,
                           const twin_matrix_t *b)
 {
     twin_matrix_t r;
-    twin_fixed_t t;
 
-    for (int row = 0; row < 3; row++)
+    for (int row = 0; row < 3; row++) {
+        twin_fixed_t t;
         for (int col = 0; col < 2; col++) {
             if (row == 2)
                 t = b->m[2][col];
@@ -23,6 +24,7 @@ void twin_matrix_multiply(twin_matrix_t *result,
                 t += twin_fixed_mul(a->m[row][n], b->m[n][col]);
             r.m[row][col] = t;
         }
+    }
 
     *result = r;
 }
@@ -72,14 +74,13 @@ void twin_matrix_scale(twin_matrix_t *m, twin_fixed_t sx, twin_fixed_t sy)
 twin_fixed_t _twin_matrix_determinant(twin_matrix_t *matrix)
 {
     twin_fixed_t a, b, c, d;
-    twin_fixed_t det;
 
     a = matrix->m[0][0];
     b = matrix->m[0][1];
     c = matrix->m[1][0];
     d = matrix->m[1][1];
 
-    det = twin_fixed_mul(a, d) - twin_fixed_mul(b, c);
+    twin_fixed_t det = twin_fixed_mul(a, d) - twin_fixed_mul(b, c);
 
     return det;
 }
@@ -99,31 +100,32 @@ twin_point_t _twin_matrix_expand(twin_matrix_t *matrix)
 
 void twin_matrix_rotate(twin_matrix_t *m, twin_angle_t a)
 {
-    twin_matrix_t t;
     twin_fixed_t c, s;
     twin_sincos(a, &s, &c);
 
-    t.m[0][0] = c;
-    t.m[0][1] = s;
-    t.m[1][0] = -s;
-    t.m[1][1] = c;
-    t.m[2][0] = 0;
-    t.m[2][1] = 0;
+    twin_matrix_t t = {
+        .m[0][0] = c,
+        .m[0][1] = s,
+        .m[1][0] = -s,
+        .m[1][1] = c,
+        .m[2][0] = 0,
+        .m[2][1] = 0,
+    };
     twin_matrix_multiply(m, &t, m);
 }
 
 twin_sfixed_t _twin_matrix_x(twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y)
 {
-    twin_sfixed_t s;
-    s = twin_fixed_to_sfixed(twin_fixed_mul(m->m[0][0], x) +
+    twin_sfixed_t s =
+        twin_fixed_to_sfixed(twin_fixed_mul(m->m[0][0], x) +
                              twin_fixed_mul(m->m[1][0], y) + m->m[2][0]);
     return s;
 }
 
 twin_sfixed_t _twin_matrix_y(twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y)
 {
-    twin_sfixed_t s;
-    s = twin_fixed_to_sfixed(twin_fixed_mul(m->m[0][1], x) +
+    twin_sfixed_t s =
+        twin_fixed_to_sfixed(twin_fixed_mul(m->m[0][1], x) +
                              twin_fixed_mul(m->m[1][1], y) + m->m[2][1]);
     return s;
 }

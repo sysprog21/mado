@@ -1,6 +1,7 @@
 /*
  * Twin - A Tiny Window System
  * Copyright (c) 2004 Keith Packard <keithp@keithp.com>
+ * Copyright (c) 2024-2025 National Cheng Kung University, Taiwan
  * All rights reserved.
  */
 
@@ -13,6 +14,7 @@
     (((alignment) & ((alignment) - 1)) == 0                \
          ? (((sz) + (alignment) - 1) & ~((alignment) - 1)) \
          : ((((sz) + (alignment) - 1) / (alignment)) * (alignment)))
+
 twin_pixmap_t *twin_pixmap_create(twin_format_t format,
                                   twin_coord_t width,
                                   twin_coord_t height)

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2004 Keith Packard
+ * Copyright (c) 2024-2025 National Cheng Kung University, Taiwan
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
  * documentation for any purpose is hereby granted without fee, provided that

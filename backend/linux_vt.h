@@ -1,6 +1,6 @@
 /*
  * Twin - A Tiny Window System
- * Copyright (c) 2024 National Cheng Kung University, Taiwan
+ * Copyright (c) 2024-2025 National Cheng Kung University, Taiwan
  * All rights reserved.
  */
 
@@ -25,12 +25,10 @@ static volatile sig_atomic_t *is_vt_actived;
 
 static inline int twin_vt_open(int vt_num)
 {
-    int fd;
-
     char vt_dev[VT_DEV_TTY_MAX] = {0};
     snprintf(vt_dev, VT_DEV_TTY_MAX, "/dev/tty%d", vt_num);
 
-    fd = open(vt_dev, O_RDWR);
+    int fd = open(vt_dev, O_RDWR);
     if (fd < 0) {
         log_error("Failed to open %s", vt_dev);
     }

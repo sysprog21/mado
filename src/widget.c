@@ -1,6 +1,7 @@
 /*
  * Twin - A Tiny Window System
  * Copyright (c) 2004 Keith Packard <keithp@keithp.com>
+ * Copyright (c) 2024-2025 National Cheng Kung University, Taiwan
  * All rights reserved.
  */
 
@@ -117,6 +118,7 @@ void _twin_widget_init(twin_widget_t *widget,
         window = parent->widget.window;
     } else
         widget->next = NULL;
+
     widget->window = window;
     widget->parent = parent;
     widget->copy_geom = NULL;
@@ -137,6 +139,7 @@ void _twin_widget_queue_paint(twin_widget_t *widget)
     while (widget->parent) {
         if (widget->paint)
             return;
+
         widget->paint = true;
         widget = &widget->parent->widget;
     }
@@ -148,6 +151,7 @@ void _twin_widget_queue_layout(twin_widget_t *widget)
     while (widget->parent) {
         if (widget->layout)
             return;
+
         widget->layout = true;
         widget->paint = true;
         widget = &widget->parent->widget;
@@ -179,6 +183,7 @@ void _twin_widget_bevel(twin_widget_t *widget, twin_fixed_t b, bool down)
             top_color = 0x80808080;
             bot_color = 0x80000000;
         }
+
         twin_path_move(path, 0, 0);
         twin_path_draw(path, w, 0);
         twin_path_draw(path, w - b, b);

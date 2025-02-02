@@ -1,6 +1,7 @@
 /*
  * Twin - A Tiny Window System
  * Copyright (c) 2004 Keith Packard <keithp@keithp.com>
+ * Copyright (c) 2024 National Cheng Kung University, Taiwan
  * All rights reserved.
  */
 
@@ -34,6 +35,7 @@ twin_fixed_t twin_tan(twin_angle_t a)
     }
     if (s == 0)
         return 0;
+
     return ((s << 15) / c) << 1;
 }
 
@@ -124,7 +126,9 @@ static twin_angle_t twin_atan2_first_quadrant(twin_fixed_t y, twin_fixed_t x)
         return TWIN_ANGLE_90;
     if (y == 0)
         return TWIN_ANGLE_0;
+
     twin_angle_t angle = 0;
+
     /* CORDIC iteration */
     /*
      * To enhance accuracy, the angle is mapped from the range 0-360 degrees to
@@ -143,6 +147,7 @@ static twin_angle_t twin_atan2_first_quadrant(twin_fixed_t y, twin_fixed_t x)
             angle -= atan_table[i];
         }
     }
+
     return (twin_angle_t) (double) angle / (32768.0) * TWIN_ANGLE_360;
 }
 
@@ -154,6 +159,7 @@ twin_angle_t twin_atan2(twin_fixed_t y, twin_fixed_t x)
         return (y > 0) ? TWIN_ANGLE_90 : TWIN_ANGLE_270;
     if (y == 0)
         return (x > 0) ? TWIN_ANGLE_0 : TWIN_ANGLE_180;
+
     twin_fixed_t x_sign_mask = x >> 31;
     twin_fixed_t abs_x = (x ^ x_sign_mask) - x_sign_mask;
     twin_fixed_t y_sign_mask = y >> 31;
@@ -164,6 +170,7 @@ twin_angle_t twin_atan2(twin_fixed_t y, twin_fixed_t x)
                      ((~x_sign_mask & y_sign_mask) * 2);
     twin_fixed_t sign = 1 - 2 * (x_sign_mask ^ y_sign_mask);
     twin_angle_t angle = twin_atan2_first_quadrant(abs_y, abs_x);
+
     /* First quadrant  : angle
      * Second quadrant : 180 - angle
      * Third quadrant  : 180 + angle
@@ -178,6 +185,7 @@ twin_angle_t twin_acos(twin_fixed_t x)
         return TWIN_ANGLE_180;
     if (x >= TWIN_FIXED_ONE)
         return TWIN_ANGLE_0;
+
     twin_fixed_t y = twin_fixed_sqrt(TWIN_FIXED_ONE - twin_fixed_mul(x, x));
     if (x < 0)
         return TWIN_ANGLE_180 - twin_atan2_first_quadrant(y, -x);

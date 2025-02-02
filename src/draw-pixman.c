@@ -1,6 +1,6 @@
 /*
  * Twin - A Tiny Window System
- * Copyright (c) 2024 National Cheng Kung University, Taiwan
+ * Copyright (c) 2024-2025 National Cheng Kung University, Taiwan
  * All rights reserved.
  */
 

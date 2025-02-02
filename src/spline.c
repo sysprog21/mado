@@ -1,6 +1,7 @@
 /*
  * Twin - A Tiny Window System
  * Copyright (c) 2004 Carl Worth <cworth@cworth.org>
+ * Copyright (c) 2024 National Cheng Kung University, Taiwan
  * All rights reserved.
  */
 

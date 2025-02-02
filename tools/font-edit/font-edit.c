@@ -21,12 +21,12 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "twin-fedit.h"
-
 #include <SDL.h>
 #include <SDL_keycode.h>
 #include <cairo.h>
 #include <stdbool.h>
+
+#include "font-edit.h"
 
 static SDL_Window *window;
 static cairo_t *cr;

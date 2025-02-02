@@ -43,6 +43,7 @@ jobs:
       run: |
             sudo apt-get update -q -y
             sudo apt install libsdl2-dev libjpeg-dev libpng-dev
+            sudo apt install libcairo2-dev
       shell: bash
     - name: default build
       run: |

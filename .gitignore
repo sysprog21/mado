@@ -4,6 +4,8 @@
 *.a
 demo-*
 .demo-*
+font-edit
+.font-edit
 
 # Swap
 [._]*.s[a-v][a-z]
@@ -27,9 +29,6 @@ __pycache__/
 .config
 .config.old
 config.h
-
-# Tools
-tools/ttf/twin-ttf
 
 # CI pipeline
 expected-format

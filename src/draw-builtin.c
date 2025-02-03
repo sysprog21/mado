@@ -681,49 +681,6 @@ void twin_composite(twin_pixmap_t *dst,
                                msk_y, operator, width, height);
 }
 
-static twin_argb32_t _twin_apply_alpha(twin_argb32_t v)
-{
-    uint16_t t1, t2, t3;
-    twin_a8_t alpha = twin_get_8(v,
-#if __BYTE_ORDER == __BIG_ENDIAN
-                                 0
-#else
-                                 24
-#endif
-    );
-
-    /* clear RGB data if alpha is zero */
-    if (!alpha)
-        return 0;
-
-#if __BYTE_ORDER == __BIG_ENDIAN
-    /* twin needs ARGB format */
-    return alpha << 24 | twin_int_mult(twin_get_8(v, 24), alpha, t1) << 16 |
-           twin_int_mult(twin_get_8(v, 16), alpha, t2) << 8 |
-           twin_int_mult(twin_get_8(v, 8), alpha, t3) << 0;
-#else
-    return alpha << 24 | twin_int_mult(twin_get_8(v, 0), alpha, t1) << 16 |
-           twin_int_mult(twin_get_8(v, 8), alpha, t2) << 8 |
-           twin_int_mult(twin_get_8(v, 16), alpha, t3) << 0;
-#endif
-}
-
-void twin_premultiply_alpha(twin_pixmap_t *px)
-{
-    int x, y;
-    twin_pointer_t p;
-
-    if (px->format != TWIN_ARGB32)
-        return;
-
-    for (y = 0; y < px->height; y++) {
-        p.b = px->p.b + y * px->stride;
-
-        for (x = 0; x < px->width; x++)
-            p.argb32[x] = _twin_apply_alpha(p.argb32[x]);
-    }
-}
-
 /*
  * array primary    index is OVER SOURCE
  * array secondary  index is ARGB32 RGB16 A8

@@ -624,7 +624,7 @@ twin_pixmap_t *twin_make_cursor(int *hx, int *hy);
 void twin_dispatch(twin_context_t *ctx);
 
 /*
- * draw.c
+ * draw-*.c
  */
 
 void twin_composite(twin_pixmap_t *dst,
@@ -647,6 +647,10 @@ void twin_fill(twin_pixmap_t *dst,
                twin_coord_t top,
                twin_coord_t right,
                twin_coord_t bottom);
+
+/*
+ * draw-common.c
+ */
 
 void twin_premultiply_alpha(twin_pixmap_t *px);
 

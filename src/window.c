@@ -18,6 +18,7 @@
 #define TWIN_TITLE_HEIGHT 20
 #define TWIN_RESIZE_SIZE ((TWIN_TITLE_HEIGHT + 4) / 5)
 #define TWIN_TITLE_BW ((TWIN_TITLE_HEIGHT + 11) / 12)
+#define SHADOW_COLOR 0xff000000
 
 twin_window_t *twin_window_create(twin_screen_t *screen,
                                   twin_format_t format,
@@ -39,8 +40,8 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
     case TwinWindowApplication:
         left = TWIN_BW;
         top = TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW;
-        right = TWIN_BW + TWIN_RESIZE_SIZE;
-        bottom = TWIN_BW + TWIN_RESIZE_SIZE;
+        right = TWIN_BW;
+        bottom = TWIN_BW;
         break;
     case TwinWindowPlain:
     default:
@@ -56,7 +57,22 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
     window->client.top = top;
     window->client.right = width - right;
     window->client.bottom = height - bottom;
+#if defined(CONFIG_DROP_SHADOW)
+    /* Handle drop shadow. */
+    /*
+     * Add a shadowed area to the pixel map of the window to create a drop
+     * shadow effect. This calculation method is based on the range of
+     * CONFIG_HORIZONTAL_OFFSET, CONFIG_VERTICAL_OFFSET, and CONFIG_SHADOW_BLUR.
+     */
+    window->shadow_x = 2 * CONFIG_HORIZONTAL_OFFSET + CONFIG_SHADOW_BLUR;
+    window->shadow_y = 2 * CONFIG_VERTICAL_OFFSET + CONFIG_SHADOW_BLUR;
+    window->pixmap = twin_pixmap_create(format, width + window->shadow_x,
+                                        height + window->shadow_y);
+#else
     window->pixmap = twin_pixmap_create(format, width, height);
+#endif
+    if (!window->pixmap)
+        return NULL;
     twin_pixmap_clip(window->pixmap, window->client.left, window->client.top,
                      window->client.right, window->client.bottom);
     twin_pixmap_origin_to_clip(window->pixmap);
@@ -137,20 +153,30 @@ bool twin_window_valid_range(twin_window_t *window,
                              twin_coord_t x,
                              twin_coord_t y)
 {
+    twin_coord_t offset_x = 0, offset_y = 0;
+#if defined(CONFIG_DROP_SHADOW)
+    /* Handle drop shadow. */
+    /*
+     * When the click coordinates fall within the drop shadow area, it will not
+     * be in the valid range of the window.
+     */
+    offset_x = window->shadow_x, offset_y = window->shadow_y;
+#endif
+
     switch (window->style) {
     case TwinWindowPlain:
     default:
         if (window->pixmap->x <= x &&
-            x < window->pixmap->x + window->pixmap->width &&
+            x < window->pixmap->x + window->pixmap->width - offset_x &&
             window->pixmap->y <= y &&
-            y < window->pixmap->y + window->pixmap->height)
+            y < window->pixmap->y + window->pixmap->height - offset_y)
             return true;
         return false;
     case TwinWindowApplication:
         if (window->pixmap->x <= x &&
-            x < window->pixmap->x + window->pixmap->width &&
+            x < window->pixmap->x + window->pixmap->width - offset_x &&
             window->pixmap->y <= y &&
-            y < window->pixmap->y + window->pixmap->height) {
+            y < window->pixmap->y + window->pixmap->height - offset_y) {
             if (y < window->pixmap->y + (window->client.top))
                 return !twin_pixmap_transparent(window->pixmap, x, y);
             return true;
@@ -316,6 +342,62 @@ static void twin_window_frame(twin_window_t *window)
     twin_path_destroy(path);
 }
 
+#if defined(CONFIG_DROP_SHADOW)
+static void twin_window_drop_shadow(twin_window_t *window)
+{
+    twin_pixmap_t *prev_active_pix = window->screen->top,
+                  *active_pix = window->pixmap;
+    twin_source_u src;
+    twin_coord_t y, ori_wid, ori_hei;
+
+    /* Remove the drop shadow from the previously active pixel map. */
+    if (prev_active_pix) {
+        src.c = 0x00000000;
+        for (y = 0; y < prev_active_pix->height; y++) {
+            if (y < prev_active_pix->height - prev_active_pix->window->shadow_y)
+                twin_cover(
+                    prev_active_pix, src.c,
+                    prev_active_pix->width - prev_active_pix->window->shadow_x,
+                    y, prev_active_pix->window->shadow_x);
+            else
+                twin_cover(prev_active_pix, src.c, 0, y,
+                           prev_active_pix->width);
+        }
+        prev_active_pix->shadow = false;
+    }
+
+    /* Mark the previously active pixel map as damaged to update its changes. */
+    if (prev_active_pix && active_pix != prev_active_pix)
+        twin_pixmap_damage(prev_active_pix, 0, 0, prev_active_pix->width,
+                           prev_active_pix->height);
+
+    /*
+     * The shadow effect of the window only becomes visible when the window is
+     * active.
+     */
+    active_pix->shadow = true;
+    ori_wid = active_pix->width - active_pix->window->shadow_x;
+    ori_hei = active_pix->height - active_pix->window->shadow_y;
+    /*
+     * Create a darker border of the active window that gives a more
+     * dimensional appearance.
+     */
+    /* The shift offset and color of the shadow can be selected by the user. */
+    twin_shadow_border(active_pix, SHADOW_COLOR, CONFIG_VERTICAL_OFFSET,
+                       CONFIG_HORIZONTAL_OFFSET);
+
+    /* Add a blur effect to the shadow of the active window. */
+    /* Right side of the active window */
+    twin_stack_blur(active_pix, CONFIG_SHADOW_BLUR, ori_wid,
+                    ori_wid + active_pix->window->shadow_x, 0,
+                    ori_hei + active_pix->window->shadow_y);
+    /* Bottom side of the active window */
+    twin_stack_blur(active_pix, CONFIG_SHADOW_BLUR, 0,
+                    ori_wid + active_pix->window->shadow_x, ori_hei,
+                    ori_hei + active_pix->window->shadow_y);
+}
+#endif
+
 void twin_window_draw(twin_window_t *window)
 {
     twin_pixmap_t *pixmap = window->pixmap;
@@ -428,6 +510,10 @@ bool twin_window_dispatch(twin_window_t *window, twin_event_t *event)
                 twin_window_frame(window->screen->top->window);
             }
         }
+#if defined(CONFIG_DROP_SHADOW)
+        /* Handle drop shadow. */
+        twin_window_drop_shadow(window);
+#endif
         if (window->client.left <= ev.u.pointer.x &&
             ev.u.pointer.x < window->client.right &&
             window->client.top <= ev.u.pointer.y &&

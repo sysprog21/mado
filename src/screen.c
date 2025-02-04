@@ -135,7 +135,7 @@ static void twin_screen_span_pixmap(twin_screen_t maybe_unused *screen,
         return;
     if (p->y + p->height <= y)
         return;
-    /* bounds check in x*/
+    /* bounds check in x */
     p_left = left;
     if (p_left < p->x)
         p_left = p->x;

@@ -55,6 +55,28 @@ config CURSOR
     default n
     depends on !BACKEND_VNC
 
+config DROP_SHADOW
+    bool "Render drop shadow for active window"
+    default y
+
+config HORIZONTAL_OFFSET
+    int "Horizontal offset"
+    default 1
+    range 1 10
+    depends on DROP_SHADOW
+
+config VERTICAL_OFFSET
+    int "Vertical offset"
+    default 1
+    range 1 10
+    depends on DROP_SHADOW
+
+config SHADOW_BLUR
+    int "Shadow blur radius"
+    default 10
+    range 1 10
+    depends on DROP_SHADOW
+
 endmenu
 
 menu "Image Loaders"

@@ -116,7 +116,7 @@ twin_pixmap_t *twin_make_cursor(int *hx, int *hy)
         twin_pixmap_create_const(TWIN_ARGB32, 14, 20, 14 * 4, pixels);
     if (!cur)
         return NULL;
-    *hx = 14;
-    *hy = 20;
+    *hx = 0;
+    *hy = 0;
     return cur;
 }

@@ -12,6 +12,9 @@
 #include "apps_spline.h"
 
 #define D(x) twin_double_to_fixed(x)
+#define CONTROL_POINT_RADIUS 10
+#define BACKBONE_WIDTH 2
+#define AUX_LINE_WIDTH 2
 
 #define _apps_spline_pixmap(spline) ((spline)->widget.window->pixmap)
 
@@ -35,9 +38,9 @@ static void _init_control_point(apps_spline_t *spline)
     };
     const int init_point_cubic[4][2] = {
         {100, 100},
-        {300, 300},
-        {100, 300},
-        {300, 100},
+        {280, 280},
+        {100, 280},
+        {280, 100},
     };
     const int(*init_point)[2];
     if (spline->n_points == 4) {
@@ -59,7 +62,7 @@ static void _draw_aux_line(twin_path_t *path,
     twin_path_move(path, spline->points[idx1].x, spline->points[idx1].y);
     twin_path_draw(path, spline->points[idx2].x, spline->points[idx2].y);
     twin_paint_stroke(_apps_spline_pixmap(spline), 0xc08000c0, path,
-                      twin_int_to_fixed(2));
+                      twin_int_to_fixed(AUX_LINE_WIDTH));
     twin_path_empty(path);
 }
 
@@ -84,7 +87,7 @@ static void _apps_spline_paint(apps_spline_t *spline)
                       spline->line_width);
     twin_path_set_cap_style(path, TwinCapButt);
     twin_paint_stroke(_apps_spline_pixmap(spline), 0xffffff00, path,
-                      twin_int_to_fixed(2));
+                      twin_int_to_fixed(BACKBONE_WIDTH));
     twin_path_empty(path);
     if (spline->n_points == 4) {
         _draw_aux_line(path, spline, 0, 1);
@@ -97,7 +100,7 @@ static void _apps_spline_paint(apps_spline_t *spline)
     for (int i = 0; i < spline->n_points; i++) {
         twin_path_empty(path);
         twin_path_circle(path, spline->points[i].x, spline->points[i].y,
-                         twin_int_to_fixed(10));
+                         twin_int_to_fixed(CONTROL_POINT_RADIUS));
         twin_paint_path(_apps_spline_pixmap(spline), 0x40004020, path);
     }
     twin_path_destroy(path);
@@ -143,8 +146,8 @@ static int _apps_spline_hit(apps_spline_t *spline,
             &(spline->transition), spline->points[i].x, spline->points[i].y));
         twin_fixed_t py = twin_sfixed_to_fixed(_twin_matrix_y(
             &(spline->transition), spline->points[i].x, spline->points[i].y));
-        if (twin_fixed_abs(x - px) < spline->line_width / 2 &&
-            twin_fixed_abs(y - py) < spline->line_width / 2)
+        if (twin_fixed_abs(x - px) < twin_int_to_fixed(CONTROL_POINT_RADIUS) &&
+            twin_fixed_abs(y - py) < twin_int_to_fixed(CONTROL_POINT_RADIUS))
             return i;
     }
     return -1;

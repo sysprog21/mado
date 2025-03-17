@@ -12,12 +12,12 @@ interesting challenges for graphical system design and implementation.
 
 To address these challenges, `Mado` has been developed. Drawing from ideas used
 in modern window systems for larger environments, `Mado` provides overlapping
-translucent windows, anti-aliased graphics, and scalable fonts within a memory
-budget of several kilobytes. `Mado` embeds window management directly into the
-toolkit, supporting resizing, moving, and minimizing without external control.
-The toolkit automatically constructs suitable decorations for each window as
-regular toolkit objects, and the normal event dispatch mechanism directs window
-management activities.
+translucent windows, anti-aliased graphics, drop shadow, animations, and scalable
+fonts within a memory budget of several kilobytes. `Mado` embeds window management
+directly into the toolkit, supporting resizing, moving, and minimizing without
+external control. The toolkit automatically constructs suitable decorations for
+each window as regular toolkit objects, and the normal event dispatch mechanism
+directs window management activities.
 
 `Mado` is a continuation of the work on [TWIN](https://keithp.com/~keithp/talks/twin-ols2005/),
 originally developed by Keith Packard. 'Mado' means 'window' in the language of

@@ -83,6 +83,9 @@ For SDL backend, install the [SDL2 library](https://www.libsdl.org/).
 * macOS: `brew install sdl2`
 * Ubuntu Linux / Debian: `sudo apt install libsdl2-dev`
 
+For DRM backend, install the [libdrm](https://gitlab.freedesktop.org/mesa/drm).
+* Ubuntu Linux / Debian: `sudo apt install libdrm-dev`
+
 For the VNC backend, please note that it has only been tested on GNU/Linux, and the prebuilt [neatvnc](https://github.com/any1/neatvnc) package might be outdated. To ensure you have the latest version, you can build the required packages from source by running the script:
 ```shell
 $ tools/build-neatvnc.sh
@@ -127,6 +130,14 @@ $ sudo usermod -a -G video $USERNAME
 ```
 
 In addition, the framebuffer device can be assigned via the environment variable `FRAMEBUFFER`.
+
+To run demo program with the DRM backend:
+
+```shell
+$ sudo ./demo-drm
+```
+
+The DRM device can be assigened via the environment variable `DRI_CARD`.
 
 To run demo program with the VNC backend:
 

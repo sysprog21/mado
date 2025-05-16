@@ -123,6 +123,15 @@ libtwin.a_files-y += backend/fbdev.c
 libtwin.a_files-y += backend/linux_input.c
 endif
 
+ifeq ($(CONFIG_BACKEND_DRM), y)
+BACKEND = drm
+TARGET_LIBS += -ludev
+libtwin.a_files-y += backend/drm.c
+libtwin.a_files-y += backend/linux_input.c
+libtwin.a_cflags-y += $(shell pkg-config --cflags libdrm)
+TARGET_LIBS += $(shell pkg-config --libs libdrm)
+endif
+
 ifeq ($(CONFIG_BACKEND_VNC), y)
 BACKEND = vnc
 libtwin.a_files-y += backend/vnc.c

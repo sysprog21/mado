@@ -163,12 +163,17 @@ void twin_shadow_border(twin_pixmap_t *shadow,
                  offset = min(offset_x, offset_y);
 
     switch (shadow->window->style) {
+    /*
+     * Draw a black border starting from the top y position of the window's
+     * client area plus CONFIG_SHADOW_BLUR / 2 + 1, to prevent twin_stack_blur()
+     * from blurring shadows over the window frame.
+     */
     case TwinWindowApplication:
-        y_start = TWIN_TITLE_HEIGHT;
+        y_start = TWIN_TITLE_HEIGHT + CONFIG_SHADOW_BLUR / 2 + 1;
         break;
     case TwinWindowPlain:
     default:
-        y_start = 0;
+        y_start = CONFIG_SHADOW_BLUR / 2 + 1;
         break;
     }
 

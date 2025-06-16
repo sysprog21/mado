@@ -443,6 +443,7 @@ struct _twin_window {
     twin_rect_t client;
     twin_rect_t damage;
     bool active;
+    bool iconify;
     bool client_grab;
     bool want_focus;
     bool draw_queued;
@@ -459,8 +460,8 @@ struct _twin_window {
  */
 typedef enum _twin_icon {
     TwinIconMenu,
-    TwinIconMinimize,
-    TwinIconMaximize,
+    TwinIconIconify,
+    TwinIconRestore,
     TwinIconClose,
     TwinIconResize,
 } twin_icon_t;

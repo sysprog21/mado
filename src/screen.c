@@ -9,6 +9,9 @@
 
 #include "twin_private.h"
 
+#define TWIN_BW 0
+#define TWIN_TITLE_HEIGHT 20
+
 twin_screen_t *twin_screen_create(twin_coord_t width,
                                   twin_coord_t height,
                                   twin_put_begin_t put_begin,
@@ -135,6 +138,11 @@ static void twin_screen_span_pixmap(twin_screen_t maybe_unused *screen,
         return;
     if (p->y + p->height <= y)
         return;
+
+    /* Skip drawing the window's client area if the window is iconified. */
+    if (p->window->iconify && y >= p->y + TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW)
+        return;
+
     /* bounds check in x */
     p_left = left;
     if (p_left < p->x)

@@ -9,6 +9,9 @@
 
 #include "twin_private.h"
 
+#define TWIN_BW 0
+#define TWIN_TITLE_HEIGHT 20
+
 #define IS_ALIGNED(p, alignment) ((p % alignment) == 0)
 #define ALIGN_UP(sz, alignment)                            \
     (((alignment) & ((alignment) - 1)) == 0                \
@@ -316,6 +319,19 @@ bool twin_pixmap_transparent(twin_pixmap_t *pixmap,
                              twin_coord_t y)
 {
     return (_twin_pixmap_fetch(pixmap, x, y) >> 24) == 0;
+}
+
+bool twin_pixmap_is_iconified(twin_pixmap_t *pixmap, twin_coord_t y)
+{
+    /*
+     * Check whether the specified area within the pixmap corresponds to an
+     * iconified window.
+     */
+    if (pixmap->window &&
+        (pixmap->window->iconify &&
+         y >= pixmap->y + TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW))
+        return true;
+    return false;
 }
 
 void twin_pixmap_move(twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y)

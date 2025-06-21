@@ -9,9 +9,6 @@
 
 #include "twin_private.h"
 
-#define TWIN_BW 0
-#define TWIN_TITLE_HEIGHT 20
-
 twin_screen_t *twin_screen_create(twin_coord_t width,
                                   twin_coord_t height,
                                   twin_put_begin_t put_begin,
@@ -139,10 +136,6 @@ static void twin_screen_span_pixmap(twin_screen_t maybe_unused *screen,
     if (p->y + p->height <= y)
         return;
 
-    /* Skip drawing the window's client area if the window is iconified. */
-    if (p->window->iconify && y >= p->y + TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW)
-        return;
-
     /* bounds check in x */
     p_left = left;
     if (p_left < p->x)
@@ -215,14 +208,20 @@ void twin_screen_update(twin_screen_t *screen)
             } else
                 memset(span, 0xff, width * sizeof(twin_argb32_t));
 
-            for (p = screen->bottom; p; p = p->up)
-                twin_screen_span_pixmap(screen, span, p, y, left, right, pop16,
-                                        pop32);
+            for (p = screen->bottom; p; p = p->up) {
+                /* Skip drawing the region of the iconified pixmap. */
+                if (!twin_pixmap_is_iconified(p, y))
+                    twin_screen_span_pixmap(screen, span, p, y, left, right,
+                                            pop16, pop32);
+            }
 
 #if defined(CONFIG_CURSOR)
-            if (screen->cursor)
-                twin_screen_span_pixmap(screen, span, screen->cursor, y, left,
-                                        right, pop16, pop32);
+            if (screen->cursor) {
+                /* Skip drawing the region of the iconified pixmap. */
+                if (!twin_pixmap_is_iconified(p, y))
+                    twin_screen_span_pixmap(screen, span, screen->cursor, y,
+                                            left, right, pop16, pop32);
+            }
 #endif
 
             (*screen->put_span)(left, y, right, span, screen->closure);

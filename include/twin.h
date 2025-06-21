@@ -1036,6 +1036,8 @@ bool twin_pixmap_transparent(twin_pixmap_t *pixmap,
                              twin_coord_t x,
                              twin_coord_t y);
 
+bool twin_pixmap_is_iconified(twin_pixmap_t *pixmap, twin_coord_t y);
+
 bool twin_pixmap_dispatch(twin_pixmap_t *pixmap, twin_event_t *event);
 
 /*

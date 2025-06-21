@@ -39,8 +39,8 @@ static const signed char _twin_itable[] = {
     's',
     'e',
 #define TWIN_MENU_LEN	    43
-    /* Minimize */
-#define TWIN_MINIMIZE_POS   TWIN_MENU_POS + TWIN_MENU_LEN
+    /* Iconify */
+#define TWIN_ICONIFY_POS   TWIN_MENU_POS + TWIN_MENU_LEN
     'm', L(0), G(0.8),
     'd', L(0), B(1),
     'd', R(1), B(1),
@@ -49,9 +49,9 @@ static const signed char _twin_itable[] = {
     'w', G(0.05),
     'p',
     'e',
-#define TWIN_MINIMIZE_LEN   17
-    /* Maximize */
-#define TWIN_MAXIMIZE_POS   TWIN_MINIMIZE_POS + TWIN_MINIMIZE_LEN
+#define TWIN_ICONIFY_LEN   17
+    /* Restore */
+#define TWIN_RESTORE_POS   TWIN_ICONIFY_POS + TWIN_ICONIFY_LEN
     'm', L(0), T(0),
     'd', L(0), G(0.2),
     'd', R(1), G(0.2),
@@ -64,9 +64,9 @@ static const signed char _twin_itable[] = {
     'x',
     's',
     'e',
-#define TWIN_MAXIMIZE_LEN   28
+#define TWIN_RESTORE_LEN   28
     /* Close */
-#define TWIN_CLOSE_POS	    TWIN_MAXIMIZE_POS + TWIN_MAXIMIZE_LEN
+#define TWIN_CLOSE_POS	    TWIN_RESTORE_POS + TWIN_RESTORE_LEN
     'm', L(0), T(0),
     'd', L(0), T(0.1),
     'd', G(0.4), G(0.5),
@@ -103,7 +103,7 @@ static const signed char _twin_itable[] = {
 /* clang-format on */
 
 const uint16_t _twin_icons[] = {
-    TWIN_MENU_POS,  TWIN_MINIMIZE_POS, TWIN_MAXIMIZE_POS,
+    TWIN_MENU_POS,  TWIN_ICONIFY_POS, TWIN_RESTORE_POS,
     TWIN_CLOSE_POS, TWIN_RESIZE_POS,
 };
 

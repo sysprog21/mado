@@ -36,6 +36,7 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
     window->screen = screen;
     window->style = style;
     window->active = false;
+    window->iconify = false;
     switch (window->style) {
     case TwinWindowApplication:
         left = TWIN_BW;
@@ -179,7 +180,7 @@ bool twin_window_valid_range(twin_window_t *window,
             y < window->pixmap->y + window->pixmap->height - offset_y) {
             if (y < window->pixmap->y + (window->client.top))
                 return !twin_pixmap_transparent(window->pixmap, x, y);
-            return true;
+            return !window->iconify;
         }
         return false;
     }
@@ -234,8 +235,8 @@ static void twin_window_frame(twin_window_t *window)
     twin_fixed_t text_width;
     twin_fixed_t title_right;
     twin_fixed_t close_x;
-    twin_fixed_t max_x;
-    twin_fixed_t min_x;
+    twin_fixed_t restore_x;
+    twin_fixed_t iconify_x;
     twin_fixed_t resize_x;
     twin_fixed_t resize_y;
     const char *name;
@@ -265,8 +266,8 @@ static void twin_window_frame(twin_window_t *window)
 
 
     close_x = c_right - t_arc_2 - icon_size;
-    max_x = close_x - bw - icon_size;
-    min_x = max_x - bw - icon_size;
+    restore_x = close_x - bw - icon_size;
+    iconify_x = restore_x - bw - icon_size;
     resize_x = twin_int_to_fixed(window->client.right);
     resize_y = twin_int_to_fixed(window->client.bottom);
 
@@ -314,14 +315,14 @@ static void twin_window_frame(twin_window_t *window)
         twin_icon_draw(pixmap, TwinIconMenu, m);
 
         twin_matrix_identity(&m);
-        twin_matrix_translate(&m, min_x, icon_y);
+        twin_matrix_translate(&m, iconify_x, icon_y);
         twin_matrix_scale(&m, icon_size, icon_size);
-        twin_icon_draw(pixmap, TwinIconMinimize, m);
+        twin_icon_draw(pixmap, TwinIconIconify, m);
 
         twin_matrix_identity(&m);
-        twin_matrix_translate(&m, max_x, icon_y);
+        twin_matrix_translate(&m, restore_x, icon_y);
         twin_matrix_scale(&m, icon_size, icon_size);
-        twin_icon_draw(pixmap, TwinIconMaximize, m);
+        twin_icon_draw(pixmap, TwinIconRestore, m);
 
         twin_matrix_identity(&m);
         twin_matrix_translate(&m, close_x, icon_y);
@@ -494,21 +495,66 @@ bool twin_window_dispatch(twin_window_t *window, twin_event_t *event)
     twin_event_t ev = *event;
     bool delegate = true;
 
+    twin_fixed_t bw = twin_int_to_fixed(TWIN_TITLE_BW);
+    twin_fixed_t t_h = twin_int_to_fixed(window->client.top) - bw;
+    twin_fixed_t t_arc_2 = t_h * 2 / 3;
+    twin_fixed_t c_right = twin_int_to_fixed(window->client.right) - bw / 2;
+    twin_fixed_t name_height = t_h - bw - bw / 2;
+    twin_fixed_t icon_size = name_height * 8 / 10;
+    twin_fixed_t menu_x = t_arc_2;
+    twin_fixed_t text_x = menu_x + icon_size + bw;
+    twin_fixed_t text_width;
+    twin_fixed_t title_right;
+    twin_path_t *path = twin_path_create();
+    const char *name = window->name;
+
+    text_width = twin_width_utf8(path, name);
+    twin_path_destroy(path);
+    title_right = (text_x + text_width + bw + icon_size + bw + icon_size + bw +
+                   icon_size + t_arc_2);
+
+    if (title_right < c_right)
+        c_right = title_right;
+
+    twin_fixed_t close_x = c_right - t_arc_2 - icon_size;
+    twin_fixed_t restore_x = close_x - bw - icon_size;
+    twin_fixed_t iconify_x = restore_x - bw - icon_size;
+    int local_x, local_y;
+
     switch (ev.kind) {
     case TwinEventButtonDown:
+        local_y = ev.u.pointer.screen_y - window->pixmap->y;
+        if (local_y >= 0 && local_y <= TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW) {
+            local_x = ev.u.pointer.screen_x - window->pixmap->x;
+            if (local_x > twin_fixed_to_int(iconify_x) &&
+                local_x < twin_fixed_to_int(restore_x)) {
+                window->iconify = true;
+                twin_pixmap_damage(window->pixmap, 0, 0, window->pixmap->width,
+                                   window->pixmap->height);
+            } else if (local_x > twin_fixed_to_int(restore_x) &&
+                       local_x < twin_fixed_to_int(close_x)) {
+                window->iconify = false;
+                twin_pixmap_damage(window->pixmap, 0, 0, window->pixmap->width,
+                                   window->pixmap->height);
+            }
+        }
     case TwinEventActivate:
         /* Set window active. */
         /*
-         * When the box is trigger by TwinEventButtonDown, its window's title
-         * bar needs to change color and be put onto the toppest layer.
+         * A iconified window is inactive. When the box is triggered by
+         * TwinEventButtonDown and the window is not iconified, it becomes
+         * active. For a window to be considered active, it must be the topmost
+         * window on the screen. The window's title bar turns blue to indicate
+         * the active state.
          */
-        if (!window->active) {
+        if (window->iconify)
+            window->active = false;
+        else
             window->active = true;
-            twin_window_frame(window);
-            if (window != window->screen->top->window) {
-                window->screen->top->window->active = false;
-                twin_window_frame(window->screen->top->window);
-            }
+        twin_window_frame(window);
+        if (window != window->screen->top->window) {
+            window->screen->top->window->active = false;
+            twin_window_frame(window->screen->top->window);
         }
 #if defined(CONFIG_DROP_SHADOW)
         /* Handle drop shadow. */

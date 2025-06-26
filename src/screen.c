@@ -216,12 +216,9 @@ void twin_screen_update(twin_screen_t *screen)
             }
 
 #if defined(CONFIG_CURSOR)
-            if (screen->cursor) {
-                /* Skip drawing the region of the iconified pixmap. */
-                if (!twin_pixmap_is_iconified(p, y))
-                    twin_screen_span_pixmap(screen, span, screen->cursor, y,
-                                            left, right, pop16, pop32);
-            }
+            if (screen->cursor)
+                twin_screen_span_pixmap(screen, span, screen->cursor, y, left,
+                                        right, pop16, pop32);
 #endif
 
             (*screen->put_span)(left, y, right, span, screen->closure);

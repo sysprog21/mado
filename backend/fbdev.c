@@ -190,7 +190,8 @@ static bool twin_fbdev_update_damage(void *closure)
     twin_fbdev_t *tx = PRIV(closure);
     twin_screen_t *screen = SCREEN(closure);
 
-    if (!tx->vt_active && twin_screen_damaged(screen))
+    if (!tx->vt_active && (tx->fb_base == MAP_FAILED) &&
+        twin_screen_damaged(screen))
         twin_screen_update(screen);
 
     return true;

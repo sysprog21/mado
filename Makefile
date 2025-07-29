@@ -131,6 +131,18 @@ libtwin.a_cflags-y += $(shell pkg-config --cflags neatvnc aml pixman-1)
 TARGET_LIBS += $(shell pkg-config --libs neatvnc aml pixman-1)
 endif
 
+# Performance tester
+
+ifeq ($(CONFIG_PERF_TEST), y)
+target-$(CONFIG_PERF_TEST) += mado-perf
+mado-perf_depends-y += $(target.a-y)
+mado-perf_files-y += tools/perf.c
+mado-perf_includes-y := include
+mado-perf_ldflags-y := \
+	$(target.a-y) \
+	$(TARGET_LIBS)
+endif
+
 # Standalone application
 
 ifeq ($(CONFIG_DEMO_APPLICATIONS), y)

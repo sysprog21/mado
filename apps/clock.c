@@ -9,7 +9,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-#include "twin_private.h"
+#include <twin.h>
 
 #include "apps_clock.h"
 
@@ -30,20 +30,23 @@
 #define APPS_CLOCK_BORDER 0xffbababa
 #define APPS_CLOCK_BORDER_WIDTH D(0.01)
 
-#define _apps_clock_pixmap(clock) ((clock)->widget.window->pixmap)
+static inline twin_pixmap_t *_apps_clock_pixmap(twin_custom_widget_t *clock)
+{
+    return twin_custom_widget_pixmap(clock);
+}
 
 typedef struct {
-    twin_widget_t widget;
     twin_timeout_t *timeout;
-} apps_clock_t;
+} apps_clock_data_t;
 
-static void apps_clock_set_transform(apps_clock_t *clock, twin_path_t *path)
+static void apps_clock_set_transform(twin_custom_widget_t *clock,
+                                     twin_path_t *path)
 {
     twin_fixed_t scale;
 
     scale = (TWIN_FIXED_ONE - APPS_CLOCK_BORDER_WIDTH * 3) / 2;
-    twin_path_scale(path, _twin_widget_width(clock) * scale,
-                    _twin_widget_height(clock) * scale);
+    twin_path_scale(path, twin_custom_widget_width(clock) * scale,
+                    twin_custom_widget_height(clock) * scale);
 
     twin_path_translate(path, TWIN_FIXED_ONE + APPS_CLOCK_BORDER_WIDTH * 3,
                         TWIN_FIXED_ONE + APPS_CLOCK_BORDER_WIDTH * 3);
@@ -51,7 +54,7 @@ static void apps_clock_set_transform(apps_clock_t *clock, twin_path_t *path)
     twin_path_rotate(path, -TWIN_ANGLE_90);
 }
 
-static void apps_clock_hand(apps_clock_t *clock,
+static void apps_clock_hand(twin_custom_widget_t *clock,
                             twin_angle_t angle,
                             twin_fixed_t len,
                             twin_fixed_t fill_width,
@@ -87,7 +90,7 @@ static void apps_clock_hand(apps_clock_t *clock,
     twin_path_destroy(stroke);
 }
 
-static void _apps_clock_date(apps_clock_t *clock, struct tm *t)
+static void _apps_clock_date(twin_custom_widget_t *clock, struct tm *t)
 {
     char text[7];
     twin_text_metrics_t metrics;
@@ -118,7 +121,7 @@ static twin_angle_t apps_clock_minute_angle(int min)
     return min * TWIN_ANGLE_360 / 60;
 }
 
-static void _apps_clock_face(apps_clock_t *clock)
+static void _apps_clock_face(twin_custom_widget_t *clock)
 {
     twin_path_t *path = twin_path_create();
     int m;
@@ -173,7 +176,7 @@ static twin_time_t _apps_clock_interval(void)
     return 1000 - (tv.tv_usec / 1000);
 }
 
-static void _apps_clock_paint(apps_clock_t *clock)
+static void _apps_clock_paint(twin_custom_widget_t *clock)
 {
     struct timeval tv;
     twin_angle_t second_angle, minute_angle, hour_angle;
@@ -199,24 +202,24 @@ static void _apps_clock_paint(apps_clock_t *clock)
                     APPS_CLOCK_SECOND, APPS_CLOCK_SECOND_OUT);
 }
 
-static twin_time_t _apps_clock_timeout(twin_time_t maybe_unused now,
-                                       void *closure)
+static twin_time_t _apps_clock_timeout(twin_time_t now, void *closure)
 {
-    apps_clock_t *clock = closure;
-    _twin_widget_queue_paint(&clock->widget);
+    (void) now; /* unused parameter */
+    twin_custom_widget_t *clock = closure;
+    twin_custom_widget_queue_paint(clock);
     return _apps_clock_interval();
 }
 
 static twin_dispatch_result_t _apps_clock_dispatch(twin_widget_t *widget,
                                                    twin_event_t *event)
 {
-    apps_clock_t *clock = (apps_clock_t *) widget;
+    twin_custom_widget_t *custom = twin_widget_get_custom(widget);
+    if (!custom)
+        return TwinDispatchContinue;
 
-    if (_twin_widget_dispatch(widget, event) == TwinDispatchDone)
-        return TwinDispatchDone;
     switch (event->kind) {
     case TwinEventPaint:
-        _apps_clock_paint(clock);
+        _apps_clock_paint(custom);
         break;
     default:
         break;
@@ -224,22 +227,24 @@ static twin_dispatch_result_t _apps_clock_dispatch(twin_widget_t *widget,
     return TwinDispatchContinue;
 }
 
-static void _apps_clock_init(apps_clock_t *clock,
-                             twin_box_t *parent,
-                             twin_dispatch_proc_t dispatch)
+static twin_custom_widget_t *_apps_clock_init(twin_box_t *parent)
 {
-    static const twin_widget_layout_t preferred = {0, 0, 1, 1};
-    _twin_widget_init(&clock->widget, parent, 0, preferred, dispatch);
-    clock->timeout =
-        twin_set_timeout(_apps_clock_timeout, _apps_clock_interval(), clock);
+    twin_custom_widget_t *custom = twin_custom_widget_create(
+        parent, 0, 0, 0, 1, 1, _apps_clock_dispatch, sizeof(apps_clock_data_t));
+    if (!custom)
+        return NULL;
+
+    apps_clock_data_t *data =
+        (apps_clock_data_t *) twin_custom_widget_data(custom);
+    data->timeout =
+        twin_set_timeout(_apps_clock_timeout, _apps_clock_interval(), custom);
+
+    return custom;
 }
 
-static apps_clock_t *apps_clock_create(twin_box_t *parent)
+static twin_custom_widget_t *apps_clock_create(twin_box_t *parent)
 {
-    apps_clock_t *clock = malloc(sizeof(apps_clock_t));
-
-    _apps_clock_init(clock, parent, _apps_clock_dispatch);
-    return clock;
+    return _apps_clock_init(parent);
 }
 
 void apps_clock_start(twin_screen_t *screen,
@@ -251,7 +256,7 @@ void apps_clock_start(twin_screen_t *screen,
 {
     twin_toplevel_t *toplevel = twin_toplevel_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
-    apps_clock_t *clock = apps_clock_create(&toplevel->box);
+    twin_custom_widget_t *clock = apps_clock_create(&toplevel->box);
     (void) clock;
     twin_toplevel_show(toplevel);
 }

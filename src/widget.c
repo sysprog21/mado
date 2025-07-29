@@ -238,3 +238,207 @@ void twin_widget_set(twin_widget_t *widget, twin_argb32_t background)
     widget->background = background;
     _twin_widget_queue_paint(widget);
 }
+
+twin_fixed_t twin_widget_width(twin_widget_t *widget)
+{
+    return _twin_widget_width(widget);
+}
+
+twin_fixed_t twin_widget_height(twin_widget_t *widget)
+{
+    return _twin_widget_height(widget);
+}
+
+void twin_widget_queue_paint(twin_widget_t *widget)
+{
+    _twin_widget_queue_paint(widget);
+}
+
+twin_widget_t *twin_widget_create_with_dispatch(twin_box_t *parent,
+                                                twin_argb32_t background,
+                                                twin_coord_t width,
+                                                twin_coord_t height,
+                                                twin_stretch_t stretch_width,
+                                                twin_stretch_t stretch_height,
+                                                twin_dispatch_proc_t dispatch)
+{
+    twin_widget_t *widget = malloc(sizeof(twin_widget_t));
+    if (!widget)
+        return NULL;
+
+    twin_widget_layout_t preferred = {
+        .width = width,
+        .height = height,
+        .stretch_width = stretch_width,
+        .stretch_height = stretch_height,
+    };
+    _twin_widget_init(widget, parent, 0, preferred, dispatch);
+    widget->background = background;
+    return widget;
+}
+
+/* Map to store custom widget associations */
+typedef struct _custom_widget_map {
+    twin_widget_t *widget;
+    twin_custom_widget_t *custom;
+    twin_dispatch_proc_t user_dispatch;
+    struct _custom_widget_map *next;
+} custom_widget_map_t;
+
+static custom_widget_map_t *custom_widget_map = NULL;
+
+static void register_custom_widget(twin_widget_t *widget,
+                                   twin_custom_widget_t *custom,
+                                   twin_dispatch_proc_t user_dispatch)
+{
+    custom_widget_map_t *entry = malloc(sizeof(custom_widget_map_t));
+    if (!entry)
+        return;
+    entry->widget = widget;
+    entry->custom = custom;
+    entry->user_dispatch = user_dispatch;
+    entry->next = custom_widget_map;
+    custom_widget_map = entry;
+}
+
+static twin_custom_widget_t *find_custom_widget(twin_widget_t *widget)
+{
+    custom_widget_map_t *entry = custom_widget_map;
+    while (entry) {
+        if (entry->widget == widget)
+            return entry->custom;
+        entry = entry->next;
+    }
+    return NULL;
+}
+
+static void unregister_custom_widget(twin_widget_t *widget)
+{
+    custom_widget_map_t **prev = &custom_widget_map;
+    custom_widget_map_t *entry = custom_widget_map;
+
+    while (entry) {
+        if (entry->widget == widget) {
+            *prev = entry->next;
+            free(entry);
+            return;
+        }
+        prev = &entry->next;
+        entry = entry->next;
+    }
+}
+
+static twin_dispatch_result_t custom_widget_dispatch(twin_widget_t *widget,
+                                                     twin_event_t *event)
+{
+    /* First call the base widget dispatch to handle standard widget behavior */
+    twin_dispatch_result_t result = _twin_widget_dispatch(widget, event);
+    if (result == TwinDispatchDone)
+        return result;
+
+    /* Then call the user's custom dispatch if any */
+    custom_widget_map_t *entry = custom_widget_map;
+    while (entry) {
+        if (entry->widget == widget) {
+            if (entry->user_dispatch)
+                return entry->user_dispatch(widget, event);
+            break;
+        }
+        entry = entry->next;
+    }
+    return TwinDispatchContinue;
+}
+
+twin_custom_widget_t *twin_custom_widget_create(twin_box_t *parent,
+                                                twin_argb32_t background,
+                                                twin_coord_t width,
+                                                twin_coord_t height,
+                                                twin_stretch_t hstretch,
+                                                twin_stretch_t vstretch,
+                                                twin_dispatch_proc_t dispatch,
+                                                size_t data_size)
+{
+    twin_custom_widget_t *custom = malloc(sizeof(twin_custom_widget_t));
+    if (!custom)
+        return NULL;
+
+    if (data_size > 0) {
+        custom->data = malloc(data_size);
+        if (!custom->data) {
+            free(custom);
+            return NULL;
+        }
+        memset(custom->data, 0, data_size);
+    } else {
+        custom->data = NULL;
+    }
+
+    custom->widget = twin_widget_create_with_dispatch(
+        parent, background, width, height, hstretch, vstretch,
+        custom_widget_dispatch);
+    if (!custom->widget) {
+        free(custom->data);
+        free(custom);
+        return NULL;
+    }
+
+    register_custom_widget(custom->widget, custom, dispatch);
+
+    return custom;
+}
+
+void twin_custom_widget_destroy(twin_custom_widget_t *custom)
+{
+    if (!custom)
+        return;
+
+    if (custom->widget) {
+        unregister_custom_widget(custom->widget);
+        /* Note: widget destruction should be handled by the parent/container */
+    }
+    free(custom->data);
+    free(custom);
+}
+
+twin_pixmap_t *twin_widget_pixmap(twin_widget_t *widget)
+{
+    if (!widget || !widget->window)
+        return NULL;
+    return widget->window->pixmap;
+}
+
+twin_custom_widget_t *twin_widget_get_custom(twin_widget_t *widget)
+{
+    return find_custom_widget(widget);
+}
+
+void *twin_custom_widget_data(twin_custom_widget_t *custom)
+{
+    return custom ? custom->data : NULL;
+}
+
+twin_widget_t *twin_custom_widget_base(twin_custom_widget_t *custom)
+{
+    return custom ? custom->widget : NULL;
+}
+
+twin_fixed_t twin_custom_widget_width(twin_custom_widget_t *custom)
+{
+    return custom ? twin_widget_width(custom->widget) : 0;
+}
+
+twin_fixed_t twin_custom_widget_height(twin_custom_widget_t *custom)
+{
+    return custom ? twin_widget_height(custom->widget) : 0;
+}
+
+void twin_custom_widget_queue_paint(twin_custom_widget_t *custom)
+{
+    if (custom && custom->widget)
+        twin_widget_queue_paint(custom->widget);
+}
+
+twin_pixmap_t *twin_custom_widget_pixmap(twin_custom_widget_t *custom)
+{
+    return custom ? twin_widget_pixmap(custom->widget) : NULL;
+}

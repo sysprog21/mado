@@ -6,20 +6,25 @@
 
 #include <stdlib.h>
 
-#include "twin_private.h"
+#include <twin.h>
 
 #include "apps_animation.h"
 
-#define _apps_animation_pixmap(animation) ((animation)->widget.window->pixmap)
+static inline twin_pixmap_t *_apps_animation_pixmap(
+    twin_custom_widget_t *animation)
+{
+    return twin_custom_widget_pixmap(animation);
+}
 
 typedef struct {
-    twin_widget_t widget;
     twin_pixmap_t *pix;
     twin_timeout_t *timeout;
-} apps_animation_t;
+} apps_animation_data_t;
 
-static void _apps_animation_paint(apps_animation_t *anim)
+static void _apps_animation_paint(twin_custom_widget_t *custom)
 {
+    apps_animation_data_t *anim =
+        (apps_animation_data_t *) twin_custom_widget_data(custom);
     twin_pixmap_t *current_frame = NULL;
 
     if (twin_pixmap_is_animated(anim->pix)) {
@@ -34,15 +39,17 @@ static void _apps_animation_paint(apps_animation_t *anim)
         .source_kind = TWIN_PIXMAP,
         .u.pixmap = current_frame,
     };
-    twin_composite(_apps_animation_pixmap(anim), 0, 0, &srcop, 0, 0, NULL, 0, 0,
-                   TWIN_SOURCE, current_frame->width, current_frame->height);
+    twin_composite(_apps_animation_pixmap(custom), 0, 0, &srcop, 0, 0, NULL, 0,
+                   0, TWIN_SOURCE, current_frame->width, current_frame->height);
 }
 
-static twin_time_t _apps_animation_timeout(twin_time_t maybe_unused now,
-                                           void *closure)
+static twin_time_t _apps_animation_timeout(twin_time_t now, void *closure)
 {
-    apps_animation_t *anim = closure;
-    _twin_widget_queue_paint(&anim->widget);
+    (void) now; /* unused parameter */
+    twin_custom_widget_t *custom = closure;
+    apps_animation_data_t *anim =
+        (apps_animation_data_t *) twin_custom_widget_data(custom);
+    twin_custom_widget_queue_paint(custom);
     twin_animation_t *a = anim->pix->animation;
     twin_time_t delay = twin_animation_get_current_delay(a);
     return delay;
@@ -51,12 +58,13 @@ static twin_time_t _apps_animation_timeout(twin_time_t maybe_unused now,
 static twin_dispatch_result_t _apps_animation_dispatch(twin_widget_t *widget,
                                                        twin_event_t *event)
 {
-    apps_animation_t *anim = (apps_animation_t *) widget;
-    if (_twin_widget_dispatch(widget, event) == TwinDispatchDone)
-        return TwinDispatchDone;
+    twin_custom_widget_t *custom = twin_widget_get_custom(widget);
+    if (!custom)
+        return TwinDispatchContinue;
+
     switch (event->kind) {
     case TwinEventPaint:
-        _apps_animation_paint(anim);
+        _apps_animation_paint(custom);
         break;
     default:
         break;
@@ -64,29 +72,35 @@ static twin_dispatch_result_t _apps_animation_dispatch(twin_widget_t *widget,
     return TwinDispatchContinue;
 }
 
-static void _apps_animation_init(apps_animation_t *anim,
-                                 twin_box_t *parent,
-                                 twin_dispatch_proc_t dispatch)
+static twin_custom_widget_t *_apps_animation_init(twin_box_t *parent,
+                                                  twin_pixmap_t *pix)
 {
-    static const twin_widget_layout_t preferred = {0, 0, 1, 1};
-    _twin_widget_init(&anim->widget, parent, 0, preferred, dispatch);
+    twin_custom_widget_t *custom = twin_custom_widget_create(
+        parent, 0, 0, 0, 1, 1, _apps_animation_dispatch,
+        sizeof(apps_animation_data_t));
+    if (!custom)
+        return NULL;
+
+    apps_animation_data_t *anim =
+        (apps_animation_data_t *) twin_custom_widget_data(custom);
+    anim->pix = pix;
 
     if (twin_pixmap_is_animated(anim->pix)) {
         twin_animation_t *a = anim->pix->animation;
         twin_time_t delay = twin_animation_get_current_delay(a);
-        anim->timeout = twin_set_timeout(_apps_animation_timeout, delay, anim);
+        anim->timeout =
+            twin_set_timeout(_apps_animation_timeout, delay, custom);
     } else {
         anim->timeout = NULL;
     }
+
+    return custom;
 }
 
-static apps_animation_t *apps_animation_create(twin_box_t *parent,
-                                               twin_pixmap_t *pix)
+static twin_custom_widget_t *apps_animation_create(twin_box_t *parent,
+                                                   twin_pixmap_t *pix)
 {
-    apps_animation_t *anim = malloc(sizeof(apps_animation_t));
-    anim->pix = pix;
-    _apps_animation_init(anim, parent, _apps_animation_dispatch);
-    return anim;
+    return _apps_animation_init(parent, pix);
 }
 
 void apps_animation_start(twin_screen_t *screen,
@@ -99,7 +113,7 @@ void apps_animation_start(twin_screen_t *screen,
     twin_toplevel_t *toplevel =
         twin_toplevel_create(screen, TWIN_ARGB32, TwinWindowApplication, x, y,
                              pix->width, pix->height, name);
-    apps_animation_t *anim = apps_animation_create(&toplevel->box, pix);
+    twin_custom_widget_t *anim = apps_animation_create(&toplevel->box, pix);
     (void) anim;
     twin_toplevel_show(toplevel);
 }

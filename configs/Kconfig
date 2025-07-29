@@ -159,4 +159,9 @@ config TOOL_FONTEDIT
     default y
     depends on TOOLS
 
+config PERF_TEST
+    bool "Build performance tester"
+    default y
+    depends on TOOLS
+
 endmenu

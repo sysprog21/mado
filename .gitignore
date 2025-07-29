@@ -4,6 +4,8 @@
 *.a
 demo-*
 .demo-*
+mado-perf
+.mado-perf
 font-edit
 .font-edit
 

@@ -9,6 +9,7 @@
 #define _TWIN_H_
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 typedef uint8_t twin_a8_t;
@@ -809,6 +810,46 @@ void twin_matrix_multiply(twin_matrix_t *result,
                           const twin_matrix_t *a,
                           const twin_matrix_t *b);
 
+/**
+ * Transform coordinates using a transformation matrix.
+ *
+ * These functions apply a 2D transformation matrix to convert coordinates
+ * from one coordinate system to another. Commonly used for rotations,
+ * scaling, and translations in graphics operations.
+ */
+
+/**
+ * Transform the X coordinate using the given matrix.
+ *
+ * @param m  Transformation matrix to apply
+ * @param x  Input X coordinate in fixed-point format
+ * @param y  Input Y coordinate in fixed-point format
+ * @return   Transformed X coordinate in fixed-point format
+ *
+ * Applies the matrix transformation to compute the new X coordinate.
+ * Both input coordinates are required as 2D transformations can
+ * affect both X and Y components.
+ */
+twin_fixed_t twin_matrix_transform_x(const twin_matrix_t *m,
+                                     twin_fixed_t x,
+                                     twin_fixed_t y);
+
+/**
+ * Transform the Y coordinate using the given matrix.
+ *
+ * @param m  Transformation matrix to apply
+ * @param x  Input X coordinate in fixed-point format
+ * @param y  Input Y coordinate in fixed-point format
+ * @return   Transformed Y coordinate in fixed-point format
+ *
+ * Applies the matrix transformation to compute the new Y coordinate.
+ * Both input coordinates are required as 2D transformations can
+ * affect both X and Y components.
+ */
+twin_fixed_t twin_matrix_transform_y(const twin_matrix_t *m,
+                                     twin_fixed_t x,
+                                     twin_fixed_t y);
+
 /*
  * path.c
  */
@@ -1177,6 +1218,134 @@ twin_widget_t *twin_widget_create(twin_box_t *parent,
                                   twin_stretch_t vstretch);
 
 void twin_widget_set(twin_widget_t *widget, twin_argb32_t background);
+
+/* Get widget dimensions */
+twin_fixed_t twin_widget_width(twin_widget_t *widget);
+twin_fixed_t twin_widget_height(twin_widget_t *widget);
+
+/* Request widget repaint */
+void twin_widget_queue_paint(twin_widget_t *widget);
+
+/* Create widget with custom dispatch handler */
+twin_widget_t *twin_widget_create_with_dispatch(twin_box_t *parent,
+                                                twin_argb32_t background,
+                                                twin_coord_t width,
+                                                twin_coord_t height,
+                                                twin_stretch_t hstretch,
+                                                twin_stretch_t vstretch,
+                                                twin_dispatch_proc_t dispatch);
+
+/*
+ * Custom widget support - allows creating widgets without accessing internals
+ *
+ * This API provides a clean abstraction for creating custom widgets that
+ * can store private data and implement custom behavior without requiring
+ * access to twin_private.h or internal widget structures.
+ */
+
+/**
+ * Structure representing a custom widget with user data.
+ * Encapsulates a base widget and allows attaching custom data.
+ */
+typedef struct {
+    twin_widget_t *widget; /* Base widget providing standard functionality */
+    void *data;            /* User-defined data specific to this widget */
+} twin_custom_widget_t;
+
+/**
+ * Create a custom widget with user-defined data and dispatch handler.
+ *
+ * @param parent       Parent box widget to contain this widget
+ * @param background   Background color (ARGB32 format)
+ * @param width        Preferred width in pixels (0 for flexible)
+ * @param height       Preferred height in pixels (0 for flexible)
+ * @param hstretch     Horizontal stretch factor for layout
+ * @param vstretch     Vertical stretch factor for layout
+ * @param dispatch     Custom event dispatch function for this widget
+ * @param data_size    Size of custom data to allocate (0 for no data)
+ * @return             Newly created custom widget, or NULL on failure
+ *
+ * The dispatch function will be called for all events sent to this widget.
+ * Custom data (if requested) is zero-initialized and accessible via
+ * twin_custom_widget_data().
+ */
+twin_custom_widget_t *twin_custom_widget_create(twin_box_t *parent,
+                                                twin_argb32_t background,
+                                                twin_coord_t width,
+                                                twin_coord_t height,
+                                                twin_stretch_t hstretch,
+                                                twin_stretch_t vstretch,
+                                                twin_dispatch_proc_t dispatch,
+                                                size_t data_size);
+
+/**
+ * Destroy a custom widget and free associated resources.
+ *
+ * @param custom  Custom widget to destroy
+ *
+ * Frees both the custom widget structure and any associated user data.
+ * Note: The base widget destruction should be handled by the parent container.
+ */
+void twin_custom_widget_destroy(twin_custom_widget_t *custom);
+
+/**
+ * Get the drawing pixmap from a widget for rendering operations.
+ *
+ * @param widget  Widget to get pixmap from
+ * @return        Widget's pixmap for drawing, or NULL if invalid
+ */
+twin_pixmap_t *twin_widget_pixmap(twin_widget_t *widget);
+
+/**
+ * Retrieve the custom widget wrapper from a base widget.
+ *
+ * @param widget  Base widget to look up
+ * @return        Associated custom widget, or NULL if not found
+ *
+ * This function allows event handlers to retrieve their custom widget
+ * context when receiving events through the base widget dispatch system.
+ */
+twin_custom_widget_t *twin_widget_get_custom(twin_widget_t *widget);
+
+/**
+ * Get the user data pointer from a custom widget.
+ *
+ * @param custom  Custom widget to get data from
+ * @return        Pointer to user data, or NULL if no data allocated
+ *
+ * Returns the user data allocated during twin_custom_widget_create().
+ * The returned pointer should be cast to the appropriate data structure type.
+ */
+void *twin_custom_widget_data(twin_custom_widget_t *custom);
+
+/**
+ * Get the base widget from a custom widget.
+ *
+ * @param custom  Custom widget to get base widget from
+ * @return        Base widget, or NULL if invalid
+ *
+ * Provides access to the underlying widget for operations that require
+ * the base widget interface.
+ */
+twin_widget_t *twin_custom_widget_base(twin_custom_widget_t *custom);
+
+/*
+ * Convenience functions for common custom widget operations.
+ * These functions provide simplified access to frequently needed operations
+ * without requiring direct manipulation of the base widget.
+ */
+
+/** Get the current width of a custom widget */
+twin_fixed_t twin_custom_widget_width(twin_custom_widget_t *custom);
+
+/** Get the current height of a custom widget */
+twin_fixed_t twin_custom_widget_height(twin_custom_widget_t *custom);
+
+/** Request that a custom widget be repainted */
+void twin_custom_widget_queue_paint(twin_custom_widget_t *custom);
+
+/** Get the drawing pixmap for a custom widget */
+twin_pixmap_t *twin_custom_widget_pixmap(twin_custom_widget_t *custom);
 
 /*
  * window.c

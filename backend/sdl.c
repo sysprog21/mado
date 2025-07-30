@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <twin.h>
 
-#include "twin_backend.h"
+#include "twin_private.h"
 
 typedef struct {
     SDL_Window *win;

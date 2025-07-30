@@ -12,7 +12,6 @@ All rights reserved.
 #include <string.h>
 #include <twin.h>
 
-#include "twin_backend.h"
 #include "twin_private.h"
 
 #define SCREEN(x) ((twin_context_t *) x)->screen

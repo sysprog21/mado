@@ -7,7 +7,7 @@
 #include <assert.h>
 #include <twin.h>
 
-#include "twin_backend.h"
+#include "twin_private.h"
 
 /* FIXME: Refine API design */
 

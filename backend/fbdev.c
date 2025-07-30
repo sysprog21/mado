@@ -14,7 +14,6 @@
 
 #include "linux_input.h"
 #include "linux_vt.h"
-#include "twin_backend.h"
 #include "twin_private.h"
 
 #define FBDEV_NAME "FRAMEBUFFER"

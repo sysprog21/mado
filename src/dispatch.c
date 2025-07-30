@@ -7,7 +7,6 @@
 
 #include <unistd.h>
 
-#include "twin_backend.h"
 #include "twin_private.h"
 
 extern twin_backend_t g_twin_backend;

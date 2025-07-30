@@ -8,6 +8,7 @@
 #ifndef _TWIN_PRIVATE_H_
 #define _TWIN_PRIVATE_H_
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -16,7 +17,7 @@
 /* FIXME: Both twin_private.h and log.h are private header files. They should
  * be moved to src/ directory.
  */
-#include "../src/log.h"
+#include "log.h"
 
 /* Boilerplate for compiler compatibility */
 #ifndef __has_attribute
@@ -630,6 +631,20 @@ void _twin_button_init(twin_button_t *button,
                        twin_fixed_t font_size,
                        twin_style_t font_style,
                        twin_dispatch_proc_t dispatch);
+
+typedef struct twin_backend {
+    /* Initialize the backend */
+    twin_context_t *(*init)(int width, int height);
+
+    /* Configure the device */
+    /* FIXME: Refine the parameter list */
+    void (*configure)(twin_context_t *ctx);
+
+    bool (*poll)(twin_context_t *ctx);
+
+    /* Device cleanup when drawing is done */
+    void (*exit)(twin_context_t *ctx);
+} twin_backend_t;
 
 /*
  * Visual effect stuff

@@ -63,9 +63,6 @@ static void apps_clock_hand(twin_custom_widget_t *clock,
                             twin_argb32_t out_pixel)
 {
     twin_path_t *stroke = twin_path_create();
-    twin_path_t *pen = twin_path_create();
-    twin_path_t *path = twin_path_create();
-    twin_matrix_t m;
 
     apps_clock_set_transform(clock, stroke);
 
@@ -73,20 +70,16 @@ static void apps_clock_hand(twin_custom_widget_t *clock,
     twin_path_move(stroke, D(0), D(0));
     twin_path_draw(stroke, len, D(0));
 
-    m = twin_path_current_matrix(stroke);
-    m.m[2][0] = 0;
-    m.m[2][1] = 0;
-    twin_path_set_matrix(pen, m);
-    twin_path_set_matrix(path, m);
-    twin_path_circle(pen, 0, 0, fill_width);
-    twin_path_convolve(path, stroke, pen);
+    /* Draw the filled part of the hand */
+    if (fill_width > 0)
+        twin_paint_stroke(_apps_clock_pixmap(clock), fill_pixel, stroke,
+                          fill_width * 2);
 
-    twin_paint_path(_apps_clock_pixmap(clock), fill_pixel, path);
+    /* Draw the outline if needed */
+    if (out_width > 0 && out_pixel != fill_pixel)
+        twin_paint_stroke(_apps_clock_pixmap(clock), out_pixel, stroke,
+                          (fill_width + out_width) * 2);
 
-    twin_paint_stroke(_apps_clock_pixmap(clock), out_pixel, path, out_width);
-
-    twin_path_destroy(path);
-    twin_path_destroy(pen);
     twin_path_destroy(stroke);
 }
 

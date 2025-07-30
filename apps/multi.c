@@ -65,7 +65,7 @@ static void apps_circletext_start(twin_screen_t *screen,
         twin_path_utf8(path, "Hello, world!");
         twin_path_restore(path, &state);
     }
-    twin_fill_path(alpha, path, 0, 0);
+    twin_paint_path(alpha, 0xff000000, path);
     twin_path_destroy(path);
     twin_path_destroy(pen);
     source.source_kind = TWIN_SOLID;
@@ -112,7 +112,7 @@ static void apps_quickbrown_start(twin_screen_t *screen,
         fy += D(s);
     }
 
-    twin_fill_path(alpha, path, 0, 0);
+    twin_paint_path(alpha, 0xff000000, path);
     twin_path_destroy(path);
     twin_path_destroy(pen);
     source.source_kind = TWIN_SOLID;
@@ -160,7 +160,7 @@ static void apps_ascii_start(twin_screen_t *screen, int x, int y, int w, int h)
         fy += D(s + 2);
     }
 
-    twin_fill_path(alpha, path, 0, 0);
+    twin_paint_path(alpha, 0xff000000, path);
     twin_path_destroy(path);
     twin_path_destroy(pen);
     source.source_kind = TWIN_SOLID;
@@ -285,15 +285,15 @@ static void apps_blur(twin_screen_t *screen, int x, int y, int w, int h)
     twin_window_t *window = twin_window_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
     twin_window_set_name(window, "Blur");
-    twin_pixmap_t *scaled_background = twin_pixmap_create(
-        TWIN_ARGB32, window->pixmap->width, window->pixmap->height);
+    int client_width = window->client.right - window->client.left;
+    int client_height = window->client.bottom - window->client.top;
+    twin_pixmap_t *scaled_background =
+        twin_pixmap_create(TWIN_ARGB32, client_width, client_height);
     twin_fixed_t sx, sy;
-    sx = twin_fixed_div(
-        twin_int_to_fixed(raw_background->width),
-        twin_int_to_fixed(window->client.right - window->client.left));
-    sy = twin_fixed_div(
-        twin_int_to_fixed(raw_background->height),
-        twin_int_to_fixed(window->client.bottom - window->client.top));
+    sx = twin_fixed_div(twin_int_to_fixed(raw_background->width),
+                        twin_int_to_fixed(client_width));
+    sy = twin_fixed_div(twin_int_to_fixed(raw_background->height),
+                        twin_int_to_fixed(client_height));
 
     twin_matrix_scale(&raw_background->transform, sx, sy);
     twin_operand_t srcop = {
@@ -304,18 +304,15 @@ static void apps_blur(twin_screen_t *screen, int x, int y, int w, int h)
     twin_composite(scaled_background, 0, 0, &srcop, 0, 0, 0, 0, 0, TWIN_SOURCE,
                    scaled_background->width, scaled_background->height);
 
-    twin_pointer_t src, dst;
-    for (int y = window->client.top; y < window->client.bottom; y++)
-        for (int x = window->client.left; x < window->client.right; x++) {
-            src =
-                twin_pixmap_pointer(scaled_background, x - window->client.left,
-                                    y - window->client.top);
-            dst = twin_pixmap_pointer(window->pixmap, x, y);
-            *dst.argb32 = *src.argb32 | 0xff000000;
-        }
-    twin_stack_blur(window->pixmap, 5, window->client.left,
-                    window->client.right, window->client.top,
-                    window->client.bottom);
+    /* Apply blur effect to the scaled background */
+    twin_stack_blur(scaled_background, 16, 0, scaled_background->width - 1, 0,
+                    scaled_background->height - 1);
+
+    /* Copy the blurred background to the window */
+    srcop.u.pixmap = scaled_background;
+    twin_composite(window->pixmap, window->client.left, window->client.top,
+                   &srcop, 0, 0, NULL, 0, 0, TWIN_SOURCE, client_width,
+                   client_height);
 
     twin_pixmap_destroy(scaled_background);
     twin_pixmap_destroy(raw_background);

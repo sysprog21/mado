@@ -148,7 +148,8 @@ static twin_angle_t twin_atan2_first_quadrant(twin_fixed_t y, twin_fixed_t x)
         }
     }
 
-    return (twin_angle_t) (double) angle / (32768.0) * TWIN_ANGLE_360;
+    /* Fixed-point conversion: angle * TWIN_ANGLE_360 / 32768 */
+    return (twin_angle_t) ((angle * TWIN_ANGLE_360) >> 15);
 }
 
 twin_angle_t twin_atan2(twin_fixed_t y, twin_fixed_t x)

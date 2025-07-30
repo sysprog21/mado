@@ -745,4 +745,73 @@ extern const uint8_t _twin_cursor_default[];
 /* run the 1st parameter */
 #define IIF_1(t, ...) t
 
+/*
+ * Internal functions moved from public API
+ * These functions are implementation details and should not be used
+ * by applications directly.
+ */
+
+/* Low-level drawing operations */
+void twin_path_convolve(twin_path_t *dest,
+                        twin_path_t *stroke,
+                        twin_path_t *pen);
+
+void twin_premultiply_alpha(twin_pixmap_t *px);
+
+void twin_cover(twin_pixmap_t *dst,
+                twin_argb32_t color,
+                twin_coord_t x,
+                twin_coord_t y,
+                twin_coord_t width);
+
+void twin_fill_path(twin_pixmap_t *pixmap,
+                    twin_path_t *path,
+                    twin_coord_t dx,
+                    twin_coord_t dy);
+
+void twin_composite_path(twin_pixmap_t *dst,
+                         twin_operand_t *src,
+                         twin_coord_t src_x,
+                         twin_coord_t src_y,
+                         twin_path_t *path,
+                         twin_operator_t operator);
+
+void twin_composite_stroke(twin_pixmap_t *dst,
+                           twin_operand_t *src,
+                           twin_coord_t src_x,
+                           twin_coord_t src_y,
+                           twin_path_t *stroke,
+                           twin_fixed_t pen_width,
+                           twin_operator_t operator);
+
+/* Internal event handling */
+void twin_event_enqueue(const twin_event_t *event);
+
+/* Internal pixmap operations */
+void twin_pixmap_lock(twin_pixmap_t *pixmap);
+void twin_pixmap_unlock(twin_pixmap_t *pixmap);
+twin_pointer_t twin_pixmap_pointer(twin_pixmap_t *pixmap,
+                                   twin_coord_t x,
+                                   twin_coord_t y);
+void twin_pixmap_origin_to_clip(twin_pixmap_t *pixmap);
+void twin_pixmap_offset(twin_pixmap_t *pixmap,
+                        twin_coord_t offx,
+                        twin_coord_t offy);
+
+/* Internal screen operations */
+void twin_screen_lock(twin_screen_t *screen);
+void twin_screen_unlock(twin_screen_t *screen);
+void twin_screen_enable_update(twin_screen_t *screen);
+void twin_screen_disable_update(twin_screen_t *screen);
+void twin_screen_register_damaged(twin_screen_t *screen,
+                                  void (*damaged)(void *),
+                                  void *closure);
+
+/* Internal widget operations */
+void twin_widget_children_paint(twin_box_t *box);
+void twin_custom_widget_destroy(twin_custom_widget_t *custom);
+
+/* Path convex hull computation */
+twin_path_t *twin_path_convex_hull(twin_path_t *path);
+
 #endif /* _TWIN_PRIVATE_H_ */

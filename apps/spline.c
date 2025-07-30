@@ -143,7 +143,7 @@ static twin_dispatch_result_t _apps_spline_update_pos(
     spline->points[spline->which].y =
         twin_matrix_transform_y(&(spline->inverse_transition), x, y);
     twin_custom_widget_queue_paint(custom);
-    twin_widget_children_paint(twin_custom_widget_base(custom)->parent);
+    /* Parent will be repainted automatically */
     return TwinDispatchDone;
 }
 

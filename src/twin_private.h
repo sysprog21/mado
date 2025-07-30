@@ -788,8 +788,6 @@ void twin_composite_stroke(twin_pixmap_t *dst,
 void twin_event_enqueue(const twin_event_t *event);
 
 /* Internal pixmap operations */
-void twin_pixmap_lock(twin_pixmap_t *pixmap);
-void twin_pixmap_unlock(twin_pixmap_t *pixmap);
 twin_pointer_t twin_pixmap_pointer(twin_pixmap_t *pixmap,
                                    twin_coord_t x,
                                    twin_coord_t y);
@@ -799,8 +797,6 @@ void twin_pixmap_offset(twin_pixmap_t *pixmap,
                         twin_coord_t offy);
 
 /* Internal screen operations */
-void twin_screen_lock(twin_screen_t *screen);
-void twin_screen_unlock(twin_screen_t *screen);
 void twin_screen_enable_update(twin_screen_t *screen);
 void twin_screen_disable_update(twin_screen_t *screen);
 void twin_screen_register_damaged(twin_screen_t *screen,

@@ -6,6 +6,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 
 #include "twin_private.h"
 
@@ -18,10 +19,73 @@
          ? (((sz) + (alignment) - 1) & ~((alignment) - 1)) \
          : ((((sz) + (alignment) - 1) / (alignment)) * (alignment)))
 
+/* Cache configuration */
+#ifdef CONFIG_PIXMAP_CACHE
+#define TWIN_PIXMAP_CACHE_SIZE CONFIG_PIXMAP_CACHE_SIZE
+#define TWIN_PIXMAP_CACHE_MAX_BYTES (CONFIG_PIXMAP_CACHE_MAX_KB * 1024)
+#else
+#define TWIN_PIXMAP_CACHE_SIZE 0
+#define TWIN_PIXMAP_CACHE_MAX_BYTES 0
+#endif
+
+/* Cache key for pixmap lookup */
+typedef struct _twin_cache_key {
+    twin_format_t format;
+    twin_coord_t width;
+    twin_coord_t height;
+} twin_cache_key_t;
+
+/* Cache entry for a pixmap */
+typedef struct _twin_cache_entry {
+    twin_cache_key_t key;
+    twin_pixmap_t *pixmap;
+    size_t size;          /* Size in bytes */
+    uint32_t ref_count;   /* Reference count */
+    uint64_t last_access; /* For LRU eviction */
+    struct _twin_cache_entry *next;
+    struct _twin_cache_entry *prev;
+} twin_cache_entry_t;
+
+/* Pixmap cache structure */
+typedef struct _twin_pixmap_cache {
+    twin_cache_entry_t *entries;  /* Hash table entries */
+    twin_cache_entry_t *lru_head; /* LRU list head (most recent) */
+    twin_cache_entry_t *lru_tail; /* LRU list tail (least recent) */
+    uint32_t count;               /* Current number of cached pixmaps */
+    size_t total_size;            /* Total size of cached pixmaps */
+    uint64_t access_counter;      /* Monotonic counter for LRU */
+    uint64_t hits;                /* Cache hit count */
+    uint64_t misses;              /* Cache miss count */
+    uint64_t evictions;           /* Number of evictions */
+} twin_pixmap_cache_t;
+
+/* Global cache instance */
+static twin_pixmap_cache_t *global_cache = NULL;
+
+/* Cache control flag */
+#ifdef CONFIG_PIXMAP_CACHE
+static bool _twin_pixmap_cache_enabled = true;
+#else
+static bool _twin_pixmap_cache_enabled = false;
+#endif
+
+/* Forward declarations for cache functions */
+static twin_pixmap_t *_twin_pixmap_cache_lookup(twin_format_t format,
+                                                twin_coord_t width,
+                                                twin_coord_t height);
+static void _twin_pixmap_cache_store(twin_pixmap_t *pixmap);
+static void _twin_pixmap_cache_release(twin_pixmap_t *pixmap);
+
 twin_pixmap_t *twin_pixmap_create(twin_format_t format,
                                   twin_coord_t width,
                                   twin_coord_t height)
 {
+    /* Try to find in cache first */
+    twin_pixmap_t *pixmap = _twin_pixmap_cache_lookup(format, width, height);
+    if (pixmap)
+        return pixmap;
+
+    /* Not in cache, create new pixmap */
     twin_coord_t stride = twin_bytes_per_pixel(format) * width;
     /* Align stride to 4 bytes for proper uint32_t access in Pixman. */
     if (!IS_ALIGNED(stride, 4))
@@ -29,7 +93,7 @@ twin_pixmap_t *twin_pixmap_create(twin_format_t format,
 
     twin_area_t space = (twin_area_t) stride * height;
     twin_area_t size = sizeof(twin_pixmap_t) + space;
-    twin_pixmap_t *pixmap = malloc(size);
+    pixmap = malloc(size);
     if (!pixmap)
         return NULL;
 
@@ -53,6 +117,10 @@ twin_pixmap_t *twin_pixmap_create(twin_format_t format,
 #endif
     pixmap->p.v = pixmap + 1;
     memset(pixmap->p.v, '\0', space);
+
+    /* Store in cache for future use */
+    _twin_pixmap_cache_store(pixmap);
+
     return pixmap;
 }
 
@@ -88,6 +156,11 @@ void twin_pixmap_destroy(twin_pixmap_t *pixmap)
 {
     if (pixmap->screen)
         twin_pixmap_hide(pixmap);
+
+    /* Release cache reference if any */
+    _twin_pixmap_cache_release(pixmap);
+
+    /* Always free the pixmap */
     free(pixmap);
 }
 
@@ -348,3 +421,290 @@ bool twin_pixmap_dispatch(twin_pixmap_t *pixmap, twin_event_t *event)
         return twin_window_dispatch(pixmap->window, event);
     return false;
 }
+
+/*
+ * Pixmap cache implementation
+ */
+
+#ifdef CONFIG_PIXMAP_CACHE
+
+/* Calculate hash for cache key */
+static uint32_t _twin_cache_hash(const twin_cache_key_t *key)
+{
+    uint32_t hash = 0;
+    hash ^= key->format * 2654435761U;
+    hash ^= key->width * 2246822519U;
+    hash ^= key->height * 3266489917U;
+    return hash % TWIN_PIXMAP_CACHE_SIZE;
+}
+
+/* Compare cache keys */
+static bool _twin_cache_key_equal(const twin_cache_key_t *a,
+                                  const twin_cache_key_t *b)
+{
+    return a->format == b->format && a->width == b->width &&
+           a->height == b->height;
+}
+
+/* Calculate pixmap size in bytes */
+static size_t _twin_pixmap_size(twin_format_t format,
+                                twin_coord_t width,
+                                twin_coord_t height)
+{
+    twin_coord_t stride = twin_bytes_per_pixel(format) * width;
+    if (stride % 4 != 0)
+        stride = ((stride + 3) / 4) * 4;
+    return sizeof(twin_pixmap_t) + (size_t) stride * height;
+}
+
+/* Move entry to front of LRU list */
+static void _twin_cache_lru_touch(twin_pixmap_cache_t *cache,
+                                  twin_cache_entry_t *entry)
+{
+    /* Update access time */
+    entry->last_access = ++cache->access_counter;
+
+    /* Already at head */
+    if (entry == cache->lru_head)
+        return;
+
+    /* Remove from current position */
+    if (entry->prev)
+        entry->prev->next = entry->next;
+    if (entry->next)
+        entry->next->prev = entry->prev;
+    if (entry == cache->lru_tail)
+        cache->lru_tail = entry->prev;
+
+    /* Insert at head */
+    entry->prev = NULL;
+    entry->next = cache->lru_head;
+    if (cache->lru_head)
+        cache->lru_head->prev = entry;
+    cache->lru_head = entry;
+    if (!cache->lru_tail)
+        cache->lru_tail = entry;
+}
+
+/* Remove entry from LRU list */
+static void _twin_cache_lru_remove(twin_pixmap_cache_t *cache,
+                                   twin_cache_entry_t *entry)
+{
+    if (entry->prev)
+        entry->prev->next = entry->next;
+    else
+        cache->lru_head = entry->next;
+
+    if (entry->next)
+        entry->next->prev = entry->prev;
+    else
+        cache->lru_tail = entry->prev;
+
+    entry->next = entry->prev = NULL;
+}
+
+/* Find the least recently used entry that can be evicted */
+static twin_cache_entry_t *_twin_cache_find_evictable(
+    twin_pixmap_cache_t *cache)
+{
+    twin_cache_entry_t *oldest = NULL;
+    uint64_t oldest_time = UINT64_MAX;
+
+    /* Find LRU entry with ref_count == 1 (only cached reference) */
+    for (uint32_t i = 0; i < TWIN_PIXMAP_CACHE_SIZE; i++) {
+        twin_cache_entry_t *entry = &cache->entries[i];
+        if (entry->pixmap && entry->ref_count == 1 &&
+            entry->last_access < oldest_time) {
+            oldest = entry;
+            oldest_time = entry->last_access;
+        }
+    }
+
+    return oldest;
+}
+
+/* Initialize the pixmap cache (internal, called lazily) */
+static void _twin_pixmap_cache_init(void)
+{
+    if (global_cache)
+        return;
+
+    global_cache = calloc(1, sizeof(twin_pixmap_cache_t));
+    if (!global_cache)
+        return;
+
+    global_cache->entries =
+        calloc(TWIN_PIXMAP_CACHE_SIZE, sizeof(twin_cache_entry_t));
+    if (!global_cache->entries) {
+        free(global_cache);
+        global_cache = NULL;
+        return;
+    }
+}
+
+/* Look up a pixmap in the cache */
+static twin_pixmap_t *_twin_pixmap_cache_lookup(twin_format_t format,
+                                                twin_coord_t width,
+                                                twin_coord_t height)
+{
+    if (!_twin_pixmap_cache_enabled)
+        return NULL;
+
+    /* Lazy initialization */
+    if (!global_cache)
+        _twin_pixmap_cache_init();
+
+    if (!global_cache)
+        return NULL;
+
+    twin_cache_key_t key = {.format = format, .width = width, .height = height};
+
+    uint32_t index = _twin_cache_hash(&key);
+    twin_cache_entry_t *entry = &global_cache->entries[index];
+
+    if (entry->pixmap && _twin_cache_key_equal(&entry->key, &key)) {
+        /* Cache hit */
+        global_cache->hits++;
+        entry->ref_count++;
+        _twin_cache_lru_touch(global_cache, entry);
+        return entry->pixmap;
+    }
+
+    /* Cache miss */
+    global_cache->misses++;
+    return NULL;
+}
+
+/* Store a pixmap in the cache */
+static void _twin_pixmap_cache_store(twin_pixmap_t *pixmap)
+{
+    if (!pixmap || !_twin_pixmap_cache_enabled)
+        return;
+
+    /* Lazy initialization */
+    if (!global_cache)
+        _twin_pixmap_cache_init();
+
+    if (!global_cache)
+        return;
+
+    twin_cache_key_t key = {
+        .format = pixmap->format,
+        .width = pixmap->width,
+        .height = pixmap->height,
+    };
+
+    size_t size =
+        _twin_pixmap_size(pixmap->format, pixmap->width, pixmap->height);
+
+    /* Don't cache if too large */
+    if (size > TWIN_PIXMAP_CACHE_MAX_BYTES / 2)
+        return;
+
+    uint32_t index = _twin_cache_hash(&key);
+    twin_cache_entry_t *entry = &global_cache->entries[index];
+
+    /* Check if slot is occupied */
+    if (entry->pixmap) {
+        /* If same key, increment reference count */
+        if (_twin_cache_key_equal(&entry->key, &key)) {
+            entry->ref_count++;
+            _twin_cache_lru_touch(global_cache, entry);
+            return;
+        }
+
+        /* Different key - try to evict if possible */
+        if (entry->ref_count > 1) {
+            /* Entry is in use, try to find another slot to evict */
+            twin_cache_entry_t *evict =
+                _twin_cache_find_evictable(global_cache);
+            if (!evict)
+                return; /* No evictable entries */
+            entry = evict;
+        }
+
+        /* Evict the current entry */
+        _twin_cache_lru_remove(global_cache, entry);
+        global_cache->count--;
+        global_cache->total_size -= entry->size;
+        global_cache->evictions++;
+
+        /* Clear the entry */
+        *entry = (twin_cache_entry_t){0};
+    }
+
+    /* Check if we need to evict for size constraints */
+    while (global_cache->total_size + size > TWIN_PIXMAP_CACHE_MAX_BYTES &&
+           global_cache->count > 0) {
+        twin_cache_entry_t *evict = _twin_cache_find_evictable(global_cache);
+        if (!evict)
+            break; /* No more evictable entries */
+
+        _twin_cache_lru_remove(global_cache, evict);
+        global_cache->count--;
+        global_cache->total_size -= evict->size;
+        global_cache->evictions++;
+        *evict = (twin_cache_entry_t){0};
+    }
+
+    /* Store new entry */
+    entry->key = key;
+    entry->pixmap = pixmap;
+    entry->size = size;
+    entry->ref_count = 1;
+    entry->last_access = ++global_cache->access_counter;
+
+    /* Add to LRU list */
+    entry->next = global_cache->lru_head;
+    entry->prev = NULL;
+    if (global_cache->lru_head)
+        global_cache->lru_head->prev = entry;
+    global_cache->lru_head = entry;
+    if (!global_cache->lru_tail)
+        global_cache->lru_tail = entry;
+
+    /* Update stats */
+    global_cache->count++;
+    global_cache->total_size += size;
+}
+
+/* Release a reference to a cached pixmap */
+static void _twin_pixmap_cache_release(twin_pixmap_t *pixmap)
+{
+    if (!global_cache || !pixmap)
+        return;
+
+    /* Find and remove the entry */
+    for (uint32_t i = 0; i < TWIN_PIXMAP_CACHE_SIZE; i++) {
+        twin_cache_entry_t *entry = &global_cache->entries[i];
+        if (entry->pixmap == pixmap) {
+            entry->ref_count--;
+
+            /* Remove from cache when destroyed */
+            _twin_cache_lru_remove(global_cache, entry);
+            global_cache->count--;
+            global_cache->total_size -= entry->size;
+
+            /* Clear the entry */
+            *entry = (twin_cache_entry_t){0};
+            return;
+        }
+    }
+}
+
+
+#else /* !CONFIG_PIXMAP_CACHE */
+
+/* Stub implementations when cache is disabled */
+static twin_pixmap_t *_twin_pixmap_cache_lookup(twin_format_t format,
+                                                twin_coord_t width,
+                                                twin_coord_t height)
+{
+    return NULL;
+}
+
+static void _twin_pixmap_cache_store(twin_pixmap_t *pixmap) {}
+
+static void _twin_pixmap_cache_release(twin_pixmap_t *pixmap) {}
+
+#endif /* CONFIG_PIXMAP_CACHE */

@@ -576,6 +576,8 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
     uint8_t *color, *frame;
     frame = malloc(gif->width * gif->height * 3);
     if (!frame) {
+        free(anim->frame_delays);
+        free(anim->frames);
         free(anim);
         gif_close(gif);
         return NULL;
@@ -584,6 +586,12 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
         anim->frames[i] =
             twin_pixmap_create(TWIN_ARGB32, gif->width, gif->height);
         if (!anim->frames[i]) {
+            /* Free previously allocated pixmaps */
+            for (twin_count_t j = 0; j < i; j++)
+                twin_pixmap_destroy(anim->frames[j]);
+            free(frame);
+            free(anim->frame_delays);
+            free(anim->frames);
             free(anim);
             gif_close(gif);
             return NULL;
@@ -617,7 +625,12 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
     }
     anim->iter = twin_animation_iter_init(anim);
     if (!anim->iter) {
+        /* Free all allocated pixmaps */
+        for (twin_count_t i = 0; i < frame_count; i++)
+            twin_pixmap_destroy(anim->frames[i]);
         free(frame);
+        free(anim->frame_delays);
+        free(anim->frames);
         free(anim);
         gif_close(gif);
         return NULL;

@@ -44,7 +44,9 @@ static void _init_control_point(apps_spline_data_t *spline)
         {100, 280},
         {280, 100},
     };
-    const int(*init_point)[2];
+    /* clang-format off */
+    const int (*init_point)[2];
+    /* clang-format on */
     if (spline->n_points == 4) {
         init_point = init_point_cubic;
     } else if (spline->n_points == 3) {

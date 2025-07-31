@@ -158,9 +158,11 @@ void twin_fill(twin_pixmap_t *_dst,
     pixman_image_t *dst = create_pixman_image_from_twin_pixmap(_dst);
     pixman_color_t color;
     twin_argb32_to_pixman_color(pixel, &color);
+    /* clang-format off */
     pixman_image_fill_rectangles(
         twin_to_pixman_op(operator), dst, &color, 1,
-        &(pixman_rectangle16_t){left, top, right - left, bottom - top});
+        &(pixman_rectangle16_t) {left, top, right - left, bottom - top});
+    /* clang-format on */
 
     twin_pixmap_damage(_dst, left, top, right, bottom);
 

@@ -165,8 +165,11 @@ static table_t *table_new(int key_size)
         table->bulk = init_bulk;
         table->n_entries = (1 << key_size) + 2;
         table->entries = (entry_t *) &table[1];
-        for (int key = 0; key < (1 << key_size); key++)
-            table->entries[key] = (entry_t){1, 0xFFF, key};
+        for (int key = 0; key < (1 << key_size); key++) {
+            /* clang-format off */
+            table->entries[key] = (entry_t) {1, 0xFFF, key};
+            /* clang-format on */
+        }
     }
     return table;
 }
@@ -190,7 +193,9 @@ static int entry_add(table_t **table_p,
         table->entries = (entry_t *) &table[1];
         *table_p = table;
     }
-    table->entries[table->n_entries] = (entry_t){length, prefix, suffix};
+    /* clang-format off */
+    table->entries[table->n_entries] = (entry_t) {length, prefix, suffix};
+    /* clang-format on */
     table->n_entries++;
     if ((table->n_entries & (table->n_entries - 1)) == 0)
         return 1;

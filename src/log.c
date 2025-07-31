@@ -115,7 +115,9 @@ int log_add_callback(log_func_t fn, void *udata, int level)
 {
     for (int i = 0; i < MAX_CALLBACKS; i++) {
         if (!L.callbacks[i].fn) {
-            L.callbacks[i] = (callback_t){fn, udata, level};
+            /* clang-format off */
+            L.callbacks[i] = (callback_t) {fn, udata, level};
+            /* clang-format on */
             return 0;
         }
     }

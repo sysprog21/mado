@@ -554,7 +554,18 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
 
     anim->n_frames = frame_count;
     anim->frames = malloc(sizeof(twin_pixmap_t *) * frame_count);
+    if (!anim->frames) {
+        free(anim);
+        gif_close(gif);
+        return NULL;
+    }
     anim->frame_delays = malloc(sizeof(twin_time_t) * frame_count);
+    if (!anim->frame_delays) {
+        free(anim->frames);
+        free(anim);
+        gif_close(gif);
+        return NULL;
+    }
 
     gif_rewind(gif);
     uint8_t *color, *frame;

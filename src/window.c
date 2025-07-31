@@ -208,6 +208,8 @@ void twin_window_set_name(twin_window_t *window, const char *name)
     window->name = malloc(strlen(name) + 1);
     if (window->name)
         strcpy(window->name, name);
+    else
+        window->name = NULL; /* Ensure consistent state on allocation failure */
     twin_window_draw(window);
 }
 

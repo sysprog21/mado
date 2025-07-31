@@ -581,6 +581,8 @@ twin_path_t *twin_path_create(void)
     twin_path_t *path;
 
     path = malloc(sizeof(twin_path_t));
+    if (!path)
+        return NULL;
     path->npoints = path->size_points = 0;
     path->nsublen = path->size_sublen = 0;
     path->points = 0;

@@ -73,6 +73,11 @@ twin_dispatch_result_t _twin_label_dispatch(twin_widget_t *widget,
     case TwinEventQueryGeometry:
         _twin_label_query_geometry(label);
         break;
+    case TwinEventDestroy:
+        /* Free the label text */
+        if (label->label)
+            free(label->label);
+        break;
     default:
         break;
     }

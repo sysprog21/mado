@@ -95,6 +95,11 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
 void twin_window_destroy(twin_window_t *window)
 {
     twin_window_hide(window);
+
+    /* Call the destroy callback if set to clean up window contents */
+    if (window->destroy)
+        (*window->destroy)(window);
+
     twin_pixmap_destroy(window->pixmap);
     free(window->name);
     free(window);

@@ -158,6 +158,17 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
         _twin_widget_dispatch(widget, event) == TwinDispatchDone)
         return TwinDispatchDone;
     switch (event->kind) {
+    case TwinEventDestroy:
+        /* Destroy all children first */
+        while (box->children) {
+            child = box->children;
+            box->children = child->next;
+
+            /* Send destroy event to child */
+            ev.kind = TwinEventDestroy;
+            (*child->dispatch)(child, &ev);
+        }
+        break;
     case TwinEventQueryGeometry:
         return _twin_box_query_geometry(box);
     case TwinEventConfigure:

@@ -96,6 +96,9 @@ twin_dispatch_result_t _twin_widget_dispatch(twin_widget_t *widget,
         _twin_widget_paint(widget);
         widget->paint = false;
         break;
+    case TwinEventDestroy:
+        /* Base widget has no special cleanup */
+        break;
     default:
         break;
     }

@@ -302,6 +302,8 @@ void twin_fill_path(twin_pixmap_t *pixmap,
 
     int nalloc = path->npoints + path->nsublen + 1;
     twin_edge_t *edges = malloc(sizeof(twin_edge_t) * nalloc);
+    if (!edges)
+        return;
     int p = 0;
     int nedges = 0;
     for (int s = 0; s <= path->nsublen; s++) {

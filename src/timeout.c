@@ -50,6 +50,13 @@ void _twin_run_timeout(void)
     twin_timeout_t *first = (twin_timeout_t *) _twin_queue_set_order(&head);
     for (timeout = first; timeout && twin_time_compare(now, >=, timeout->time);
          timeout = (twin_timeout_t *) timeout->queue.order) {
+        /* Validate closure pointer before executing timeout callback */
+        if (!twin_pointer_valid(timeout->closure)) {
+            /* Invalid closure pointer, remove this timeout */
+            _twin_queue_delete(&head, &timeout->queue);
+            continue;
+        }
+
         delay = (*timeout->proc)(now, timeout->closure);
         if (delay >= 0) {
             timeout->time = twin_now() + delay;
@@ -67,6 +74,12 @@ twin_timeout_t *twin_set_timeout(twin_timeout_proc_t timeout_proc,
     twin_timeout_t *timeout = malloc(sizeof(twin_timeout_t));
     if (!timeout)
         return NULL;
+
+    /* Basic validation of closure pointer at scheduling time */
+    if (closure && !twin_pointer_valid(closure)) {
+        free(timeout);
+        return NULL;
+    }
 
     if (!start)
         start = twin_now();

@@ -810,4 +810,38 @@ void twin_custom_widget_destroy(twin_custom_widget_t *custom);
 /* Path convex hull computation */
 twin_path_t *twin_path_convex_hull(twin_path_t *path);
 
+/*
+ * Memory pointer validation
+ *
+ * This defines the minimum valid pointer address for closure validation.
+ * Different environments have different memory layouts:
+ *
+ * - Unix-like systems (Linux/BSD/macOS/Solaris): First 4KB (0x1000) typically
+ * unmapped
+ * - Windows: First 64KB (0x10000) reserved
+ * - Bare-metal: May have valid memory starting at 0x0
+ */
+#ifndef TWIN_POINTER_MIN_VALID
+#if defined(_WIN32) || defined(_WIN64)
+#define TWIN_POINTER_MIN_VALID 0x10000 /* Windows: 64KB */
+#elif defined(__unix__) || defined(__unix) || defined(unix) ||             \
+    (defined(__APPLE__) && defined(__MACH__)) || defined(__linux__) ||     \
+    defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
+    defined(__DragonFly__) || defined(__sun) || defined(__HAIKU__) ||      \
+    defined(__ANDROID__)
+#define TWIN_POINTER_MIN_VALID 0x1000 /* Unix-like: 4KB */
+#else
+#define TWIN_POINTER_MIN_VALID 0x100 /* Bare-metal/embedded: 256 bytes */
+#endif
+#endif
+
+/*
+ * Validate a pointer for basic sanity
+ * Returns true if the pointer appears to be valid
+ */
+static inline bool twin_pointer_valid(const void *ptr)
+{
+    return ptr && (uintptr_t) ptr >= TWIN_POINTER_MIN_VALID;
+}
+
 #endif /* _TWIN_PRIVATE_H_ */

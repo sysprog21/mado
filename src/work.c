@@ -32,9 +32,17 @@ void _twin_run_work(void)
     twin_work_t *first;
 
     first = (twin_work_t *) _twin_queue_set_order(&head);
-    for (work = first; work; work = (twin_work_t *) work->queue.order)
+    for (work = first; work; work = (twin_work_t *) work->queue.order) {
+        /* Validate closure pointer before executing callback */
+        if (!twin_pointer_valid(work->closure)) {
+            /* Invalid closure pointer, remove this work item */
+            _twin_queue_delete(&head, &work->queue);
+            continue;
+        }
+
         if (!(*work->proc)(work->closure))
             _twin_queue_delete(&head, &work->queue);
+    }
     _twin_queue_review_order(&first->queue);
 }
 
@@ -45,6 +53,12 @@ twin_work_t *twin_set_work(twin_work_proc_t work_proc,
     twin_work_t *work = malloc(sizeof(twin_work_t));
     if (!work)
         return NULL;
+
+    /* Basic validation of closure pointer at scheduling time */
+    if (closure && !twin_pointer_valid(closure)) {
+        free(work);
+        return NULL;
+    }
 
     work->proc = work_proc;
     work->priority = priority;

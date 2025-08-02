@@ -51,6 +51,7 @@ libtwin.a_files-y = \
 	src/timeout.c \
 	src/image.c \
 	src/animation.c \
+	src/closure.c \
 	src/api.c
 
 libtwin.a_includes-y := \

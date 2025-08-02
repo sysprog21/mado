@@ -50,10 +50,9 @@ void _twin_run_timeout(void)
     twin_timeout_t *first = (twin_timeout_t *) _twin_queue_set_order(&head);
     for (timeout = first; timeout && twin_time_compare(now, >=, timeout->time);
          timeout = (twin_timeout_t *) timeout->queue.order) {
-        /* Validate closure pointer before executing timeout callback */
-        if (!twin_pointer_valid(timeout->closure)) {
-            /* Invalid closure pointer, remove this timeout */
-            _twin_queue_delete(&head, &timeout->queue);
+        /* Validate closure pointer using closure lifetime tracking */
+        if (!_twin_closure_is_valid(timeout->closure)) {
+            /* Invalid or freed closure, skip this timeout */
             continue;
         }
 
@@ -75,10 +74,15 @@ twin_timeout_t *twin_set_timeout(twin_timeout_proc_t timeout_proc,
     if (!timeout)
         return NULL;
 
-    /* Basic validation of closure pointer at scheduling time */
-    if (closure && !twin_pointer_valid(closure)) {
-        free(timeout);
-        return NULL;
+    /* Register closure with lifetime tracking if provided */
+    if (closure) {
+        if (!_twin_closure_register(closure)) {
+            /* Failed to register closure */
+            free(timeout);
+            return NULL;
+        }
+        /* Add reference for this timeout */
+        _twin_closure_ref(closure);
     }
 
     if (!start)
@@ -92,7 +96,16 @@ twin_timeout_t *twin_set_timeout(twin_timeout_proc_t timeout_proc,
 
 void twin_clear_timeout(twin_timeout_t *timeout)
 {
+    if (!timeout)
+        return;
+
     _twin_queue_delete(&head, &timeout->queue);
+
+    /* Unref the closure */
+    if (timeout->closure)
+        _twin_closure_unref(timeout->closure);
+
+    free(timeout);
 }
 
 twin_time_t _twin_timeout_delay(void)

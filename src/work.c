@@ -33,10 +33,9 @@ void _twin_run_work(void)
 
     first = (twin_work_t *) _twin_queue_set_order(&head);
     for (work = first; work; work = (twin_work_t *) work->queue.order) {
-        /* Validate closure pointer before executing callback */
-        if (!twin_pointer_valid(work->closure)) {
-            /* Invalid closure pointer, remove this work item */
-            _twin_queue_delete(&head, &work->queue);
+        /* Validate closure pointer using closure lifetime tracking */
+        if (!_twin_closure_is_valid(work->closure)) {
+            /* Invalid or freed closure, skip this work item */
             continue;
         }
 
@@ -54,10 +53,15 @@ twin_work_t *twin_set_work(twin_work_proc_t work_proc,
     if (!work)
         return NULL;
 
-    /* Basic validation of closure pointer at scheduling time */
-    if (closure && !twin_pointer_valid(closure)) {
-        free(work);
-        return NULL;
+    /* Register closure with lifetime tracking if provided */
+    if (closure) {
+        if (!_twin_closure_register(closure)) {
+            /* Failed to register closure */
+            free(work);
+            return NULL;
+        }
+        /* Add reference for this work item */
+        _twin_closure_ref(closure);
     }
 
     work->proc = work_proc;
@@ -69,5 +73,14 @@ twin_work_t *twin_set_work(twin_work_proc_t work_proc,
 
 void twin_clear_work(twin_work_t *work)
 {
+    if (!work)
+        return;
+
     _twin_queue_delete(&head, &work->queue);
+
+    /* Unref the closure */
+    if (work->closure)
+        _twin_closure_unref(work->closure);
+
+    free(work);
 }

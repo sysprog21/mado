@@ -53,6 +53,12 @@ static void _twin_toplevel_destroy(twin_window_t *window)
     twin_toplevel_t *toplevel = window->client_data;
     twin_event_t event;
 
+    /* Mark this toplevel as being freed to prevent new work items */
+    _twin_closure_mark_for_free(toplevel);
+
+    /* Unregister from closure tracking */
+    _twin_closure_unregister(toplevel);
+
     event.kind = TwinEventDestroy;
     (*toplevel->box.widget.dispatch)(&toplevel->box.widget, &event);
 }
@@ -68,6 +74,9 @@ void _twin_toplevel_init(twin_toplevel_t *toplevel,
     window->event = _twin_toplevel_event;
     window->client_data = toplevel;
     _twin_box_init(&toplevel->box, 0, window, TwinBoxVert, dispatch);
+
+    /* Register this toplevel with closure tracking */
+    _twin_closure_register(toplevel);
 }
 
 twin_toplevel_t *twin_toplevel_create(twin_screen_t *screen,

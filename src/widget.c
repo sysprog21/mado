@@ -320,6 +320,9 @@ static void unregister_custom_widget(twin_widget_t *widget)
     custom_widget_map_t **prev = &custom_widget_map;
     custom_widget_map_t *entry = custom_widget_map;
 
+    if (!widget)
+        return;
+
     while (entry) {
         if (entry->widget == widget) {
             *prev = entry->next;
@@ -334,6 +337,26 @@ static void unregister_custom_widget(twin_widget_t *widget)
 static twin_dispatch_result_t custom_widget_dispatch(twin_widget_t *widget,
                                                      twin_event_t *event)
 {
+    /* Handle destroy events specially to ensure proper cleanup order */
+    if (event->kind == TwinEventDestroy) {
+        /* Find and call user dispatch first if it exists */
+        custom_widget_map_t *entry = custom_widget_map;
+        while (entry) {
+            if (entry->widget == widget) {
+                if (entry->user_dispatch)
+                    entry->user_dispatch(widget, event);
+                break;
+            }
+            entry = entry->next;
+        }
+
+        /* Unregister from custom widget map before base destruction */
+        unregister_custom_widget(widget);
+
+        /* Now call base widget dispatch to complete destruction */
+        return _twin_widget_dispatch(widget, event);
+    }
+
     /* First call the base widget dispatch to handle standard widget behavior */
     twin_dispatch_result_t result = _twin_widget_dispatch(widget, event);
     if (result == TwinDispatchDone)
@@ -396,6 +419,9 @@ void twin_custom_widget_destroy(twin_custom_widget_t *custom)
         return;
 
     if (custom->widget) {
+        /* Unregister from dispatch map (idempotent if already done during
+         * TwinEventDestroy)
+         */
         unregister_custom_widget(custom->widget);
         /* Note: widget destruction should be handled by the parent/container */
     }

@@ -844,4 +844,54 @@ static inline bool twin_pointer_valid(const void *ptr)
     return ptr && (uintptr_t) ptr >= TWIN_POINTER_MIN_VALID;
 }
 
+/*
+ * Closure lifetime management
+ *
+ * This system tracks closure pointers used in work queues and timeouts
+ * to prevent use-after-free bugs when widgets are destroyed while
+ * callbacks are still queued.
+ */
+
+/* Maximum number of tracked closures */
+#define TWIN_MAX_CLOSURES 1024
+
+/* Closure tracking entry */
+typedef struct _twin_closure_entry {
+    void *closure;        /* Closure pointer */
+    uint32_t ref_count;   /* Reference count */
+    bool marked_for_free; /* Closure is being freed */
+} twin_closure_entry_t;
+
+/* Closure tracking table */
+typedef struct _twin_closure_tracker {
+    twin_closure_entry_t entries[TWIN_MAX_CLOSURES];
+    int count;
+    bool initialized; /* Track initialization status */
+    /* Mutex would go here for thread safety if needed */
+} twin_closure_tracker_t;
+
+/* Global closure tracker instance */
+extern twin_closure_tracker_t _twin_closure_tracker;
+
+/* Initialize closure tracking system */
+void _twin_closure_tracker_init(void);
+
+/* Register a closure with the tracking system */
+bool _twin_closure_register(void *closure);
+
+/* Unregister a closure from the tracking system */
+void _twin_closure_unregister(void *closure);
+
+/* Increment reference count for a closure */
+bool _twin_closure_ref(void *closure);
+
+/* Decrement reference count for a closure */
+bool _twin_closure_unref(void *closure);
+
+/* Check if a closure is valid and not marked for deletion */
+bool _twin_closure_is_valid(void *closure);
+
+/* Mark a closure as being freed (prevents new references) */
+void _twin_closure_mark_for_free(void *closure);
+
 #endif /* _TWIN_PRIVATE_H_ */

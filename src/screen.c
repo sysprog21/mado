@@ -15,9 +15,16 @@ twin_screen_t *twin_screen_create(twin_coord_t width,
                                   twin_put_span_t put_span,
                                   void *closure)
 {
+    static bool closure_tracker_initialized = false;
     twin_screen_t *screen = calloc(1, sizeof(twin_screen_t));
     if (!screen)
         return NULL;
+
+    /* Initialize closure tracking system on first screen creation */
+    if (!closure_tracker_initialized) {
+        _twin_closure_tracker_init();
+        closure_tracker_initialized = true;
+    }
 
     screen->top = 0;
     screen->bottom = 0;

@@ -77,6 +77,32 @@ config SHADOW_BLUR
     range 1 10
     depends on DROP_SHADOW
 
+config PIXMAP_CACHE
+    bool "Enable pixmap caching"
+    default y
+    help
+      Enable caching of pixmaps to improve performance by reusing
+      frequently allocated pixmaps. This reduces memory allocation
+      overhead at the cost of slightly increased memory usage.
+
+config PIXMAP_CACHE_SIZE
+    int "Maximum number of cached pixmaps"
+    default 8
+    range 4 32
+    depends on PIXMAP_CACHE
+    help
+      Maximum number of pixmaps that can be stored in the cache.
+      Larger values may improve performance but use more memory.
+
+config PIXMAP_CACHE_MAX_KB
+    int "Maximum cache size in KB"
+    default 64
+    range 16 512
+    depends on PIXMAP_CACHE
+    help
+      Maximum total memory size for cached pixmaps in kilobytes.
+      The cache will evict entries to stay within this limit.
+
 endmenu
 
 menu "Image Loaders"

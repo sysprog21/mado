@@ -310,9 +310,8 @@ static void apps_blur(twin_screen_t *screen, int x, int y, int w, int h)
 
     /* Copy the blurred background to the window */
     srcop.u.pixmap = scaled_background;
-    twin_composite(window->pixmap, window->client.left, window->client.top,
-                   &srcop, 0, 0, NULL, 0, 0, TWIN_SOURCE, client_width,
-                   client_height);
+    twin_composite(window->pixmap, 0, 0, &srcop, 0, 0, NULL, 0, 0, TWIN_SOURCE,
+                   client_width, client_height);
 
     twin_pixmap_destroy(scaled_background);
     twin_pixmap_destroy(raw_background);

@@ -345,44 +345,43 @@ static void _twin_composite_simple(twin_pixmap_t *dst,
     if (src->source_kind == TWIN_PIXMAP) {
         src_x += src->u.pixmap->origin_x;
         src_y += src->u.pixmap->origin_y;
-    } else
+    } else {
         s.c = src->u.argb;
+    }
 
     sdx = src_x - dst_x;
     sdy = src_y - dst_y;
 
     if (msk) {
-        twin_src_msk_op op;
         twin_source_u m;
         twin_coord_t mdx, mdy;
 
         if (msk->source_kind == TWIN_PIXMAP) {
             msk_x += msk->u.pixmap->origin_x;
             msk_y += msk->u.pixmap->origin_y;
-        } else
+        } else {
             m.c = msk->u.argb;
+        }
 
         mdx = msk_x - dst_x;
         mdy = msk_y - dst_y;
 
-    op = comp3[operator][operand_index(src)][operand_index(msk)][dst->format];
-    for (iy = top; iy < bottom; iy++) {
-        if (src->source_kind == TWIN_PIXMAP)
-            s.p = twin_pixmap_pointer(src->u.pixmap, left + sdx, iy + sdy);
-        if (msk->source_kind == TWIN_PIXMAP)
-            m.p = twin_pixmap_pointer(msk->u.pixmap, left + mdx, iy + mdy);
-        (*op)(twin_pixmap_pointer(dst, left, iy), s, m, right - left);
-    }
+        twin_src_msk_op op = comp3[operator][operand_index(src)][operand_index(msk)][dst->format];
+        for (iy = top; iy < bottom; iy++) {
+            if (src->source_kind == TWIN_PIXMAP)
+                s.p = twin_pixmap_pointer(src->u.pixmap, left + sdx, iy + sdy);
+            if (msk->source_kind == TWIN_PIXMAP)
+                m.p = twin_pixmap_pointer(msk->u.pixmap, left + mdx, iy + mdy);
+            (*op)(twin_pixmap_pointer(dst, left, iy), s, m, right - left);
+        }
     } else {
-        twin_src_op op;
+        twin_src_op op = comp2[operator][operand_index(src)][dst->format];
 
-    op = comp2[operator][operand_index(src)][dst->format];
-
-    for (iy = top; iy < bottom; iy++) {
-        if (src->source_kind == TWIN_PIXMAP)
-            s.p = twin_pixmap_pointer(src->u.pixmap, left + sdx, iy + sdy);
-        (*op)(twin_pixmap_pointer(dst, left, iy), s, right - left);
-    }
+        for (iy = top; iy < bottom; iy++) {
+            if (src->source_kind == TWIN_PIXMAP)
+                s.p = twin_pixmap_pointer(src->u.pixmap, left + sdx, iy + sdy);
+            (*op)(twin_pixmap_pointer(dst, left, iy), s, right - left);
+        }
     }
     twin_pixmap_damage(dst, left, top, right, bottom);
 }
@@ -400,14 +399,14 @@ static twin_xform_t *twin_pixmap_init_xform(twin_pixmap_t *pixmap,
                                             twin_coord_t src_x,
                                             twin_coord_t src_y)
 {
-    twin_xform_t *xform;
     twin_format_t fmt = pixmap->format;
 
     if (fmt == TWIN_RGB16)
         fmt = TWIN_ARGB32;
 
-    xform = calloc(1, sizeof(twin_xform_t) + width * twin_bytes_per_pixel(fmt));
-    if (xform == NULL)
+    twin_xform_t *xform =
+        calloc(1, sizeof(twin_xform_t) + width * twin_bytes_per_pixel(fmt));
+    if (!xform)
         return NULL;
 
     xform->span.v = (twin_argb32_t *) (char *) (xform + 1);
@@ -578,7 +577,6 @@ static void _twin_composite_xform(twin_pixmap_t *dst,
                                   twin_coord_t width,
                                   twin_coord_t height)
 {
-    twin_coord_t iy;
     twin_coord_t left, top, right, bottom;
     twin_xform_t *sxform = NULL, *mxform = NULL;
     twin_source_u s;
@@ -611,14 +609,14 @@ static void _twin_composite_xform(twin_pixmap_t *dst,
         src_y += src->u.pixmap->origin_y;
         sxform =
             twin_pixmap_init_xform(src->u.pixmap, left, width, src_x, src_y);
-        if (sxform == NULL)
+        if (!sxform)
             return;
         s.p = sxform->span;
-    } else
+    } else {
         s.c = src->u.argb;
+    }
 
     if (msk) {
-        twin_src_msk_op op;
         twin_source_u m;
 
         if (msk->source_kind == TWIN_PIXMAP) {
@@ -626,31 +624,30 @@ static void _twin_composite_xform(twin_pixmap_t *dst,
             msk_y += msk->u.pixmap->origin_y;
             mxform = twin_pixmap_init_xform(msk->u.pixmap, left, width, msk_x,
                                             msk_y);
-            if (mxform == NULL)
+            if (!mxform)
                 return;
             m.p = mxform->span;
-        } else
+        } else {
             m.c = msk->u.argb;
+        }
 
-    op = comp3[operator][operand_xindex(src)][operand_xindex(msk)]
+        twin_src_msk_op op = comp3[operator][operand_xindex(src)][operand_xindex(msk)]
 		[dst->format];
-    for (iy = top; iy < bottom; iy++) {
-        if (src->source_kind == TWIN_PIXMAP)
-            twin_pixmap_read_xform(sxform, iy - top);
-        if (msk->source_kind == TWIN_PIXMAP)
-            twin_pixmap_read_xform(mxform, iy - top);
-        (*op)(twin_pixmap_pointer(dst, left, iy), s, m, right - left);
-    }
+        for (twin_coord_t iy = top; iy < bottom; iy++) {
+            if (src->source_kind == TWIN_PIXMAP)
+                twin_pixmap_read_xform(sxform, iy - top);
+            if (msk->source_kind == TWIN_PIXMAP)
+                twin_pixmap_read_xform(mxform, iy - top);
+            (*op)(twin_pixmap_pointer(dst, left, iy), s, m, right - left);
+        }
     } else {
-        twin_src_op op;
+        twin_src_op op = comp2[operator][operand_xindex(src)][dst->format];
 
-    op = comp2[operator][operand_xindex(src)][dst->format];
-
-    for (iy = top; iy < bottom; iy++) {
-        if (src->source_kind == TWIN_PIXMAP)
-            twin_pixmap_read_xform(sxform, iy - top);
-        (*op)(twin_pixmap_pointer(dst, left, iy), s, right - left);
-    }
+        for (twin_coord_t iy = top; iy < bottom; iy++) {
+            if (src->source_kind == TWIN_PIXMAP)
+                twin_pixmap_read_xform(sxform, iy - top);
+            (*op)(twin_pixmap_pointer(dst, left, iy), s, right - left);
+        }
     }
     twin_pixmap_damage(dst, left, top, right, bottom);
     twin_pixmap_free_xform(sxform);
@@ -673,12 +670,13 @@ void twin_composite(twin_pixmap_t *dst,
     if ((src->source_kind == TWIN_PIXMAP &&
          !twin_matrix_is_identity(&src->u.pixmap->transform)) ||
         (msk && (msk->source_kind == TWIN_PIXMAP &&
-                 !twin_matrix_is_identity(&msk->u.pixmap->transform))))
+                 !twin_matrix_is_identity(&msk->u.pixmap->transform)))) {
         _twin_composite_xform(dst, dst_x, dst_y, src, src_x, src_y, msk, msk_x,
                               msk_y, operator, width, height);
-    else
+    } else {
         _twin_composite_simple(dst, dst_x, dst_y, src, src_x, src_y, msk, msk_x,
                                msk_y, operator, width, height);
+    }
 }
 
 /*
@@ -708,10 +706,6 @@ void twin_fill(twin_pixmap_t *dst,
                twin_coord_t right,
                twin_coord_t bottom)
 {
-    twin_src_op op;
-    twin_source_u src;
-    twin_coord_t iy;
-
     /* offset */
     left += dst->origin_x;
     top += dst->origin_y;
@@ -729,9 +723,10 @@ void twin_fill(twin_pixmap_t *dst,
         bottom = dst->clip.bottom;
     if (left >= right || top >= bottom)
         return;
-    src.c = pixel;
-    op = fill[operator][dst->format];
-    for (iy = top; iy < bottom; iy++)
+
+    twin_source_u src = {.c = pixel};
+    twin_src_op op = fill[operator][dst->format];
+    for (twin_coord_t iy = top; iy < bottom; iy++)
         (*op)(twin_pixmap_pointer(dst, left, iy), src, right - left);
     twin_pixmap_damage(dst, left, top, right, bottom);
 }

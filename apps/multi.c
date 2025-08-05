@@ -304,8 +304,11 @@ static void apps_blur(twin_screen_t *screen, int x, int y, int w, int h)
     twin_composite(scaled_background, 0, 0, &srcop, 0, 0, 0, 0, 0, TWIN_SOURCE,
                    scaled_background->width, scaled_background->height);
 
-    /* Apply blur effect to the scaled background */
-    twin_stack_blur(scaled_background, 16, 0, scaled_background->width - 1, 0,
+    /*
+     * Apply blur effect to the scaled background. The valid kernel size range
+     * is from 1 to 15.
+     */
+    twin_stack_blur(scaled_background, 15, 0, scaled_background->width - 1, 0,
                     scaled_background->height - 1);
 
     /* Copy the blurred background to the window */

@@ -74,7 +74,7 @@ config VERTICAL_OFFSET
 config SHADOW_BLUR
     int "Shadow blur radius"
     default 10
-    range 1 10
+    range 1 15
     depends on DROP_SHADOW
 
 endmenu

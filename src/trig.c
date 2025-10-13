@@ -72,7 +72,7 @@ void twin_sincos(twin_angle_t a, twin_fixed_t *sin, twin_fixed_t *cos)
     /* limit to [0..360) */
     a = a & (TWIN_ANGLE_360 - 1);
     int c = a > TWIN_ANGLE_90 && a < TWIN_ANGLE_270;
-    /* special case for 90 degrees */
+    /* special case for 90 and 270 degrees */
     if ((a & ~(TWIN_ANGLE_180)) == TWIN_ANGLE_90) {
         sin_val = TWIN_FIXED_ONE;
         cos_val = 0;

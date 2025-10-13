@@ -179,6 +179,15 @@ endif
 
 # Menuconfig
 .PHONY: config
+KCONFIGLIB_AVAILABLE := $(shell python3 -c "import kconfiglib" >/dev/null 2>&1 && echo 1 || echo 0)
+
 config: configs/Kconfig
+ifeq ($(KCONFIGLIB_AVAILABLE),1)
+	@echo ">>> Using Kconfiglib"
+	@python3 -m menuconfig $<
+	@python3 -m genconfig $<
+else
+	@echo ">>> Falling back to local tools"
 	@tools/kconfig/menuconfig.py $<
 	@tools/kconfig/genconfig.py $<
+endif

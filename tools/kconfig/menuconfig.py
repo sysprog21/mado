@@ -285,7 +285,7 @@ view the help of the selected item without leaving the dialog.
 
 _STYLES = {
     "default": """
-    path=fg:white,bg:back,bold
+    path=fg:white,bg:black,bold
     separator=fg:white,bg:blue,bold
     list=fg:white,bg:black
     selection=fg:black,bg:white,bold

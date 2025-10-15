@@ -6,7 +6,15 @@ sudo apt install -y meson ninja-build libpixman-1-dev zlib1g-dev libdrm-dev pkg-
 
 TOP_DIR=$(pwd)
 # Clone and build aml
-git clone https://github.com/any1/aml && pushd aml
+if [ ! -d "aml" ]; then
+    git clone https://github.com/any1/aml --depth=1 -b v0.3.0
+else
+    pushd aml
+    git fetch --tags
+    git checkout v0.3.0
+    popd
+fi
+pushd aml
 meson -Dprefix=$TOP_DIR/_static --default-library=static build
 ninja -C build install
 popd
@@ -14,7 +22,15 @@ popd
 export PKG_CONFIG_PATH=$TOP_DIR/_static/lib/$(uname -m)-linux-gnu/pkgconfig
 
 # Clone and build NeatVNC
-git clone https://github.com/any1/neatvnc --depth=1 -b v0.8.1 && pushd neatvnc
+if [ ! -d "neatvnc" ]; then
+    git clone https://github.com/any1/neatvnc --depth=1 -b v0.9.5
+else
+    pushd neatvnc
+    git fetch --tags
+    git checkout v0.9.5
+    popd
+fi
+pushd neatvnc
 meson -Dprefix=$TOP_DIR/_static --default-library=static build
 ninja -C build install
 popd

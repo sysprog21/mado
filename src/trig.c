@@ -148,7 +148,15 @@ static twin_angle_t twin_atan2_first_quadrant(twin_fixed_t y, twin_fixed_t x)
         }
     }
 
-    return (twin_angle_t) (double) angle / (32768.0) * TWIN_ANGLE_360;
+    /* Fixed-point conversion: angle / 32768 * TWIN_ANGLE_360
+     * Simplified: angle * 2^12 / 2^15 = angle / 8
+     * Use integer division (not right shift) to match original
+     * truncate-towards-zero behavior for negative values. Right shift would
+     * round towards negative infinity, causing precision errors for
+     * non-multiples of 8. Avoids overflow since no intermediate multiplication
+     * required.
+     */
+    return (twin_angle_t) (angle / 8);
 }
 
 twin_angle_t twin_atan2(twin_fixed_t y, twin_fixed_t x)

@@ -8,6 +8,7 @@ mado-perf
 .mado-perf
 font-edit
 .font-edit
+src/composite-decls.h
 
 # Swap
 [._]*.s[a-v][a-z]

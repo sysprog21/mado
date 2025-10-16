@@ -327,6 +327,10 @@ struct _twin_screen {
     /* Window manager */
     twin_coord_t button_x, button_y; /**< Window button position */
 
+    /* Span buffer cache for screen updates */
+    twin_argb32_t *span_cache;     /**< Cached span buffer */
+    twin_coord_t span_cache_width; /**< Cached span buffer width */
+
     /* Event processing: event filter callback */
     bool (*event_filter)(twin_screen_t *screen, twin_event_t *event);
 };

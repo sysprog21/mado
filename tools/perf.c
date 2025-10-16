@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -25,6 +26,9 @@
 /* Size-based calibration limits */
 #define MAX_REPS_LARGE 20000   /* For operations >= 100x100 */
 #define MAX_REPS_MEDIUM 200000 /* For operations >= 10x10 */
+
+/* Memory profiling iterations */
+#define MEM_TEST_ITERATIONS 10000
 
 static twin_pixmap_t *src32, *dst32, *mask8;
 static int test_width, test_height;
@@ -287,12 +291,219 @@ static void run_large_tests(void)
     run_test_series("500x500 solid over", test_solid_over_argb32, 500, 500);
 }
 
+/* Memory profiling mode */
+
+/* Get memory usage statistics */
+static void get_memory_usage(long *rss_kb, long *max_rss_kb)
+{
+    struct rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+#ifdef __APPLE__
+    *max_rss_kb = usage.ru_maxrss / 1024; /* macOS reports in bytes */
+#else
+    *max_rss_kb = usage.ru_maxrss; /* Linux reports in KB */
+#endif
+    *rss_kb = *max_rss_kb; /* Current RSS approximation */
+}
+
+/* Print memory test statistics */
+static void print_memory_stats(const char *test_name,
+                               int iterations,
+                               uint64_t elapsed_us,
+                               long start_rss,
+                               long end_rss,
+                               long peak_rss)
+{
+    double ops_per_sec =
+        (double) iterations / ((double) elapsed_us / 1000000.0);
+    double us_per_op = (double) elapsed_us / iterations;
+    double kops_per_sec = ops_per_sec / 1000.0;
+    long delta_rss = end_rss - start_rss;
+
+    printf("%-28s %6d %8.1f %9.1f %+8ld %7ld\n", test_name, iterations,
+           us_per_op, kops_per_sec, delta_rss, peak_rss);
+}
+
+/* Memory test data structures */
+struct mem_composite_test {
+    twin_pixmap_t *dst, *src;
+    int width, height;
+    int iterations;
+};
+
+struct mem_polygon_test {
+    twin_pixmap_t *dst;
+    int iterations;
+};
+
+struct mem_pixmap_test {
+    int width, height;
+    int iterations;
+};
+
+struct mem_path_test {
+    int iterations;
+};
+
+/* Memory test: Composite operations (xform buffer allocation) */
+static void mem_test_composite(void *data)
+{
+    struct mem_composite_test *d = (struct mem_composite_test *) data;
+    twin_operand_t srco = {.source_kind = TWIN_PIXMAP, .u.pixmap = d->src};
+
+    for (int i = 0; i < d->iterations; i++) {
+        twin_composite(d->dst, 0, 0, &srco, 0, 0, NULL, 0, 0, TWIN_OVER,
+                       d->width, d->height);
+    }
+}
+
+/* Memory test: Path operations (point reallocation) */
+static void mem_test_path(void *data)
+{
+    struct mem_path_test *d = (struct mem_path_test *) data;
+
+    for (int i = 0; i < d->iterations; i++) {
+        twin_path_t *path = twin_path_create();
+
+        /* Add many points to trigger reallocation */
+        for (int j = 0; j < 100; j++) {
+            twin_path_move(path, twin_int_to_fixed(j), twin_int_to_fixed(j));
+            twin_path_draw(path, twin_int_to_fixed(j + 10),
+                           twin_int_to_fixed(j + 10));
+        }
+
+        twin_path_destroy(path);
+    }
+}
+
+/* Memory test: Polygon filling (edge buffer allocation) */
+static void mem_test_polygon(void *data)
+{
+    struct mem_polygon_test *d = (struct mem_polygon_test *) data;
+
+    for (int i = 0; i < d->iterations; i++) {
+        twin_path_t *path = twin_path_create();
+
+        /* Create a complex polygon */
+        twin_path_move(path, twin_int_to_fixed(10), twin_int_to_fixed(10));
+        twin_path_draw(path, twin_int_to_fixed(100), twin_int_to_fixed(10));
+        twin_path_draw(path, twin_int_to_fixed(100), twin_int_to_fixed(100));
+        twin_path_draw(path, twin_int_to_fixed(10), twin_int_to_fixed(100));
+        twin_path_close(path);
+
+        twin_paint_path(d->dst, 0xffff0000, path);
+
+        twin_path_destroy(path);
+    }
+}
+
+/* Memory test: Pixmap lifecycle */
+static void mem_test_pixmap(void *data)
+{
+    struct mem_pixmap_test *d = (struct mem_pixmap_test *) data;
+
+    for (int i = 0; i < d->iterations; i++) {
+        twin_pixmap_t *pixmap =
+            twin_pixmap_create(TWIN_ARGB32, d->width, d->height);
+        twin_pixmap_destroy(pixmap);
+    }
+}
+
+/* Run a memory profiling test */
+static void run_memory_test(const char *test_name,
+                            void (*test_func)(void *),
+                            void *test_data,
+                            int iterations)
+{
+    struct timeval start, end;
+    long start_rss, end_rss, peak_rss;
+
+    get_memory_usage(&start_rss, &peak_rss);
+
+    gettimeofday(&start, NULL);
+    test_func(test_data);
+    gettimeofday(&end, NULL);
+
+    get_memory_usage(&end_rss, &peak_rss);
+
+    uint64_t elapsed_us = ((uint64_t) end.tv_sec * 1000000U + end.tv_usec) -
+                          ((uint64_t) start.tv_sec * 1000000U + start.tv_usec);
+
+    print_memory_stats(test_name, iterations, elapsed_us, start_rss, end_rss,
+                       peak_rss);
+}
+
+/* Run complete memory profiling suite */
+static void run_memory_profiling(void)
+{
+    printf("\n");
+    printf(
+        "Test                          Iters    us/op   kops/s  DeltaRS "
+        "PeakRS\n");
+    printf(
+        "                                                          (KB)    "
+        "(KB)\n");
+    printf(
+        "----------------------------------------------------------------------"
+        "\n");
+
+    /* Composite operations (xform buffer) */
+    struct mem_composite_test comp_100 = {
+        .dst = dst32,
+        .src = src32,
+        .width = 100,
+        .height = 100,
+        .iterations = MEM_TEST_ITERATIONS,
+    };
+    run_memory_test("100x100 comp (xform)", mem_test_composite, &comp_100,
+                    MEM_TEST_ITERATIONS);
+
+    struct mem_composite_test comp_500 = {
+        .dst = dst32,
+        .src = src32,
+        .width = 500,
+        .height = 500,
+        .iterations = MEM_TEST_ITERATIONS / 10,
+    };
+    run_memory_test("500x500 comp (xform)", mem_test_composite, &comp_500,
+                    MEM_TEST_ITERATIONS / 10);
+
+    /* Path operations (point reallocation) */
+    struct mem_path_test path_test = {.iterations = MEM_TEST_ITERATIONS / 10};
+    run_memory_test("Path ops (realloc)", mem_test_path, &path_test,
+                    MEM_TEST_ITERATIONS / 10);
+
+    /* Polygon fill (edge buffer) */
+    struct mem_polygon_test poly_test = {
+        .dst = dst32,
+        .iterations = MEM_TEST_ITERATIONS,
+    };
+    run_memory_test("Polygon fill (pool)", mem_test_polygon, &poly_test,
+                    MEM_TEST_ITERATIONS);
+
+    /* Pixmap lifecycle */
+    struct mem_pixmap_test pixmap_100 = {
+        .width = 100, .height = 100, .iterations = MEM_TEST_ITERATIONS};
+    run_memory_test("100x100 pixmap life", mem_test_pixmap, &pixmap_100,
+                    MEM_TEST_ITERATIONS);
+
+    struct mem_pixmap_test pixmap_500 = {
+        .width = 500, .height = 500, .iterations = MEM_TEST_ITERATIONS / 10};
+    run_memory_test("500x500 pixmap life", mem_test_pixmap, &pixmap_500,
+                    MEM_TEST_ITERATIONS / 10);
+
+    printf("\nNotes:\n");
+    printf("  DeltaRS: RSS change (+/- KB, negative = cleanup)\n");
+    printf("  PeakRS: Maximum memory usage during test\n");
+    printf("  Targets: xform (comp), pool (poly), realloc (path)\n");
+}
+
 int main(void)
 {
     time_t now;
     char hostname[256];
 
-    /* Print header similar to x11perf */
+    /* Print header */
     time(&now);
     if (gethostname(hostname, sizeof(hostname)) != 0)
         strcpy(hostname, "localhost");
@@ -306,7 +517,11 @@ int main(void)
 
     /* Create test pixmaps */
     src32 = twin_pixmap_from_file("assets/tux.png", TWIN_ARGB32);
-    assert(src32);
+    if (!src32) {
+        /* Fallback: create a simple pixmap if file not found */
+        src32 = twin_pixmap_create(TWIN_ARGB32, 256, 256);
+        twin_fill(src32, 0xffff0000, TWIN_SOURCE, 0, 0, 256, 256);
+    }
     dst32 = twin_pixmap_create(TWIN_ARGB32, TEST_PIX_WIDTH, TEST_PIX_HEIGHT);
     assert(dst32);
     mask8 = twin_pixmap_create(TWIN_A8, TEST_PIX_WIDTH, TEST_PIX_HEIGHT);
@@ -325,11 +540,18 @@ int main(void)
     test_height = 1;
     test_argb32_source_argb32();
 
-    /* Run comprehensive test series */
+    /* Run comprehensive performance test series */
     run_basic_tests();
     run_solid_tests();
     run_alpha_tests();
     run_large_tests();
+
+    /* Run memory profiling tests */
+    printf("\n");
+    printf("========================================\n");
+    printf("  Memory Profiling\n");
+    printf("========================================\n");
+    run_memory_profiling();
 
     /* Cleanup */
     twin_pixmap_destroy(src32);

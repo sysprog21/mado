@@ -4,18 +4,18 @@ config CONFIGURED
     bool
     default y
 
-# Dependency detection using Kbuild toolchain functions
+# Dependency detection using Kconfiglib shell function
 config HAVE_SDL2
-    def_bool $(success,pkg-config --exists sdl2)
+    def_bool $(shell,pkg-config --exists sdl2 && echo y)
 
 config HAVE_PIXMAN
-    def_bool $(success,pkg-config --exists pixman-1)
+    def_bool $(shell,pkg-config --exists pixman-1 && echo y)
 
 config HAVE_LIBPNG
-    def_bool $(success,pkg-config --exists libpng)
+    def_bool $(shell,pkg-config --exists libpng && echo y)
 
 config HAVE_LIBJPEG
-    def_bool $(success,pkg-config --exists libjpeg)
+    def_bool $(shell,pkg-config --exists libjpeg && echo y)
 
 choice
     prompt "Backend Selection"

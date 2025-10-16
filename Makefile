@@ -177,10 +177,15 @@ endif
 
 CFLAGS += -include config.h
 
-# Only include build rules when not running configuration targets
-ifeq ($(filter $(check_goal),config defconfig),)
-include mk/common.mk
+# Only skip build rules when running ONLY config/defconfig (no other targets)
+ifneq ($(filter-out config defconfig,$(check_goal)),)
+    # Has targets other than config/defconfig
+    include mk/common.mk
+else ifeq ($(check_goal),)
+    # Empty goals means building 'all'
+    include mk/common.mk
 endif
+# Otherwise, only config/defconfig targets - skip mk/common.mk
 
 KCONFIGLIB := tools/kconfig/kconfiglib.py
 $(KCONFIGLIB):

@@ -175,7 +175,8 @@ font-edit_cflags-y := \
 	$(shell sdl2-config --cflags)
 font-edit_ldflags-y := \
 	$(shell pkg-config --libs cairo) \
-	$(shell sdl2-config --libs)
+	$(shell sdl2-config --libs) \
+	-lm
 
 # Headless control tool
 target-$(CONFIG_TOOL_HEADLESS_CTL) += headless-ctl

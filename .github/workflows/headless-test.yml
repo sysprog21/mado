@@ -1,0 +1,135 @@
+name: Headless Backend Tests
+
+on: [push, pull_request]
+
+jobs:
+  headless-test:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y valgrind imagemagick python3
+
+    - name: Configure build
+      run: |
+        make defconfig
+        python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig \
+          BACKEND_HEADLESS=y \
+          TOOLS=y \
+          TOOL_HEADLESS_CTL=y \
+          DEMO_MULTI=y
+
+    - name: Build with headless backend
+      run: |
+        make -j$(nproc)
+
+    - name: Verify build outputs
+      run: |
+        test -x ./demo-headless || (echo "demo-headless not built" && exit 1)
+        test -x ./headless-ctl || (echo "headless-ctl not built" && exit 1)
+        echo "Build outputs verified successfully"
+
+    - name: Run basic headless test
+      run: |
+        # Start demo in background
+        timeout 30s ./demo-headless &
+        DEMO_PID=$!
+        echo "Started demo-headless with PID $DEMO_PID"
+
+        # Wait for backend to initialize
+        sleep 3
+
+        # Test control tool commands
+        ./headless-ctl status
+        ./headless-ctl shot test_output.png
+
+        # Inject mouse events
+        ./headless-ctl mouse move 100 100
+        ./headless-ctl mouse down 100 100 1
+        ./headless-ctl mouse up 100 100 1
+
+        # Check status again after events
+        ./headless-ctl status
+
+        # Shutdown gracefully
+        ./headless-ctl shutdown || true
+
+        # Wait for process to exit
+        wait $DEMO_PID || true
+        echo "Basic test completed"
+
+    - name: Verify screenshot output
+      run: |
+        test -f test_output.png || (echo "Screenshot not created" && exit 1)
+        file test_output.png | grep -q PNG || (echo "Screenshot is not a valid PNG" && exit 1)
+        echo "Screenshot verification passed"
+
+    - name: Test deterministic rendering
+      run: |
+        # Run twice and compare outputs for determinism
+        echo "First run..."
+        timeout 10s ./demo-headless &
+        PID1=$!
+        sleep 3
+        ./headless-ctl shot run1.png
+        ./headless-ctl shutdown
+        wait $PID1 || true
+
+        echo "Second run..."
+        timeout 10s ./demo-headless &
+        PID2=$!
+        sleep 3
+        ./headless-ctl shot run2.png
+        ./headless-ctl shutdown
+        wait $PID2 || true
+
+        # Compare images (allowing minor differences)
+        DIFF=$(compare -metric AE run1.png run2.png null: 2>&1 || echo "0")
+        echo "Pixel difference: $DIFF"
+
+        if [ "$DIFF" -gt "100" ]; then
+          echo "ERROR: Renderings differ by more than 100 pixels"
+          exit 1
+        fi
+        echo "Deterministic rendering test passed"
+
+    - name: Memory leak detection with Valgrind
+      run: |
+        # Run with Valgrind for leak detection
+        timeout 15s valgrind \
+          --leak-check=full \
+          --show-leak-kinds=definite,possible \
+          --errors-for-leak-kinds=definite \
+          --error-exitcode=1 \
+          --log-file=valgrind.log \
+          ./demo-headless &
+        VALGRIND_PID=$!
+
+        sleep 5
+
+        # Perform some operations
+        ./headless-ctl mouse move 50 50 || true
+        ./headless-ctl shot valgrind_screenshot.png || true
+        ./headless-ctl shutdown || true
+
+        # Wait for Valgrind to finish
+        wait $VALGRIND_PID || VALGRIND_EXIT=$?
+
+        # Display Valgrind summary
+        echo "=== Valgrind Summary ==="
+        grep -A 10 "LEAK SUMMARY" valgrind.log || true
+        grep "ERROR SUMMARY" valgrind.log || true
+
+        # Check for definite leaks
+        if grep -q "definitely lost: [1-9]" valgrind.log; then
+          echo "ERROR: Memory leaks detected"
+          cat valgrind.log
+          exit 1
+        fi
+        echo "No definite memory leaks detected"

@@ -133,6 +133,11 @@ libtwin.a_cflags-y += $(shell pkg-config --cflags neatvnc aml pixman-1)
 TARGET_LIBS += $(shell pkg-config --libs neatvnc aml pixman-1)
 endif
 
+ifeq ($(CONFIG_BACKEND_HEADLESS), y)
+BACKEND = headless
+libtwin.a_files-y += backend/headless.c
+endif
+
 # Performance tester
 
 ifeq ($(CONFIG_PERF_TEST), y)
@@ -171,6 +176,12 @@ font-edit_cflags-y := \
 font-edit_ldflags-y := \
 	$(shell pkg-config --libs cairo) \
 	$(shell sdl2-config --libs)
+
+# Headless control tool
+target-$(CONFIG_TOOL_HEADLESS_CTL) += headless-ctl
+headless-ctl_files-y = tools/headless-ctl.c
+headless-ctl_includes-y := include
+headless-ctl_ldflags-y := # -lrt
 endif
 
 # Build system integration

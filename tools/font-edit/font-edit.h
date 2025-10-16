@@ -24,10 +24,13 @@
 #define _TWIN_FEDIT_H_
 
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#define maybe_unused __attribute__((unused))
 
 /* Geometric types */
 
@@ -104,8 +107,10 @@ void dispose_pts(pts_t *pts);
  * add_pt() - Add a point to pts_t
  * @pts: the object that receives the added points
  * @pt: the point to be added
+ *
+ * Return: true on success, false on memory allocation failure
  */
-void add_pt(pts_t *pts, pt_t *pt);
+bool add_pt(pts_t *pts, pt_t *pt);
 
 /*
  * distance_to_point() - Calculate distance between two points

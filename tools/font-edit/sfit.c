@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2004 Keith Packard
+ * Copyright (c) 2025 National Cheng Kung University, Taiwan
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
  * documentation for any purpose is hereby granted without fee, provided that
@@ -22,29 +23,11 @@
 
 #include "font-edit.h"
 
-static double min(double a, double b)
-{
-    return a < b ? a : b;
-}
-
-static double max(double a, double b)
-{
-    return a > b ? a : b;
-}
-
-double sqrt(double x)
-{
-    double i = x / 2;
-    if (x < 0)
-        return 0;
-    while (fabs(i - (x / i)) / i > 0.000000000000001)
-        i = (i + (x / i)) / 2;
-    return i;
-}
-
 pts_t *new_pts(void)
 {
     pts_t *pts = malloc(sizeof(pts_t));
+    if (!pts)
+        return NULL;
 
     pts->n = 0;
     pts->s = 0;
@@ -60,18 +43,25 @@ void dispose_pts(pts_t *pts)
     free(pts);
 }
 
-void add_pt(pts_t *pts, pt_t *pt)
+bool add_pt(pts_t *pts, pt_t *pt)
 {
     if (pts->n == pts->s) {
         int ns = pts->s ? pts->s * 2 : 16;
+        pt_t *new_pt;
 
         if (pts->pt)
-            pts->pt = realloc(pts->pt, ns * sizeof(pt_t));
+            new_pt = realloc(pts->pt, ns * sizeof(pt_t));
         else
-            pts->pt = malloc(ns * sizeof(pt_t));
+            new_pt = malloc(ns * sizeof(pt_t));
+
+        if (!new_pt)
+            return false;
+
+        pts->pt = new_pt;
         pts->s = ns;
     }
     pts->pt[pts->n++] = *pt;
+    return true;
 }
 
 double distance_to_point(pt_t *a, pt_t *b)
@@ -84,8 +74,7 @@ double distance_to_point(pt_t *a, pt_t *b)
 
 double distance_to_line(pt_t *p, pt_t *p1, pt_t *p2)
 {
-    /*
-     * Convert to normal form (AX + BY + C = 0)
+    /* Convert to normal form (AX + BY + C = 0)
      *
      * (X - x1) * (y2 - y1) = (Y - y1) * (x2 - x1)
      *
@@ -147,17 +136,6 @@ double distance_to_segment(pt_t *p, pt_t *p1, pt_t *p2)
     return distance_to_point(p, &px);
 }
 
-static double distance_to_segments(pt_t *p, pts_t *s)
-{
-    double m = distance_to_segment(p, &s->pt[0], &s->pt[1]);
-    int i;
-    for (i = 1; i < s->n - 1; i++) {
-        double d = distance_to_segment(p, &s->pt[i], &s->pt[i + 1]);
-        m = min(d, m);
-    }
-    return m;
-}
-
 pt_t lerp(pt_t *a, pt_t *b)
 {
     pt_t p;
@@ -167,127 +145,128 @@ pt_t lerp(pt_t *a, pt_t *b)
     return p;
 }
 
-static void dcj(spline_t *s, spline_t *s1, spline_t *s2)
+/* Chord-length parameterization
+ * Assigns parameter t to each point based on cumulative chord length
+ */
+static void chord_length_parameterize(pt_t *p, int n, double *t)
 {
-    pt_t ab = lerp(&s->a, &s->b);
-    pt_t bc = lerp(&s->b, &s->c);
-    pt_t cd = lerp(&s->c, &s->d);
-    pt_t abbc = lerp(&ab, &bc);
-    pt_t bccd = lerp(&bc, &cd);
-    pt_t final = lerp(&abbc, &bccd);
-
-    s1->a = s->a;
-    s1->b = ab;
-    s1->c = abbc;
-    s1->d = final;
-
-    s2->a = final;
-    s2->b = bccd;
-    s2->c = cd;
-    s2->d = s->d;
-}
-
-static double spline_error(spline_t *s)
-{
-    double berr, cerr;
-
-    berr = distance_to_line(&s->b, &s->a, &s->d);
-    cerr = distance_to_line(&s->c, &s->a, &s->d);
-    return max(berr, cerr);
-}
-
-static void decomp(pts_t *pts, spline_t *s, double tolerance)
-{
-    if (spline_error(s) <= tolerance)
-        add_pt(pts, &s->a);
-    else {
-        spline_t s1, s2;
-        dcj(s, &s1, &s2);
-        decomp(pts, &s1, tolerance);
-        decomp(pts, &s2, tolerance);
-    }
-}
-
-static pts_t *decompose(spline_t *s, double tolerance)
-{
-    pts_t *result = new_pts();
-
-    decomp(result, s, tolerance);
-    add_pt(result, &s->d);
-    return result;
-}
-
-static double spline_fit_error(pt_t *p, int n, spline_t *s, double tolerance)
-{
-    pts_t *sp = decompose(s, tolerance);
-    double err = 0;
+    double total_len = 0.0;
     int i;
 
-    for (i = 0; i < n; i++) {
-        double e = distance_to_segments(&p[i], sp);
-        err += e * e;
+    t[0] = 0.0;
+
+    /* Calculate cumulative chord lengths */
+    for (i = 1; i < n; i++) {
+        double dx = p[i].x - p[i - 1].x;
+        double dy = p[i].y - p[i - 1].y;
+        double len = sqrt(dx * dx + dy * dy);
+        total_len += len;
+        t[i] = total_len;
     }
-    dispose_pts(sp);
-    return err;
+
+    /* Normalize to [0, 1] */
+    if (total_len > 0.0) {
+        for (i = 1; i < n; i++)
+            t[i] /= total_len;
+    }
 }
 
+/* Least-squares cubic Bézier curve fitting - O(n) algorithm
+ *
+ * Given n points and fixed endpoints (a, d), finds control points (b, c)
+ * that minimize squared distance to the curve.
+ *
+ * Uses chord-length parameterization and normal equations:
+ *   For cubic Bézier: B(t) = (1-t)³a + 3(1-t)²t·b + 3(1-t)t²·c + t³d
+ *
+ *   Rearranged: p - (1-t)³a - t³d = A(t)·b + B(t)·c
+ *   where A(t) = 3(1-t)²t, B(t) = 3(1-t)t²
+ *
+ * Solves 2x2 linear system for b and c using normal equations.
+ */
 spline_t fit(pt_t *p, int n)
 {
     spline_t s;
-    spline_t best_s;
+    double *t;
+    double C[2][2] = {{0, 0}, {0, 0}}; /* Coefficient matrix CᵀC */
+    double X[2] = {0, 0};              /* Right-hand side for x coords */
+    double Y[2] = {0, 0};              /* Right-hand side for y coords */
+    double det;
+    int i;
 
-    double tol = 0.5;
-    double best_err = 10000;
-    double sbx_min;
-    double sbx_max;
-    double sby_min;
-    double sby_max;
-    double scx_min;
-    double scx_max;
-    double scy_min;
-    double scy_max;
-
+    /* Fixed endpoints */
     s.a = p[0];
     s.d = p[n - 1];
 
-    if (s.a.x < s.d.x) {
-        sbx_min = s.a.x;
-        sbx_max = s.d.x;
-
-        scx_max = s.d.x;
-        scx_min = s.a.x;
-    } else {
-        sbx_max = s.a.x;
-        sbx_min = s.d.x;
-
-        scx_min = s.d.x;
-        scx_max = s.a.x;
+    /* Handle degenerate cases */
+    if (n < 2) {
+        s.b = s.a;
+        s.c = s.d;
+        return s;
     }
 
-    if (s.a.y < s.d.y) {
-        sby_min = s.a.y;
-        sby_max = s.d.y;
-
-        scy_max = s.d.y;
-        scy_min = s.a.y;
-    } else {
-        sby_max = s.a.y;
-        sby_min = s.d.y;
-
-        scy_min = s.d.y;
-        scy_max = s.a.y;
+    /* Allocate parameter array */
+    t = malloc(n * sizeof(double));
+    if (!t) {
+        /* Fallback: linear interpolation */
+        s.b.x = s.a.x + (s.d.x - s.a.x) / 3.0;
+        s.b.y = s.a.y + (s.d.y - s.a.y) / 3.0;
+        s.c.x = s.a.x + 2.0 * (s.d.x - s.a.x) / 3.0;
+        s.c.y = s.a.y + 2.0 * (s.d.y - s.a.y) / 3.0;
+        return s;
     }
 
-    tol = 0.5;
-    for (s.b.x = sbx_min; s.b.x <= sbx_max; s.b.x += 1.0)
-        for (s.b.y = sby_min; s.b.y <= sby_max; s.b.y += 1.0)
-            for (s.c.x = scx_min; s.c.x <= scx_max; s.c.x += 1.0)
-                for (s.c.y = scy_min; s.c.y <= scy_max; s.c.y += 1.0) {
-                    double err = spline_fit_error(p, n, &s, tol);
-                    if (err < best_err) {
-                        best_err = err;
-                        best_s = s;
-                    }
-                }
-    return best_s;
+    /* Compute parameter values */
+    chord_length_parameterize(p, n, t);
+
+    /* Build normal equations: CᵀC and Cᵀrhs */
+    for (i = 0; i < n; i++) {
+        double ti = t[i];
+        double ti2 = ti * ti;
+        double ti3 = ti2 * ti;
+        double one_minus_t = 1.0 - ti;
+        double one_minus_t2 = one_minus_t * one_minus_t;
+        double one_minus_t3 = one_minus_t2 * one_minus_t;
+
+        /* Basis functions for control points b and c */
+        double A = 3.0 * one_minus_t2 * ti; /* coefficient for b */
+        double B = 3.0 * one_minus_t * ti2; /* coefficient for c */
+
+        /* Subtract fixed endpoint contributions from points */
+        double tmp_x = p[i].x - one_minus_t3 * s.a.x - ti3 * s.d.x;
+        double tmp_y = p[i].y - one_minus_t3 * s.a.y - ti3 * s.d.y;
+
+        /* Accumulate normal equations */
+        C[0][0] += A * A;
+        C[0][1] += A * B;
+        C[1][1] += B * B;
+
+        X[0] += A * tmp_x;
+        X[1] += B * tmp_x;
+        Y[0] += A * tmp_y;
+        Y[1] += B * tmp_y;
+    }
+
+    C[1][0] = C[0][1]; /* Matrix is symmetric */
+
+    free(t);
+
+    /* Solve 2x2 system using Cramer's rule */
+    det = C[0][0] * C[1][1] - C[0][1] * C[1][0];
+
+    if (fabs(det) < 1e-10) {
+        /* Singular matrix: fallback to linear interpolation */
+        s.b.x = s.a.x + (s.d.x - s.a.x) / 3.0;
+        s.b.y = s.a.y + (s.d.y - s.a.y) / 3.0;
+        s.c.x = s.a.x + 2.0 * (s.d.x - s.a.x) / 3.0;
+        s.c.y = s.a.y + 2.0 * (s.d.y - s.a.y) / 3.0;
+    } else {
+        /* Solve for control points */
+        s.b.x = (X[0] * C[1][1] - X[1] * C[0][1]) / det;
+        s.c.x = (C[0][0] * X[1] - C[1][0] * X[0]) / det;
+        s.b.y = (Y[0] * C[1][1] - Y[1] * C[0][1]) / det;
+        s.c.y = (C[0][0] * Y[1] - C[1][0] * Y[0]) / det;
+    }
+
+    return s;
 }

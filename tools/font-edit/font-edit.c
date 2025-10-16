@@ -39,19 +39,19 @@ static int offset;
 
 static int offsets[1024];
 
-/*
- * exit_window - bool. Control the life of the window.
+/* exit_window - bool. Control the life of the window.
  * if the value is false, the window remains open;
  * otherwise, the window closes.
  */
 static bool exit_window = false;
 
-static int init(int argc __attribute__((unused)),
-                char **argv __attribute__((unused)))
+static void free_cmd(cmd_t *cmd);
+
+static bool init(int argc maybe_unused, char **argv maybe_unused)
 {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("Failed to initialize SDL video. Reason: %s\n", SDL_GetError());
-        return 0;
+        return false;
     }
 
     window = SDL_CreateWindow("Font Editor", SDL_WINDOWPOS_CENTERED,
@@ -59,7 +59,7 @@ static int init(int argc __attribute__((unused)),
                               SDL_WINDOW_SHOWN);
     if (!window) {
         printf("Failed to create SDL window. Reason: %s\n", SDL_GetError());
-        return 0;
+        return false;
     }
 
     /* Create an SDL surface linked to the window */
@@ -76,30 +76,65 @@ static int init(int argc __attribute__((unused)),
     cairo_scale(cr, scale, scale);
 
     cairo_set_font_size(cr, 2);
-    return 1;
+    return true;
+}
+
+static void cleanup(void)
+{
+    if (cr) {
+        cairo_destroy(cr);
+        cr = NULL;
+    }
+    if (surface) {
+        cairo_surface_destroy(surface);
+        surface = NULL;
+    }
+    if (window) {
+        SDL_DestroyWindow(window);
+        window = NULL;
+    }
+    SDL_Quit();
 }
 
 static cmd_t *copy_cmd(cmd_t *cmd)
 {
-    cmd_t *n = malloc(sizeof(cmd_t));
     if (!cmd)
-        return 0;
-    *n = *cmd;
-    n->next = copy_cmd(cmd->next);
-    return n;
+        return NULL;
+
+    cmd_t *head = NULL;
+    cmd_t **tail = &head;
+
+    while (cmd) {
+        cmd_t *n = malloc(sizeof(cmd_t));
+        if (!n) {
+            /* Cleanup on failure */
+            free_cmd(head);
+            return NULL;
+        }
+        *n = *cmd;
+        n->next = NULL;
+        *tail = n;
+        tail = &n->next;
+        cmd = cmd->next;
+    }
+
+    return head;
 }
 
 static void free_cmd(cmd_t *cmd)
 {
-    if (cmd) {
-        free_cmd(cmd->next);
+    while (cmd) {
+        cmd_t *next = cmd->next;
         free(cmd);
+        cmd = next;
     }
 }
 
 static cmd_t *insert_cmd(cmd_t **prev)
 {
     cmd_t *n = malloc(sizeof(cmd_t));
+    if (!n)
+        return NULL;
 
     n->op = op_noop;
     n->next = *prev;
@@ -124,13 +159,21 @@ static void delete_cmd(cmd_t **head, cmd_t *cmd)
     free(cmd);
 }
 
-static void push(char_t *c)
+static bool push(char_t *c)
 {
     cmd_stack_t *s = malloc(sizeof(cmd_stack_t));
+    if (!s)
+        return false;
 
     s->cmd = copy_cmd(c->cmd);
+    if (!s->cmd && c->cmd) {
+        free(s);
+        return false;
+    }
+
     s->prev = c->stack;
     c->stack = s;
+    return true;
 }
 
 static void pop(char_t *c)
@@ -148,7 +191,8 @@ static void pop(char_t *c)
 
 static void delete_first_cmd(char_t *c, cmd_t *first)
 {
-    push(c);
+    if (!push(c))
+        fprintf(stderr, "Warning: cannot save undo state\n");
     delete_cmd(&c->cmd, first);
     c->first = c->last = 0;
 }
@@ -171,6 +215,9 @@ static int commas(char *line)
 static char_t *read_char(FILE *file)
 {
     char_t *c = malloc(sizeof(char_t));
+    if (!c)
+        return NULL;
+
     char line[1024];
     cmd_t *cmd;
 
@@ -195,16 +242,22 @@ static char_t *read_char(FILE *file)
         switch (line[5]) {
         case 'm':
             cmd = append_cmd(c);
+            if (!cmd)
+                goto error;
             cmd->op = op_move;
             sscanf(line + 8, "%lf, %lf", &cmd->pt[0].x, &cmd->pt[0].y);
             break;
         case 'l':
             cmd = append_cmd(c);
+            if (!cmd)
+                goto error;
             cmd->op = op_line;
             sscanf(line + 8, "%lf, %lf", &cmd->pt[0].x, &cmd->pt[0].y);
             break;
         case 'c':
             cmd = append_cmd(c);
+            if (!cmd)
+                goto error;
             cmd->op = op_curve;
             sscanf(line + 8, "%lf, %lf, %lf, %lf, %lf, %lf", &cmd->pt[0].x,
                    &cmd->pt[0].y, &cmd->pt[1].x, &cmd->pt[1].y, &cmd->pt[2].x,
@@ -214,7 +267,18 @@ static char_t *read_char(FILE *file)
             return c;
         }
     }
-    return 0;
+    return NULL;
+
+error:
+    free_cmd(c->cmd);
+    while (c->stack) {
+        cmd_stack_t *s = c->stack;
+        c->stack = s->prev;
+        free_cmd(s->cmd);
+        free(s);
+    }
+    free(c);
+    return NULL;
 }
 
 #define DOT_SIZE 1
@@ -408,9 +472,13 @@ static bool is_before(cmd_t *before, cmd_t *after)
 {
     if (!before)
         return false;
-    if (before->next == after)
-        return true;
-    return is_before(before->next, after);
+
+    while (before) {
+        if (before->next == after)
+            return true;
+        before = before->next;
+    }
+    return false;
 }
 
 static void order(cmd_t **first_p, cmd_t **last_p)
@@ -425,18 +493,28 @@ static void order(cmd_t **first_p, cmd_t **last_p)
 static void replace_with_spline(char_t *c, cmd_t *first, cmd_t *last)
 {
     pts_t *pts = new_pts();
+    if (!pts) {
+        fprintf(stderr, "Error: out of memory\n");
+        return;
+    }
+
     spline_t s;
     cmd_t *cmd, *next, *save;
 
     order(&first, &last);
     for (cmd = first; cmd != last->next; cmd = cmd->next) {
         int i = cmd->op == op_curve ? 2 : 0;
-        add_pt(pts, &cmd->pt[i]);
+        if (!add_pt(pts, &cmd->pt[i])) {
+            dispose_pts(pts);
+            fprintf(stderr, "Error: out of memory\n");
+            return;
+        }
     }
 
     s = fit(pts->pt, pts->n);
 
-    push(c);
+    if (!push(c))
+        fprintf(stderr, "Warning: cannot save undo state\n");
 
     save = last->next;
 
@@ -446,6 +524,12 @@ static void replace_with_spline(char_t *c, cmd_t *first, cmd_t *last)
     }
 
     cmd = insert_cmd(&first->next);
+    if (!cmd) {
+        pop(c);
+        dispose_pts(pts);
+        fprintf(stderr, "Error: out of memory\n");
+        return;
+    }
 
     cmd->op = op_curve;
     cmd->pt[0] = s.b;
@@ -460,13 +544,23 @@ static void split(char_t *c, cmd_t *first, cmd_t *last)
 {
     cmd_t *cmd;
 
-    push(c);
+    if (!push(c))
+        fprintf(stderr, "Warning: cannot save undo state\n");
     cmd = insert_cmd(&first->next);
+    if (!cmd) {
+        pop(c);
+        fprintf(stderr, "Error: out of memory\n");
+        return;
+    }
     cmd->op = op_line;
     cmd->pt[0] = lerp(&first->pt[0], &last->pt[0]);
     if (last->op == op_move) {
         cmd_t *extra = insert_cmd(&last->next);
-
+        if (!extra) {
+            pop(c);
+            fprintf(stderr, "Error: out of memory\n");
+            return;
+        }
         extra->op = op_line;
         extra->pt[0] = last->pt[0];
         last->pt[0] = cmd->pt[0];
@@ -482,7 +576,8 @@ static void tweak_spline(char_t *c,
 {
     int i = !!is_2nd_point;
 
-    push(c);
+    if (!push(c))
+        fprintf(stderr, "Warning: cannot save undo state\n");
     first->pt[i].x += dx;
     first->pt[i].y += dy;
 }
@@ -658,6 +753,21 @@ static void generate_font_metrics(void)
     printf("\n");
 }
 
+static void free_char(char_t *c)
+{
+    if (!c)
+        return;
+
+    free_cmd(c->cmd);
+    while (c->stack) {
+        cmd_stack_t *s = c->stack;
+        c->stack = s->prev;
+        free_cmd(s->cmd);
+        free(s);
+    }
+    free(c);
+}
+
 int main(int argc, char **argv)
 {
     char_t *c;
@@ -673,16 +783,22 @@ int main(int argc, char **argv)
         return 2;
     }
 
-    if (!init(argc, argv))
-        exit(1);
+    if (!init(argc, argv)) {
+        fclose(file);
+        return 1;
+    }
+
     while ((c = read_char(file)) && !exit_window) {
         play(c);
         print_char(c);
+        free_char(c);
     }
 
     fclose(file);
 
     generate_font_metrics();
+
+    cleanup();
 
     return 0;
 }

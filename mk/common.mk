@@ -681,10 +681,11 @@ __FORCE:
 # Only include dependencies when building known targets
 build-goals := all clean $(target-builds)
 ifneq ($(MAKECMDGOALS),)
-    # MAKECMDGOALS is not empty, check if it's a known target
-    ifneq ($(filter $(MAKECMDGOALS),$(build-goals)),)
-        # Known target, include dependencies (except for clean)
-        ifneq "$(MAKECMDGOALS)" "clean"
+    # MAKECMDGOALS is not empty, check if ALL goals are known
+    # (i.e., no unknown goals remain after filtering out known ones)
+    ifeq ($(filter-out $(build-goals),$(MAKECMDGOALS)),)
+        # All goals are known, include dependencies (except for clean-only builds)
+        ifeq ($(filter clean,$(MAKECMDGOALS)),)
             -include $(target-depends)
         endif
     endif

@@ -1,8 +1,3 @@
-# Ensure tools/kconfig submodule is initialized
-ifeq ($(wildcard tools/kconfig/menuconfig.py),)
-    $(shell git submodule update --init tools/kconfig)
-endif
-
 -include .config
 
 check_goal := $(strip $(MAKECMDGOALS))
@@ -189,7 +184,12 @@ endif
 
 KCONFIGLIB := tools/kconfig/kconfiglib.py
 $(KCONFIGLIB):
-	git submodule update --init tools/kconfig
+	@if [ -d .git ]; then \
+	    git submodule update --init tools/kconfig; \
+	else \
+	    echo "Error: Kconfig tools not found"; \
+	    exit 1; \
+	fi
 
 # Load default configuration
 .PHONY: defconfig

@@ -308,7 +308,7 @@ _cmd_compile.cxx.host     = $(HOSTCXX) $(__HOSTARCHFLAGS) $(__CXXFLAGS) $($1_arc
                             $$($1_$$<_cxxflags-y) $($1_includes) -c -o $$@ $$<
 _cmd_link.cxx.host        = $(HOSTCXX) $(__HOSTARCHFLAGS) $(__CXXFLAGS) $($1_libraries) -o $$@ $$(filter-out __FORCE $($1_depends_y),$$^) \
                             $($1_archflags) $($1_ldflags) $(__LDFLAGS)
-_cmd_link_so.cxx.host     = $(HOSTCXX) $(__HOSTARCHFLAGS) $(__CXXFLAGS)$($1_libraries) -o $$@ $$(filter-out __FORCE $($1_depends_y),$$^) \
+_cmd_link_so.cxx.host     = $(HOSTCXX) $(__HOSTARCHFLAGS) $(__CXXFLAGS) $($1_libraries) -o $$@ $$(filter-out __FORCE $($1_depends_y),$$^) \
                             $($1_archflags) $($1_ldflags) $$(filter-out -static,$(__LDFLAGS)) -shared $$(if $($1_soname-y),-Wl$$(comma)-soname$$(comma)$($1_soname-y),)
 
 _cmd_ar                   = $(AR) rcs $$@ $$(filter-out __FORCE $($1_depends_y),$$^)

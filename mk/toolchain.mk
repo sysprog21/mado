@@ -25,7 +25,7 @@ ifndef CXX
 CXX := $(CROSS_COMPILE)g++
 endif
 ifeq ("$(CC_IS_CLANG)", "1")
-override CXX := $(dir $(CC))$(subst clang,clang++,$(notdir $(CC)))
+override CXX := $(subst clang,clang++,$(CC))
 endif
 
 ifndef CPP
@@ -81,5 +81,5 @@ HOSTSTRIP := $(HOST_COMPILE)strip
 endif
 
 ifndef HOSTOBJCOPY
-HOSTOBJCOPY:= $(HOST_COMPILE)objcpy
+HOSTOBJCOPY := $(HOST_COMPILE)objcopy
 endif

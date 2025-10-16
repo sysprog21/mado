@@ -1,5 +1,8 @@
 -include .config
 
+# Set default goal explicitly
+.DEFAULT_GOAL := all
+
 check_goal := $(strip $(MAKECMDGOALS))
 ifeq ($(filter $(check_goal),config defconfig),)
     ifneq "$(CONFIG_CONFIGURED)" "y"
@@ -57,6 +60,11 @@ libtwin.a_files-y = \
 libtwin.a_includes-y := \
 	include \
 	src
+
+# Auto-generate compositing function declarations if missing
+src/composite-decls.h: scripts/gen-composite-decls.py
+	@echo "  GEN        $@"
+	@$< > $@
 
 # Optional features
 
@@ -188,6 +196,14 @@ endif
 # Build system integration
 
 CFLAGS += -include config.h
+
+# Ensure composite-decls.h exists before including build rules
+# (needed for dependency generation in mk/common.mk)
+ifeq ($(filter config defconfig clean,$(MAKECMDGOALS)),)
+    ifeq ($(wildcard src/composite-decls.h),)
+        $(shell scripts/gen-composite-decls.py > src/composite-decls.h)
+    endif
+endif
 
 # Only skip build rules when running ONLY config/defconfig (no other targets)
 ifneq ($(filter-out config defconfig,$(check_goal)),)

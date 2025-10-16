@@ -46,7 +46,8 @@ static int offsets[1024];
  */
 static bool exit_window = false;
 
-static int init(int argc, char **argv)
+static int init(int argc __attribute__((unused)),
+                char **argv __attribute__((unused)))
 {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("Failed to initialize SDL video. Reason: %s\n", SDL_GetError());

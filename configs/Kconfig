@@ -6,16 +6,16 @@ config CONFIGURED
 
 # Dependency detection using Kconfiglib shell function
 config HAVE_SDL2
-    def_bool $(shell,pkg-config --exists sdl2 && echo y)
+    def_bool $(shell,pkg-config --exists sdl2 && echo y || echo n)
 
 config HAVE_PIXMAN
-    def_bool $(shell,pkg-config --exists pixman-1 && echo y)
+    def_bool $(shell,pkg-config --exists pixman-1 && echo y || echo n)
 
 config HAVE_LIBPNG
-    def_bool $(shell,pkg-config --exists libpng && echo y)
+    def_bool $(shell,pkg-config --exists libpng && echo y || echo n)
 
 config HAVE_LIBJPEG
-    def_bool $(shell,pkg-config --exists libjpeg && echo y)
+    def_bool $(shell,pkg-config --exists libjpeg && echo y || echo n)
 
 choice
     prompt "Backend Selection"
@@ -31,6 +31,9 @@ config BACKEND_SDL
 
 config BACKEND_VNC
     bool "VNC server output support"
+
+config BACKEND_HEADLESS
+    bool "Headless backend"
 endchoice
 
 choice
@@ -174,11 +177,16 @@ config TOOLS
 config TOOL_FONTEDIT
     bool "Build scalable font editor"
     default y
-    depends on TOOLS
+    depends on TOOLS && HAVE_SDL2
 
 config PERF_TEST
     bool "Build performance tester"
     default y
     depends on TOOLS
+
+config TOOL_HEADLESS_CTL
+    bool "Build headless backend control tool"
+    default y
+    depends on TOOLS && BACKEND_HEADLESS
 
 endmenu

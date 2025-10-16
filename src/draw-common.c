@@ -184,7 +184,7 @@ void twin_shadow_border(twin_pixmap_t *shadow,
              * Create a shadow with a diagonal shape, extending from the
              * top-left to the bottom-right.
              */
-            clip = min((y - y_start), offset_x);
+            clip = min((twin_coord_t) (y - y_start), offset_x);
             twin_cover(shadow, color, right_edge, y, clip);
         } else {
             /* Calculate the range of the corner. */
@@ -203,7 +203,8 @@ void twin_shadow_border(twin_pixmap_t *shadow,
              * Handle the case where the vertical shadow offset is larger than
              * the horizontal shadow offset.
              */
-            corner_offset = min(right_span - right_edge, offset);
+            corner_offset =
+                min((twin_coord_t) (right_span - right_edge), offset);
             for (twin_coord_t i = 0; i < corner_offset; i++) {
                 /* The corner's pixels are symmetrical to the diagonal. */
                 twin_cover(shadow, color, right_edge + i, y, 1);

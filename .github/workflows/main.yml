@@ -47,8 +47,7 @@ jobs:
       shell: bash
     - name: default build
       run: |
-            tools/kconfig/defconfig.py --kconfig configs/Kconfig configs/defconfig
-            tools/kconfig/genconfig.py configs/Kconfig
+            make defconfig
             make
 
   coding-style:

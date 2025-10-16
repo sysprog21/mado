@@ -4,6 +4,19 @@ config CONFIGURED
     bool
     default y
 
+# Dependency detection using Kbuild toolchain functions
+config HAVE_SDL2
+    def_bool $(success,pkg-config --exists sdl2)
+
+config HAVE_PIXMAN
+    def_bool $(success,pkg-config --exists pixman-1)
+
+config HAVE_LIBPNG
+    def_bool $(success,pkg-config --exists libpng)
+
+config HAVE_LIBJPEG
+    def_bool $(success,pkg-config --exists libjpeg)
+
 choice
     prompt "Backend Selection"
     default BACKEND_SDL
@@ -14,6 +27,7 @@ config BACKEND_FBDEV
 
 config BACKEND_SDL
     bool "SDL video output support"
+    depends on HAVE_SDL2
 
 config BACKEND_VNC
     bool "VNC server output support"
@@ -28,6 +42,7 @@ config RENDERER_BUILTIN
 
 config RENDERER_PIXMAN
     bool "Pixman based rendering"
+    depends on HAVE_PIXMAN
 
 endchoice
 
@@ -83,10 +98,12 @@ menu "Image Loaders"
 
 config LOADER_PNG
     bool "Enable PNG loader"
+    depends on HAVE_LIBPNG
     default y
 
 config LOADER_JPEG
     bool "Enable JPEG loader"
+    depends on HAVE_LIBJPEG
     default y
 
 config LOADER_GIF
@@ -131,7 +148,7 @@ config DEMO_LINE
     depends on DEMO_APPLICATIONS
 
 config DEMO_SPLINE
-    bool "Build spline demp"
+    bool "Build spline demo"
     default y
     depends on DEMO_APPLICATIONS 
 

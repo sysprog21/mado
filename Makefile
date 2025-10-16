@@ -31,7 +31,6 @@ libtwin.a_files-y = \
 	src/button.c \
 	src/fixed.c \
 	src/label.c \
-	src/primitive.c \
 	src/trig.c \
 	src/convolve.c \
 	src/font.c \
@@ -72,6 +71,9 @@ libtwin.a_files-$(CONFIG_LOGGING) += src/log.c
 libtwin.a_files-$(CONFIG_CURSOR) += src/cursor.c
 
 # Rendering backends
+# Screen compositing operations (always needed for screen buffer management)
+libtwin.a_files-y += src/screen-ops.c
+# Renderer implementations (draw-builtin.c includes all compositing operations)
 libtwin.a_files-$(CONFIG_RENDERER_BUILTIN) += src/draw-builtin.c
 libtwin.a_files-$(CONFIG_RENDERER_PIXMAN) += src/draw-pixman.c
 libtwin.a_cflags-$(CONFIG_RENDERER_PIXMAN) += $(shell pkg-config --cflags pixman-1)

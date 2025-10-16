@@ -1,13 +1,18 @@
+# Ensure tools/kconfig submodule is initialized
+ifeq ($(wildcard tools/kconfig/menuconfig.py),)
+    $(shell git submodule update --init tools/kconfig)
+endif
+
 -include .config
 
 check_goal := $(strip $(MAKECMDGOALS))
-ifneq ($(check_goal), config)
-ifneq "$(CONFIG_CONFIGURED)" "y"
-$(error You must first run 'make config')
-endif
+ifeq ($(filter $(check_goal),config defconfig),)
+    ifneq "$(CONFIG_CONFIGURED)" "y"
+        $(error You must first run 'make config' or 'make defconfig')
+    endif
 endif
 
-# Rules
+# Target variables initialization
 
 target-y :=
 target.o-y :=
@@ -58,11 +63,12 @@ libtwin.a_includes-y := \
 	include \
 	src
 
-# Features
+# Optional features
+
 libtwin.a_files-$(CONFIG_LOGGING) += src/log.c
 libtwin.a_files-$(CONFIG_CURSOR) += src/cursor.c
 
-# Renderer
+# Rendering backends
 libtwin.a_files-$(CONFIG_RENDERER_BUILTIN) += src/draw-builtin.c
 libtwin.a_files-$(CONFIG_RENDERER_PIXMAN) += src/draw-pixman.c
 libtwin.a_cflags-$(CONFIG_RENDERER_PIXMAN) += $(shell pkg-config --cflags pixman-1)
@@ -156,29 +162,43 @@ demo-$(BACKEND)_ldflags-y := \
 	$(TARGET_LIBS)
 endif
 
+# Font editor tool
+
 ifeq ($(CONFIG_TOOLS), y)
 target-$(CONFIG_TOOL_FONTEDIT) += font-edit
 font-edit_files-y = \
-    tools/font-edit/sfit.c \
-    tools/font-edit/font-edit.c
+	tools/font-edit/sfit.c \
+	tools/font-edit/font-edit.c
 font-edit_includes-y := tools/font-edit
 font-edit_cflags-y := \
-    $(shell pkg-config --cflags cairo) \
-    $(shell sdl2-config --cflags)
+	$(shell pkg-config --cflags cairo) \
+	$(shell sdl2-config --cflags)
 font-edit_ldflags-y := \
-    $(shell pkg-config --libs cairo) \
-    $(shell sdl2-config --libs)
+	$(shell pkg-config --libs cairo) \
+	$(shell sdl2-config --libs)
 endif
+
+# Build system integration
 
 CFLAGS += -include config.h
 
-check_goal := $(strip $(MAKECMDGOALS))
-ifneq ($(check_goal), config)
+# Only include build rules when not running configuration targets
+ifeq ($(filter $(check_goal),config defconfig),)
 include mk/common.mk
 endif
 
-# Menuconfig
+KCONFIGLIB := tools/kconfig/kconfiglib.py
+$(KCONFIGLIB):
+	git submodule update --init tools/kconfig
+
+# Load default configuration
+.PHONY: defconfig
+defconfig: $(KCONFIGLIB)
+	@tools/kconfig/defconfig.py --kconfig configs/Kconfig configs/defconfig
+	@tools/kconfig/genconfig.py configs/Kconfig
+
+# Interactive configuration
 .PHONY: config
-config: configs/Kconfig
-	@tools/kconfig/menuconfig.py $<
-	@tools/kconfig/genconfig.py $<
+config: $(KCONFIGLIB) configs/Kconfig
+	@tools/kconfig/menuconfig.py configs/Kconfig
+	@tools/kconfig/genconfig.py configs/Kconfig

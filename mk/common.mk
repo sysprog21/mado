@@ -678,6 +678,17 @@ clean: __FORCE
 __FORCE:
 	@true
 
-ifneq "$(MAKECMDGOALS)" "clean"
--include $(target-depends)
+# Only include dependencies when building known targets
+build-goals := all clean $(target-builds)
+ifneq ($(MAKECMDGOALS),)
+    # MAKECMDGOALS is not empty, check if it's a known target
+    ifneq ($(filter $(MAKECMDGOALS),$(build-goals)),)
+        # Known target, include dependencies (except for clean)
+        ifneq "$(MAKECMDGOALS)" "clean"
+            -include $(target-depends)
+        endif
+    endif
+else
+    # Empty MAKECMDGOALS means building 'all', include dependencies
+    -include $(target-depends)
 endif

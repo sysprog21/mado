@@ -32,6 +32,10 @@ config BACKEND_FBDEV
       Renders directly to /dev/fb0 without X11/Wayland.
       Requires Linux input subsystem for keyboard/mouse events.
 
+config BACKEND_DRM
+    bool "Linux DRM support"
+    select CURSOR
+
 config BACKEND_SDL
     bool "SDL video output support"
     depends on HAVE_SDL2

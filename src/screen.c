@@ -41,6 +41,8 @@ twin_screen_t *twin_screen_create(twin_coord_t width,
     screen->closure = closure;
 
     screen->button_x = screen->button_y = -1;
+    screen->span_cache = NULL;
+    screen->span_cache_width = 0;
     return screen;
 }
 
@@ -48,6 +50,7 @@ void twin_screen_destroy(twin_screen_t *screen)
 {
     while (screen->bottom)
         twin_pixmap_hide(screen->bottom);
+    free(screen->span_cache); /* Free span buffer cache */
     free(screen);
 }
 
@@ -185,10 +188,20 @@ void twin_screen_update(twin_screen_t *screen)
 
         screen->damage.left = screen->damage.right = 0;
         screen->damage.top = screen->damage.bottom = 0;
-        /* FIXME: what is the maximum number of lines? */
-        span = malloc(width * sizeof(twin_argb32_t));
-        if (!span)
-            return;
+
+        /* Reuse cached span buffer if large enough */
+        if (screen->span_cache && screen->span_cache_width >= width) {
+            span = screen->span_cache;
+        } else {
+            /* Need larger cache - reallocate */
+            twin_argb32_t *new_cache =
+                realloc(screen->span_cache, width * sizeof(twin_argb32_t));
+            if (!new_cache)
+                return;
+            screen->span_cache = new_cache;
+            screen->span_cache_width = width;
+            span = new_cache;
+        }
 
         if (screen->put_begin)
             (*screen->put_begin)(left, top, right, bottom, screen->closure);
@@ -230,7 +243,7 @@ void twin_screen_update(twin_screen_t *screen)
 
             (*screen->put_span)(left, y, right, span, screen->closure);
         }
-        free(span);
+        /* Span buffer is now cached - don't free */
     }
 }
 

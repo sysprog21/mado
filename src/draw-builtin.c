@@ -633,10 +633,22 @@ static twin_xform_t *twin_pixmap_init_xform(twin_pixmap_t *pixmap,
     if (fmt == TWIN_RGB16)
         fmt = TWIN_ARGB32;
 
-    twin_xform_t *xform =
-        calloc(1, sizeof(twin_xform_t) + width * twin_bytes_per_pixel(fmt));
-    if (!xform)
-        return NULL;
+    size_t required_size =
+        sizeof(twin_xform_t) + (size_t) width * twin_bytes_per_pixel(fmt);
+
+    /* Reuse cached xform buffer if large enough */
+    twin_xform_t *xform;
+    if (pixmap->xform_cache && pixmap->xform_cache_size >= required_size) {
+        xform = (twin_xform_t *) pixmap->xform_cache;
+    } else {
+        /* Need larger cache - reallocate */
+        void *new_cache = realloc(pixmap->xform_cache, required_size);
+        if (!new_cache)
+            return NULL;
+        pixmap->xform_cache = new_cache;
+        pixmap->xform_cache_size = required_size;
+        xform = (twin_xform_t *) new_cache;
+    }
 
     xform->span.v = (twin_argb32_t *) (char *) (xform + 1);
     xform->pixmap = pixmap;
@@ -650,7 +662,9 @@ static twin_xform_t *twin_pixmap_init_xform(twin_pixmap_t *pixmap,
 
 static void twin_pixmap_free_xform(twin_xform_t *xform)
 {
-    free(xform);
+    /* Xform buffer is now cached in pixmap - don't free */
+    /* This function is kept for API compatibility but does nothing */
+    (void) xform;
 }
 
 #define FX(x) twin_int_to_fixed(x)

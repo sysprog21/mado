@@ -16,17 +16,28 @@ The SDL (Simple DirectMedia Layer) backend provides cross-platform graphics outp
 - Windowed and fullscreen modes
 - Audio support (if needed)
 
+**Dependencies:**
+Install the [SDL2 library](https://www.libsdl.org/):
+* macOS: `brew install sdl2`
+* Ubuntu Linux / Debian: `sudo apt install libsdl2-dev`
+
 **Build:**
 ```shell
-make BACKEND=sdl
-# or
-make config  # Select "SDL video output support"
+make defconfig  # SDL backend is enabled by default
+make
 ```
+
+**Run:**
+```shell
+./demo-sdl
+```
+
+Once the window appears, you can move windows and interact with widgets.
 
 **Use Cases:**
 - Desktop applications
 - Cross-platform development
-- Games and multimedia applications
+- Primary development and testing platform
 
 ### Linux Framebuffer (fbdev)
 Direct framebuffer access for embedded Linux systems without X11/Wayland.
@@ -38,12 +49,30 @@ Direct framebuffer access for embedded Linux systems without X11/Wayland.
 - Linux input subsystem integration
 - Virtual terminal switching support
 
+**Dependencies:**
+Install `libudev` and `libuuid`:
+* Ubuntu Linux / Debian: `sudo apt install libudev-dev uuid-dev`
+
 **Build:**
 ```shell
-make BACKEND=fbdev
-# or
-make config  # Select "Linux framebuffer support"
+make defconfig
+python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig \
+    BACKEND_FBDEV=y \
+    BACKEND_SDL=n
+make
 ```
+
+**Run:**
+```shell
+sudo ./demo-fbdev
+```
+
+Normal users don't have access to `/dev/fb0`, requiring `sudo`. Alternatively, add the user to the video group:
+```shell
+sudo usermod -a -G video $USERNAME
+```
+
+The framebuffer device can be assigned via the environment variable `FRAMEBUFFER`.
 
 **Use Cases:**
 - Embedded Linux systems
@@ -61,12 +90,29 @@ Provides remote display capabilities through the VNC (Virtual Network Computing)
 - Built-in authentication
 - Compression support
 
+**Dependencies:**
+Install [neatvnc](https://github.com/any1/neatvnc). Note: The VNC backend has only been tested on GNU/Linux, and prebuilt packages might be outdated. To ensure the latest version, build from source:
+```shell
+tools/build-neatvnc.sh
+```
+
 **Build:**
 ```shell
-make BACKEND=vnc
-# or
-make config  # Select "VNC server output support"
+make defconfig
+python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig \
+    BACKEND_VNC=y \
+    BACKEND_SDL=n
+make
 ```
+
+**Run:**
+```shell
+./demo-vnc
+```
+
+This starts the VNC server. Connect using any VNC client with the specified IP address (default: `127.0.0.1`) and port (default: `5900`).
+- IP address: Set via `MADO_VNC_HOST` environment variable
+- Port: Set via `MADO_VNC_PORT` environment variable
 
 **Use Cases:**
 - Remote desktop applications
@@ -84,12 +130,16 @@ Renders to a memory buffer without any display output, ideal for testing and aut
 - Event injection for testing
 - Memory debugging friendly
 
+**Dependencies:**
+No additional dependencies required. This backend uses shared memory for rendering.
+
 **Build:**
 ```shell
 # Using setconfig.py (recommended)
 make defconfig
 python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig \
     BACKEND_HEADLESS=y \
+    BACKEND_SDL=n \
     TOOLS=y \
     TOOL_HEADLESS_CTL=y
 make
@@ -99,10 +149,20 @@ make config  # Select "Headless backend" and "Headless control tool"
 make
 ```
 
+**Run:**
+```shell
+./demo-headless &
+./headless-ctl status           # Check backend status
+./headless-ctl shot output.png  # Capture screenshot
+./headless-ctl shutdown         # Graceful shutdown
+```
+
+The headless backend uses shared memory for rendering without display output. Use `headless-ctl` to monitor, control, and capture screenshots.
+
 **Use Cases:**
 - Automated testing
 - CI/CD pipelines
-- Memory analysis
+- Memory analysis with Valgrind or AddressSanitizer
 - Screenshot generation
 - Performance benchmarking
 

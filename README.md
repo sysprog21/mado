@@ -79,50 +79,35 @@ Install [Pixman](https://pixman.org/) before selecting the corresponding rendere
 * macOS: `brew install pixman`
 * Ubuntu Linux / Debian: `sudo apt install libpixman-1-dev`
 
+### Graphics Backend
+
 `Mado` supports multiple graphics backends. Choose one based on your deployment scenario:
 - SDL: Cross-platform desktop development with hardware acceleration
 - Linux framebuffer (fbdev): Direct hardware access for embedded Linux
 - VNC: Remote display via Virtual Network Computing protocol
 - Headless: Testing and automation without display output
 
-### Backend-Specific Dependencies
+`Mado` uses SDL2 as the primary development and demonstration backend, providing cross-platform graphics with hardware acceleration. For other backend options (Linux framebuffer, VNC, headless), see [docs/backends.md](docs/backends.md).
 
-For SDL backend, install the [SDL2 library](https://www.libsdl.org/).
+Install the [SDL2 library](https://www.libsdl.org/):
 * macOS: `brew install sdl2`
 * Ubuntu Linux / Debian: `sudo apt install libsdl2-dev`
 
-For the VNC backend, please note that it has only been tested on GNU/Linux, and the prebuilt [neatvnc](https://github.com/any1/neatvnc) package might be outdated. To ensure you have the latest version, you can build the required packages from source by running the script:
-```shell
-$ tools/build-neatvnc.sh
-```
-
-For Linux framebuffer backend, install `libudev` and `libuuid`:
-* Ubuntu Linux / Debian: `sudo apt install libudev-dev uuid-dev`
-
-For the headless backend, no additional dependencies are required. This backend uses shared memory for rendering and can be controlled programmatically via `headless-ctl`.
-
-For detailed information about each backend's features, use cases, and configuration options, see [docs/backends.md](docs/backends.md).
-
 ### Configuration
 
-`Mado` uses [Kconfiglib](https://github.com/sysprog21/Kconfiglib) for flexible build configuration. Choose from multiple graphics backends: SDL, Linux framebuffer, VNC, or headless (for testing/automation).
+`Mado` uses [Kconfiglib](https://github.com/sysprog21/Kconfiglib) for flexible build configuration.
 
-For interactive configuration with a terminal menu:
+For quick setup with defaults (SDL backend enabled):
+```shell
+$ make defconfig
+```
+
+For interactive configuration (to explore all options):
 ```shell
 $ make config
 ```
 
-For quick scripted configuration (recommended for most users):
-```shell
-$ make defconfig
-$ python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig \
-    BACKEND_SDL=y \
-    DEMO_MULTI=y
-```
-
-For detailed configuration options and advanced usage, see [docs/kconfig-usage.md](docs/kconfig-usage.md).
-
-### Build and execution
+### Build and Execution
 
 Build the library and demo program:
 
@@ -130,49 +115,15 @@ Build the library and demo program:
 $ make
 ```
 
-To run demo program with SDL backend:
+Run the demo program:
 
 ```shell
 $ ./demo-sdl
 ```
 
-Once the window appears, you should be able to move the windows and interact with the widgets.
+Once the window appears, you can move the windows and interact with the widgets.
 
-To run demo program with the Linux framebuffer backend:
-
-```shell
-$ sudo ./demo-fbdev
-```
-
-Normal users don't have access to `/dev/fb0` so require `sudo`. Alternatively, you can add the user to the video group to avoid typing `sudo` every time:
-
-```shell
-$ sudo usermod -a -G video $USERNAME
-```
-
-In addition, the framebuffer device can be assigned via the environment variable `FRAMEBUFFER`.
-
-To run demo program with the VNC backend:
-
-```shell
-$ ./demo-vnc
-```
-
-This will start the VNC server. You can use any VNC client to connect using the specified IP address (default is `127.0.0.1`) and port (default is `5900`).
-The IP address can be set using the `MADO_VNC_HOST` environment variable, and the port can be configured using `MADO_VNC_PORT`.
-
-To run demo program with the headless backend (for testing/automation):
-
-```shell
-$ ./demo-headless &
-$ ./headless-ctl status           # Check backend status
-$ ./headless-ctl shot output.png  # Capture screenshot
-$ ./headless-ctl shutdown         # Graceful shutdown
-```
-
-The headless backend uses shared memory for rendering without display output. Use `headless-ctl` to monitor, control, and capture screenshots.
-Ideal for CI/CD pipelines, automated testing, and memory debugging.
-See [docs/backends.md](docs/backends.md) for advanced usage including event injection and live monitoring.
+For information about other backends (Linux framebuffer, VNC, headless), see [docs/backends.md](docs/backends.md).
 
 ## License
 

@@ -17,6 +17,9 @@ config HAVE_LIBPNG
 config HAVE_LIBJPEG
     def_bool $(shell,pkg-config --exists libjpeg && echo y || echo n)
 
+config HAVE_CAIRO
+    def_bool $(shell,pkg-config --exists cairo && echo y || echo n)
+
 choice
     prompt "Backend Selection"
     default BACKEND_SDL
@@ -281,9 +284,9 @@ config TOOLS
 config TOOL_FONTEDIT
     bool "Build scalable font editor"
     default y
-    depends on TOOLS && HAVE_SDL2
+    depends on TOOLS && HAVE_SDL2 && HAVE_CAIRO
     help
-      Interactive font editor for Twin font format.
+      Interactive font editor for Mado font format.
       Allows creation and modification of scalable fonts.
 
 config PERF_TEST

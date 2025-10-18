@@ -10,9 +10,20 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/resource.h>
 #include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
+
+/* getrusage() is POSIX-specific for memory profiling
+ * Not available on bare-metal or systems without full POSIX support
+ */
+#if defined(__unix__) || defined(__unix) || defined(unix) ||               \
+    (defined(__APPLE__) && defined(__MACH__)) || defined(__linux__) ||     \
+    defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
+    defined(__HAIKU__)
+#define HAVE_GETRUSAGE 1
+#include <sys/resource.h>
+#endif
 
 #include "twin.h"
 
@@ -293,9 +304,14 @@ static void run_large_tests(void)
 
 /* Memory profiling mode */
 
-/* Get memory usage statistics */
+/* Get memory usage statistics
+ * Note: getrusage() requires POSIX support (Linux, macOS, etc.)
+ * For bare-metal or embedded systems, return zero
+ */
 static void get_memory_usage(long *rss_kb, long *max_rss_kb)
 {
+#ifdef HAVE_GETRUSAGE
+    /* POSIX systems with getrusage() support */
     struct rusage usage;
     getrusage(RUSAGE_SELF, &usage);
 #ifdef __APPLE__
@@ -304,6 +320,11 @@ static void get_memory_usage(long *rss_kb, long *max_rss_kb)
     *max_rss_kb = usage.ru_maxrss; /* Linux reports in KB */
 #endif
     *rss_kb = *max_rss_kb; /* Current RSS approximation */
+#else
+    /* Bare-metal or systems without getrusage() */
+    *rss_kb = 0;
+    *max_rss_kb = 0;
+#endif
 }
 
 /* Print memory test statistics */
@@ -500,16 +521,23 @@ static void run_memory_profiling(void)
 
 int main(void)
 {
+    /* Print header */
+    printf("Mado performance tester");
+#ifdef HAVE_GETRUSAGE
+    /* Full POSIX systems can provide hostname and timestamp */
     time_t now;
     char hostname[256];
 
-    /* Print header */
     time(&now);
     if (gethostname(hostname, sizeof(hostname)) != 0)
         strcpy(hostname, "localhost");
 
-    printf("Mado performance tester on %s\n", hostname);
+    printf(" on %s\n", hostname);
     printf("%s", ctime(&now));
+#else
+    /* Bare-metal systems: minimal header */
+    printf("\n");
+#endif
 
     /* Measure sync time adjustment */
     measure_sync_time();

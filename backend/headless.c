@@ -4,20 +4,35 @@
  * All rights reserved.
  */
 
-#include <errno.h>
-#include <fcntl.h>
-#include <signal.h>
+/* Detect POSIX environment for shared memory support
+ * Bare-metal and embedded systems lack sys/mman.h and related POSIX APIs
+ */
+#if defined(__unix__) || defined(__unix) || defined(unix) ||               \
+    (defined(__APPLE__) && defined(__MACH__)) || defined(__linux__) ||     \
+    defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
+    defined(__HAIKU__)
+#define HAVE_POSIX_SHM 1
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <twin.h>
+
+#ifdef HAVE_POSIX_SHM
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <twin.h>
 #include <unistd.h>
-
 #include "headless-shm.h"
+#endif
+
 #include "twin_private.h"
+
+#ifdef HAVE_POSIX_SHM
 
 typedef struct {
     twin_headless_shm_t *shm;
@@ -361,10 +376,44 @@ error:
     return NULL;
 }
 
+#else  /* !HAVE_POSIX_SHM - Bare-metal stub implementation */
+/* Provides minimal no-op backend for embedded systems without POSIX support */
+
+static void twin_headless_config_dummy(twin_context_t *ctx)
+{
+    (void) ctx;
+}
+
+static bool twin_headless_poll_dummy(twin_context_t *ctx)
+{
+    (void) ctx;
+    return false; /* Immediately exit */
+}
+
+static void twin_headless_exit_dummy(twin_context_t *ctx)
+{
+    free(ctx);
+}
+
+static twin_context_t *twin_headless_init_dummy(int width, int height)
+{
+    (void) width;
+    (void) height;
+    return NULL;
+}
+#endif /* HAVE_POSIX_SHM */
+
 /* Register the headless backend */
 const twin_backend_t g_twin_backend = {
+#ifdef HAVE_POSIX_SHM
     .init = twin_headless_init,
     .configure = twin_headless_configure,
     .poll = twin_headless_poll,
     .exit = twin_headless_exit,
+#else
+    .init = twin_headless_init_dummy,
+    .configure = twin_headless_config_dummy,
+    .poll = twin_headless_poll_dummy,
+    .exit = twin_headless_exit_dummy,
+#endif
 };

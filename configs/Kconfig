@@ -4,6 +4,47 @@ config CONFIGURED
     bool
     default y
 
+menu "Toolchain Configuration"
+
+# Compiler detection using scripts/detect-compiler.py
+config COMPILER_TYPE
+    string
+    default "$(shell,python3 scripts/detect-compiler.py --type 2>/dev/null || echo Unknown)"
+
+config CC_IS_EMCC
+    def_bool $(shell,python3 scripts/detect-compiler.py --is Emscripten 2>/dev/null && echo y || echo n)
+
+config CC_IS_CLANG
+    def_bool $(shell,python3 scripts/detect-compiler.py --is Clang 2>/dev/null && echo y || echo n)
+
+config CC_IS_GCC
+    def_bool $(shell,python3 scripts/detect-compiler.py --is GCC 2>/dev/null && echo y || echo n)
+
+# Cross-compilation support detection
+config CROSS_COMPILE_ENABLED
+    def_bool $(shell,test -n "$(CROSS_COMPILE)" && echo y || echo n)
+
+config CROSS_COMPILE_PREFIX
+    string
+    default "$(CROSS_COMPILE)"
+
+# Verify cross-compilation tools exist
+config CROSS_COMPILE_VALID
+    def_bool $(shell,test -n "$(CROSS_COMPILE)" && which "$(CROSS_COMPILE)gcc" >/dev/null 2>&1 && echo y || echo n)
+
+comment "Toolchain Information"
+
+comment "Cross-compilation: ENABLED"
+    depends on CROSS_COMPILE_ENABLED && CROSS_COMPILE_VALID
+
+comment "Cross-compilation: ENABLED (WARNING: Compiler not found!)"
+    depends on CROSS_COMPILE_ENABLED && !CROSS_COMPILE_VALID
+
+comment "Cross-compilation: DISABLED (Native build)"
+    depends on !CROSS_COMPILE_ENABLED
+
+endmenu
+
 # Dependency detection using Kconfiglib shell function
 config HAVE_SDL2
     def_bool $(shell,pkg-config --exists sdl2 && echo y || echo n)

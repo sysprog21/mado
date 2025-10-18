@@ -148,9 +148,9 @@ endif
 
 # macOS-specific linker flags
 # Xcode 15+ generates warnings about duplicate library options
-# Only apply to native macOS builds (not cross-compilation)
+# Only apply to native macOS builds (not cross-compilation or Emscripten)
 ifeq ($(shell uname -s),Darwin)
-    ifndef CROSS_COMPILE
+    ifeq ($(CROSS_COMPILE)$(CC_IS_EMCC),)
         # Check if ld supports -no_warn_duplicate_libraries
         LD_SUPPORTS_NO_WARN := $(shell $(CC) -Wl,-no_warn_duplicate_libraries 2>&1 | grep -q "unknown option" && echo 0 || echo 1)
         ifeq ($(LD_SUPPORTS_NO_WARN),1)

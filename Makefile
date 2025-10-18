@@ -170,6 +170,14 @@ demo-$(BACKEND)_includes-y := include
 demo-$(BACKEND)_ldflags-y := \
 	$(target.a-y) \
 	$(TARGET_LIBS)
+
+# Emscripten-specific linker flags to avoid "section too large" errors
+ifeq ($(CC_IS_EMCC), 1)
+demo-$(BACKEND)_ldflags-y += \
+	-sINITIAL_MEMORY=33554432 \
+	-sALLOW_MEMORY_GROWTH=1 \
+	-sSTACK_SIZE=1048576
+endif
 endif
 
 # Font editor tool

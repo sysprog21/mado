@@ -52,6 +52,8 @@ twin_pixmap_t *twin_pixmap_create(twin_format_t format,
     pixmap->shadow = false;
 #endif
     pixmap->window = NULL; /* Initialize window field */
+    pixmap->xform_cache = NULL;
+    pixmap->xform_cache_size = 0;
     pixmap->p.v = pixmap + 1;
     memset(pixmap->p.v, '\0', space);
     return pixmap;
@@ -82,6 +84,8 @@ twin_pixmap_t *twin_pixmap_create_const(twin_format_t format,
     pixmap->stride = stride;
     pixmap->disable = 0;
     pixmap->window = NULL; /* Initialize window field */
+    pixmap->xform_cache = NULL;
+    pixmap->xform_cache_size = 0;
     pixmap->p = pixels;
     return pixmap;
 }
@@ -90,6 +94,7 @@ void twin_pixmap_destroy(twin_pixmap_t *pixmap)
 {
     if (pixmap->screen)
         twin_pixmap_hide(pixmap);
+    free(pixmap->xform_cache); /* Free xform buffer cache */
     free(pixmap);
 }
 

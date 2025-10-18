@@ -253,6 +253,10 @@ typedef struct _twin_pixmap {
 #endif
 
     twin_window_t *window; /**< Associated window (if any) */
+
+    /* Transform buffer cache for compositing operations */
+    void *xform_cache;       /**< Cached xform buffer */
+    size_t xform_cache_size; /**< Cached xform buffer size in bytes */
 } twin_pixmap_t;
 
 /**

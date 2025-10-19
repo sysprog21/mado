@@ -1,6 +1,6 @@
 /*
  * Twin - A Tiny Window System
- * Copyright (c) 2024 National Cheng Kung University, Taiwan
+ * Copyright (c) 2024-2025 National Cheng Kung University, Taiwan
  * All rights reserved.
  */
 
@@ -8,6 +8,10 @@
 #include <SDL_render.h>
 #include <stdio.h>
 #include <twin.h>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 #include "twin_private.h"
 
@@ -59,11 +63,29 @@ static void _twin_sdl_put_span(twin_coord_t left,
 static void _twin_sdl_destroy(twin_screen_t *screen maybe_unused,
                               twin_sdl_t *tx)
 {
-    SDL_DestroyTexture(tx->texture);
-    SDL_DestroyRenderer(tx->render);
-    SDL_DestroyWindow(tx->win);
+    /* Destroy SDL resources and mark as freed to prevent double-destroy */
+    if (tx->texture) {
+        SDL_DestroyTexture(tx->texture);
+        tx->texture = NULL;
+    }
+    if (tx->render) {
+        SDL_DestroyRenderer(tx->render);
+        tx->render = NULL;
+    }
+    if (tx->win) {
+        SDL_DestroyWindow(tx->win);
+        tx->win = NULL;
+    }
     SDL_Quit();
 }
+
+#ifdef __EMSCRIPTEN__
+/* Placeholder main loop to prevent SDL from complaining during initialization.
+ * This will be replaced by the real main loop in main().
+ */
+static void twin_sdl_placeholder_loop(void) {}
+static bool twin_sdl_placeholder_set = false;
+#endif
 
 static void twin_sdl_damage(twin_screen_t *screen, twin_sdl_t *tx)
 {
@@ -92,7 +114,17 @@ twin_context_t *twin_sdl_init(int width, int height)
         return NULL;
     }
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+#ifdef __EMSCRIPTEN__
+    /* Tell SDL we will manage the main loop externally via
+     * emscripten_set_main_loop, preventing SDL from trying to set up its own
+     * timing before we are ready.
+     */
+    SDL_SetMainReady();  // Prevent SDL from taking over main()
+    SDL_SetHint(SDL_HINT_EMSCRIPTEN_ASYNCIFY, "0");
+    SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
+#endif
+
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) < 0) {
         log_error("%s", SDL_GetError());
         goto bail;
     }
@@ -109,7 +141,22 @@ twin_context_t *twin_sdl_init(int width, int height)
     }
 
     tx->pixels = malloc(width * height * sizeof(*tx->pixels));
+    if (!tx->pixels) {
+        log_error("Failed to allocate pixel buffer");
+        goto bail_window;
+    }
     memset(tx->pixels, 255, width * height * sizeof(*tx->pixels));
+
+#ifdef __EMSCRIPTEN__
+    /* Set up a placeholder main loop to prevent SDL_CreateRenderer from
+     * complaining about missing main loop. The real main loop will be set
+     * up in main() after all initialization is complete.
+     */
+    if (!twin_sdl_placeholder_set) {
+        emscripten_set_main_loop(twin_sdl_placeholder_loop, 0, 0);
+        twin_sdl_placeholder_set = true;
+    }
+#endif
 
     tx->render = SDL_CreateRenderer(tx->win, -1, SDL_RENDERER_ACCELERATED);
     if (!tx->render) {
@@ -121,16 +168,30 @@ twin_context_t *twin_sdl_init(int width, int height)
 
     tx->texture = SDL_CreateTexture(tx->render, SDL_PIXELFORMAT_ARGB8888,
                                     SDL_TEXTUREACCESS_STREAMING, width, height);
+    if (!tx->texture) {
+        log_error("%s", SDL_GetError());
+        goto bail_renderer;
+    }
 
     ctx->screen = twin_screen_create(width, height, _twin_sdl_put_begin,
                                      _twin_sdl_put_span, ctx);
+    if (!ctx->screen) {
+        log_error("Failed to create screen");
+        goto bail_texture;
+    }
 
     twin_set_work(twin_sdl_work, TWIN_WORK_REDISPLAY, ctx);
 
     return ctx;
 
+bail_texture:
+    SDL_DestroyTexture(tx->texture);
+bail_renderer:
+    SDL_DestroyRenderer(tx->render);
 bail_pixels:
     free(tx->pixels);
+bail_window:
+    SDL_DestroyWindow(tx->win);
 bail:
     free(ctx->priv);
     free(ctx);
@@ -150,7 +211,9 @@ static bool twin_sdl_poll(twin_context_t *ctx)
     twin_sdl_t *tx = PRIV(ctx);
 
     SDL_Event ev;
+    bool has_event = false;
     while (SDL_PollEvent(&ev)) {
+        has_event = true;
         twin_event_t tev;
         switch (ev.type) {
         case SDL_WINDOWEVENT:
@@ -188,6 +251,14 @@ static bool twin_sdl_poll(twin_context_t *ctx)
             break;
         }
     }
+
+    /* Yield CPU when idle to avoid busy-waiting.
+     * Skip delay if events were processed or screen needs update.
+     */
+    if (!has_event && !twin_screen_damaged(screen)) {
+        SDL_Delay(1); /* 1ms sleep reduces CPU usage when idle */
+    }
+
     return true;
 }
 
@@ -195,9 +266,65 @@ static void twin_sdl_exit(twin_context_t *ctx)
 {
     if (!ctx)
         return;
-    free(PRIV(ctx)->pixels);
+
+    twin_sdl_t *tx = PRIV(ctx);
+
+    /* Clean up SDL resources */
+    if (tx->texture)
+        SDL_DestroyTexture(tx->texture);
+    if (tx->render)
+        SDL_DestroyRenderer(tx->render);
+    if (tx->win)
+        SDL_DestroyWindow(tx->win);
+    SDL_Quit();
+
+    /* Free memory */
+    free(tx->pixels);
     free(ctx->priv);
     free(ctx);
+}
+
+#ifdef __EMSCRIPTEN__
+/* Emscripten main loop state */
+static void (*g_wasm_init_callback)(twin_context_t *) = NULL;
+static bool g_wasm_initialized = false;
+
+/* Main loop callback for Emscripten */
+static void twin_sdl_wasm_loop(void *arg)
+{
+    twin_context_t *ctx = (twin_context_t *) arg;
+
+    /* Perform one-time initialization on first iteration */
+    if (!g_wasm_initialized && g_wasm_init_callback) {
+        g_wasm_init_callback(ctx);
+        g_wasm_initialized = true;
+    }
+
+    twin_dispatch_once(ctx);
+}
+#endif
+
+/* Backend start function: unified entry point for both native and WebAssembly
+ */
+static void twin_sdl_start(twin_context_t *ctx,
+                           void (*init_callback)(twin_context_t *))
+{
+#ifdef __EMSCRIPTEN__
+    /* WebAssembly: Set up Emscripten main loop */
+    g_wasm_init_callback = init_callback;
+    g_wasm_initialized = false;
+
+    emscripten_cancel_main_loop(); /* Cancel placeholder from init */
+    emscripten_set_main_loop_arg(twin_sdl_wasm_loop, ctx, 0, 1);
+#else
+    /* Native: Initialize immediately and enter standard dispatch loop */
+    if (init_callback)
+        init_callback(ctx);
+
+    /* Use twin_dispatch_once() to ensure work queue and timeouts run */
+    while (twin_dispatch_once(ctx))
+        ;
+#endif
 }
 
 /* Register the SDL backend */
@@ -206,5 +333,6 @@ const twin_backend_t g_twin_backend = {
     .init = twin_sdl_init,
     .configure = twin_sdl_configure,
     .poll = twin_sdl_poll,
+    .start = twin_sdl_start,
     .exit = twin_sdl_exit,
 };

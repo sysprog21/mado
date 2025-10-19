@@ -82,6 +82,39 @@ static void sigint_handler(int sig)
     exit(1);
 }
 
+/* Initialize demo applications based on build configuration.
+ * Shared by both native and WebAssembly builds.
+ */
+static void init_demo_apps(twin_context_t *ctx)
+{
+    twin_screen_t *screen = ctx->screen;
+#if defined(CONFIG_DEMO_MULTI)
+    apps_multi_start(screen, "Demo", 100, 100, 400, 400);
+#endif
+#if defined(CONFIG_DEMO_HELLO)
+    apps_hello_start(screen, "Hello, World", 0, 0, 200, 200);
+#endif
+#if defined(CONFIG_DEMO_CLOCK)
+    apps_clock_start(screen, "Clock", 10, 10, 200, 200);
+#endif
+#if defined(CONFIG_DEMO_CALCULATOR)
+    apps_calc_start(screen, "Calculator", 100, 100, 200, 200);
+#endif
+#if defined(CONFIG_DEMO_LINE)
+    apps_line_start(screen, "Line", 0, 0, 200, 200);
+#endif
+#if defined(CONFIG_DEMO_SPLINE)
+    apps_spline_start(screen, "Spline", 20, 20, 400, 400);
+#endif
+#if defined(CONFIG_DEMO_ANIMATION)
+    apps_animation_start(screen, "Viewer", ASSET_PATH "nyancat.gif", 20, 20);
+#endif
+#if defined(CONFIG_DEMO_IMAGE)
+    apps_image_start(screen, "Viewer", 20, 20);
+#endif
+    twin_screen_set_active(screen, screen->top);
+}
+
 int main(void)
 {
     tx = twin_create(WIDTH, HEIGHT);
@@ -106,34 +139,8 @@ int main(void)
     twin_screen_set_background(
         tx->screen, load_background(tx->screen, ASSET_PATH "/tux.png"));
 
-#if defined(CONFIG_DEMO_MULTI)
-    apps_multi_start(tx->screen, "Demo", 100, 100, 400, 400);
-#endif
-#if defined(CONFIG_DEMO_HELLO)
-    apps_hello_start(tx->screen, "Hello, World", 0, 0, 200, 200);
-#endif
-#if defined(CONFIG_DEMO_CLOCK)
-    apps_clock_start(tx->screen, "Clock", 10, 10, 200, 200);
-#endif
-#if defined(CONFIG_DEMO_CALCULATOR)
-    apps_calc_start(tx->screen, "Calculator", 100, 100, 200, 200);
-#endif
-#if defined(CONFIG_DEMO_LINE)
-    apps_line_start(tx->screen, "Line", 0, 0, 200, 200);
-#endif
-#if defined(CONFIG_DEMO_SPLINE)
-    apps_spline_start(tx->screen, "Spline", 20, 20, 400, 400);
-#endif
-#if defined(CONFIG_DEMO_ANIMATION)
-    apps_animation_start(tx->screen, "Viewer", ASSET_PATH "nyancat.gif", 20,
-                         20);
-#endif
-#if defined(CONFIG_DEMO_IMAGE)
-    apps_image_start(tx->screen, "Viewer", 20, 20);
-#endif
-
-    twin_screen_set_active(tx->screen, tx->screen->top);
-    twin_dispatch(tx);
+    /* Start application with unified API (handles native and WebAssembly) */
+    twin_run(tx, init_demo_apps);
 
     return 0;
 }

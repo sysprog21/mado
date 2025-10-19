@@ -140,10 +140,101 @@ typedef int64_t twin_xfixed_t;
 #define twin_dfixed_div(a, b) \
     (twin_dfixed_t)((((int64_t) (a)) << 8) / ((int64_t) (b)))
 
+/* 64-bit fixed-point multiplication and division
+ * These require 128-bit intermediate results for full precision.
+ *
+ * For 64-bit platforms with __int128_t support, use native 128-bit arithmetic.
+ * For 32-bit platforms (RISC-V 32, ARM32, i386), use software implementation.
+ */
+#if defined(__SIZEOF_INT128__) ||               \
+    (defined(__GNUC__) && !defined(__i386__) && \
+     (defined(__x86_64__) || defined(__aarch64__)))
+/* Native 128-bit integer support (x86-64, AArch64, etc.) */
 #define twin_xfixed_mul(a, b) \
     (twin_xfixed_t)((((__int128_t) (a)) * ((__int128_t) (b))) >> 32)
 #define twin_xfixed_div(a, b) \
     (twin_xfixed_t)((((__int128_t) (a)) << 32) / ((__int128_t) (b)))
+#else
+/* Software implementation for 32-bit platforms
+ * Uses 64x64 -> 128 multiplication split into 32x32 -> 64 parts
+ *
+ * For a * b where a and b are 64-bit:
+ *   a = ah << 32 | al
+ *   b = bh << 32 | bl
+ *   a * b = (ah*bh << 64) + (ah*bl << 32) + (al*bh << 32) + (al*bl)
+ *
+ * After right shift by 32:
+ *   result = (ah*bh << 32) + (ah*bl) + (al*bh) + (al*bl >> 32)
+ */
+static inline twin_xfixed_t _twin_xfixed_mul_32bit(twin_xfixed_t a,
+                                                   twin_xfixed_t b)
+{
+    /* Handle sign */
+    int neg = ((a < 0) != (b < 0));
+    uint64_t ua = (a < 0) ? -a : a;
+    uint64_t ub = (b < 0) ? -b : b;
+
+    /* Split into high and low 32-bit parts */
+    uint64_t ah = ua >> 32;
+    uint64_t al = ua & 0xFFFFFFFFULL;
+    uint64_t bh = ub >> 32;
+    uint64_t bl = ub & 0xFFFFFFFFULL;
+
+    /* Compute partial products */
+    uint64_t p_hh = ah * bh, p_hl = ah * bl;
+    uint64_t p_lh = al * bh, p_ll = al * bl;
+
+    /* Combine with appropriate shifts, handling carry correctly
+     * Result = (p_hh << 32) + p_hl + p_lh + (p_ll >> 32)
+     * Split middle terms to prevent overflow: add low 32 bits first,
+     * then high 32 bits with carries
+     */
+    uint64_t mid_low =
+        (p_hl & 0xFFFFFFFFULL) + (p_lh & 0xFFFFFFFFULL) + (p_ll >> 32);
+    uint64_t mid_high = (p_hl >> 32) + (p_lh >> 32) + (mid_low >> 32);
+    uint64_t result =
+        (p_hh << 32) + (mid_high << 32) + (mid_low & 0xFFFFFFFFULL);
+
+    return neg ? -(int64_t) result : (int64_t) result;
+}
+
+static inline twin_xfixed_t _twin_xfixed_div_32bit(twin_xfixed_t a,
+                                                   twin_xfixed_t b)
+{
+    /* Handle sign */
+    int neg = ((a < 0) != (b < 0));
+    uint64_t ua = (a < 0) ? -a : a;
+    uint64_t ub = (b < 0) ? -b : b;
+
+    /* Fixed-point division: (a / b) in Q32.32 = (a << 32) / b in integer
+     * arithmetic Since ua is 64-bit, (ua << 32) is 96-bit. Perform long
+     * division: Split ua into 32-bit parts: ua = (ah << 32) | al Then (ua <<
+     * 32) = (ah << 64) | (al << 32)
+     *
+     * Step 1: Divide high part (ah << 32) by ub to get high 32 bits of quotient
+     * Step 2: Divide ((remainder << 32) | al) by ub to get low 32 bits
+     */
+    uint64_t ah = ua >> 32;           /* High 32 bits */
+    uint64_t al = ua & 0xFFFFFFFFULL; /* Low 32 bits */
+
+    /* Divide (ah << 32) / ub */
+    uint64_t ah_shifted = ah << 32;
+    uint64_t q_h = ah_shifted / ub;
+    uint64_t rem = ah_shifted % ub;
+
+    /* Divide ((rem << 32) | al) / ub */
+    uint64_t dividend_low = (rem << 32) | al;
+    uint64_t q_l = dividend_low / ub;
+
+    /* Combine quotients: result = (q_h << 32) | q_l */
+    uint64_t result = (q_h << 32) | q_l;
+
+    return neg ? -(int64_t) result : (int64_t) result;
+}
+
+#define twin_xfixed_mul(a, b) _twin_xfixed_mul_32bit(a, b)
+#define twin_xfixed_div(a, b) _twin_xfixed_div_32bit(a, b)
+#endif
 
 /*
  * 'double' is a no-no in any shipping code, but useful during
@@ -432,6 +523,9 @@ twin_time_t _twin_timeout_delay(void);
 
 void _twin_run_work(void);
 
+/* Event dispatch - internal use only */
+bool twin_dispatch_once(twin_context_t *ctx);
+
 void _twin_box_init(twin_box_t *box,
                     twin_box_t *parent,
                     twin_window_t *window,
@@ -513,6 +607,9 @@ typedef struct twin_backend {
     void (*configure)(twin_context_t *ctx);
 
     bool (*poll)(twin_context_t *ctx);
+
+    /* Start the main loop with application initialization callback */
+    void (*start)(twin_context_t *ctx, void (*init_callback)(twin_context_t *));
 
     /* Device cleanup when drawing is done */
     void (*exit)(twin_context_t *ctx);

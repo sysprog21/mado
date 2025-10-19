@@ -736,11 +736,35 @@ twin_button_t *twin_button_create(twin_box_t *parent,
 twin_pixmap_t *twin_make_cursor(int *hx, int *hy);
 
 /**
+ * Start the Twin application with initialization callback
+ * @ctx           : Twin context containing screen and backend data
+ * @init_callback : Application initialization function (called once before
+ * event loop)
+ *
+ * Unified application startup function that handles platform differences
+ * internally.
+ *
+ * For native builds:
+ *   - Calls init_callback immediately
+ *   - Enters infinite event loop via twin_dispatch()
+ *
+ * For WebAssembly builds:
+ *   - Sets up browser-compatible event loop
+ *   - Defers init_callback to first iteration (works around SDL timing issues)
+ *
+ * This is the recommended way to start Twin applications.
+ */
+void twin_run(twin_context_t *ctx, void (*init_callback)(twin_context_t *));
+
+/**
  * Process pending events and work items
  * @ctx : Twin context containing screen and backend data
  *
  * Main event loop function that processes input events,
  * executes work procedures, and handles timeouts.
+ *
+ * For native builds, this runs an infinite loop until termination.
+ * For WebAssembly builds, use twin_run() instead.
  */
 void twin_dispatch(twin_context_t *ctx);
 

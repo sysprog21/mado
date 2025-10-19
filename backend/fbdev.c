@@ -236,7 +236,7 @@ twin_context_t *twin_fbdev_init(int width, int height)
         return NULL;
     ctx->priv = calloc(1, sizeof(twin_fbdev_t));
     if (!ctx->priv)
-        return NULL;
+        goto bail;
 
     twin_fbdev_t *tx = ctx->priv;
 
@@ -264,7 +264,7 @@ twin_context_t *twin_fbdev_init(int width, int height)
     /* Examine if framebuffer mapping is valid */
     if (tx->fb_base == MAP_FAILED) {
         log_error("Failed to map framebuffer memory");
-        return;
+        goto bail_vt_fd;
     }
 
     const twin_put_span_t fbdev_put_spans[] = {
@@ -276,6 +276,10 @@ twin_context_t *twin_fbdev_init(int width, int height)
     ctx->screen = twin_screen_create(
         width, height, NULL, fbdev_put_spans[tx->fb_var.bits_per_pixel / 8 - 2],
         ctx);
+    if (!ctx->screen) {
+        log_error("Failed to create screen");
+        goto bail_fb_unmap;
+    }
 
     /* Create Linux input system object */
     tx->input = twin_linux_input_create(ctx->screen);
@@ -294,6 +298,9 @@ twin_context_t *twin_fbdev_init(int width, int height)
 
 bail_screen:
     twin_screen_destroy(ctx->screen);
+bail_fb_unmap:
+    if (tx->fb_base != MAP_FAILED)
+        munmap(tx->fb_base, tx->fb_len);
 bail_vt_fd:
     close(tx->vt_fd);
 bail_fb_fd:
@@ -327,9 +334,27 @@ static void twin_fbdev_exit(twin_context_t *ctx)
     free(ctx);
 }
 
+/* Start function for fbdev backend
+ * Note: fbdev uses Linux input system with background thread for events,
+ * so we use the standard dispatcher for work queue and timeout processing.
+ */
+static void twin_fbdev_start(twin_context_t *ctx,
+                             void (*init_callback)(twin_context_t *))
+{
+    if (init_callback)
+        init_callback(ctx);
+
+    /* Use standard dispatcher to ensure work queue and timeouts run.
+     * Events are handled by linux_input background thread.
+     */
+    while (twin_dispatch_once(ctx))
+        ;
+}
+
 /* Register the Linux framebuffer backend */
 const twin_backend_t g_twin_backend = {
     .init = twin_fbdev_init,
     .configure = twin_fbdev_configure,
+    .start = twin_fbdev_start,
     .exit = twin_fbdev_exit,
 };

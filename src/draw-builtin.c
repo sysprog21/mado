@@ -7,10 +7,35 @@
 
 #include <stdlib.h>
 
-#if defined(__APPLE__)
-#include <machine/endian.h>
-#else
+/* Cross-platform endianness detection
+ *
+ * Priority:
+ * 1. Linux/glibc: <endian.h>
+ * 2. macOS/BSD: <machine/endian.h>
+ * 3. Bare-metal/embedded: Manual detection via compiler macros
+ *
+ * Note: We don't actually use any endian.h macros in this file currently,
+ * but keep the includes for future compatibility.
+ */
+#if defined(__linux__) || defined(__GLIBC__)
 #include <endian.h>
+#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || \
+    defined(__OpenBSD__)
+#include <machine/endian.h>
+#elif defined(__BYTE_ORDER__)
+/* Compiler-provided endianness (GCC/Clang bare-metal) */
+#define __LITTLE_ENDIAN 1234
+#define __BIG_ENDIAN 4321
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define __BYTE_ORDER __LITTLE_ENDIAN
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define __BYTE_ORDER __BIG_ENDIAN
+#endif
+#else
+/* Fallback: Assume little-endian (x86, ARM, RISC-V default) */
+#define __LITTLE_ENDIAN 1234
+#define __BIG_ENDIAN 4321
+#define __BYTE_ORDER __LITTLE_ENDIAN
 #endif
 
 #include "twin_private.h"

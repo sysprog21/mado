@@ -1,6 +1,6 @@
 /*
 Twin - A Tiny Window System
-Copyright (c) 2024 National Cheng Kung University, Taiwan
+Copyright (c) 2024-2025 National Cheng Kung University, Taiwan
 All rights reserved.
 */
 #define AML_UNSTABLE_API 1
@@ -289,9 +289,22 @@ static void twin_vnc_exit(twin_context_t *ctx)
     free(ctx);
 }
 
+/* Start function for VNC backend */
+static void twin_vnc_start(twin_context_t *ctx,
+                           void (*init_callback)(twin_context_t *))
+{
+    if (init_callback)
+        init_callback(ctx);
+
+    /* Use standard dispatcher to ensure work queue and timeouts run */
+    while (twin_dispatch_once(ctx))
+        ;
+}
+
 const twin_backend_t g_twin_backend = {
     .init = twin_vnc_init,
     .poll = twin_vnc_poll,
     .configure = twin_vnc_configure,
+    .start = twin_vnc_start,
     .exit = twin_vnc_exit,
 };

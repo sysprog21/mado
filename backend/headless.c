@@ -401,7 +401,28 @@ static twin_context_t *twin_headless_init_dummy(int width, int height)
     (void) height;
     return NULL;
 }
+
+static void twin_headless_start_dummy(twin_context_t *ctx,
+                                      void (*init_callback)(twin_context_t *))
+{
+    (void) ctx;
+    (void) init_callback;
+}
 #endif /* HAVE_POSIX_SHM */
+
+#ifdef HAVE_POSIX_SHM
+/* Start function for headless backend */
+static void twin_headless_start(twin_context_t *ctx,
+                                void (*init_callback)(twin_context_t *))
+{
+    if (init_callback)
+        init_callback(ctx);
+
+    /* Use standard dispatcher to ensure work queue and timeouts run */
+    while (twin_dispatch_once(ctx))
+        ;
+}
+#endif
 
 /* Register the headless backend */
 const twin_backend_t g_twin_backend = {
@@ -409,11 +430,13 @@ const twin_backend_t g_twin_backend = {
     .init = twin_headless_init,
     .configure = twin_headless_configure,
     .poll = twin_headless_poll,
+    .start = twin_headless_start,
     .exit = twin_headless_exit,
 #else
     .init = twin_headless_init_dummy,
     .configure = twin_headless_config_dummy,
     .poll = twin_headless_poll_dummy,
+    .start = twin_headless_start_dummy,
     .exit = twin_headless_exit_dummy,
 #endif
 };

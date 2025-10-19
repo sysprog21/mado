@@ -41,9 +41,7 @@ bool twin_dispatch_once(twin_context_t *ctx)
 {
     /* Validate context to prevent null pointer dereference in callbacks */
     if (!ctx) {
-#ifdef CONFIG_LOGGING
         log_error("twin_dispatch_once: NULL context");
-#endif
         return false;
     }
 
@@ -57,9 +55,7 @@ bool twin_dispatch_once(twin_context_t *ctx)
         if (!g_twin_backend.poll(ctx))
             return false;
     } else {
-#ifdef CONFIG_LOGGING
         log_warn("twin_dispatch_once: No backend poll function registered");
-#endif
         /* Yield CPU to avoid busy-waiting when no event source available */
 #ifdef __EMSCRIPTEN__
         emscripten_sleep(0);
@@ -94,18 +90,14 @@ void twin_dispatch(twin_context_t *ctx)
      * Calling twin_dispatch() directly will not work in WebAssembly.
      */
     (void) ctx; /* Unused in Emscripten builds */
-#ifdef CONFIG_LOGGING
     log_error(
         "twin_dispatch() called in Emscripten build - use "
         "twin_dispatch_once() with emscripten_set_main_loop_arg()");
-#endif
     return;
 #else
     /* Validate context before entering event loop */
     if (!ctx) {
-#ifdef CONFIG_LOGGING
         log_error("twin_dispatch: NULL context");
-#endif
         return;
     }
 

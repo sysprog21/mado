@@ -137,7 +137,7 @@ twin_context_t *twin_sdl_init(int width, int height)
                                SDL_WINDOW_SHOWN);
     if (!tx->win) {
         log_error("%s", SDL_GetError());
-        goto bail;
+        goto bail_sdl;
     }
 
     tx->pixels = malloc(width * height * sizeof(*tx->pixels));
@@ -192,6 +192,8 @@ bail_pixels:
     free(tx->pixels);
 bail_window:
     SDL_DestroyWindow(tx->win);
+bail_sdl:
+    SDL_Quit();
 bail:
     free(ctx->priv);
     free(ctx);

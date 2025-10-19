@@ -39,6 +39,9 @@ typedef struct {
     uint16_t cmap[3][256];
     uint8_t *fb_base;
     size_t fb_len;
+
+    /* Initialization state */
+    bool first_run; /* Track first work queue execution for initial damage */
 } twin_fbdev_t;
 
 /* color conversion */
@@ -201,6 +204,16 @@ static bool twin_fbdev_work(void *closure)
     twin_fbdev_t *tx = PRIV(closure);
     twin_screen_t *screen = SCREEN(closure);
 
+    /* Mark entire screen as damaged on first run to ensure initial rendering.
+     * This is necessary because the screen content is not automatically
+     * rendered when the application starts. Using per-context state allows
+     * proper reinitialization if the backend is torn down and recreated.
+     */
+    if (tx->first_run) {
+        tx->first_run = false;
+        twin_screen_damage(screen, 0, 0, screen->width, screen->height);
+    }
+
     if (tx->vt_active && (tx->fb_base != MAP_FAILED)) {
         /* Unmap the fbdev */
         munmap(tx->fb_base, tx->fb_len);
@@ -239,6 +252,9 @@ twin_context_t *twin_fbdev_init(int width, int height)
         goto bail;
 
     twin_fbdev_t *tx = ctx->priv;
+
+    /* Initialize first_run flag for initial screen damage */
+    tx->first_run = true;
 
     /* Open the framebuffer device */
     tx->fb_fd = open(fbdev_path, O_RDWR);

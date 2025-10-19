@@ -36,6 +36,7 @@ typedef struct {
     int fd;
     int btns;
     int x, y;
+    int abs_x_max, abs_y_max; /* Maximum value for ABS_X/ABS_Y from device */
 } twin_linux_input_t;
 
 static void check_mouse_bounds(twin_linux_input_t *tm)
@@ -79,16 +80,21 @@ static void twin_linux_input_events(struct input_event *ev,
         }
         break;
     case EV_ABS:
-        if (ev->code == ABS_X) {
-            tm->x = ev->value;
+        /* Scale absolute coordinates to screen resolution.
+         * The range is dynamically queried from each device using EVIOCGABS.
+         * If no device reported ABS info, we fall back to the common default
+         * of 32767 for touchscreens and absolute pointing devices.
+         */
+        if (ev->code == ABS_X && tm->abs_x_max > 0) {
+            tm->x = ((int64_t) ev->value * tm->screen->width) / tm->abs_x_max;
             check_mouse_bounds(tm);
             tev.kind = TwinEventMotion;
             tev.u.pointer.screen_x = tm->x;
             tev.u.pointer.screen_y = tm->y;
             tev.u.pointer.button = tm->btns;
             twin_screen_dispatch(tm->screen, &tev);
-        } else if (ev->code == ABS_Y) {
-            tm->y = ev->value;
+        } else if (ev->code == ABS_Y && tm->abs_y_max > 0) {
+            tm->y = ((int64_t) ev->value * tm->screen->height) / tm->abs_y_max;
             check_mouse_bounds(tm);
             tev.kind = TwinEventMotion;
             tev.u.pointer.screen_x = tm->x;
@@ -169,6 +175,26 @@ static bool twin_linux_udev_update(struct udev_monitor *mon)
     return false;
 }
 
+/* Query absolute axis information from an input device */
+static void twin_linux_input_query_abs(int fd, twin_linux_input_t *tm)
+{
+    struct input_absinfo abs_info;
+
+    /* Query ABS_X maximum value */
+    if (ioctl(fd, EVIOCGABS(ABS_X), &abs_info) == 0 && abs_info.maximum > 0) {
+        /* Update global maximum if this device has a larger range */
+        if (abs_info.maximum > tm->abs_x_max)
+            tm->abs_x_max = abs_info.maximum;
+    }
+
+    /* Query ABS_Y maximum value */
+    if (ioctl(fd, EVIOCGABS(ABS_Y), &abs_info) == 0 && abs_info.maximum > 0) {
+        /* Update global maximum if this device has a larger range */
+        if (abs_info.maximum > tm->abs_y_max)
+            tm->abs_y_max = abs_info.maximum;
+    }
+}
+
 static void twin_linux_edev_open(struct pollfd *pfds, twin_linux_input_t *tm)
 {
     /* New event device list */
@@ -201,6 +227,8 @@ static void twin_linux_edev_open(struct pollfd *pfds, twin_linux_input_t *tm)
         /* Open the file if it is not on the list */
         int fd = open(evdev_name, O_RDWR | O_NONBLOCK);
         if (fd > 0 && !opened) {
+            /* Query absolute axis info for newly opened devices */
+            twin_linux_input_query_abs(fd, tm);
             evdevs[new_evdev_cnt].idx = i;
             evdevs[new_evdev_cnt].fd = fd;
             new_evdev_cnt++;
@@ -292,6 +320,11 @@ void *twin_linux_input_create(twin_screen_t *screen)
         return NULL;
 
     tm->screen = screen;
+
+    /* Initialize ABS axis ranges to common touchscreen default.
+     * These will be updated to actual device values when devices are opened.
+     */
+    tm->abs_x_max = tm->abs_y_max = 32767;
 
     /* Centering the cursor position */
     tm->x = screen->width / 2;

@@ -8,52 +8,119 @@ All backends maintain the same application interface, so switching between them 
 
 ### SDL Backend
 The SDL (Simple DirectMedia Layer) backend provides cross-platform graphics output with hardware acceleration support.
+It also serves as the only backend supporting WebAssembly/Emscripten builds for browser deployment.
 
-**Features:**
+Features:
 - Cross-platform (Windows, macOS, Linux, etc.)
+- WebAssembly/Emscripten support for browser deployment
 - Hardware-accelerated rendering when available
 - Full keyboard and mouse input support
 - Windowed and fullscreen modes
 - Audio support (if needed)
 
-**Dependencies:**
+#### Native Builds
+
+Dependencies:
 Install the [SDL2 library](https://www.libsdl.org/):
 * macOS: `brew install sdl2`
 * Ubuntu Linux / Debian: `sudo apt install libsdl2-dev`
 
-**Build:**
+Build:
 ```shell
 make defconfig  # SDL backend is enabled by default
 make
 ```
 
-**Run:**
+Run:
 ```shell
 ./demo-sdl
 ```
 
 Once the window appears, you can move windows and interact with widgets.
 
-**Use Cases:**
+#### WebAssembly/Emscripten Builds
+
+The SDL backend can be compiled to WebAssembly using Emscripten, enabling Mado applications to run in web browsers.
+
+Dependencies:
+Install the [Emscripten SDK](https://emscripten.org/):
+```shell
+# Clone the Emscripten SDK
+git clone https://github.com/emscripten-core/emsdk
+cd emsdk
+
+# Install and activate the latest version
+./emsdk install latest
+./emsdk activate latest
+
+# Add Emscripten to your PATH (add to ~/.bashrc or ~/.zshrc)
+source ./emsdk_env.sh
+```
+
+Build:
+```shell
+# The build system auto-detects Emscripten when CC=emcc
+make defconfig
+make CC=emcc
+```
+
+The build system automatically:
+- Detects Emscripten compiler via `scripts/detect-compiler.py`
+- Restricts backend selection to SDL only (VNC/fbdev incompatible with WebAssembly)
+- Disables incompatible features (Cairo-based font editor)
+- Uses Emscripten's SDL2 port (no manual installation needed)
+- Copies build artifacts to `assets/web/` directory
+
+Run:
+```shell
+# Start the development server
+./scripts/serve-wasm.py --open
+
+# Or manually:
+python3 scripts/serve-wasm.py
+# Then open http://localhost:8080 in your browser
+```
+
+The web interface (`assets/web/index.html`) provides:
+- Canvas-based rendering with SDL2
+- Keyboard and mouse event handling
+- Console output for debugging
+- Error reporting and status display
+- Automatic module loading and initialization
+
+Browser Requirements:
+- Modern browser with WebAssembly support (Chrome 57+, Firefox 52+, Safari 11+, Edge 16+)
+- JavaScript enabled
+- Hardware acceleration recommended for better performance
+
+Known Limitations:
+- Single-threaded execution (no WebWorkers support yet)
+- No direct file system access (use Emscripten's virtual filesystem)
+- Initial load time proportional to binary size
+
+Use Cases:
 - Desktop applications
 - Cross-platform development
 - Primary development and testing platform
+- Web-based demonstrations and interactive tutorials
+- Browser-based UI prototyping
+- Client-side graphics applications without installation
 
 ### Linux Framebuffer (fbdev)
 Direct framebuffer access for embedded Linux systems without X11/Wayland.
 
-**Features:**
+Features:
 - Direct hardware access
 - Minimal dependencies
 - Built-in cursor support
 - Linux input subsystem integration
 - Virtual terminal switching support
 
-**Dependencies:**
+Dependencies:
 Install `libudev` and `libuuid`:
 * Ubuntu Linux / Debian: `sudo apt install libudev-dev uuid-dev`
 
-**Build:**
+Build:
 ```shell
 make defconfig
 python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig \
@@ -62,7 +129,7 @@ python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig \
 make
 ```
 
-**Run:**
+Run:
 ```shell
 sudo ./demo-fbdev
 ```
@@ -74,7 +141,7 @@ sudo usermod -a -G video $USERNAME
 
 The framebuffer device can be assigned via the environment variable `FRAMEBUFFER`.
 
-**Use Cases:**
+Use Cases:
 - Embedded Linux systems
 - Kiosk applications
 - Boot splash screens
@@ -83,20 +150,20 @@ The framebuffer device can be assigned via the environment variable `FRAMEBUFFER
 ### VNC Backend
 Provides remote display capabilities through the VNC (Virtual Network Computing) protocol.
 
-**Features:**
+Features:
 - Remote access over network
 - Multiple client support
 - Platform-independent clients
 - Built-in authentication
 - Compression support
 
-**Dependencies:**
+Dependencies:
 Install [neatvnc](https://github.com/any1/neatvnc). Note: The VNC backend has only been tested on GNU/Linux, and prebuilt packages might be outdated. To ensure the latest version, build from source:
 ```shell
 tools/build-neatvnc.sh
 ```
 
-**Build:**
+Build:
 ```shell
 make defconfig
 python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig \
@@ -105,7 +172,7 @@ python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig \
 make
 ```
 
-**Run:**
+Run:
 ```shell
 ./demo-vnc
 ```
@@ -114,7 +181,7 @@ This starts the VNC server. Connect using any VNC client with the specified IP a
 - IP address: Set via `MADO_VNC_HOST` environment variable
 - Port: Set via `MADO_VNC_PORT` environment variable
 
-**Use Cases:**
+Use Cases:
 - Remote desktop applications
 - Server-side rendering
 - Thin client deployments
@@ -123,17 +190,17 @@ This starts the VNC server. Connect using any VNC client with the specified IP a
 ### Headless Backend
 Renders to a memory buffer without any display output, ideal for testing and automation.
 
-**Features:**
+Features:
 - No display dependencies
 - Shared memory architecture
 - Screenshot capability
 - Event injection for testing
 - Memory debugging friendly
 
-**Dependencies:**
+Dependencies:
 No additional dependencies required. This backend uses shared memory for rendering.
 
-**Build:**
+Build:
 ```shell
 # Using setconfig.py (recommended)
 make defconfig
@@ -149,7 +216,7 @@ make config  # Select "Headless backend" and "Headless control tool"
 make
 ```
 
-**Run:**
+Run:
 ```shell
 ./demo-headless &
 ./headless-ctl status           # Check backend status
@@ -159,7 +226,7 @@ make
 
 The headless backend uses shared memory for rendering without display output. Use `headless-ctl` to monitor, control, and capture screenshots.
 
-**Use Cases:**
+Use Cases:
 - Automated testing
 - CI/CD pipelines
 - Memory analysis with Valgrind or AddressSanitizer
@@ -170,11 +237,20 @@ The headless backend uses shared memory for rendering without display output. Us
 
 Backends are selected at compile time through the Kconfig-based build system.
 
+WebAssembly Compatibility Note:
+When compiling with Emscripten (`CC=emcc`), the build system automatically restricts backend selection to SDL only.
+The following backends are incompatible with WebAssembly:
+- VNC Backend: Requires native networking APIs not available in WebAssembly
+- Framebuffer Backend: Requires direct Linux kernel interfaces (`/dev/fb0`, ioctls)
+- Headless Backend: Requires POSIX shared memory APIs (`shm_open`, `mmap`)
+
+The Kconfig system automatically enforces these restrictions when Emscripten is detected.
+
 ### Configuration Methods
 
 Mado uses [Kconfiglib](https://github.com/sysprog21/Kconfiglib) for configuration management, providing several methods to configure backends:
 
-**Method 1: Interactive Configuration** (best for exploration)
+Method 1: Interactive Configuration (best for exploration)
 ```shell
 make config          # Terminal-based menu
 # or
@@ -182,7 +258,7 @@ make menuconfig      # Alternative terminal interface
 make
 ```
 
-**Method 2: Using `setconfig.py`** (best for scripting)
+Method 2: Using `setconfig.py` (best for scripting)
 ```shell
 make defconfig
 python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig \
@@ -196,7 +272,7 @@ Advantages:
 - No need to manually edit `.config`
 - Symbol names don't require `CONFIG_` prefix
 
-**Method 3: Configuration Fragments** (best for CI/CD)
+Method 3: Configuration Fragments (best for CI/CD)
 ```shell
 # Create a fragment file (e.g., configs/mybackend.fragment)
 # Contents: CONFIG_BACKEND_SDL=y
@@ -330,10 +406,20 @@ make CFLAGS="-fsanitize=address -g"
 Each backend may have specific configuration options:
 
 ### SDL Backend
+
+Native Configuration:
 - Window size and position
 - Fullscreen mode toggle
 - Hardware acceleration preferences
 - VSync settings
+
+WebAssembly Configuration:
+- Canvas element ID (default: `#canvas`, configured in `assets/web/index.html`)
+- Keyboard input element (set via `SDL_EMSCRIPTEN_KEYBOARD_ELEMENT`)
+- Initial canvas size (640x480 default, configurable in HTML)
+- Browser console logging (enabled by default for debugging)
+- Main loop timing (managed by `emscripten_set_main_loop_arg`)
+- Memory allocation limits (configurable via Emscripten linker flags)
 
 ### Framebuffer Backend
 - Device path (default: `/dev/fb0`)

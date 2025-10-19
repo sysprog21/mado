@@ -47,7 +47,7 @@ endmenu
 
 config HAVE_SDL2
     bool
-    default y if CC_IS_EMCC
+    default n if CC_IS_EMCC
     default $(shell,pkg-config --exists sdl2 && echo y || echo n) if !CC_IS_EMCC
 
 config HAVE_PIXMAN
@@ -70,6 +70,7 @@ config HAVE_CAIRO
 
 choice
     prompt "Backend Selection"
+    default BACKEND_WASM if CC_IS_EMCC
     default BACKEND_SDL
     help
       Select the display backend for window system rendering.
@@ -77,12 +78,9 @@ choice
 
 config BACKEND_SDL
     bool "SDL video output support"
-    depends on HAVE_SDL2
+    depends on HAVE_SDL2 && !CC_IS_EMCC
     help
-      Cross-platform SDL2 backend for development and testing.
-
-      For Emscripten (WebAssembly): This is the only supported backend.
-      Emscripten provides SDL2 via its ports system (-sUSE_SDL=2).
+      Cross-platform SDL2 backend for native development and testing.
 
 config BACKEND_FBDEV
     bool "Linux framebuffer support"
@@ -108,9 +106,18 @@ config BACKEND_HEADLESS
       Renders to memory without display hardware or VNC.
       Designed for CI/CD pipelines and automated testing.
 
+config BACKEND_WASM
+    bool "Native WebAssembly backend"
+    depends on CC_IS_EMCC
+    help
+      Lightweight WebAssembly backend without SDL dependency.
+
+      This backend uses direct Canvas 2D API rendering and
+      browser-native image decoding (JPEG/PNG).
+
 endchoice
 
-comment "WebAssembly builds use SDL2 backend only"
+comment "WebAssembly builds use the native WASM backend (no SDL dependency)"
     depends on CC_IS_EMCC
 
 choice
@@ -347,9 +354,7 @@ config TOOL_FONTEDIT
       Interactive font editor for Mado font format.
       Allows creation and modification of scalable fonts.
 
-      Note: Only available for native builds. Not supported for
-      cross-compilation or WebAssembly (Emscripten) builds due to
-      Cairo library dependencies.
+      Note: Only available for native builds.
 
 config PERF_TEST
     bool "Build performance tester"

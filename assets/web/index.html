@@ -1,176 +1,280 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mado Window System (WebAssembly)</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mado - Lightweight Window System (WebAssembly)</title>
     <style>
-        body {
-            margin: 0;
-            padding: 20px;
-            background: #1a1a1a;
-            color: #fff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+      }
+
+      header {
+        text-align: center;
+        color: white;
+        margin-bottom: 30px;
+      }
+
+      h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .subtitle {
+        font-size: 1.1rem;
+        opacity: 0.9;
+      }
+
+      .container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+        max-width: 90vw;
+      }
+
+      .canvas-wrapper {
+        background: #f5f5f5;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+      }
+
+      #canvas {
+        display: block;
+        image-rendering: pixelated;
+        cursor: default;
+      }
+
+      .controls {
+        padding: 20px;
+        background: #f9f9f9;
+        border-top: 1px solid #e0e0e0;
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 15px;
+      }
+
+      .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #4caf50;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
         }
-        h1 {
-            margin-bottom: 10px;
+        50% {
+          opacity: 0.5;
         }
-        .info {
-            margin-bottom: 20px;
-            color: #aaa;
-            text-align: center;
+      }
+
+      .status-text {
+        color: #333;
+        font-weight: 500;
+      }
+
+      .info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+      }
+
+      .info-item {
+        background: white;
+        padding: 12px;
+        border-radius: 6px;
+        border: 1px solid #e0e0e0;
+      }
+
+      .info-label {
+        font-size: 0.85rem;
+        color: #666;
+        margin-bottom: 4px;
+      }
+
+      .info-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #333;
+      }
+
+      .console {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 15px;
+        border-top: 1px solid #333;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: "Courier New", monospace;
+        font-size: 0.9rem;
+      }
+
+      .console-line {
+        margin-bottom: 4px;
+        word-break: break-all;
+      }
+
+      .console-error {
+        color: #f48771;
+      }
+
+      footer {
+        margin-top: 30px;
+        text-align: center;
+        color: white;
+        opacity: 0.8;
+      }
+
+      footer a {
+        color: white;
+        text-decoration: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+      }
+
+      footer a:hover {
+        opacity: 0.8;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+      }
+
+      .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
         }
-        #canvas {
-            border: 1px solid #444;
-            background: #000;
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
+        100% {
+          transform: rotate(360deg);
         }
-        #status {
-            margin-top: 10px;
-            color: #888;
-        }
-        #console {
-            margin-top: 20px;
-            padding: 15px;
-            background: #000;
-            border: 1px solid #444;
-            border-radius: 4px;
-            max-width: 800px;
-            max-height: 300px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            text-align: left;
-            display: none;
-        }
-        #console.error {
-            display: block;
-            border-color: #f44;
-        }
-        .console-line {
-            margin: 2px 0;
-            padding: 2px 0;
-        }
-        .console-error {
-            color: #f44;
-        }
-        .console-warn {
-            color: #fa0;
-        }
-        .console-info {
-            color: #4af;
-        }
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+      }
     </style>
-</head>
-<body>
-    <h1>Mado Window System</h1>
-    <div class="info">
-        WebAssembly build running in your browser<br>
-    </div>
-    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
-    <div id="status">
-        <span class="spinner"></span> Loading...
-    </div>
-    <div id="console"></div>
+  </head>
+  <body>
+    <header>
+      <h1>Mado</h1>
+      <p class="subtitle">Lightweight Window System for WebAssembly</p>
+    </header>
 
-    <script type='text/javascript'>
-        var statusElement = document.getElementById('status');
-        var consoleElement = document.getElementById('console');
-        var canvas = document.getElementById('canvas');
+    <div class="container">
+      <div class="canvas-wrapper">
+        <canvas id="canvas" width="640" height="480"></canvas>
+      </div>
 
-        function addConsoleLog(message, type) {
-            // Only add error styling when the message type is actually an error
-            if (type === 'error') {
-                consoleElement.classList.add('error');
-            }
-            var line = document.createElement('div');
-            line.className = 'console-line console-' + type;
-            line.textContent = message;
-            consoleElement.appendChild(line);
-            consoleElement.scrollTop = consoleElement.scrollHeight;
+      <div class="controls">
+        <div class="status">
+          <div class="status-indicator"></div>
+          <span class="status-text">WebAssembly Runtime Active</span>
+        </div>
+
+        <div class="info">
+          <div class="info-item">
+            <div class="info-label">Canvas Size</div>
+            <div class="info-value">640 × 480</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Rendering</div>
+            <div class="info-value">Canvas 2D API</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="console" id="console">
+        <div class="console-line">Console output will appear here...</div>
+      </div>
+    </div>
+
+    <footer>
+      <p>
+        Powered by
+        <a href="https://github.com/sysprog21/mado" target="_blank">Mado</a>
+        |
+        <a href="https://emscripten.org/" target="_blank">Emscripten</a>
+      </p>
+    </footer>
+
+    <!-- Load JavaScript glue code -->
+    <script src="mado-wasm.js"></script>
+
+    <!-- Enhanced console logging -->
+    <script>
+      (function () {
+        const consoleDiv = document.getElementById("console");
+        const maxLines = 50;
+        let lineCount = 0;
+
+        function addConsoleLine(text, isError = false) {
+          const line = document.createElement("div");
+          line.className = "console-line" + (isError ? " console-error" : "");
+          line.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+          consoleDiv.appendChild(line);
+
+          lineCount++;
+          if (lineCount > maxLines) {
+            consoleDiv.removeChild(consoleDiv.firstChild);
+            lineCount--;
+          }
+
+          consoleDiv.scrollTop = consoleDiv.scrollHeight;
         }
 
-        var Module = {
-            // SDL2 environment variables for Emscripten
-            preRun: [function() {
-                ENV.SDL_EMSCRIPTEN_KEYBOARD_ELEMENT = '#canvas';
-            }],
-            postRun: [],
-            print: function(text) {
-                console.log(text);
-                addConsoleLog(text, 'info');
-            },
-            printErr: function(text) {
-                console.error(text);
-                addConsoleLog(text, 'error');
-            },
-            canvas: canvas,
-            setStatus: function(text) {
-                if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
-                if (text === Module.setStatus.last.text) return;
-                var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
-                var now = Date.now();
-                if (m && now - Module.setStatus.last.time < 30) return;
-                Module.setStatus.last.time = now;
-                Module.setStatus.last.text = text;
-                if (m) {
-                    text = m[1];
-                    statusElement.innerHTML = text + ' (' + m[2] + '/' + m[4] + ')';
-                } else {
-                    statusElement.innerHTML = text;
-                }
-            },
-            totalDependencies: 0,
-            monitorRunDependencies: function(left) {
-                this.totalDependencies = Math.max(this.totalDependencies, left);
-                Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
-            }
-        };
-        Module.setStatus('Downloading...');
-        window.onerror = function(message, source, lineno, colno, error) {
-            var errorMsg = 'Exception: ' + message;
-            if (error && error.stack) {
-                errorMsg += '\n' + error.stack;
-            }
-            if (source) {
-                errorMsg += '\nSource: ' + source + ':' + lineno + ':' + colno;
-            }
-            Module.setStatus('Exception thrown - see error details below');
-            statusElement.style.color = '#f44';
-            addConsoleLog(errorMsg, 'error');
-            Module.setStatus = function(text) {
-                if (text) {
-                    Module.printErr('[post-exception status] ' + text);
-                }
-            };
-            return true;
+        // Override Module print functions
+        const originalPrint = Module.print;
+        const originalPrintErr = Module.printErr;
+
+        Module.print = function (text) {
+          addConsoleLine(text, false);
+          if (originalPrint) originalPrint(text);
         };
 
-        // Catch unhandled promise rejections
-        window.addEventListener('unhandledrejection', function(event) {
-            var errorMsg = 'Unhandled Promise Rejection: ' + event.reason;
-            if (event.reason && event.reason.stack) {
-                errorMsg += '\n' + event.reason.stack;
-            }
-            addConsoleLog(errorMsg, 'error');
-        });
+        Module.printErr = function (text) {
+          addConsoleLine(text, true);
+          if (originalPrintErr) originalPrintErr(text);
+        };
+
+        // Initial message
+        addConsoleLine("Initializing Mado WebAssembly module...");
+      })();
     </script>
-    <script async type="text/javascript" src="demo-sdl"></script>
-</body>
+
+    <!-- Load WebAssembly module -->
+    <script src="demo-wasm.js"></script>
+  </body>
 </html>

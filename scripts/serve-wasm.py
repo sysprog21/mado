@@ -63,9 +63,9 @@ def check_required_files(web_dir):
     """Check if required WebAssembly files exist."""
     required_files = [
         'index.html',
-        'demo-sdl.wasm',
-        'demo-sdl',
-        'demo-sdl.data'
+        'demo-wasm.wasm',
+        'demo-wasm.js',  # Emscripten JS glue code
+        'mado-wasm.js'
     ]
 
     missing = []

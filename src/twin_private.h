@@ -523,7 +523,21 @@ twin_time_t _twin_timeout_delay(void);
 
 void _twin_run_work(void);
 
-/* Event dispatch - internal use only */
+/* Event dispatch - internal use only
+ *
+ * twin_dispatch_once() - Single iteration of event loop
+ *   Processes timeouts, work queue, and backend events once.
+ *
+ *   Backend implementations should call this in their .start() function:
+ *     while (twin_dispatch_once(ctx))
+ *         ;
+ *
+ *   For WebAssembly, use with emscripten_set_main_loop_arg():
+ *     static void main_loop(void *arg) {
+ *         twin_dispatch_once((twin_context_t *) arg);
+ *     }
+ *     emscripten_set_main_loop_arg(main_loop, ctx, 0, 1);
+ */
 bool twin_dispatch_once(twin_context_t *ctx);
 
 void _twin_box_init(twin_box_t *box,

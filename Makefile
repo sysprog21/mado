@@ -16,11 +16,11 @@ ifneq ($(findstring emcc,$(CC_VERSION)),)
     CC_IS_EMCC := 1
 endif
 
-# Enforce SDL backend for Emscripten builds (skip during config targets)
+# Enforce compatible backend for Emscripten builds (skip during config targets)
 ifeq ($(filter $(check_goal),config defconfig),)
     ifeq ($(CC_IS_EMCC),1)
-        ifneq ($(CONFIG_BACKEND_SDL),y)
-            $(error Emscripten (WebAssembly) builds require SDL backend. Please run: env CC=emcc make defconfig)
+        ifneq ($(CONFIG_BACKEND_WASM),y)
+            $(error Emscripten (WebAssembly) builds require WASM backend. SDL backend is native-only.)
         endif
     endif
 endif
@@ -155,15 +155,8 @@ BACKEND := none
 ifeq ($(CONFIG_BACKEND_SDL), y)
 BACKEND = sdl
 libtwin.a_files-y += backend/sdl.c
-# Emscripten uses ports system for SDL2
-ifneq ($(CC_IS_EMCC), 1)
 libtwin.a_cflags-y += $(shell sdl2-config --cflags)
 TARGET_LIBS += $(shell sdl2-config --libs)
-else
-# Emscripten SDL2 port - flags needed for both compile and link
-libtwin.a_cflags-y += -sUSE_SDL=2
-TARGET_LIBS += -sUSE_SDL=2
-endif
 endif
 
 ifeq ($(CONFIG_BACKEND_FBDEV), y)
@@ -184,6 +177,12 @@ endif
 ifeq ($(CONFIG_BACKEND_HEADLESS), y)
 BACKEND = headless
 libtwin.a_files-y += backend/headless.c
+endif
+
+ifeq ($(CONFIG_BACKEND_WASM), y)
+BACKEND = wasm
+libtwin.a_files-y += backend/wasm.c
+# WASM backend uses Emscripten directly, no external libraries needed
 endif
 
 # Performance tester
@@ -212,22 +211,35 @@ demo-$(BACKEND)_ldflags-y := \
 
 # Emscripten-specific linker flags for WebAssembly builds
 ifeq ($(CC_IS_EMCC), 1)
+# Base Emscripten flags for all backends
 demo-$(BACKEND)_ldflags-y += \
 	-sINITIAL_MEMORY=33554432 \
 	-sALLOW_MEMORY_GROWTH=1 \
 	-sSTACK_SIZE=1048576 \
-	-sUSE_SDL=2 \
-	-sMINIMAL_RUNTIME=0 \
 	-sDYNAMIC_EXECUTION=0 \
 	-sASSERTIONS=0 \
 	-sEXPORTED_FUNCTIONS=_main,_malloc,_free \
-	-sEXPORTED_RUNTIME_METHODS=ccall,cwrap \
+	-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,HEAPU32,HEAP32 \
 	-sNO_EXIT_RUNTIME=1 \
-	-Oz \
-	--preload-file assets \
-	--exclude-file assets/web
+	-Oz
+
+# WebAssembly-specific optimizations
+ifeq ($(CONFIG_BACKEND_WASM), y)
+demo-$(BACKEND)_cflags-y += -flto
+demo-$(BACKEND)_ldflags-y += \
+	-sMALLOC=emmalloc \
+	-sFILESYSTEM=1 \
+	--embed-file assets@/assets \
+	--exclude-file assets/web \
+	-sDISABLE_EXCEPTION_CATCHING=1 \
+	-sEXPORT_ES6=0 \
+	-sMODULARIZE=0 \
+	-sENVIRONMENT=web \
+	-sSUPPORT_ERRNO=0 \
+	-flto
 endif
 endif
+endif  # CONFIG_DEMO_APPLICATIONS
 
 # Font editor tool
 # Tools should not be built for WebAssembly
@@ -303,7 +315,8 @@ wasm-install:
 	@if [ "$(CC_IS_EMCC)" = "1" ]; then \
 		echo "Installing WebAssembly artifacts to assets/web/..."; \
 		mkdir -p assets/web; \
-		cp -f .demo-$(BACKEND)/demo-$(BACKEND) .demo-$(BACKEND)/demo-$(BACKEND).wasm .demo-$(BACKEND)/demo-$(BACKEND).data assets/web/ 2>/dev/null || true; \
+		cp -f .demo-$(BACKEND)/demo-$(BACKEND) assets/web/demo-$(BACKEND).js 2>/dev/null || true; \
+		cp -f .demo-$(BACKEND)/demo-$(BACKEND).wasm assets/web/ 2>/dev/null || true; \
 		echo "✓ WebAssembly build artifacts copied to assets/web/"; \
 		echo ""; \
 		echo "\033[1;32m========================================\033[0m"; \

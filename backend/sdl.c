@@ -9,10 +9,6 @@
 #include <stdio.h>
 #include <twin.h>
 
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
-
 #include "twin_private.h"
 
 typedef struct {
@@ -79,14 +75,6 @@ static void _twin_sdl_destroy(twin_screen_t *screen maybe_unused,
     SDL_Quit();
 }
 
-#ifdef __EMSCRIPTEN__
-/* Placeholder main loop to prevent SDL from complaining during initialization.
- * This will be replaced by the real main loop in main().
- */
-static void twin_sdl_placeholder_loop(void) {}
-static bool twin_sdl_placeholder_set = false;
-#endif
-
 static void twin_sdl_damage(twin_screen_t *screen, twin_sdl_t *tx)
 {
     int width, height;
@@ -114,16 +102,6 @@ twin_context_t *twin_sdl_init(int width, int height)
         return NULL;
     }
 
-#ifdef __EMSCRIPTEN__
-    /* Tell SDL we will manage the main loop externally via
-     * emscripten_set_main_loop, preventing SDL from trying to set up its own
-     * timing before we are ready.
-     */
-    SDL_SetMainReady();  // Prevent SDL from taking over main()
-    SDL_SetHint(SDL_HINT_EMSCRIPTEN_ASYNCIFY, "0");
-    SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
-#endif
-
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) < 0) {
         log_error("%s", SDL_GetError());
         goto bail;
@@ -146,17 +124,6 @@ twin_context_t *twin_sdl_init(int width, int height)
         goto bail_window;
     }
     memset(tx->pixels, 255, width * height * sizeof(*tx->pixels));
-
-#ifdef __EMSCRIPTEN__
-    /* Set up a placeholder main loop to prevent SDL_CreateRenderer from
-     * complaining about missing main loop. The real main loop will be set
-     * up in main() after all initialization is complete.
-     */
-    if (!twin_sdl_placeholder_set) {
-        emscripten_set_main_loop(twin_sdl_placeholder_loop, 0, 0);
-        twin_sdl_placeholder_set = true;
-    }
-#endif
 
     tx->render = SDL_CreateRenderer(tx->win, -1, SDL_RENDERER_ACCELERATED);
     if (!tx->render) {
@@ -257,9 +224,8 @@ static bool twin_sdl_poll(twin_context_t *ctx)
     /* Yield CPU when idle to avoid busy-waiting.
      * Skip delay if events were processed or screen needs update.
      */
-    if (!has_event && !twin_screen_damaged(screen)) {
+    if (!has_event && !twin_screen_damaged(screen))
         SDL_Delay(1); /* 1ms sleep reduces CPU usage when idle */
-    }
 
     return true;
 }
@@ -286,47 +252,16 @@ static void twin_sdl_exit(twin_context_t *ctx)
     free(ctx);
 }
 
-#ifdef __EMSCRIPTEN__
-/* Emscripten main loop state */
-static void (*g_wasm_init_callback)(twin_context_t *) = NULL;
-static bool g_wasm_initialized = false;
-
-/* Main loop callback for Emscripten */
-static void twin_sdl_wasm_loop(void *arg)
-{
-    twin_context_t *ctx = (twin_context_t *) arg;
-
-    /* Perform one-time initialization on first iteration */
-    if (!g_wasm_initialized && g_wasm_init_callback) {
-        g_wasm_init_callback(ctx);
-        g_wasm_initialized = true;
-    }
-
-    twin_dispatch_once(ctx);
-}
-#endif
-
-/* Backend start function: unified entry point for both native and WebAssembly
- */
 static void twin_sdl_start(twin_context_t *ctx,
                            void (*init_callback)(twin_context_t *))
 {
-#ifdef __EMSCRIPTEN__
-    /* WebAssembly: Set up Emscripten main loop */
-    g_wasm_init_callback = init_callback;
-    g_wasm_initialized = false;
-
-    emscripten_cancel_main_loop(); /* Cancel placeholder from init */
-    emscripten_set_main_loop_arg(twin_sdl_wasm_loop, ctx, 0, 1);
-#else
-    /* Native: Initialize immediately and enter standard dispatch loop */
+    /* Initialize immediately and enter standard dispatch loop */
     if (init_callback)
         init_callback(ctx);
 
     /* Use twin_dispatch_once() to ensure work queue and timeouts run */
     while (twin_dispatch_once(ctx))
         ;
-#endif
 }
 
 /* Register the SDL backend */

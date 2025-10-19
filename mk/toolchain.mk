@@ -12,6 +12,10 @@
 #
 # Reference: https://www.kernel.org/doc/html/latest/kbuild/kbuild.html
 
+# Include guard to prevent double inclusion
+ifndef TOOLCHAIN_MK_INCLUDED
+TOOLCHAIN_MK_INCLUDED := 1
+
 # Compiler identification flags
 CC_IS_CLANG :=
 CC_IS_GCC :=
@@ -75,14 +79,16 @@ endif
 # For other compilers, use CROSS_COMPILE prefix
 ifeq ($(CC_IS_EMCC),1)
     # Emscripten toolchain
-    ifndef AR
-    AR := emar
+    # Use $(origin) to detect if variables come from Make's built-in defaults
+    ifeq ($(origin AR),default)
+        AR := emar
     endif
-    ifndef RANLIB
-    RANLIB := emranlib
+    # RANLIB has no built-in default in Make, check if undefined or default
+    ifeq ($(filter-out undefined default,$(origin RANLIB)),)
+        RANLIB := emranlib
     endif
     ifndef STRIP
-    STRIP := emstrip
+        STRIP := emstrip
     endif
     # Emscripten doesn't use traditional ld/objcopy
     LD := emcc
@@ -96,7 +102,8 @@ else
     ifeq ($(origin AR),default)
         AR := $(CROSS_COMPILE)ar
     endif
-    ifeq ($(origin RANLIB),default)
+    # RANLIB may have origin 'default' or 'undefined' depending on Make version
+    ifeq ($(filter-out undefined default,$(origin RANLIB)),)
         RANLIB := $(CROSS_COMPILE)ranlib
     endif
     ifndef STRIP
@@ -152,7 +159,8 @@ endif
 ifeq ($(shell uname -s),Darwin)
     ifeq ($(CROSS_COMPILE)$(CC_IS_EMCC),)
         # Check if ld supports -no_warn_duplicate_libraries
-        LD_SUPPORTS_NO_WARN := $(shell $(CC) -Wl,-no_warn_duplicate_libraries 2>&1 | grep -q "unknown option" && echo 0 || echo 1)
+        # Use /dev/null as input to ensure compiler invokes the linker
+        LD_SUPPORTS_NO_WARN := $(shell printf '' | $(CC) -Wl,-no_warn_duplicate_libraries -x c - -o /dev/null 2>&1 | grep -q "unknown option" && echo 0 || echo 1)
         ifeq ($(LD_SUPPORTS_NO_WARN),1)
             LDFLAGS += -Wl,-no_warn_duplicate_libraries
         endif
@@ -170,3 +178,5 @@ ifeq ($(CC_IS_EMCC),1)
     $(info Compiler: $(CC))
     $(info Toolchain: emar, emranlib, emstrip)
 endif
+
+endif # TOOLCHAIN_MK_INCLUDED

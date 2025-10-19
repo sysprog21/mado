@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mado Window System (WebAssembly)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            margin-bottom: 10px;
+        }
+        .info {
+            margin-bottom: 20px;
+            color: #aaa;
+            text-align: center;
+        }
+        #canvas {
+            border: 1px solid #444;
+            background: #000;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #status {
+            margin-top: 10px;
+            color: #888;
+        }
+        #console {
+            margin-top: 20px;
+            padding: 15px;
+            background: #000;
+            border: 1px solid #444;
+            border-radius: 4px;
+            max-width: 800px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            text-align: left;
+            display: none;
+        }
+        #console.error {
+            display: block;
+            border-color: #f44;
+        }
+        .console-line {
+            margin: 2px 0;
+            padding: 2px 0;
+        }
+        .console-error {
+            color: #f44;
+        }
+        .console-warn {
+            color: #fa0;
+        }
+        .console-info {
+            color: #4af;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>Mado Window System</h1>
+    <div class="info">
+        WebAssembly build running in your browser<br>
+    </div>
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+    <div id="status">
+        <span class="spinner"></span> Loading...
+    </div>
+    <div id="console"></div>
+
+    <script type='text/javascript'>
+        var statusElement = document.getElementById('status');
+        var consoleElement = document.getElementById('console');
+        var canvas = document.getElementById('canvas');
+
+        function addConsoleLog(message, type) {
+            // Only add error styling when the message type is actually an error
+            if (type === 'error') {
+                consoleElement.classList.add('error');
+            }
+            var line = document.createElement('div');
+            line.className = 'console-line console-' + type;
+            line.textContent = message;
+            consoleElement.appendChild(line);
+            consoleElement.scrollTop = consoleElement.scrollHeight;
+        }
+
+        var Module = {
+            // SDL2 environment variables for Emscripten
+            preRun: [function() {
+                ENV.SDL_EMSCRIPTEN_KEYBOARD_ELEMENT = '#canvas';
+            }],
+            postRun: [],
+            print: function(text) {
+                console.log(text);
+                addConsoleLog(text, 'info');
+            },
+            printErr: function(text) {
+                console.error(text);
+                addConsoleLog(text, 'error');
+            },
+            canvas: canvas,
+            setStatus: function(text) {
+                if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+                if (text === Module.setStatus.last.text) return;
+                var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+                var now = Date.now();
+                if (m && now - Module.setStatus.last.time < 30) return;
+                Module.setStatus.last.time = now;
+                Module.setStatus.last.text = text;
+                if (m) {
+                    text = m[1];
+                    statusElement.innerHTML = text + ' (' + m[2] + '/' + m[4] + ')';
+                } else {
+                    statusElement.innerHTML = text;
+                }
+            },
+            totalDependencies: 0,
+            monitorRunDependencies: function(left) {
+                this.totalDependencies = Math.max(this.totalDependencies, left);
+                Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+            }
+        };
+        Module.setStatus('Downloading...');
+        window.onerror = function(message, source, lineno, colno, error) {
+            var errorMsg = 'Exception: ' + message;
+            if (error && error.stack) {
+                errorMsg += '\n' + error.stack;
+            }
+            if (source) {
+                errorMsg += '\nSource: ' + source + ':' + lineno + ':' + colno;
+            }
+            Module.setStatus('Exception thrown - see error details below');
+            statusElement.style.color = '#f44';
+            addConsoleLog(errorMsg, 'error');
+            Module.setStatus = function(text) {
+                if (text) {
+                    Module.printErr('[post-exception status] ' + text);
+                }
+            };
+            return true;
+        };
+
+        // Catch unhandled promise rejections
+        window.addEventListener('unhandledrejection', function(event) {
+            var errorMsg = 'Unhandled Promise Rejection: ' + event.reason;
+            if (event.reason && event.reason.stack) {
+                errorMsg += '\n' + event.reason.stack;
+            }
+            addConsoleLog(errorMsg, 'error');
+        });
+    </script>
+    <script async type="text/javascript" src="demo-sdl"></script>
+</body>
+</html>

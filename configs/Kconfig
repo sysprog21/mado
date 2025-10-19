@@ -9,16 +9,16 @@ menu "Toolchain Configuration"
 # Compiler detection using scripts/detect-compiler.py
 config COMPILER_TYPE
     string
-    default "$(shell,python3 scripts/detect-compiler.py --type 2>/dev/null || echo Unknown)"
+    default "$(shell,scripts/detect-compiler.py 2>/dev/null || echo Unknown)"
 
 config CC_IS_EMCC
-    def_bool $(shell,python3 scripts/detect-compiler.py --is Emscripten 2>/dev/null && echo y || echo n)
+    def_bool $(shell,scripts/detect-compiler.py --is Emscripten 2>/dev/null && echo y || echo n)
 
 config CC_IS_CLANG
-    def_bool $(shell,python3 scripts/detect-compiler.py --is Clang 2>/dev/null && echo y || echo n)
+    def_bool $(shell,scripts/detect-compiler.py --is Clang 2>/dev/null && echo y || echo n)
 
 config CC_IS_GCC
-    def_bool $(shell,python3 scripts/detect-compiler.py --is GCC 2>/dev/null && echo y || echo n)
+    def_bool $(shell,scripts/detect-compiler.py --is GCC 2>/dev/null && echo y || echo n)
 
 # Cross-compilation support detection
 config CROSS_COMPILE_ENABLED
@@ -28,38 +28,45 @@ config CROSS_COMPILE_PREFIX
     string
     default "$(CROSS_COMPILE)"
 
-# Verify cross-compilation tools exist
-config CROSS_COMPILE_VALID
-    def_bool $(shell,test -n "$(CROSS_COMPILE)" && which "$(CROSS_COMPILE)gcc" >/dev/null 2>&1 && echo y || echo n)
-
 comment "Toolchain Information"
 
-comment "Cross-compilation: ENABLED"
-    depends on CROSS_COMPILE_ENABLED && CROSS_COMPILE_VALID
+comment "Build mode: WebAssembly (Emscripten)"
+    depends on CC_IS_EMCC
 
-comment "Cross-compilation: ENABLED (WARNING: Compiler not found!)"
-    depends on CROSS_COMPILE_ENABLED && !CROSS_COMPILE_VALID
+comment "Build mode: Cross-compilation"
+    depends on CROSS_COMPILE_ENABLED && !CC_IS_EMCC
 
-comment "Cross-compilation: DISABLED (Native build)"
-    depends on !CROSS_COMPILE_ENABLED
+comment "Build mode: Native"
+    depends on !CROSS_COMPILE_ENABLED && !CC_IS_EMCC
 
 endmenu
 
 # Dependency detection using Kconfiglib shell function
+# For Emscripten builds, libraries are provided via ports system (-sUSE_*)
+# and do not require host pkg-config detection
+
 config HAVE_SDL2
-    def_bool $(shell,pkg-config --exists sdl2 && echo y || echo n)
+    bool
+    default y if CC_IS_EMCC
+    default $(shell,pkg-config --exists sdl2 && echo y || echo n) if !CC_IS_EMCC
 
 config HAVE_PIXMAN
-    def_bool $(shell,pkg-config --exists pixman-1 && echo y || echo n)
+    default n if CC_IS_EMCC
+    def_bool $(shell,pkg-config --exists pixman-1 && echo y || echo n) if !CC_IS_EMCC
 
 config HAVE_LIBPNG
-    def_bool $(shell,pkg-config --exists libpng && echo y || echo n)
+    bool
+    default y if CC_IS_EMCC
+    default $(shell,pkg-config --exists libpng && echo y || echo n) if !CC_IS_EMCC
 
 config HAVE_LIBJPEG
-    def_bool $(shell,pkg-config --exists libjpeg && echo y || echo n)
+    bool
+    default y if CC_IS_EMCC
+    default $(shell,pkg-config --exists libjpeg && echo y || echo n) if !CC_IS_EMCC
 
 config HAVE_CAIRO
-    def_bool $(shell,pkg-config --exists cairo && echo y || echo n)
+    default n if CC_IS_EMCC
+    def_bool $(shell,pkg-config --exists cairo && echo y || echo n) if !CC_IS_EMCC
 
 choice
     prompt "Backend Selection"
@@ -68,33 +75,43 @@ choice
       Select the display backend for window system rendering.
       Only one backend can be active at a time.
 
-config BACKEND_FBDEV
-    bool "Linux framebuffer support"
-    select CURSOR
-    help
-      Direct Linux framebuffer backend for embedded systems.
-      Renders directly to /dev/fb0 without X11/Wayland.
-      Requires Linux input subsystem for keyboard/mouse events.
-
 config BACKEND_SDL
     bool "SDL video output support"
     depends on HAVE_SDL2
     help
       Cross-platform SDL2 backend for development and testing.
 
+      For Emscripten (WebAssembly): This is the only supported backend.
+      Emscripten provides SDL2 via its ports system (-sUSE_SDL=2).
+
+config BACKEND_FBDEV
+    bool "Linux framebuffer support"
+    depends on !CC_IS_EMCC
+    imply CURSOR
+    help
+      Direct Linux framebuffer backend for embedded systems.
+      Renders directly to /dev/fb0 without X11/Wayland.
+      Requires Linux input subsystem for keyboard/mouse events.
+
 config BACKEND_VNC
     bool "VNC server output support"
+    depends on !CC_IS_EMCC
     help
       Remote access backend using neatvnc library.
       Allows headless operation with VNC client connections.
 
 config BACKEND_HEADLESS
     bool "Headless backend"
+    depends on !CC_IS_EMCC
     help
       Shared memory backend for testing and automation.
       Renders to memory without display hardware or VNC.
       Designed for CI/CD pipelines and automated testing.
+
 endchoice
+
+comment "WebAssembly builds use SDL2 backend only"
+    depends on CC_IS_EMCC
 
 choice
     prompt "Renderer Selection"
@@ -325,10 +342,14 @@ config TOOLS
 config TOOL_FONTEDIT
     bool "Build scalable font editor"
     default y
-    depends on TOOLS && HAVE_SDL2 && HAVE_CAIRO
+    depends on TOOLS && HAVE_SDL2 && HAVE_CAIRO && !CROSS_COMPILE_ENABLED && !CC_IS_EMCC
     help
       Interactive font editor for Mado font format.
       Allows creation and modification of scalable fonts.
+
+      Note: Only available for native builds. Not supported for
+      cross-compilation or WebAssembly (Emscripten) builds due to
+      Cairo library dependencies.
 
 config PERF_TEST
     bool "Build performance tester"

@@ -10,6 +10,21 @@ ifeq ($(filter $(check_goal),config defconfig),)
     endif
 endif
 
+# Detect Emscripten early (before including toolchain.mk)
+CC_VERSION := $(shell $(CC) --version 2>/dev/null)
+ifneq ($(findstring emcc,$(CC_VERSION)),)
+    CC_IS_EMCC := 1
+endif
+
+# Enforce SDL backend for Emscripten builds (skip during config targets)
+ifeq ($(filter $(check_goal),config defconfig),)
+    ifeq ($(CC_IS_EMCC),1)
+        ifneq ($(CONFIG_BACKEND_SDL),y)
+            $(error Emscripten (WebAssembly) builds require SDL backend. Please run: env CC=emcc make defconfig)
+        endif
+    endif
+endif
+
 # Target variables initialization
 
 target-y :=
@@ -23,6 +38,8 @@ target.a-y += libtwin.a
 # Core library
 
 libtwin.a_cflags-y :=
+# Emscripten size optimization
+libtwin.a_cflags-$(CC_IS_EMCC) += -Oz
 
 libtwin.a_files-y = \
 	src/box.c \
@@ -85,14 +102,26 @@ endif
 
 ifeq ($(CONFIG_LOADER_JPEG), y)
 libtwin.a_files-y += src/image-jpeg.c
+ifneq ($(CC_IS_EMCC), 1)
 libtwin.a_cflags-y += $(shell pkg-config --cflags libjpeg)
 TARGET_LIBS += $(shell pkg-config --libs libjpeg)
+else
+# Emscripten libjpeg port - flags needed for both compile and link
+libtwin.a_cflags-y += -sUSE_LIBJPEG=1
+TARGET_LIBS += -sUSE_LIBJPEG=1
+endif
 endif
 
 ifeq ($(CONFIG_LOADER_PNG), y)
 libtwin.a_files-y += src/image-png.c
+ifneq ($(CC_IS_EMCC), 1)
 libtwin.a_cflags-y += $(shell pkg-config --cflags libpng)
 TARGET_LIBS += $(shell pkg-config --libs libpng)
+else
+# Emscripten libpng port (includes zlib) - flags needed for both compile and link
+libtwin.a_cflags-y += -sUSE_LIBPNG=1 -sUSE_ZLIB=1
+TARGET_LIBS += -sUSE_LIBPNG=1 -sUSE_ZLIB=1
+endif
 endif
 
 ifeq ($(CONFIG_LOADER_GIF), y)
@@ -116,6 +145,8 @@ libapps.a_files-$(CONFIG_DEMO_ANIMATION) += apps/animation.c
 libapps.a_files-$(CONFIG_DEMO_IMAGE) += apps/image.c
 
 libapps.a_includes-y := include
+# Emscripten size optimization
+libapps.a_cflags-$(CC_IS_EMCC) += -Oz
 
 # Graphical backends
 
@@ -124,8 +155,15 @@ BACKEND := none
 ifeq ($(CONFIG_BACKEND_SDL), y)
 BACKEND = sdl
 libtwin.a_files-y += backend/sdl.c
+# Emscripten uses ports system for SDL2
+ifneq ($(CC_IS_EMCC), 1)
 libtwin.a_cflags-y += $(shell sdl2-config --cflags)
 TARGET_LIBS += $(shell sdl2-config --libs)
+else
+# Emscripten SDL2 port - flags needed for both compile and link
+libtwin.a_cflags-y += -sUSE_SDL=2
+TARGET_LIBS += -sUSE_SDL=2
+endif
 endif
 
 ifeq ($(CONFIG_BACKEND_FBDEV), y)
@@ -149,7 +187,6 @@ libtwin.a_files-y += backend/headless.c
 endif
 
 # Performance tester
-
 ifeq ($(CONFIG_PERF_TEST), y)
 target-$(CONFIG_PERF_TEST) += mado-perf
 mado-perf_depends-y += $(target.a-y)
@@ -167,21 +204,34 @@ target-y += demo-$(BACKEND)
 demo-$(BACKEND)_depends-y += $(target.a-y)
 demo-$(BACKEND)_files-y = apps/main.c
 demo-$(BACKEND)_includes-y := include
+# Emscripten size optimization
+demo-$(BACKEND)_cflags-$(CC_IS_EMCC) += -Oz
 demo-$(BACKEND)_ldflags-y := \
 	$(target.a-y) \
 	$(TARGET_LIBS)
 
-# Emscripten-specific linker flags to avoid "section too large" errors
+# Emscripten-specific linker flags for WebAssembly builds
 ifeq ($(CC_IS_EMCC), 1)
 demo-$(BACKEND)_ldflags-y += \
 	-sINITIAL_MEMORY=33554432 \
 	-sALLOW_MEMORY_GROWTH=1 \
-	-sSTACK_SIZE=1048576
+	-sSTACK_SIZE=1048576 \
+	-sUSE_SDL=2 \
+	-sMINIMAL_RUNTIME=0 \
+	-sDYNAMIC_EXECUTION=0 \
+	-sASSERTIONS=0 \
+	-sEXPORTED_FUNCTIONS=_main,_malloc,_free \
+	-sEXPORTED_RUNTIME_METHODS=ccall,cwrap \
+	-sNO_EXIT_RUNTIME=1 \
+	-Oz \
+	--preload-file assets \
+	--exclude-file assets/web
 endif
 endif
 
 # Font editor tool
-
+# Tools should not be built for WebAssembly
+ifneq ($(CC_IS_EMCC), 1)
 ifeq ($(CONFIG_TOOLS), y)
 target-$(CONFIG_TOOL_FONTEDIT) += font-edit
 font-edit_files-y = \
@@ -201,6 +251,7 @@ target-$(CONFIG_TOOL_HEADLESS_CTL) += headless-ctl
 headless-ctl_files-y = tools/headless-ctl.c
 headless-ctl_includes-y := include
 headless-ctl_ldflags-y := # -lrt
+endif
 endif
 
 # Build system integration
@@ -245,3 +296,26 @@ defconfig: $(KCONFIGLIB)
 config: $(KCONFIGLIB) configs/Kconfig
 	@tools/kconfig/menuconfig.py configs/Kconfig
 	@tools/kconfig/genconfig.py configs/Kconfig
+
+# WebAssembly post-build: Copy artifacts to assets/web/
+.PHONY: wasm-install
+wasm-install:
+	@if [ "$(CC_IS_EMCC)" = "1" ]; then \
+		echo "Installing WebAssembly artifacts to assets/web/..."; \
+		mkdir -p assets/web; \
+		cp -f .demo-$(BACKEND)/demo-$(BACKEND) .demo-$(BACKEND)/demo-$(BACKEND).wasm .demo-$(BACKEND)/demo-$(BACKEND).data assets/web/ 2>/dev/null || true; \
+		echo "✓ WebAssembly build artifacts copied to assets/web/"; \
+		echo ""; \
+		echo "\033[1;32m========================================\033[0m"; \
+		echo "\033[1;32mWebAssembly build complete!\033[0m"; \
+		echo "\033[1;32m========================================\033[0m"; \
+		echo ""; \
+		echo "To test in browser, run:"; \
+		echo "  \033[1;34m./scripts/serve-wasm.py --open\033[0m"; \
+		echo ""; \
+	fi
+
+# Override all target to add post-build hook for Emscripten
+ifeq ($(CC_IS_EMCC), 1)
+all: wasm-install
+endif

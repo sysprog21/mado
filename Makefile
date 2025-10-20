@@ -1,4 +1,5 @@
 -include .config
+include mk/deps.mk
 
 # Set default goal explicitly
 .DEFAULT_GOAL := all
@@ -93,9 +94,9 @@ libtwin.a_files-y += src/screen-ops.c
 # Renderer implementations (draw-builtin.c includes all compositing operations)
 libtwin.a_files-$(CONFIG_RENDERER_BUILTIN) += src/draw-builtin.c
 libtwin.a_files-$(CONFIG_RENDERER_PIXMAN) += src/draw-pixman.c
-libtwin.a_cflags-$(CONFIG_RENDERER_PIXMAN) += $(shell pkg-config --cflags pixman-1)
+libtwin.a_cflags-$(CONFIG_RENDERER_PIXMAN) += $(call dep,cflags,pixman-1)
 ifeq ($(CONFIG_RENDERER_PIXMAN), y)
-TARGET_LIBS += $(shell pkg-config --libs pixman-1)
+TARGET_LIBS += $(call dep,libs,pixman-1)
 endif
 
 # Image loaders
@@ -103,8 +104,8 @@ endif
 ifeq ($(CONFIG_LOADER_JPEG), y)
 libtwin.a_files-y += src/image-jpeg.c
 ifneq ($(CC_IS_EMCC), 1)
-libtwin.a_cflags-y += $(shell pkg-config --cflags libjpeg)
-TARGET_LIBS += $(shell pkg-config --libs libjpeg)
+libtwin.a_cflags-y += $(call dep,cflags,libjpeg)
+TARGET_LIBS += $(call dep,libs,libjpeg)
 else
 # Emscripten libjpeg port - flags needed for both compile and link
 libtwin.a_cflags-y += -sUSE_LIBJPEG=1
@@ -115,8 +116,8 @@ endif
 ifeq ($(CONFIG_LOADER_PNG), y)
 libtwin.a_files-y += src/image-png.c
 ifneq ($(CC_IS_EMCC), 1)
-libtwin.a_cflags-y += $(shell pkg-config --cflags libpng)
-TARGET_LIBS += $(shell pkg-config --libs libpng)
+libtwin.a_cflags-y += $(call dep,cflags,libpng)
+TARGET_LIBS += $(call dep,libs,libpng)
 else
 # Emscripten libpng port (includes zlib) - flags needed for both compile and link
 libtwin.a_cflags-y += -sUSE_LIBPNG=1 -sUSE_ZLIB=1
@@ -155,8 +156,8 @@ BACKEND := none
 ifeq ($(CONFIG_BACKEND_SDL), y)
 BACKEND = sdl
 libtwin.a_files-y += backend/sdl.c
-libtwin.a_cflags-y += $(shell sdl2-config --cflags)
-TARGET_LIBS += $(shell sdl2-config --libs)
+libtwin.a_cflags-y += $(call dep,cflags,sdl2)
+TARGET_LIBS += $(call dep,libs,sdl2)
 endif
 
 ifeq ($(CONFIG_BACKEND_FBDEV), y)
@@ -170,8 +171,8 @@ ifeq ($(CONFIG_BACKEND_VNC), y)
 BACKEND = vnc
 libtwin.a_files-y += backend/vnc.c
 libtwin.a_files-y += src/cursor.c
-libtwin.a_cflags-y += $(shell pkg-config --cflags neatvnc aml pixman-1)
-TARGET_LIBS += $(shell pkg-config --libs neatvnc aml pixman-1)
+libtwin.a_cflags-y += $(call dep,cflags,neatvnc aml pixman-1)
+TARGET_LIBS += $(call dep,libs,neatvnc aml pixman-1)
 endif
 
 ifeq ($(CONFIG_BACKEND_HEADLESS), y)
@@ -251,11 +252,11 @@ font-edit_files-y = \
 	tools/font-edit/font-edit.c
 font-edit_includes-y := tools/font-edit
 font-edit_cflags-y := \
-	$(shell pkg-config --cflags cairo) \
-	$(shell sdl2-config --cflags)
+	$(call dep,cflags,cairo) \
+	$(call dep,cflags,sdl2)
 font-edit_ldflags-y := \
-	$(shell pkg-config --libs cairo) \
-	$(shell sdl2-config --libs) \
+	$(call dep,libs,cairo) \
+	$(call dep,libs,sdl2) \
 	-lm
 
 # Headless control tool

@@ -83,11 +83,13 @@ Install [Pixman](https://pixman.org/) before selecting the corresponding rendere
 
 `Mado` supports multiple graphics backends. Choose one based on your deployment scenario:
 - SDL: Cross-platform desktop development with hardware acceleration
+- WebAssembly: Lightweight browser deployment using native Canvas API
 - Linux framebuffer (fbdev): Direct hardware access for embedded Linux
 - VNC: Remote display via Virtual Network Computing protocol
 - Headless: Testing and automation without display output
 
-`Mado` uses SDL2 as the primary development and demonstration backend, providing cross-platform graphics with hardware acceleration. For other backend options (Linux framebuffer, VNC, headless), see [docs/backends.md](docs/backends.md).
+`Mado` uses SDL2 as the primary development and demonstration backend, providing cross-platform graphics with hardware acceleration.
+For web deployment, a dedicated WebAssembly backend directly uses the browser's Canvas API without SDL dependency, significantly reducing binary size. For all backend options and detailed build instructions, see [docs/backends.md](docs/backends.md).
 
 Install the [SDL2 library](https://www.libsdl.org/):
 * macOS: `brew install sdl2`

@@ -7,18 +7,14 @@ All backends maintain the same application interface, so switching between them 
 ## Available Backends
 
 ### SDL Backend
-The SDL (Simple DirectMedia Layer) backend provides cross-platform graphics output with hardware acceleration support.
-It also serves as the only backend supporting WebAssembly/Emscripten builds for browser deployment.
+The SDL (Simple DirectMedia Layer) backend provides cross-platform graphics output with hardware acceleration support for native desktop platforms.
 
 Features:
 - Cross-platform (Windows, macOS, Linux, etc.)
-- WebAssembly/Emscripten support for browser deployment
 - Hardware-accelerated rendering when available
 - Full keyboard and mouse input support
 - Windowed and fullscreen modes
 - Audio support (if needed)
-
-#### Native Builds
 
 Dependencies:
 Install the [SDL2 library](https://www.libsdl.org/):
@@ -38,9 +34,22 @@ Run:
 
 Once the window appears, you can move windows and interact with widgets.
 
-#### WebAssembly/Emscripten Builds
+Use Cases:
+- Desktop applications
+- Cross-platform development
+- Primary development and testing platform
 
-The SDL backend can be compiled to WebAssembly using Emscripten, enabling Mado applications to run in web browsers.
+### WebAssembly Backend
+Native WebAssembly backend providing direct Canvas API integration without SDL dependency,
+optimized for browser deployment.
+
+Features:
+- Direct Canvas 2D API rendering via Emscripten inline assembly
+- Browser-native image decoding (JPEG/PNG)
+- Lightweight implementation (no SDL dependency)
+- Single-threaded design using requestAnimationFrame
+- Direct memory access for efficient rendering
+- Event handling through exported C functions
 
 Dependencies:
 Install the [Emscripten SDK](https://emscripten.org/):
@@ -59,16 +68,15 @@ source ./emsdk_env.sh
 
 Build:
 ```shell
-# The build system auto-detects Emscripten when CC=emcc
+# The build system auto-detects Emscripten and selects WASM backend
 make defconfig
 make CC=emcc
 ```
 
 The build system automatically:
 - Detects Emscripten compiler via `scripts/detect-compiler.py`
-- Restricts backend selection to SDL only (VNC/fbdev incompatible with WebAssembly)
+- Selects WebAssembly backend (other backends incompatible with WebAssembly)
 - Disables incompatible features (Cairo-based font editor)
-- Uses Emscripten's SDL2 port (no manual installation needed)
 - Copies build artifacts to `assets/web/` directory
 
 Run:
@@ -82,7 +90,7 @@ python3 scripts/serve-wasm.py
 ```
 
 The web interface (`assets/web/index.html`) provides:
-- Canvas-based rendering with SDL2
+- Canvas-based rendering using native browser APIs
 - Keyboard and mouse event handling
 - Console output for debugging
 - Error reporting and status display
@@ -93,18 +101,23 @@ Browser Requirements:
 - JavaScript enabled
 - Hardware acceleration recommended for better performance
 
+Architecture:
+- C code maintains framebuffer in WebAssembly linear memory
+- JavaScript accesses framebuffer via Module.HEAPU32
+- Direct ARGB32 → RGBA conversion in JavaScript
+- Canvas ImageData updated via putImageData()
+- Event callbacks inject events through exported C functions
+
 Known Limitations:
 - Single-threaded execution (no WebWorkers support yet)
 - No direct file system access (use Emscripten's virtual filesystem)
 - Initial load time proportional to binary size
 
 Use Cases:
-- Desktop applications
-- Cross-platform development
-- Primary development and testing platform
 - Web-based demonstrations and interactive tutorials
 - Browser-based UI prototyping
 - Client-side graphics applications without installation
+- Online documentation with live examples
 
 ### Linux Framebuffer (fbdev)
 Direct framebuffer access for embedded Linux systems without X11/Wayland.
@@ -238,12 +251,7 @@ Use Cases:
 Backends are selected at compile time through the Kconfig-based build system.
 
 WebAssembly Compatibility Note:
-When compiling with Emscripten (`CC=emcc`), the build system automatically restricts backend selection to SDL only.
-The following backends are incompatible with WebAssembly:
-- VNC Backend: Requires native networking APIs not available in WebAssembly
-- Framebuffer Backend: Requires direct Linux kernel interfaces (`/dev/fb0`, ioctls)
-- Headless Backend: Requires POSIX shared memory APIs (`shm_open`, `mmap`)
-
+When compiling with Emscripten (`CC=emcc`), the build system automatically selects the WebAssembly backend.
 The Kconfig system automatically enforces these restrictions when Emscripten is detected.
 
 ### Configuration Methods
@@ -252,9 +260,7 @@ Mado uses [Kconfiglib](https://github.com/sysprog21/Kconfiglib) for configuratio
 
 Method 1: Interactive Configuration (best for exploration)
 ```shell
-make config          # Terminal-based menu
-# or
-make menuconfig      # Alternative terminal interface
+make config          # Terminal-based menu configuration
 make
 ```
 
@@ -406,20 +412,18 @@ make CFLAGS="-fsanitize=address -g"
 Each backend may have specific configuration options:
 
 ### SDL Backend
-
-Native Configuration:
 - Window size and position
 - Fullscreen mode toggle
 - Hardware acceleration preferences
 - VSync settings
 
-WebAssembly Configuration:
+### WebAssembly Backend
 - Canvas element ID (default: `#canvas`, configured in `assets/web/index.html`)
-- Keyboard input element (set via `SDL_EMSCRIPTEN_KEYBOARD_ELEMENT`)
 - Initial canvas size (640x480 default, configurable in HTML)
 - Browser console logging (enabled by default for debugging)
 - Main loop timing (managed by `emscripten_set_main_loop_arg`)
 - Memory allocation limits (configurable via Emscripten linker flags)
+- Framebuffer format conversion (ARGB32 → RGBA handled in JavaScript)
 
 ### Framebuffer Backend
 - Device path (default: `/dev/fb0`)

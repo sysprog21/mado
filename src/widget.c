@@ -75,16 +75,20 @@ static void _twin_widget_paint(twin_widget_t *widget)
                              _twin_widget_height(widget), widget->radius);
 }
 
+
 twin_dispatch_result_t _twin_widget_dispatch(twin_widget_t *widget,
-                                             twin_event_t *event)
+                                             twin_event_t *event,
+                                             void *closure)
 {
+    (void) closure; /* Base widget doesn't use closure */
+
     switch (event->kind) {
     case TwinEventQueryGeometry:
         widget->layout = false;
         if (widget->copy_geom) {
             twin_widget_t *copy = widget->copy_geom;
             if (copy->layout)
-                (*copy->dispatch)(copy, event);
+                copy->handler(copy, event, copy->callback_data);
             widget->preferred = copy->preferred;
             return TwinDispatchDone;
         }
@@ -109,7 +113,7 @@ void _twin_widget_init(twin_widget_t *widget,
                        twin_box_t *parent,
                        twin_window_t *window,
                        twin_widget_layout_t preferred,
-                       twin_dispatch_proc_t dispatch)
+                       twin_widget_proc_t handler)
 {
     if (parent) {
         twin_widget_t **prev;
@@ -132,7 +136,9 @@ void _twin_widget_init(twin_widget_t *widget,
     widget->extents.left = widget->extents.top = 0;
     widget->extents.right = widget->extents.bottom = 0;
     widget->preferred = preferred;
-    widget->dispatch = dispatch;
+    widget->handler = handler;
+    widget->callback = NULL;
+    widget->callback_data = NULL;
     widget->shape = TwinShapeRectangle;
     widget->radius = twin_int_to_fixed(12);
 }
@@ -257,13 +263,13 @@ void twin_widget_queue_paint(twin_widget_t *widget)
     _twin_widget_queue_paint(widget);
 }
 
-twin_widget_t *twin_widget_create_with_dispatch(twin_box_t *parent,
-                                                twin_argb32_t background,
-                                                twin_coord_t width,
-                                                twin_coord_t height,
-                                                twin_stretch_t stretch_width,
-                                                twin_stretch_t stretch_height,
-                                                twin_dispatch_proc_t dispatch)
+twin_widget_t *twin_widget_create_with_handler(twin_box_t *parent,
+                                               twin_argb32_t background,
+                                               twin_coord_t width,
+                                               twin_coord_t height,
+                                               twin_stretch_t stretch_width,
+                                               twin_stretch_t stretch_height,
+                                               twin_widget_proc_t handler)
 {
     twin_widget_t *widget = malloc(sizeof(twin_widget_t));
     if (!widget)
@@ -275,7 +281,7 @@ twin_widget_t *twin_widget_create_with_dispatch(twin_box_t *parent,
         .stretch_width = stretch_width,
         .stretch_height = stretch_height,
     };
-    _twin_widget_init(widget, parent, 0, preferred, dispatch);
+    _twin_widget_init(widget, parent, 0, preferred, handler);
     widget->background = background;
     return widget;
 }
@@ -284,7 +290,7 @@ twin_widget_t *twin_widget_create_with_dispatch(twin_box_t *parent,
 typedef struct _custom_widget_map {
     twin_widget_t *widget;
     twin_custom_widget_t *custom;
-    twin_dispatch_proc_t user_dispatch;
+    twin_widget_proc_t user_dispatch;
     struct _custom_widget_map *next;
 } custom_widget_map_t;
 
@@ -292,7 +298,7 @@ static custom_widget_map_t *custom_widget_map = NULL;
 
 static void register_custom_widget(twin_widget_t *widget,
                                    twin_custom_widget_t *custom,
-                                   twin_dispatch_proc_t user_dispatch)
+                                   twin_widget_proc_t user_dispatch)
 {
     custom_widget_map_t *entry = malloc(sizeof(custom_widget_map_t));
     if (!entry)
@@ -335,7 +341,8 @@ static void unregister_custom_widget(twin_widget_t *widget)
 }
 
 static twin_dispatch_result_t custom_widget_dispatch(twin_widget_t *widget,
-                                                     twin_event_t *event)
+                                                     twin_event_t *event,
+                                                     void *closure)
 {
     /* Handle destroy events specially to ensure proper cleanup order */
     if (event->kind == TwinEventDestroy) {
@@ -344,7 +351,7 @@ static twin_dispatch_result_t custom_widget_dispatch(twin_widget_t *widget,
         while (entry) {
             if (entry->widget == widget) {
                 if (entry->user_dispatch)
-                    entry->user_dispatch(widget, event);
+                    entry->user_dispatch(widget, event, closure);
                 break;
             }
             entry = entry->next;
@@ -354,11 +361,12 @@ static twin_dispatch_result_t custom_widget_dispatch(twin_widget_t *widget,
         unregister_custom_widget(widget);
 
         /* Now call base widget dispatch to complete destruction */
-        return _twin_widget_dispatch(widget, event);
+        return _twin_widget_dispatch(widget, event, closure);
     }
 
     /* First call the base widget dispatch to handle standard widget behavior */
-    twin_dispatch_result_t result = _twin_widget_dispatch(widget, event);
+    twin_dispatch_result_t result =
+        _twin_widget_dispatch(widget, event, closure);
     if (result == TwinDispatchDone)
         return result;
 
@@ -367,7 +375,7 @@ static twin_dispatch_result_t custom_widget_dispatch(twin_widget_t *widget,
     while (entry) {
         if (entry->widget == widget) {
             if (entry->user_dispatch)
-                return entry->user_dispatch(widget, event);
+                return entry->user_dispatch(widget, event, closure);
             break;
         }
         entry = entry->next;
@@ -381,7 +389,7 @@ twin_custom_widget_t *twin_custom_widget_create(twin_box_t *parent,
                                                 twin_coord_t height,
                                                 twin_stretch_t hstretch,
                                                 twin_stretch_t vstretch,
-                                                twin_dispatch_proc_t dispatch,
+                                                twin_widget_proc_t handler,
                                                 size_t data_size)
 {
     twin_custom_widget_t *custom = malloc(sizeof(twin_custom_widget_t));
@@ -399,16 +407,16 @@ twin_custom_widget_t *twin_custom_widget_create(twin_box_t *parent,
         custom->data = NULL;
     }
 
-    custom->widget = twin_widget_create_with_dispatch(
-        parent, background, width, height, hstretch, vstretch,
-        custom_widget_dispatch);
+    custom->widget = twin_widget_create_with_handler(parent, background, width,
+                                                     height, hstretch, vstretch,
+                                                     custom_widget_dispatch);
     if (!custom->widget) {
         free(custom->data);
         free(custom);
         return NULL;
     }
 
-    register_custom_widget(custom->widget, custom, dispatch);
+    register_custom_widget(custom->widget, custom, handler);
 
     return custom;
 }
@@ -470,4 +478,14 @@ void twin_custom_widget_queue_paint(twin_custom_widget_t *custom)
 twin_pixmap_t *twin_custom_widget_pixmap(twin_custom_widget_t *custom)
 {
     return custom ? twin_widget_pixmap(custom->widget) : NULL;
+}
+
+void twin_widget_set_callback(twin_widget_t *widget,
+                              twin_widget_proc_t callback,
+                              void *data)
+{
+    if (!widget)
+        return;
+    widget->callback = callback;
+    widget->callback_data = data;
 }

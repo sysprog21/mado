@@ -54,8 +54,11 @@ static void _apps_image_paint(twin_custom_widget_t *custom)
 }
 
 static twin_dispatch_result_t _apps_image_dispatch(twin_widget_t *widget,
-                                                   twin_event_t *event)
+                                                   twin_event_t *event,
+                                                   void *closure)
 {
+    (void) closure; /* unused parameter */
+
     twin_custom_widget_t *custom = twin_widget_get_custom(widget);
     if (!custom)
         return TwinDispatchContinue;
@@ -70,15 +73,16 @@ static twin_dispatch_result_t _apps_image_dispatch(twin_widget_t *widget,
     return TwinDispatchContinue;
 }
 
-static void _apps_image_button_signal(twin_button_t *button,
-                                      twin_button_signal_t signal,
-                                      void *closure)
+static twin_dispatch_result_t _apps_image_button_clicked(twin_widget_t *widget,
+                                                         twin_event_t *event,
+                                                         void *data)
 {
-    (void) button; /* unused parameter */
-    if (signal != TwinButtonSignalDown)
-        return;
+    (void) widget; /* unused parameter */
 
-    twin_custom_widget_t *custom = closure;
+    if (event->kind != TwinEventButtonSignalUp)
+        return TwinDispatchContinue;
+
+    twin_custom_widget_t *custom = data;
     apps_image_data_t *img =
         (apps_image_data_t *) twin_custom_widget_data(custom);
     const int n = sizeof(tvg_files) / sizeof(tvg_files[0]);
@@ -87,10 +91,11 @@ static void _apps_image_button_signal(twin_button_t *button,
         twin_pixmap_t *pix = twin_tvg_to_pixmap_scale(
             tvg_files[img->image_idx], TWIN_ARGB32, APP_WIDTH, APP_HEIGHT);
         if (!pix)
-            return;
+            return TwinDispatchContinue;
         img->pixes[img->image_idx] = pix;
     }
     twin_custom_widget_queue_paint(custom);
+    return TwinDispatchDone;
 }
 
 static twin_custom_widget_t *_apps_image_init(twin_box_t *parent)
@@ -113,8 +118,8 @@ static twin_custom_widget_t *_apps_image_init(twin_box_t *parent)
         twin_button_create(parent, "Next Image", 0xFF482722, D(10),
                            TwinStyleBold | TwinStyleOblique);
     twin_widget_set(&button->label.widget, 0xFFFEE4CE);
-    button->signal = _apps_image_button_signal;
-    button->closure = custom;
+    twin_widget_set_callback(&button->label.widget, _apps_image_button_clicked,
+                             custom);
     button->label.widget.shape = TwinShapeRectangle;
 
     return custom;

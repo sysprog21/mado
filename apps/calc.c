@@ -129,18 +129,20 @@ static void _apps_calc_digit(apps_calc_t *calc, int digit)
     _apps_calc_update_value(calc);
 }
 
-static void _apps_calc_button_signal(twin_button_t *button,
-                                     twin_button_signal_t signal,
-                                     void *closure)
+static twin_dispatch_result_t _apps_calc_button_clicked(twin_widget_t *widget,
+                                                        twin_event_t *event,
+                                                        void *data)
 {
-    apps_calc_t *calc = closure;
+    if (event->kind != TwinEventButtonSignalUp)
+        return TwinDispatchContinue;
+
+    apps_calc_t *calc = data;
+    twin_button_t *button = (twin_button_t *) widget;
     int a, b;
 
-    if (signal != TwinButtonSignalDown)
-        return;
     int i = _apps_calc_button_to_id(calc, button);
     if (i < 0)
-        return;
+        return TwinDispatchContinue;
 
     switch (i) {
 #define _(x) APPS_CALC_##x
@@ -191,6 +193,7 @@ static void _apps_calc_button_signal(twin_button_t *button,
         _apps_calc_digit(calc, i);
         break;
     }
+    return TwinDispatchDone;
 }
 
 void apps_calc_start(twin_screen_t *screen,
@@ -220,8 +223,8 @@ void apps_calc_start(twin_screen_t *screen,
                 APPS_CALC_BUTTON_SIZE, APPS_CALC_BUTTON_STYLE);
             twin_widget_set(&calc->buttons[b]->label.widget,
                             APPS_CALC_BUTTON_BG);
-            calc->buttons[b]->signal = _apps_calc_button_signal;
-            calc->buttons[b]->closure = calc;
+            twin_widget_set_callback(&calc->buttons[b]->label.widget,
+                                     _apps_calc_button_clicked, calc);
             calc->buttons[b]->label.widget.shape = TwinShapeEllipse;
             if (i || j)
                 calc->buttons[b]->label.widget.copy_geom =

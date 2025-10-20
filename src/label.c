@@ -60,11 +60,12 @@ static void _twin_label_paint(twin_label_t *label)
 }
 
 twin_dispatch_result_t _twin_label_dispatch(twin_widget_t *widget,
-                                            twin_event_t *event)
+                                            twin_event_t *event,
+                                            void *closure)
 {
     twin_label_t *label = (twin_label_t *) widget;
 
-    if (_twin_widget_dispatch(widget, event) == TwinDispatchDone)
+    if (_twin_widget_dispatch(widget, event, closure) == TwinDispatchDone)
         return TwinDispatchDone;
     switch (event->kind) {
     case TwinEventPaint:
@@ -112,10 +113,10 @@ void _twin_label_init(twin_label_t *label,
                       twin_argb32_t foreground,
                       twin_fixed_t font_size,
                       twin_style_t font_style,
-                      twin_dispatch_proc_t dispatch)
+                      twin_widget_proc_t handler)
 {
     static const twin_widget_layout_t preferred = {0, 0, 1, 1};
-    _twin_widget_init(&label->widget, parent, 0, preferred, dispatch);
+    _twin_widget_init(&label->widget, parent, 0, preferred, handler);
     label->label = NULL;
     label->offset.x = 0;
     label->offset.y = 0;

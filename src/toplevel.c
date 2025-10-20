@@ -9,7 +9,8 @@
 #include "twin_private.h"
 
 twin_dispatch_result_t _twin_toplevel_dispatch(twin_widget_t *widget,
-                                               twin_event_t *event)
+                                               twin_event_t *event,
+                                               void *closure)
 {
     twin_toplevel_t *toplevel = (twin_toplevel_t *) widget;
     twin_event_t ev = *event;
@@ -26,15 +27,15 @@ twin_dispatch_result_t _twin_toplevel_dispatch(twin_widget_t *widget,
     default:
         break;
     }
-    return _twin_box_dispatch(&toplevel->box.widget, &ev);
+    return _twin_box_dispatch(&toplevel->box.widget, &ev, closure);
 }
 
 static bool _twin_toplevel_event(twin_window_t *window, twin_event_t *event)
 {
     twin_toplevel_t *toplevel = window->client_data;
 
-    return (*toplevel->box.widget.dispatch)(&toplevel->box.widget, event) ==
-           TwinDispatchDone;
+    return (*(&toplevel->box.widget)->handler)(&toplevel->box.widget, event,
+                                               NULL) == TwinDispatchDone;
 }
 
 static void _twin_toplevel_draw(twin_window_t *window)
@@ -44,7 +45,7 @@ static void _twin_toplevel_draw(twin_window_t *window)
 
     twin_screen_disable_update(window->screen);
     event.kind = TwinEventPaint;
-    (*toplevel->box.widget.dispatch)(&toplevel->box.widget, &event);
+    (*(&toplevel->box.widget)->handler)(&toplevel->box.widget, &event, NULL);
     twin_screen_enable_update(window->screen);
 }
 
@@ -60,11 +61,11 @@ static void _twin_toplevel_destroy(twin_window_t *window)
     _twin_closure_unregister(toplevel);
 
     event.kind = TwinEventDestroy;
-    (*toplevel->box.widget.dispatch)(&toplevel->box.widget, &event);
+    (*(&toplevel->box.widget)->handler)(&toplevel->box.widget, &event, NULL);
 }
 
 void _twin_toplevel_init(twin_toplevel_t *toplevel,
-                         twin_dispatch_proc_t dispatch,
+                         twin_widget_proc_t dispatch,
                          twin_window_t *window,
                          const char *name)
 {
@@ -110,7 +111,7 @@ static bool _twin_toplevel_paint(void *closure)
 
     twin_screen_disable_update(toplevel->box.widget.window->screen);
     ev.kind = TwinEventPaint;
-    (*toplevel->box.widget.dispatch)(&toplevel->box.widget, &ev);
+    (*(&toplevel->box.widget)->handler)(&toplevel->box.widget, &ev, NULL);
     twin_screen_enable_update(toplevel->box.widget.window->screen);
     return false;
 }
@@ -132,13 +133,13 @@ static bool _twin_toplevel_layout(void *closure)
     twin_window_t *window = toplevel->box.widget.window;
 
     ev.kind = TwinEventQueryGeometry;
-    (*toplevel->box.widget.dispatch)(&toplevel->box.widget, &ev);
+    (*(&toplevel->box.widget)->handler)(&toplevel->box.widget, &ev, NULL);
     ev.kind = TwinEventConfigure;
     ev.u.configure.extents.left = 0;
     ev.u.configure.extents.top = 0;
     ev.u.configure.extents.right = window->client.right - window->client.left;
     ev.u.configure.extents.bottom = window->client.bottom - window->client.top;
-    (*toplevel->box.widget.dispatch)(&toplevel->box.widget, &ev);
+    (*(&toplevel->box.widget)->handler)(&toplevel->box.widget, &ev, NULL);
     return false;
 }
 

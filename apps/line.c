@@ -71,8 +71,11 @@ static int _apps_line_hit(apps_line_data_t *line,
 }
 
 static twin_dispatch_result_t _apps_line_dispatch(twin_widget_t *widget,
-                                                  twin_event_t *event)
+                                                  twin_event_t *event,
+                                                  void *closure)
 {
+    (void) closure; /* unused parameter */
+
     twin_custom_widget_t *custom = twin_widget_get_custom(widget);
     if (!custom)
         return TwinDispatchContinue;

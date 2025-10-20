@@ -116,6 +116,12 @@ typedef struct _twin_screen twin_screen_t;
 typedef struct _twin_pixmap twin_pixmap_t;
 typedef struct _twin_animation twin_animation_t;
 
+/** Button signal types (used in unified event system) */
+typedef enum _twin_button_signal {
+    TwinButtonSignalDown /**< Sent when button pressed */,
+    TwinButtonSignalUp /**< Sent when button released inside widget */
+} twin_button_signal_t;
+
 /**
  * Event type enumeration for input and system events
  *
@@ -147,7 +153,11 @@ typedef enum _twin_event_kind {
     TwinEventPaint = 0x1001 /**< Widget needs painting */,
     TwinEventQueryGeometry = 0x1002 /**< Widget geometry query */,
     TwinEventConfigure = 0x1003 /**< Widget configuration change */,
-    TwinEventDestroy = 0x1004 /**< Widget destruction */
+    TwinEventDestroy = 0x1004 /**< Widget destruction */,
+
+    /* Button signals (unified with event system) */
+    TwinEventButtonSignalDown = 0x2001 /**< Button pressed signal */,
+    TwinEventButtonSignalUp = 0x2002 /**< Button released signal */
 } twin_event_kind_t;
 
 /**
@@ -177,7 +187,10 @@ typedef struct _twin_event {
         struct {
             twin_rect_t extents; /**< New widget geometry */
         } configure;             /**< Widget configuration event data */
-    } u;                         /**< Event-specific data union */
+        struct {
+            twin_button_signal_t signal; /**< Button signal type */
+        } button_signal;                 /**< Button signal event data */
+    } u;                                 /**< Event-specific data union */
 } twin_event_t;
 
 /**
@@ -588,11 +601,27 @@ typedef enum _twin_box_dir {
 
 typedef enum _twin_dispatch_result {
     TwinDispatchDone /**< Event processing complete */,
-    TwinDispatchContinue /**< Continue event propagation */
+    TwinDispatchContinue /**< Continue event propagation */,
+    TwinDispatchReject /**< Cannot handle this event */
 } twin_dispatch_result_t;
 
-typedef twin_dispatch_result_t (*twin_dispatch_proc_t)(twin_widget_t *widget,
-                                                       twin_event_t *event);
+/**
+ * Widget event handler function signature
+ *
+ * All widget event handlers use this signature with closure support.
+ * The closure parameter enables stateful event handling without global state.
+ *
+ * @widget  : Widget receiving the event
+ * @event   : Event to process
+ * @closure : User data pointer for stateful handling
+ * @return  : Dispatch result (Done, Continue, or Reject)
+ *
+ * This type is used for both framework-level handlers and application
+ * callbacks.
+ */
+typedef twin_dispatch_result_t (*twin_widget_proc_t)(twin_widget_t *widget,
+                                                     twin_event_t *event,
+                                                     void *closure);
 
 typedef struct _twin_widget_layout {
     twin_coord_t width, height;    /**< Preferred dimensions */
@@ -614,10 +643,15 @@ struct _twin_widget {
     twin_widget_t *next;   /**< Next sibling widget */
     twin_box_t *parent;    /**< Parent container */
 
-    /* Widget behavior */
-    twin_dispatch_proc_t dispatch; /**< Event dispatch handler */
-    twin_rect_t extents;           /**< Current geometry */
-    twin_widget_t *copy_geom;      /**< Geometry source widget */
+    /* Event handling:
+     * - handler: Framework event handler (processes paint, configure, etc.)
+     * - callback: Application callback (optional, receives button clicks, etc.)
+     */
+    twin_widget_proc_t handler;  /**< Widget event handler (framework) */
+    twin_widget_proc_t callback; /**< Application callback (optional) */
+    void *callback_data;         /**< Callback user data */
+    twin_rect_t extents;         /**< Current geometry */
+    twin_widget_t *copy_geom;    /**< Geometry source widget */
 
     /* Widget state */
     bool paint;      /**< Needs painting */
@@ -659,41 +693,13 @@ typedef struct _twin_label {
     twin_align_t align;       /**< Text alignment */
 } twin_label_t;
 
-typedef enum _twin_button_signal {
-    TwinButtonSignalDown /**< Sent when button pressed */,
-    TwinButtonSignalUp /**< Sent when button released inside widget */
-} twin_button_signal_t;
-
 typedef struct _twin_button twin_button_t;
 
-typedef void (*twin_button_signal_proc_t)(twin_button_t *button,
-                                          twin_button_signal_t signal,
-                                          void *closure);
 
 struct _twin_button {
-    twin_label_t label;               /**< Base label widget */
-    bool pressed;                     /**< Button pressed state */
-    bool active;                      /**< Button active state */
-    twin_button_signal_proc_t signal; /**< Signal callback */
-    void *closure;                    /**< Callback closure */
-};
-
-typedef enum _twin_scroll_signal {
-    TwinScrollSignalUpArrow /**< Up arrow clicked */,
-    TwinScrollSignalDownArrow /**< Down arrow clicked */,
-    TwinScrollSignalThumb /**< Thumb/slider clicked */,
-    TwinScrollSignalAboveThumb /**< Area above thumb clicked */,
-    TwinScrollSignalBelowThumb /**< Area below thumb clicked */
-} twin_scroll_signal_t;
-
-typedef struct _twin_scroll twin_scroll_t;
-
-typedef void (*twin_scroll_signal_proc_t)(twin_scroll_t *scroll,
-                                          twin_scroll_signal_t signal,
-                                          void *closure);
-
-struct _twin_scroll {
-    twin_widget_t widget; /**< Base widget */
+    twin_label_t label; /**< Base label widget */
+    bool pressed;       /**< Button pressed state */
+    bool active;        /**< Button active state */
 };
 
 typedef struct _twin_context {
@@ -725,6 +731,20 @@ twin_button_t *twin_button_create(twin_box_t *parent,
                                   twin_argb32_t foreground,
                                   twin_fixed_t font_size,
                                   twin_style_t font_style);
+
+
+/**
+ * Set application callback for widget events (low-level API)
+ * @widget   : Widget to configure
+ * @callback : Application callback function
+ * @data     : User data passed to callback
+ *
+ * Allows applications to respond to widget events (e.g., button clicks).
+ * The callback receives events after the widget's core handler processes them.
+ */
+void twin_widget_set_callback(twin_widget_t *widget,
+                              twin_widget_proc_t callback,
+                              void *data);
 
 /**
  * Create default mouse cursor pixmap
@@ -1376,14 +1396,14 @@ twin_fixed_t twin_widget_height(twin_widget_t *widget);
 /* Request widget repaint */
 void twin_widget_queue_paint(twin_widget_t *widget);
 
-/* Create widget with custom dispatch handler */
-twin_widget_t *twin_widget_create_with_dispatch(twin_box_t *parent,
-                                                twin_argb32_t background,
-                                                twin_coord_t width,
-                                                twin_coord_t height,
-                                                twin_stretch_t hstretch,
-                                                twin_stretch_t vstretch,
-                                                twin_dispatch_proc_t dispatch);
+/* Create widget with custom event handler */
+twin_widget_t *twin_widget_create_with_handler(twin_box_t *parent,
+                                               twin_argb32_t background,
+                                               twin_coord_t width,
+                                               twin_coord_t height,
+                                               twin_stretch_t hstretch,
+                                               twin_stretch_t vstretch,
+                                               twin_widget_proc_t handler);
 
 /*
  * Custom widget support - allows creating widgets without accessing internals
@@ -1403,7 +1423,7 @@ typedef struct {
 } twin_custom_widget_t;
 
 /**
- * Create a custom widget with user-defined data and dispatch handler.
+ * Create a custom widget with user-defined data and event handler.
  *
  * @parent       : Parent box widget to contain this widget
  * @background   : Background color (ARGB32 format)
@@ -1411,11 +1431,11 @@ typedef struct {
  * @height       : Preferred height in pixels (0 for flexible)
  * @hstretch     : Horizontal stretch factor for layout
  * @vstretch     : Vertical stretch factor for layout
- * @dispatch     : Custom event dispatch function for this widget
+ * @handler      : Custom event handler function for this widget
  * @data_size    : Size of custom data to allocate (0 for no data)
  * @return       : Newly created custom widget, or NULL on failure
  *
- * The dispatch function will be called for all events sent to this widget.
+ * The handler function will be called for all events sent to this widget.
  * Custom data (if requested) is zero-initialized and accessible via
  * twin_custom_widget_data().
  */
@@ -1425,7 +1445,7 @@ twin_custom_widget_t *twin_custom_widget_create(twin_box_t *parent,
                                                 twin_coord_t height,
                                                 twin_stretch_t hstretch,
                                                 twin_stretch_t vstretch,
-                                                twin_dispatch_proc_t dispatch,
+                                                twin_widget_proc_t handler,
                                                 size_t data_size);
 
 /**

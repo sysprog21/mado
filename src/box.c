@@ -12,10 +12,10 @@ void _twin_box_init(twin_box_t *box,
                     twin_box_t *parent,
                     twin_window_t *window,
                     twin_box_dir_t dir,
-                    twin_dispatch_proc_t dispatch)
+                    twin_widget_proc_t handler)
 {
     static twin_widget_layout_t preferred = {0, 0, 0, 0};
-    _twin_widget_init(&box->widget, parent, window, preferred, dispatch);
+    _twin_widget_init(&box->widget, parent, window, preferred, handler);
     box->dir = dir;
     box->children = NULL;
     box->button_down = NULL;
@@ -41,7 +41,7 @@ static twin_dispatch_result_t _twin_box_query_geometry(twin_box_t *box)
     for (twin_widget_t *child = box->children; child; child = child->next) {
         if (child->layout) {
             ev.kind = TwinEventQueryGeometry;
-            (*child->dispatch)(child, &ev);
+            child->handler(child, &ev, child->callback_data);
         }
         if (box->dir == TwinBoxHorz) {
             preferred.width += child->preferred.width;
@@ -129,7 +129,7 @@ static twin_dispatch_result_t _twin_box_configure(twin_box_t *box)
             extents.bottom != ev.u.configure.extents.bottom) {
             ev.kind = TwinEventConfigure;
             ev.u.configure.extents = extents;
-            (*child->dispatch)(child, &ev);
+            child->handler(child, &ev, child->callback_data);
         }
     }
     return TwinDispatchContinue;
@@ -148,14 +148,15 @@ static twin_widget_t *_twin_box_xy_to_widget(twin_box_t *box,
 }
 
 twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
-                                          twin_event_t *event)
+                                          twin_event_t *event,
+                                          void *closure)
 {
     twin_box_t *box = (twin_box_t *) widget;
     twin_event_t ev;
     twin_widget_t *child;
 
     if (event->kind != TwinEventPaint &&
-        _twin_widget_dispatch(widget, event) == TwinDispatchDone)
+        _twin_widget_dispatch(widget, event, closure) == TwinDispatchDone)
         return TwinDispatchDone;
     switch (event->kind) {
     case TwinEventDestroy:
@@ -166,7 +167,7 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
 
             /* Send destroy event to child */
             ev.kind = TwinEventDestroy;
-            (*child->dispatch)(child, &ev);
+            child->handler(child, &ev, child->callback_data);
         }
         break;
     case TwinEventQueryGeometry:
@@ -187,14 +188,15 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
             ev = *event;
             ev.u.pointer.x -= child->extents.left;
             ev.u.pointer.y -= child->extents.top;
-            return (*box->button_down->dispatch)(child, &ev);
+            return child->handler(child, &ev, child->callback_data);
         }
         break;
     case TwinEventKeyDown:
     case TwinEventKeyUp:
     case TwinEventUcs4:
         if (box->focus)
-            return (*box->focus->dispatch)(box->focus, event);
+            return box->focus->handler(box->focus, event,
+                                       box->focus->callback_data);
         break;
     case TwinEventPaint:
         box->widget.paint = false;
@@ -213,7 +215,7 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
                 twin_pixmap_set_clip(pixmap, child->extents);
                 twin_pixmap_origin_to_clip(pixmap);
                 child->paint = false;
-                (*child->dispatch)(child, event);
+                child->handler(child, event, child->callback_data);
                 twin_pixmap_restore_clip(pixmap, clip);
                 twin_pixmap_set_origin(pixmap, ox, oy);
             }

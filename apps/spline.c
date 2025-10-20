@@ -113,20 +113,22 @@ static void _apps_spline_paint(twin_custom_widget_t *custom)
     twin_path_destroy(path);
 }
 
-static void _apps_spline_button_signal(twin_button_t *button,
-                                       twin_button_signal_t signal,
-                                       void *closure)
+static twin_dispatch_result_t _apps_spline_button_clicked(twin_widget_t *widget,
+                                                          twin_event_t *event,
+                                                          void *data)
 {
-    (void) button; /* unused parameter */
-    if (signal != TwinButtonSignalDown)
-        return;
+    (void) widget; /* unused parameter */
 
-    twin_custom_widget_t *custom = closure;
+    if (event->kind != TwinEventButtonSignalUp)
+        return TwinDispatchContinue;
+
+    twin_custom_widget_t *custom = data;
     apps_spline_data_t *spline =
         (apps_spline_data_t *) twin_custom_widget_data(custom);
     spline->n_points = (spline->n_points == 3) ? 4 : 3;
     _init_control_point(spline);
     twin_custom_widget_queue_paint(custom);
+    return TwinDispatchDone;
 }
 
 static twin_dispatch_result_t _apps_spline_update_pos(
@@ -167,8 +169,11 @@ static int _apps_spline_hit(apps_spline_data_t *spline,
 }
 
 static twin_dispatch_result_t _apps_spline_dispatch(twin_widget_t *widget,
-                                                    twin_event_t *event)
+                                                    twin_event_t *event,
+                                                    void *closure)
 {
+    (void) closure; /* unused parameter */
+
     twin_custom_widget_t *custom = twin_widget_get_custom(widget);
     if (!custom)
         return TwinDispatchContinue;
@@ -227,8 +232,8 @@ static twin_custom_widget_t *_apps_spline_init(twin_box_t *parent, int n_points)
         twin_button_create(parent, "Switch curve", 0xffae0000, D(10),
                            TwinStyleBold | TwinStyleOblique);
     twin_widget_set(&button->label.widget, 0xc0808080);
-    button->signal = _apps_spline_button_signal;
-    button->closure = custom;
+    twin_widget_set_callback(&button->label.widget, _apps_spline_button_clicked,
+                             custom);
     button->label.widget.shape = TwinShapeRectangle;
 
     return custom;

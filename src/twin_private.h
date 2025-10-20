@@ -544,16 +544,17 @@ void _twin_box_init(twin_box_t *box,
                     twin_box_t *parent,
                     twin_window_t *window,
                     twin_box_dir_t dir,
-                    twin_dispatch_proc_t dispatch);
+                    twin_widget_proc_t dispatch);
 
 twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
-                                          twin_event_t *event);
+                                          twin_event_t *event,
+                                          void *closure);
 
 void _twin_widget_init(twin_widget_t *widget,
                        twin_box_t *parent,
                        twin_window_t *window,
                        twin_widget_layout_t preferred,
-                       twin_dispatch_proc_t dispatch);
+                       twin_widget_proc_t dispatch);
 
 void _twin_widget_paint_shape(twin_widget_t *widget,
                               twin_shape_t shape,
@@ -564,7 +565,9 @@ void _twin_widget_paint_shape(twin_widget_t *widget,
                               twin_fixed_t radius);
 
 twin_dispatch_result_t _twin_widget_dispatch(twin_widget_t *widget,
-                                             twin_event_t *event);
+                                             twin_event_t *event,
+                                             void *closure);
+
 
 void _twin_widget_queue_paint(twin_widget_t *widget);
 
@@ -584,16 +587,18 @@ void _twin_label_init(twin_label_t *label,
                       twin_argb32_t foreground,
                       twin_fixed_t font_size,
                       twin_style_t font_style,
-                      twin_dispatch_proc_t dispatch);
+                      twin_widget_proc_t dispatch);
 
 twin_dispatch_result_t _twin_label_dispatch(twin_widget_t *widget,
-                                            twin_event_t *event);
+                                            twin_event_t *event,
+                                            void *closure);
 
 twin_dispatch_result_t _twin_toplevel_dispatch(twin_widget_t *widget,
-                                               twin_event_t *event);
+                                               twin_event_t *event,
+                                               void *closure);
 
 void _twin_toplevel_init(twin_toplevel_t *toplevel,
-                         twin_dispatch_proc_t dispatch,
+                         twin_widget_proc_t dispatch,
                          twin_window_t *window,
                          const char *name);
 
@@ -602,7 +607,8 @@ void _twin_toplevel_queue_paint(twin_widget_t *widget);
 void _twin_toplevel_queue_layout(twin_widget_t *widget);
 
 twin_dispatch_result_t _twin_button_dispatch(twin_widget_t *widget,
-                                             twin_event_t *event);
+                                             twin_event_t *event,
+                                             void *closure);
 
 void _twin_button_init(twin_button_t *button,
                        twin_box_t *parent,
@@ -610,7 +616,7 @@ void _twin_button_init(twin_button_t *button,
                        twin_argb32_t foreground,
                        twin_fixed_t font_size,
                        twin_style_t font_style,
-                       twin_dispatch_proc_t dispatch);
+                       twin_widget_proc_t dispatch);
 
 typedef struct twin_backend {
     /* Initialize the backend */

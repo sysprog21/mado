@@ -29,8 +29,7 @@ __pycache__/
 *.pyc
 
 # Configuration
-.config
-.config.old
+.config*
 config.h
 
 # CI pipeline

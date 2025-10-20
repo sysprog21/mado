@@ -557,7 +557,6 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
 #define operand_index(o) \
     ((o)->source_kind == TWIN_SOLID ? 3 : o->u.pixmap->format)
 
-/* FIXME: source clipping is busted */
 static void _twin_composite_simple(twin_pixmap_t *dst,
                                    twin_coord_t dst_x,
                                    twin_coord_t dst_y,
@@ -596,6 +595,13 @@ static void _twin_composite_simple(twin_pixmap_t *dst,
     if (left >= right || top >= bottom)
         return;
 
+    /* Adjust source coordinates after clipping
+     * When destination is clipped, source coordinates must be adjusted
+     * to maintain correct 1:1 mapping between dst and src pixels.
+     */
+    src_x += (left - dst_x);
+    src_y += (top - dst_y);
+
     if (src->source_kind == TWIN_PIXMAP) {
         src_x += src->u.pixmap->origin_x;
         src_y += src->u.pixmap->origin_y;
@@ -603,12 +609,16 @@ static void _twin_composite_simple(twin_pixmap_t *dst,
         s.c = src->u.argb;
     }
 
-    sdx = src_x - dst_x;
-    sdy = src_y - dst_y;
+    sdx = src_x - left;
+    sdy = src_y - top;
 
     if (msk) {
         twin_source_u m;
         twin_coord_t mdx, mdy;
+
+        /* Adjust mask coordinates after clipping (same as source) */
+        msk_x += (left - dst_x);
+        msk_y += (top - dst_y);
 
         if (msk->source_kind == TWIN_PIXMAP) {
             msk_x += msk->u.pixmap->origin_x;
@@ -617,8 +627,8 @@ static void _twin_composite_simple(twin_pixmap_t *dst,
             m.c = msk->u.argb;
         }
 
-        mdx = msk_x - dst_x;
-        mdy = msk_y - dst_y;
+        mdx = msk_x - left;
+        mdy = msk_y - top;
 
         twin_src_msk_op op = comp3[operator][operand_index(src)][operand_index(msk)][dst->format];
         for (iy = top; iy < bottom; iy++) {

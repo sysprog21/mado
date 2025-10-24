@@ -48,8 +48,9 @@ typedef struct {
     int fd;
     int btns;
     int x, y;
-    int abs_x_min, abs_y_min; /* Minimum value for ABS_X/ABS_Y from device */
-    int abs_x_max, abs_y_max; /* Maximum value for ABS_X/ABS_Y from device */
+    int abs_x_min, abs_y_min;   /* Minimum value for ABS_X/ABS_Y from device */
+    int abs_x_max, abs_y_max;   /* Maximum value for ABS_X/ABS_Y from device */
+    bool abs_range_initialized; /* Whether ABS range has been queried */
 #if TWIN_INPUT_SMOOTH_WEIGHT > 0
     int smooth_x, smooth_y;  /* Smoothed coordinates for ABS events */
     bool smooth_initialized; /* Whether smoothing has been initialized */
@@ -269,12 +270,15 @@ static void twin_linux_input_query_abs(int fd, twin_linux_input_t *tm)
             int range = abs_info.maximum - abs_info.minimum;
             int current_range = tm->abs_x_max - tm->abs_x_min;
 
-            /* Update global range if this device has a larger range */
-            if (range > current_range) {
+            /* Accept first device range unconditionally, or larger ranges from
+             * subsequent devices
+             */
+            if (!tm->abs_range_initialized || range > current_range) {
                 log_info("ABS_X range updated: [%d,%d] (device fd=%d)",
                          abs_info.minimum, abs_info.maximum, fd);
                 tm->abs_x_min = abs_info.minimum;
                 tm->abs_x_max = abs_info.maximum;
+                tm->abs_range_initialized = true;
             }
         } else {
             log_warn("Device fd=%d: ABS_X range invalid [%d,%d]", fd,
@@ -289,8 +293,10 @@ static void twin_linux_input_query_abs(int fd, twin_linux_input_t *tm)
             int range = abs_info.maximum - abs_info.minimum;
             int current_range = tm->abs_y_max - tm->abs_y_min;
 
-            /* Update global range if this device has a larger range */
-            if (range > current_range) {
+            /* Accept first device range unconditionally, or larger ranges from
+             * subsequent devices
+             */
+            if (!tm->abs_range_initialized || range > current_range) {
                 log_info("ABS_Y range updated: [%d,%d] (device fd=%d)",
                          abs_info.minimum, abs_info.maximum, fd);
                 tm->abs_y_min = abs_info.minimum;

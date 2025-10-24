@@ -109,7 +109,8 @@ static void twin_linux_input_events(struct input_event *ev,
                                     twin_linux_input_t *tm)
 {
     /* TODO: twin_screen_dispatch() should be protect by mutex_lock, but the
-     * counterpart piece of code with mutex is not yet sure */
+     * counterpart piece of code with mutex is not yet sure.
+     */
 
     twin_event_t tev;
 
@@ -350,14 +351,28 @@ static void twin_linux_edev_open(struct pollfd *pfds, twin_linux_input_t *tm)
     }
 
     /* Close disconnected devices */
+    bool device_list_changed = false;
     for (size_t i = 0; i < tm->evdev_cnt; i++) {
-        if (tm->evdevs[i].fd > 0)
+        if (tm->evdevs[i].fd > 0) {
             close(tm->evdevs[i].fd);
+            device_list_changed = true;
+        }
     }
+
+    /* Check if new devices were added */
+    if (new_evdev_cnt != tm->evdev_cnt)
+        device_list_changed = true;
 
     /* Overwrite the evdev list */
     memcpy(tm->evdevs, evdevs, sizeof(tm->evdevs));
     tm->evdev_cnt = new_evdev_cnt;
+
+#if TWIN_INPUT_SMOOTH_WEIGHT > 0
+    /* Reset smoothing state on device reconnection to prevent coordinate jumps
+     */
+    if (device_list_changed && tm->smooth_initialized)
+        tm->smooth_initialized = false;
+#endif
 
     /* Initialize evdev poll file descriptors */
     for (size_t i = tm->udev_cnt; i < tm->evdev_cnt + tm->udev_cnt; i++) {

@@ -1,6 +1,6 @@
 /*
  * Twin - A Tiny Window System
- * Copyright (c) 2024 National Cheng Kung University, Taiwan
+ * Copyright (c) 2024-2025 National Cheng Kung University, Taiwan
  * All rights reserved.
  */
 
@@ -9,6 +9,7 @@
 #include <linux/input.h>
 #include <poll.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <twin.h>
@@ -27,6 +28,17 @@ struct evdev_info {
     int fd;
 };
 
+/* Coordinate smoothing configuration */
+/* Weight for smoothing (0=off, 1-7=strength) */
+#ifndef TWIN_INPUT_SMOOTH_WEIGHT
+#define TWIN_INPUT_SMOOTH_WEIGHT 3
+#endif
+
+/* Compile-time bounds check for smoothing weight */
+#if TWIN_INPUT_SMOOTH_WEIGHT < 0 || TWIN_INPUT_SMOOTH_WEIGHT > 7
+#error "TWIN_INPUT_SMOOTH_WEIGHT must be in range [0, 7]"
+#endif
+
 typedef struct {
     twin_screen_t *screen;
     pthread_t evdev_thread;
@@ -36,20 +48,61 @@ typedef struct {
     int fd;
     int btns;
     int x, y;
+    int abs_x_min, abs_y_min; /* Minimum value for ABS_X/ABS_Y from device */
     int abs_x_max, abs_y_max; /* Maximum value for ABS_X/ABS_Y from device */
+#if TWIN_INPUT_SMOOTH_WEIGHT > 0
+    int smooth_x, smooth_y;  /* Smoothed coordinates for ABS events */
+    bool smooth_initialized; /* Whether smoothing has been initialized */
+#endif
 } twin_linux_input_t;
 
 static void check_mouse_bounds(twin_linux_input_t *tm)
 {
+    /* Guard against zero-sized screens */
+    if (tm->screen->width == 0 || tm->screen->height == 0) {
+        tm->x = tm->y = 0;
+        return;
+    }
+
     if (tm->x < 0)
         tm->x = 0;
-    if (tm->x > tm->screen->width)
-        tm->x = tm->screen->width;
+    if (tm->x >= tm->screen->width)
+        tm->x = tm->screen->width - 1;
     if (tm->y < 0)
         tm->y = 0;
-    if (tm->y > tm->screen->height)
-        tm->y = tm->screen->height;
+    if (tm->y >= tm->screen->height)
+        tm->y = tm->screen->height - 1;
 }
+
+#if TWIN_INPUT_SMOOTH_WEIGHT > 0
+/* Apply weighted moving average smoothing to reduce jitter
+ * Formula: smooth = (smooth * weight + raw) / (weight + 1)
+ * Higher weight = more smoothing but more latency
+ */
+static inline void smooth_abs_coords(twin_linux_input_t *tm,
+                                     int raw_x,
+                                     int raw_y)
+{
+    if (!tm->smooth_initialized) {
+        /* Cold start: use raw values directly */
+        tm->smooth_x = raw_x;
+        tm->smooth_y = raw_y;
+        tm->smooth_initialized = true;
+    } else {
+        /* Weighted moving average with 64-bit intermediates to prevent overflow
+         */
+        int64_t acc_x =
+            (int64_t) tm->smooth_x * TWIN_INPUT_SMOOTH_WEIGHT + raw_x;
+        int64_t acc_y =
+            (int64_t) tm->smooth_y * TWIN_INPUT_SMOOTH_WEIGHT + raw_y;
+        tm->smooth_x = (int) (acc_x / (TWIN_INPUT_SMOOTH_WEIGHT + 1));
+        tm->smooth_y = (int) (acc_y / (TWIN_INPUT_SMOOTH_WEIGHT + 1));
+    }
+
+    tm->x = tm->smooth_x;
+    tm->y = tm->smooth_y;
+}
+#endif
 
 static void twin_linux_input_events(struct input_event *ev,
                                     twin_linux_input_t *tm)
@@ -82,25 +135,54 @@ static void twin_linux_input_events(struct input_event *ev,
     case EV_ABS:
         /* Scale absolute coordinates to screen resolution.
          * The range is dynamically queried from each device using EVIOCGABS.
-         * If no device reported ABS info, we fall back to the common default
-         * of 32767 for touchscreens and absolute pointing devices.
+         * Formula: scaled = ((value - min) * (screen_size - 1)) / (max - min)
+         * This correctly maps device coordinates [min, max] to screen [0,
+         * size-1]
          */
-        if (ev->code == ABS_X && tm->abs_x_max > 0) {
-            tm->x = ((int64_t) ev->value * tm->screen->width) / tm->abs_x_max;
-            check_mouse_bounds(tm);
-            tev.kind = TwinEventMotion;
-            tev.u.pointer.screen_x = tm->x;
-            tev.u.pointer.screen_y = tm->y;
-            tev.u.pointer.button = tm->btns;
-            twin_screen_dispatch(tm->screen, &tev);
-        } else if (ev->code == ABS_Y && tm->abs_y_max > 0) {
-            tm->y = ((int64_t) ev->value * tm->screen->height) / tm->abs_y_max;
-            check_mouse_bounds(tm);
-            tev.kind = TwinEventMotion;
-            tev.u.pointer.screen_x = tm->x;
-            tev.u.pointer.screen_y = tm->y;
-            tev.u.pointer.button = tm->btns;
-            twin_screen_dispatch(tm->screen, &tev);
+        if (ev->code == ABS_X) {
+            int range = tm->abs_x_max - tm->abs_x_min;
+            if (range > 0) {
+                int raw_x = ((int64_t) (ev->value - tm->abs_x_min) *
+                             (tm->screen->width - 1)) /
+                            range;
+#if TWIN_INPUT_SMOOTH_WEIGHT > 0
+                /* Apply smoothing to X axis, keep Y unchanged */
+                smooth_abs_coords(tm, raw_x, tm->y);
+#else
+                tm->x = raw_x;
+#endif
+                check_mouse_bounds(tm);
+                tev.kind = TwinEventMotion;
+                tev.u.pointer.screen_x = tm->x;
+                tev.u.pointer.screen_y = tm->y;
+                tev.u.pointer.button = tm->btns;
+                twin_screen_dispatch(tm->screen, &tev);
+            } else {
+                log_warn("Ignoring ABS_X event: invalid range [%d,%d]",
+                         tm->abs_x_min, tm->abs_x_max);
+            }
+        } else if (ev->code == ABS_Y) {
+            int range = tm->abs_y_max - tm->abs_y_min;
+            if (range > 0) {
+                int raw_y = ((int64_t) (ev->value - tm->abs_y_min) *
+                             (tm->screen->height - 1)) /
+                            range;
+#if TWIN_INPUT_SMOOTH_WEIGHT > 0
+                /* Apply smoothing to Y axis, keep X unchanged */
+                smooth_abs_coords(tm, tm->x, raw_y);
+#else
+                tm->y = raw_y;
+#endif
+                check_mouse_bounds(tm);
+                tev.kind = TwinEventMotion;
+                tev.u.pointer.screen_x = tm->x;
+                tev.u.pointer.screen_y = tm->y;
+                tev.u.pointer.button = tm->btns;
+                twin_screen_dispatch(tm->screen, &tev);
+            } else {
+                log_warn("Ignoring ABS_Y event: invalid range [%d,%d]",
+                         tm->abs_y_min, tm->abs_y_max);
+            }
         }
         break;
     case EV_KEY:
@@ -180,18 +262,44 @@ static void twin_linux_input_query_abs(int fd, twin_linux_input_t *tm)
 {
     struct input_absinfo abs_info;
 
-    /* Query ABS_X maximum value */
-    if (ioctl(fd, EVIOCGABS(ABS_X), &abs_info) == 0 && abs_info.maximum > 0) {
-        /* Update global maximum if this device has a larger range */
-        if (abs_info.maximum > tm->abs_x_max)
-            tm->abs_x_max = abs_info.maximum;
+    /* Query ABS_X range (minimum and maximum) */
+    if (ioctl(fd, EVIOCGABS(ABS_X), &abs_info) == 0) {
+        /* Validate range: maximum must be greater than minimum */
+        if (abs_info.maximum > abs_info.minimum) {
+            int range = abs_info.maximum - abs_info.minimum;
+            int current_range = tm->abs_x_max - tm->abs_x_min;
+
+            /* Update global range if this device has a larger range */
+            if (range > current_range) {
+                log_info("ABS_X range updated: [%d,%d] (device fd=%d)",
+                         abs_info.minimum, abs_info.maximum, fd);
+                tm->abs_x_min = abs_info.minimum;
+                tm->abs_x_max = abs_info.maximum;
+            }
+        } else {
+            log_warn("Device fd=%d: ABS_X range invalid [%d,%d]", fd,
+                     abs_info.minimum, abs_info.maximum);
+        }
     }
 
-    /* Query ABS_Y maximum value */
-    if (ioctl(fd, EVIOCGABS(ABS_Y), &abs_info) == 0 && abs_info.maximum > 0) {
-        /* Update global maximum if this device has a larger range */
-        if (abs_info.maximum > tm->abs_y_max)
-            tm->abs_y_max = abs_info.maximum;
+    /* Query ABS_Y range (minimum and maximum) */
+    if (ioctl(fd, EVIOCGABS(ABS_Y), &abs_info) == 0) {
+        /* Validate range: maximum must be greater than minimum */
+        if (abs_info.maximum > abs_info.minimum) {
+            int range = abs_info.maximum - abs_info.minimum;
+            int current_range = tm->abs_y_max - tm->abs_y_min;
+
+            /* Update global range if this device has a larger range */
+            if (range > current_range) {
+                log_info("ABS_Y range updated: [%d,%d] (device fd=%d)",
+                         abs_info.minimum, abs_info.maximum, fd);
+                tm->abs_y_min = abs_info.minimum;
+                tm->abs_y_max = abs_info.maximum;
+            }
+        } else {
+            log_warn("Device fd=%d: ABS_Y range invalid [%d,%d]", fd,
+                     abs_info.minimum, abs_info.maximum);
+        }
     }
 }
 
@@ -226,7 +334,7 @@ static void twin_linux_edev_open(struct pollfd *pfds, twin_linux_input_t *tm)
 
         /* Open the file if it is not on the list */
         int fd = open(evdev_name, O_RDWR | O_NONBLOCK);
-        if (fd > 0 && !opened) {
+        if (fd >= 0 && !opened) {
             /* Query absolute axis info for newly opened devices */
             twin_linux_input_query_abs(fd, tm);
             evdevs[new_evdev_cnt].idx = i;
@@ -324,11 +432,21 @@ void *twin_linux_input_create(twin_screen_t *screen)
     /* Initialize ABS axis ranges to common touchscreen default.
      * These will be updated to actual device values when devices are opened.
      */
+    tm->abs_x_min = tm->abs_y_min = 0;
     tm->abs_x_max = tm->abs_y_max = 32767;
+    log_info(
+        "Input system initialized: screen=%dx%d, default ABS range=[%d,%d]",
+        screen->width, screen->height, tm->abs_x_min, tm->abs_x_max);
 
     /* Centering the cursor position */
     tm->x = screen->width / 2;
     tm->y = screen->height / 2;
+
+#if TWIN_INPUT_SMOOTH_WEIGHT > 0
+    /* Initialize smoothing from center position */
+    tm->smooth_x = tm->x, tm->smooth_y = tm->y;
+    tm->smooth_initialized = true;
+#endif
 
     /* Start event handling thread */
     if (pthread_create(&tm->evdev_thread, NULL, twin_linux_evdev_thread, tm)) {

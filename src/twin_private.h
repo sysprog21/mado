@@ -716,14 +716,20 @@ typedef struct twin_backend {
  */
 
 #if defined(CONFIG_DROP_SHADOW)
+#define TWIN_SHADOW_SOFTNESS_TAIL (((CONFIG_SHADOW_BLUR) + 1) / 2)
+#define TWIN_SHADOW_FADE_EXTENT                            \
+    ((CONFIG_SHADOW_FADE_TAIL > TWIN_SHADOW_SOFTNESS_TAIL) \
+         ? CONFIG_SHADOW_FADE_TAIL                         \
+         : TWIN_SHADOW_SOFTNESS_TAIL)
+#define TWIN_SHADOW_EXTENT_X \
+    (CONFIG_HORIZONTAL_OFFSET + TWIN_SHADOW_FADE_EXTENT)
+#define TWIN_SHADOW_EXTENT_Y (CONFIG_VERTICAL_OFFSET + TWIN_SHADOW_FADE_EXTENT)
 /*
- * Add a shadow with the specified color, horizontal offset, and vertical
- * offset.
+ * Render a CSS-style drop shadow mask onto the pixmap's shadow region.
+ * Offsets and blur are compile-time constants (CONFIG_HORIZONTAL_OFFSET,
+ * CONFIG_VERTICAL_OFFSET, CONFIG_SHADOW_BLUR).  Requires ARGB32 format.
  */
-void twin_shadow_border(twin_pixmap_t *shadow,
-                        twin_argb32_t color,
-                        twin_coord_t shift_x,
-                        twin_coord_t shift_y);
+void twin_shadow_border(twin_pixmap_t *shadow, twin_argb32_t color);
 #endif
 
 /* utility */

@@ -9,6 +9,7 @@ mado-perf
 font-edit
 .font-edit
 src/composite-decls.h
+src/shadow-gaussian-lut.h
 
 # Swap
 [._]*.s[a-v][a-z]

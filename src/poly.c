@@ -383,10 +383,15 @@ static void _twin_edge_fill(twin_pixmap_t *pixmap,
              * Only apply to spans >= 16 pixels to avoid branch overhead.
              * Threshold: 16 pixels * 4 samples/pixel = 64 samples
              *
-             * Check if both edges forming this span are vertical (dx=0).
+             * Check aa_quality (not dx) to detect vertical edges.
+             * By this point, dx has been reduced by Bresenham, so dx==0
+             * incorrectly matches diagonal lines with integer slopes, causing
+             * thin diagonal strokes to disappear. The aa_quality flag was set
+             * using the ORIGINAL dx value before Bresenham reduction.
              */
             twin_sfixed_t span_width = a->x - x0;
-            if (edge_start && edge_start->dx == 0 && a->dx == 0 &&
+            if (edge_start && edge_start->aa_quality == 0 &&
+                a->aa_quality == 0 &&
                 span_width >= (16 << TWIN_POLY_FIXED_SHIFT)) {
                 /* Both edges vertical and span is wide enough: use optimized
                  * span fill */

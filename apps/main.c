@@ -17,7 +17,6 @@
 #include "apps_calc.h"
 #include "apps_clock.h"
 #include "apps_image.h"
-#include "apps_line.h"
 #include "apps_multi.h"
 #include "apps_spline.h"
 
@@ -95,9 +94,6 @@ static void init_demo_apps(twin_context_t *ctx)
 #endif
 #if defined(CONFIG_DEMO_CALCULATOR)
     apps_calc_start(screen, "Calculator", 100, 100, 200, 200);
-#endif
-#if defined(CONFIG_DEMO_LINE)
-    apps_line_start(screen, "Line", 0, 0, 200, 200);
 #endif
 #if defined(CONFIG_DEMO_SPLINE)
     apps_spline_start(screen, "Spline", 20, 20, 400, 400);

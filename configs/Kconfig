@@ -288,15 +288,6 @@ config DEMO_CALCULATOR
       Demonstrates button widgets and event handling.
       Shows layout management and user input processing.
 
-config DEMO_LINE
-    bool "Build line demo"
-    default y
-    depends on DEMO_APPLICATIONS
-    help
-      Line drawing demonstration program.
-      Shows primitive rendering capabilities.
-      Tests line drawing algorithms and antialiasing.
-
 config DEMO_SPLINE
     bool "Build spline demo"
     default y

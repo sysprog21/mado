@@ -644,10 +644,7 @@ typedef struct twin_backend {
  * Add a shadow with the specified color, horizontal offset, and vertical
  * offset.
  */
-void twin_shadow_border(twin_pixmap_t *shadow,
-                        twin_argb32_t color,
-                        twin_coord_t shift_x,
-                        twin_coord_t shift_y);
+void twin_shadow_border(twin_pixmap_t *shadow, twin_argb32_t color);
 #endif
 
 /* utility */

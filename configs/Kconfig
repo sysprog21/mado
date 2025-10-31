@@ -191,31 +191,44 @@ config DROP_SHADOW
 
 config HORIZONTAL_OFFSET
     int "Horizontal offset"
-    default 1
+    default 6
     range 1 10
     depends on DROP_SHADOW
     help
       Horizontal shadow offset in pixels.
+      Default matches a CSS-style soft shadow (≈6 px offset).
       Larger values push shadow further right.
 
 config VERTICAL_OFFSET
     int "Vertical offset"
-    default 1
+    default 6
     range 1 10
     depends on DROP_SHADOW
     help
       Vertical shadow offset in pixels.
+      Default matches a CSS-style soft shadow (≈6 px offset).
       Larger values push shadow further down.
 
 config SHADOW_BLUR
     int "Shadow blur radius"
-    default 10
+    default 12
     range 1 15
     depends on DROP_SHADOW
     help
       Shadow blur kernel size (radius).
+      Default 12 approximates common CSS box-shadow softness.
       Larger values create softer, more diffuse shadows.
       Higher values increase rendering cost.
+
+config SHADOW_FADE_TAIL
+    int "Shadow fade tail"
+    default 2
+    range 0 3
+    depends on DROP_SHADOW
+    help
+      Additional zero-alpha pixels appended to the shadow mask.
+      Default adds ~2 px of clear space to match CSS feathering.
+      Higher values slightly enlarge the off-screen buffer usage.
 
 endmenu
 

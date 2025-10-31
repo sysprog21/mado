@@ -18,7 +18,9 @@
 #define TWIN_TITLE_HEIGHT 20
 #define TWIN_RESIZE_SIZE ((TWIN_TITLE_HEIGHT + 4) / 5)
 #define TWIN_TITLE_BW ((TWIN_TITLE_HEIGHT + 11) / 12)
-#define SHADOW_COLOR 0xff000000
+
+/* Shadow color for CSS-style effect: semi-transparent black (50% opacity). */
+#define SHADOW_COLOR 0x80000000
 
 twin_window_t *twin_window_create(twin_screen_t *screen,
                                   twin_format_t format,
@@ -59,11 +61,12 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
     window->client.right = width - right;
     window->client.bottom = height - bottom;
 #if defined(CONFIG_DROP_SHADOW)
-    /* Handle drop shadow. */
-    /*
-     * Add a shadowed area to the pixel map of the window to create a drop
-     * shadow effect. This calculation method is based on the range of
-     * CONFIG_HORIZONTAL_OFFSET, CONFIG_VERTICAL_OFFSET, and CONFIG_SHADOW_BLUR.
+    /* Handle drop shadow.
+     *
+     * Allocate extra space in the pixmap for the drop shadow. The dimensions
+     * are calculated based on the configured horizontal and vertical offsets,
+     * plus a blur radius, to ensure sufficient area for the blurred shadow.
+     * This approach is part of emulating a CSS-like 'box-shadow' effect.
      */
     window->shadow_x = 2 * CONFIG_HORIZONTAL_OFFSET + CONFIG_SHADOW_BLUR;
     window->shadow_y = 2 * CONFIG_VERTICAL_OFFSET + CONFIG_SHADOW_BLUR;
@@ -391,8 +394,7 @@ static void twin_window_drop_shadow(twin_window_t *window)
      * dimensional appearance.
      */
     /* The shift offset and color of the shadow can be selected by the user. */
-    twin_shadow_border(active_pix, SHADOW_COLOR, CONFIG_VERTICAL_OFFSET,
-                       CONFIG_HORIZONTAL_OFFSET);
+    twin_shadow_border(active_pix, SHADOW_COLOR);
 
     /* Add a blur effect to the shadow of the active window. */
     /* Right side of the active window */

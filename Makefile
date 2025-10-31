@@ -83,6 +83,10 @@ src/composite-decls.h: scripts/gen-composite-decls.py
 	@echo "  GEN        $@"
 	@$< > $@
 
+src/shadow-gaussian-lut.h: scripts/gen-shadow-lut.py
+	@echo "  GEN        $@"
+	@./scripts/gen-shadow-lut.py $@
+
 # Optional features
 
 libtwin.a_files-$(CONFIG_LOGGING) += src/log.c
@@ -274,6 +278,9 @@ CFLAGS += -include config.h
 ifeq ($(filter config defconfig clean,$(MAKECMDGOALS)),)
     ifeq ($(wildcard src/composite-decls.h),)
         $(shell scripts/gen-composite-decls.py > src/composite-decls.h)
+    endif
+    ifeq ($(wildcard src/shadow-gaussian-lut.h),)
+        $(shell ./scripts/gen-shadow-lut.py src/shadow-gaussian-lut.h)
     endif
 endif
 

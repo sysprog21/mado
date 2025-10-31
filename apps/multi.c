@@ -216,6 +216,57 @@ static void apps_circletext_start(twin_screen_t *screen,
     twin_window_show(window);
 }
 
+static void apps_smiley_start(twin_screen_t *screen, int x, int y, int w, int h)
+{
+    twin_window_t *window = twin_window_create(
+        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
+    twin_pixmap_t *pixmap = window->pixmap;
+
+    twin_window_set_name(window, "Smiley");
+
+    /* Clear background to white */
+    twin_fill(pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, w, h);
+
+    /* Calculate center and dimensions */
+    twin_fixed_t center_x = twin_int_to_fixed(w / 2);
+    twin_fixed_t center_y = twin_int_to_fixed(h / 2);
+    twin_fixed_t face_radius = D(70);
+    twin_fixed_t mouth_radius = D(50);
+    twin_fixed_t eye_radius = D(10);
+    twin_fixed_t eye_offset_x = D(25);
+    twin_fixed_t eye_offset_y = D(20);
+
+    /* Draw face - yellow circle with black outline */
+    twin_path_t *face = twin_path_create();
+    twin_path_circle(face, center_x, center_y, face_radius);
+    twin_paint_path(pixmap, 0xffffff00, face);         /* Yellow fill */
+    twin_paint_stroke(pixmap, 0xff000000, face, D(5)); /* Black outline */
+    twin_path_destroy(face);
+
+    /* Draw left eye */
+    twin_path_t *left_eye = twin_path_create();
+    twin_path_circle(left_eye, center_x - eye_offset_x, center_y - eye_offset_y,
+                     eye_radius);
+    twin_paint_path(pixmap, 0xff000000, left_eye); /* Black */
+    twin_path_destroy(left_eye);
+
+    /* Draw right eye */
+    twin_path_t *right_eye = twin_path_create();
+    twin_path_circle(right_eye, center_x + eye_offset_x,
+                     center_y - eye_offset_y, eye_radius);
+    twin_paint_path(pixmap, 0xff000000, right_eye); /* Black */
+    twin_path_destroy(right_eye);
+
+    /* Draw smile - bottom half arc */
+    twin_path_t *smile = twin_path_create();
+    twin_path_arc(smile, center_x, center_y, mouth_radius, mouth_radius,
+                  TWIN_ANGLE_0, TWIN_ANGLE_180);
+    twin_paint_stroke(pixmap, 0xff000000, smile, D(5)); /* Black line */
+    twin_path_destroy(smile);
+
+    twin_window_show(window);
+}
+
 static void apps_ascii_start(twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_window_t *window = twin_window_create(
@@ -374,6 +425,7 @@ void apps_multi_start(twin_screen_t *screen,
     (void) name;
     apps_circletext_start(screen, x, y, w, h);
     apps_multiline_start(screen, x += 20, y += 20, w * 2 / 3, h * 2 / 3);
+    apps_smiley_start(screen, x += 20, y += 20, 200, 200);
     apps_ascii_start(screen, x += 20, y += 20, w, h);
     apps_flower_start(screen, x += 20, y += 20, w, h);
     apps_blur(screen, x += 20, y += 20, w / 2, h / 2);

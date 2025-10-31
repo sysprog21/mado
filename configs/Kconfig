@@ -270,14 +270,6 @@ config DEMO_MULTI
       Comprehensive demo with multiple windows and widgets.
       Demonstrates window management and event handling.
 
-config DEMO_HELLO
-    bool "Build Hello world demo"
-    default y
-    depends on DEMO_APPLICATIONS
-    help
-      Simple "Hello World" demonstration program.
-      Minimal example of Mado window system usage.
-
 config DEMO_CLOCK
     bool "Build clock demo"
     default y

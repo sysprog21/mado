@@ -16,7 +16,6 @@
 #include "apps_animation.h"
 #include "apps_calc.h"
 #include "apps_clock.h"
-#include "apps_hello.h"
 #include "apps_image.h"
 #include "apps_line.h"
 #include "apps_multi.h"
@@ -90,9 +89,6 @@ static void init_demo_apps(twin_context_t *ctx)
     twin_screen_t *screen = ctx->screen;
 #if defined(CONFIG_DEMO_MULTI)
     apps_multi_start(screen, "Demo", 100, 100, 400, 400);
-#endif
-#if defined(CONFIG_DEMO_HELLO)
-    apps_hello_start(screen, "Hello, World", 0, 0, 200, 200);
 #endif
 #if defined(CONFIG_DEMO_CLOCK)
     apps_clock_start(screen, "Clock", 10, 10, 200, 200);

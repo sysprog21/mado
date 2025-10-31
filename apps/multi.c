@@ -173,55 +173,6 @@ static void apps_ascii_start(twin_screen_t *screen, int x, int y, int w, int h)
     twin_window_show(window);
 }
 
-static void apps_jelly_start(twin_screen_t *screen, int x, int y, int w, int h)
-{
-    twin_window_t *window = twin_window_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
-    int wid = window->client.right - window->client.left;
-    int hei = window->client.bottom - window->client.top;
-    twin_pixmap_t *pixmap = window->pixmap;
-    twin_path_t *path = twin_path_create();
-    twin_fixed_t fx, fy;
-    int s;
-
-    twin_window_set_name(window, "Jelly");
-
-    twin_fill(pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, wid, hei);
-
-    fx = D(3);
-    fy = D(8);
-    for (s = 6; s < 36; s += 2) {
-        twin_path_set_font_size(path, D(s));
-        fy += D(s + 2);
-        twin_path_move(path, fx, fy);
-#define TEXT "jelly text"
-        /* twin_path_set_font_style (path, TwinStyleUnhinted); */
-        twin_path_utf8(path, TEXT);
-        twin_paint_path(pixmap, 0xff000000, path);
-        twin_path_empty(path);
-        {
-            twin_text_metrics_t m;
-            twin_path_t *stroke = twin_path_create();
-            twin_path_set_matrix(stroke, twin_path_current_matrix(path));
-            twin_text_metrics_utf8(path, TEXT, &m);
-            twin_path_translate(stroke, TWIN_FIXED_HALF, TWIN_FIXED_HALF);
-            twin_path_move(stroke, fx, fy);
-            twin_path_draw(stroke, fx + m.width, fy);
-            twin_paint_stroke(pixmap, 0xffff0000, stroke, D(1));
-            twin_path_empty(stroke);
-            twin_path_move(stroke, fx + m.left_side_bearing, fy - m.ascent);
-            twin_path_draw(stroke, fx + m.right_side_bearing, fy - m.ascent);
-            twin_path_draw(stroke, fx + m.right_side_bearing, fy + m.descent);
-            twin_path_draw(stroke, fx + m.left_side_bearing, fy + m.descent);
-            twin_path_draw(stroke, fx + m.left_side_bearing, fy - m.ascent);
-            twin_paint_stroke(pixmap, 0xff00ff00, stroke, D(1));
-            twin_path_destroy(stroke);
-        }
-    }
-    twin_path_destroy(path);
-    twin_window_show(window);
-}
-
 static void draw_flower(twin_path_t *path,
                         twin_fixed_t radius,
                         int number_of_petals)
@@ -334,7 +285,6 @@ void apps_multi_start(twin_screen_t *screen,
     apps_line_start(screen, x += 20, y += 20, w, h);
     apps_quickbrown_start(screen, x += 20, y += 20, w, h);
     apps_ascii_start(screen, x += 20, y += 20, w, h);
-    apps_jelly_start(screen, x += 20, y += 20, w / 2, h);
     apps_flower_start(screen, x += 20, y += 20, w, h);
     apps_blur(screen, x += 20, y += 20, w / 2, h / 2);
 }

@@ -137,7 +137,6 @@ endif
 
 libapps.a_files-y := apps/dummy.c
 libapps.a_files-$(CONFIG_DEMO_MULTI) += apps/multi.c
-libapps.a_files-$(CONFIG_DEMO_HELLO) += apps/hello.c
 libapps.a_files-$(CONFIG_DEMO_CLOCK) += apps/clock.c
 libapps.a_files-$(CONFIG_DEMO_CALCULATOR) += apps/calc.c
 libapps.a_files-$(CONFIG_DEMO_LINE) += apps/line.c

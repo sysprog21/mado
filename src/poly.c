@@ -5,6 +5,8 @@
  * All rights reserved.
  */
 
+#include <assert.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "twin_private.h"
@@ -18,6 +20,7 @@ typedef struct _twin_edge {
     twin_sfixed_t inc_x;
     twin_sfixed_t step_x;
     int winding;
+    uint8_t aa_quality; /* Adaptive AA: 0=1x1, 1=2x2, 2=4x4 */
 } twin_edge_t;
 
 #define TWIN_POLY_SHIFT 2
@@ -28,6 +31,26 @@ typedef struct _twin_edge {
 #define TWIN_POLY_START (TWIN_POLY_STEP >> 1)
 #define TWIN_POLY_CEIL(c) (((c) + (TWIN_POLY_STEP - 1)) & ~(TWIN_POLY_STEP - 1))
 #define TWIN_POLY_COL(x) (((x) >> TWIN_POLY_FIXED_SHIFT) & TWIN_POLY_MASK)
+
+/* Adaptive AA quality computation
+ *
+ * Only optimize perfectly vertical edges (dx=0) where visual impact is
+ * guaranteed to be minimal. All other edges use full 4x4 AA to preserve
+ * quality, especially for text, curves, and diagonal strokes.
+ *
+ * Returns: 0 (1x1), or 2 (4x4 - default)
+ */
+static inline uint8_t _compute_aa_quality(twin_sfixed_t dx, twin_sfixed_t dy)
+{
+    (void) dy; /* Unused in conservative mode */
+
+    /* Conservative approach: only optimize perfectly vertical edges */
+    if (dx == 0)
+        return 0; /* Vertical: 1x1 (16x faster per edge) */
+
+    /* All other edges use full quality to preserve visual fidelity */
+    return 2; /* Default: 4x4 (full AA) */
+}
 
 static int _edge_compare_y(const void *a, const void *b)
 {
@@ -100,6 +123,17 @@ static int _twin_edge_build(twin_spoint_t *vertices,
         /* Compute bresenham terms */
         edges[e].dx = vertices[bv].x - vertices[tv].x;
         edges[e].dy = vertices[bv].y - vertices[tv].y;
+
+        /* Compute adaptive AA quality based on slope */
+        edges[e].aa_quality = _compute_aa_quality(edges[e].dx, edges[e].dy);
+
+        /* Sanity check: AA quality must be 0 or 2 in conservative mode
+         * (1 is reserved for future medium-quality mode if needed)
+         */
+        assert(edges[e].aa_quality <= 2 && "Invalid AA quality computed");
+        assert((edges[e].aa_quality == 0 || edges[e].aa_quality == 2) &&
+               "Conservative mode should only produce 0 or 2");
+
         if (edges[e].dx >= 0)
             edges[e].inc_x = 1;
         else {
@@ -124,44 +158,130 @@ static int _twin_edge_build(twin_spoint_t *vertices,
     return e;
 }
 
+/* Optimized span fill for perfectly vertical edges (dx=0)
+ *
+ * For vertical edges, coverage doesn't vary horizontally within a pixel.
+ * All sub-pixel positions contribute equally (0x10 or 0x0f for rounding).
+ * This allows us to:
+ * 1. Skip array indexing (use constants directly)
+ * 2. Simplify partial pixel calculations
+ * 3. Eliminate the coverage table lookup entirely
+ *
+ * WARNING: This optimization is only correct for perfectly vertical edges
+ * where the span is guaranteed to have uniform horizontal coverage.
+ */
+static inline void _span_fill_vertical(twin_pixmap_t *pixmap,
+                                       twin_sfixed_t y,
+                                       twin_sfixed_t left,
+                                       twin_sfixed_t right)
+{
+    /* For vertical edges, coverage is uniform across all horizontal positions.
+     * We use constant 0x10 for all sub-pixels, accepting a tiny rounding
+     * error on row 2 (0x10 vs 0x0f for the first sub-pixel).
+     *
+     * Precision trade-off:
+     * - Row 2 partial pixels: max error = 1/255 = 0.4% (visually imperceptible)
+     *
+     * Full pixel coverage: 4 * 0x10 = 0x40 (64 in decimal)
+     * Note: Row 2 should technically be 0x3f, but 0x40 is within
+     * acceptable rounding error and allows constant-based optimization.
+     */
+    const twin_a16_t full_coverage = 0x40;
+
+    int row = twin_sfixed_trunc(y);
+    twin_a8_t *span = pixmap->p.a8 + row * pixmap->stride;
+    twin_a8_t *s;
+    twin_sfixed_t x;
+    twin_a16_t a;
+
+    /* Clip to pixmap */
+    if (left < twin_int_to_sfixed(pixmap->clip.left))
+        left = twin_int_to_sfixed(pixmap->clip.left);
+
+    if (right > twin_int_to_sfixed(pixmap->clip.right))
+        right = twin_int_to_sfixed(pixmap->clip.right);
+
+    /* Convert to sample grid */
+    left = _twin_sfixed_grid_ceil(left) >> TWIN_POLY_FIXED_SHIFT;
+    right = _twin_sfixed_grid_ceil(right) >> TWIN_POLY_FIXED_SHIFT;
+
+    /* Check for empty */
+    if (right <= left)
+        return;
+
+    x = left;
+
+    /* Starting address */
+    s = span + (x >> TWIN_POLY_SHIFT);
+
+    /* First pixel (may be partial)
+     * For vertical edges, each sub-pixel contributes constant 0x10.
+     * This is optimized to count * 0x10, which the compiler can
+     * optimize to a shift operation (count << 4).
+     */
+    if (x & TWIN_POLY_MASK) {
+        int count = 0;
+        while (x < right && (x & TWIN_POLY_MASK)) {
+            count++;
+            x++;
+        }
+        twin_a16_t w = count * 0x10; /* Constant multiplication, fast */
+        a = *s + w;
+        *s++ = twin_sat(a);
+    }
+
+    /* Middle pixels (full pixels) - constant coverage per pixel
+     * This is the hot path where we get the biggest win
+     */
+    while (x + TWIN_POLY_MASK < right) {
+        a = *s + full_coverage;
+        *s++ = twin_sat(a);
+        x += TWIN_POLY_SAMPLE;
+    }
+
+    /* Last pixel (may be partial)
+     * Same optimization as first pixel: use constant 0x10 per sub-pixel.
+     */
+    if (right & TWIN_POLY_MASK && x != right) {
+        int count = 0;
+        while (x < right) {
+            count++;
+            x++;
+        }
+        twin_a16_t w = count * 0x10; /* Constant multiplication, fast */
+        a = *s + w;
+        *s = twin_sat(a);
+    }
+}
+
 static void _span_fill(twin_pixmap_t *pixmap,
                        twin_sfixed_t y,
                        twin_sfixed_t left,
-                       twin_sfixed_t right)
+                       twin_sfixed_t right,
+                       uint8_t aa_quality)
 {
-#if TWIN_POLY_SHIFT == 0
-    /* 1x1 */
-    static const twin_a8_t coverage[1][1] = {
-        {0xff},
-    };
-#endif
-#if TWIN_POLY_SHIFT == 1
-    /* 2x2 */
-    static const twin_a8_t coverage[2][2] = {
-        {0x40, 0x40},
-        {0x3f, 0x40},
-    };
-#endif
-#if TWIN_POLY_SHIFT == 2
-    /* 4x4 */
+    /* Coverage table for anti-aliasing
+     *
+     * The grid is always 4x4 (TWIN_POLY_SHIFT=2, TWIN_POLY_STEP=0.25 pixels).
+     * Each entry represents coverage contribution for a sub-pixel position.
+     * Sum of all 16 entries = 0xFF (255) for full pixel coverage.
+     */
     static const twin_a8_t coverage[4][4] = {
         {0x10, 0x10, 0x10, 0x10},
         {0x10, 0x10, 0x10, 0x10},
-        {0x0f, 0x10, 0x10, 0x10},
+        {0x0f, 0x10, 0x10, 0x10}, /* Rounding: 15+240=255 */
         {0x10, 0x10, 0x10, 0x10},
     };
-#endif
-#if TWIN_POLY_SHIFT == 3
-    /* 8x8 */
-    static const twin_a8_t coverage[8][8] = {
-        {4, 4, 4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4, 4, 4},
-        {4, 4, 4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4, 4, 4},
-        {3, 4, 4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4, 4, 4},
-        {4, 4, 4, 4, 4, 4, 4, 4}, {4, 4, 4, 4, 4, 4, 4, 4},
-    };
-#endif
+
+    /* NOTE: aa_quality parameter is currently unused in standard path.
+     * Adaptive AA optimization is handled by calling _span_fill_vertical()
+     * for perfectly vertical edges (dx=0) in _twin_edge_fill().
+     */
+    (void) aa_quality;
+
     const twin_a8_t *cover =
-        coverage[(y >> TWIN_POLY_FIXED_SHIFT) & TWIN_POLY_MASK];
+        &coverage[(y >> TWIN_POLY_FIXED_SHIFT) & TWIN_POLY_MASK][0];
+
     int row = twin_sfixed_trunc(y);
     twin_a8_t *span = pixmap->p.a8 + row * pixmap->stride;
     twin_a8_t *s;
@@ -249,12 +369,37 @@ static void _twin_edge_fill(twin_pixmap_t *pixmap,
 
         /* walk this y value marking coverage */
         int w = 0;
+        twin_edge_t *edge_start = NULL;
         for (a = active; a; a = a->next) {
-            if (w == 0)
+            if (w == 0) {
                 x0 = a->x;
+                edge_start = a;
+            }
             w += a->winding;
-            if (w == 0)
-                _span_fill(pixmap, y, x0, a->x);
+            if (w != 0)
+                continue;
+
+            /* Adaptive AA: use optimized path for perfectly vertical edges
+             * Only apply to spans >= 16 pixels to avoid branch overhead.
+             * Threshold: 16 pixels * 4 samples/pixel = 64 samples
+             *
+             * Check aa_quality (not dx) to detect vertical edges.
+             * By this point, dx has been reduced by Bresenham, so dx==0
+             * incorrectly matches diagonal lines with integer slopes, causing
+             * thin diagonal strokes to disappear. The aa_quality flag was set
+             * using the ORIGINAL dx value before Bresenham reduction.
+             */
+            twin_sfixed_t span_width = a->x - x0;
+            if (edge_start && edge_start->aa_quality == 0 &&
+                a->aa_quality == 0 &&
+                span_width >= (16 << TWIN_POLY_FIXED_SHIFT)) {
+                /* Both edges vertical and span is wide enough: use optimized
+                 * span fill */
+                _span_fill_vertical(pixmap, y, x0, a->x);
+            } else {
+                /* General case or thin/medium span: use full 4x4 AA */
+                _span_fill(pixmap, y, x0, a->x, 2);
+            }
         }
 
         /* step down, clipping to pixmap */

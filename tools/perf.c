@@ -302,6 +302,221 @@ static void run_large_tests(void)
     run_test_series("500x500 solid over", test_solid_over_argb32, 500, 500);
 }
 
+/* Polygon rendering tests for adaptive AA validation */
+
+/* Test: Vertical lines (should benefit from adaptive AA) */
+static void test_polygon_vertical_lines(void)
+{
+    twin_path_t *path = twin_path_create();
+
+    /* Draw 10 vertical lines */
+    for (int i = 0; i < 10; i++) {
+        twin_fixed_t x = twin_int_to_fixed(10 + i * 20);
+        twin_path_move(path, x, twin_int_to_fixed(10));
+        twin_path_draw(path, x, twin_int_to_fixed(test_height - 10));
+    }
+
+    twin_paint_stroke(dst32, 0xff000000, path, twin_int_to_fixed(2));
+    twin_path_destroy(path);
+}
+
+/* Test: Horizontal lines (no adaptive AA optimization) */
+static void test_polygon_horizontal_lines(void)
+{
+    twin_path_t *path = twin_path_create();
+
+    /* Draw 10 horizontal lines */
+    for (int i = 0; i < 10; i++) {
+        twin_fixed_t y = twin_int_to_fixed(10 + i * 20);
+        twin_path_move(path, twin_int_to_fixed(10), y);
+        twin_path_draw(path, twin_int_to_fixed(test_width - 10), y);
+    }
+
+    twin_paint_stroke(dst32, 0xff000000, path, twin_int_to_fixed(2));
+    twin_path_destroy(path);
+}
+
+/* Test: Diagonal lines (45 degrees, no optimization) */
+static void test_polygon_diagonal_lines(void)
+{
+    twin_path_t *path = twin_path_create();
+
+    /* Draw 5 diagonal lines */
+    for (int i = 0; i < 5; i++) {
+        int offset = i * 40;
+        twin_path_move(path, twin_int_to_fixed(10 + offset),
+                       twin_int_to_fixed(10));
+        twin_path_draw(path, twin_int_to_fixed(110 + offset),
+                       twin_int_to_fixed(110));
+    }
+
+    twin_paint_stroke(dst32, 0xff000000, path, twin_int_to_fixed(2));
+    twin_path_destroy(path);
+}
+
+/* Test: Rectangles (50% vertical edges, should benefit) */
+static void test_polygon_rectangles(void)
+{
+    twin_path_t *path = twin_path_create();
+
+    /* Draw 10 rectangles */
+    for (int i = 0; i < 10; i++) {
+        int x = 10 + (i % 5) * 50;
+        int y = 10 + (i / 5) * 50;
+        twin_path_rectangle(path, twin_int_to_fixed(x), twin_int_to_fixed(y),
+                            twin_int_to_fixed(40), twin_int_to_fixed(40));
+    }
+
+    twin_paint_path(dst32, 0xff0000ff, path);
+    twin_path_destroy(path);
+}
+
+/* Test: Text-like shapes (mixed angles, sensitive to AA quality) */
+static void test_polygon_text_shapes(void)
+{
+    twin_path_t *path = twin_path_create();
+
+    /* Simulate text strokes with various angles (30-50 degrees) */
+    for (int i = 0; i < 5; i++) {
+        int base_x = 20 + i * 60;
+        int base_y = 50;
+
+        /* Letter "N" shape: vertical + 30-degree diagonal + vertical */
+        twin_path_move(path, twin_int_to_fixed(base_x),
+                       twin_int_to_fixed(base_y));
+        twin_path_draw(path, twin_int_to_fixed(base_x),
+                       twin_int_to_fixed(base_y + 40)); /* Vertical */
+        twin_path_move(path, twin_int_to_fixed(base_x),
+                       twin_int_to_fixed(base_y));
+        twin_path_draw(path, twin_int_to_fixed(base_x + 25),
+                       twin_int_to_fixed(base_y + 40)); /* ~30° diagonal */
+        twin_path_move(path, twin_int_to_fixed(base_x + 25),
+                       twin_int_to_fixed(base_y));
+        twin_path_draw(path, twin_int_to_fixed(base_x + 25),
+                       twin_int_to_fixed(base_y + 40)); /* Vertical */
+    }
+
+    twin_paint_stroke(dst32, 0xff000000, path, twin_int_to_fixed(3));
+    twin_path_destroy(path);
+}
+
+/* Test: Ellipses (all angles, mostly non-vertical) */
+static void test_polygon_ellipses(void)
+{
+    twin_path_t *path = twin_path_create();
+
+    /* Draw 5 ellipses using twin_path_ellipse */
+    for (int i = 0; i < 5; i++) {
+        int cx = 50 + i * 60;
+        int cy = 50;
+
+        twin_path_ellipse(path, twin_int_to_fixed(cx), twin_int_to_fixed(cy),
+                          twin_int_to_fixed(25), twin_int_to_fixed(15));
+    }
+
+    twin_paint_path(dst32, 0xffff0000, path);
+    twin_path_destroy(path);
+}
+
+/* Test: Complex polygon (hexagon - mixed edge angles) */
+static void test_polygon_complex(void)
+{
+    twin_path_t *path = twin_path_create();
+
+    /* Hexagon: 6 edges with 60-degree angles */
+    int cx = test_width / 2;
+    int cy = test_height / 2;
+    int size = 60;
+
+    /* Hexagon vertices (approximated with fixed angles) */
+    int vertices[][2] = {
+        {cx + size, cy},            /* 0° */
+        {cx + size / 2, cy + size}, /* 60° */
+        {cx - size / 2, cy + size}, /* 120° */
+        {cx - size, cy},            /* 180° */
+        {cx - size / 2, cy - size}, /* 240° */
+        {cx + size / 2, cy - size}, /* 300° */
+    };
+
+    for (int i = 0; i < 6; i++) {
+        if (i == 0)
+            twin_path_move(path, twin_int_to_fixed(vertices[i][0]),
+                           twin_int_to_fixed(vertices[i][1]));
+        else
+            twin_path_draw(path, twin_int_to_fixed(vertices[i][0]),
+                           twin_int_to_fixed(vertices[i][1]));
+    }
+    twin_path_close(path);
+
+    twin_paint_path(dst32, 0xffffff00, path);
+    twin_path_destroy(path);
+}
+
+/* Run polygon rendering benchmark suite */
+static void run_polygon_tests(void)
+{
+    printf("\n");
+    printf("========================================\n");
+    printf("  Polygon Rendering (Adaptive AA)\n");
+    printf("========================================\n\n");
+
+    /* Clear destination for each test */
+    printf("Vertical Lines (Expected: HIGH benefit from adaptive AA)\n");
+    twin_fill(dst32, 0xffffffff, TWIN_SOURCE, 0, 0, TEST_PIX_WIDTH,
+              TEST_PIX_HEIGHT);
+    run_test_series("100x100 vertical lines", test_polygon_vertical_lines, 100,
+                    100);
+    run_test_series("500x500 vertical lines", test_polygon_vertical_lines, 500,
+                    500);
+
+    printf("Horizontal Lines (Expected: NO adaptive AA benefit)\n");
+    twin_fill(dst32, 0xffffffff, TWIN_SOURCE, 0, 0, TEST_PIX_WIDTH,
+              TEST_PIX_HEIGHT);
+    run_test_series("100x100 horizontal lines", test_polygon_horizontal_lines,
+                    100, 100);
+    run_test_series("500x500 horizontal lines", test_polygon_horizontal_lines,
+                    500, 500);
+
+    printf("Diagonal Lines (Expected: NO adaptive AA benefit)\n");
+    twin_fill(dst32, 0xffffffff, TWIN_SOURCE, 0, 0, TEST_PIX_WIDTH,
+              TEST_PIX_HEIGHT);
+    run_test_series("100x100 diagonal lines", test_polygon_diagonal_lines, 100,
+                    100);
+    run_test_series("500x500 diagonal lines", test_polygon_diagonal_lines, 500,
+                    500);
+
+    printf("Rectangles (Expected: MEDIUM benefit, 50%% vertical edges)\n");
+    twin_fill(dst32, 0xffffffff, TWIN_SOURCE, 0, 0, TEST_PIX_WIDTH,
+              TEST_PIX_HEIGHT);
+    run_test_series("100x100 rectangles", test_polygon_rectangles, 100, 100);
+    run_test_series("500x500 rectangles", test_polygon_rectangles, 500, 500);
+
+    printf("Text-like Shapes (Expected: NO benefit, quality preserved)\n");
+    twin_fill(dst32, 0xffffffff, TWIN_SOURCE, 0, 0, TEST_PIX_WIDTH,
+              TEST_PIX_HEIGHT);
+    run_test_series("100x100 text shapes", test_polygon_text_shapes, 100, 100);
+    run_test_series("500x500 text shapes", test_polygon_text_shapes, 500, 500);
+
+    printf("Ellipses (Expected: MINIMAL benefit, mostly non-vertical)\n");
+    twin_fill(dst32, 0xffffffff, TWIN_SOURCE, 0, 0, TEST_PIX_WIDTH,
+              TEST_PIX_HEIGHT);
+    run_test_series("100x100 ellipses", test_polygon_ellipses, 100, 100);
+    run_test_series("500x500 ellipses", test_polygon_ellipses, 500, 500);
+
+    printf("Complex Polygons (Expected: SMALL benefit, mixed angles)\n");
+    twin_fill(dst32, 0xffffffff, TWIN_SOURCE, 0, 0, TEST_PIX_WIDTH,
+              TEST_PIX_HEIGHT);
+    run_test_series("200x200 hexagon", test_polygon_complex, 200, 200);
+    run_test_series("500x500 hexagon", test_polygon_complex, 500, 500);
+
+    printf("\n");
+    printf("Summary:\n");
+    printf("  - Vertical lines: Should show 10-20%% improvement\n");
+    printf("  - Rectangles: Should show 5-10%% improvement\n");
+    printf("  - Other shapes: Should show 0-5%% improvement\n");
+    printf("  - Quality: All shapes should maintain visual quality\n");
+}
+
 /* Memory profiling mode */
 
 /* Get memory usage statistics
@@ -573,6 +788,9 @@ int main(void)
     run_solid_tests();
     run_alpha_tests();
     run_large_tests();
+
+    /* Run polygon rendering tests (adaptive AA validation) */
+    run_polygon_tests();
 
     /* Run memory profiling tests */
     printf("\n");

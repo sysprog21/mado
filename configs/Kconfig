@@ -68,6 +68,11 @@ config HAVE_CAIRO
     default n if CC_IS_EMCC
     def_bool $(shell,pkg-config --exists cairo && echo y || echo n) if !CC_IS_EMCC
 
+config HAVE_LIBRLOTTIE
+    bool
+    default y if CC_IS_EMCC
+    default $(shell,pkg-config --exists rlottie && echo y || echo n) if !CC_IS_EMCC
+
 choice
     prompt "Backend Selection"
     default BACKEND_WASM if CC_IS_EMCC
@@ -251,6 +256,13 @@ config LOADER_TVG
       Enable TinyVG vector graphics format support.
       Compact binary format for scalable graphics.
 
+config LOADER_LOTTIE
+    bool "Enable Lottie loader"
+    depends on HAVE_LIBRLOTTIE
+    default y
+    help
+      Enable Lottie graphics format support.
+
 endmenu
 
 menu "Demo Applications"
@@ -316,6 +328,14 @@ config DEMO_IMAGE
       Shows TinyVG format rendering capabilities.
       Automatically enables TVG loader.
       Demonstrates resolution-independent graphics.
+
+config DEMO_LOTTIE
+    bool "Build lottie demo"
+    select LOADER_LOTTIE
+    default y
+    depends on DEMO_APPLICATIONS
+    help
+      Shows lottie format rendering capabilities.
 
 endmenu
 

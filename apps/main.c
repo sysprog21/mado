@@ -17,6 +17,7 @@
 #include "apps_calc.h"
 #include "apps_clock.h"
 #include "apps_image.h"
+#include "apps_lottie.h"
 #include "apps_multi.h"
 #include "apps_spline.h"
 
@@ -100,9 +101,14 @@ static void init_demo_apps(twin_context_t *ctx)
 #endif
 #if defined(CONFIG_DEMO_ANIMATION)
     apps_animation_start(screen, "Viewer", ASSET_PATH "nyancat.gif", 20, 20);
+    apps_animation_start(screen, "Lottie Animation API", ASSET_PATH "nyancat.json", 20, 20);
 #endif
 #if defined(CONFIG_DEMO_IMAGE)
     apps_image_start(screen, "Viewer", 20, 20);
+#endif
+#if defined(CONFIG_DEMO_LOTTIE)
+    apps_lottie_start(screen, "Lottie Viewer(JSON)", ASSET_PATH "nyancat.json", 20, 20);
+    apps_lottie_start(screen, "Lottie Viewer(dotLottie)", ASSET_PATH "nyancat.lottie", 20, 20);
 #endif
     twin_screen_set_active(screen, screen->top);
 }

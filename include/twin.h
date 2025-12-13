@@ -1521,12 +1521,6 @@ mado_lottie_image_t *mado_lottie_from_file(const char *path,
                                            size_t width,
                                            size_t height);
 
-mado_lottie_image_t *mado_lottie_from_data(const char *data,
-                                           const char *key,
-                                           const char *resource_path,
-                                           size_t width,
-                                           size_t height);
-
 void mado_lottie_destroy(mado_lottie_image_t *lottie);
 
 /*

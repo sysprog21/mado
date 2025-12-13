@@ -133,6 +133,20 @@ ifeq ($(CONFIG_LOADER_TVG), y)
 libtwin.a_files-y += src/image-tvg.c
 endif
 
+ifeq ($(CONFIG_LOADER_LOTTIE), y)
+libtwin.a_files-y += src/image-lottie.c
+ifneq ($(CC_IS_EMCC), 1)
+libtwin.a_cflags-y += $(call dep,cflags,rlottie)
+libtwin.a_cflags-y += $(call dep,cflags,libzip)
+TARGET_LIBS += $(call dep,libs,rlottie)
+TARGET_LIBS += $(call dep,libs,libzip)
+else
+# Emscripten rlottie port (includes zlib) - flags needed for both compile and link
+libtwin.a_cflags-y += -sUSE_RLOTTIE=1 -sUSE_ZLIB=1
+TARGET_LIBS += -sUSE_RLOTTIE=1 -sUSE_ZLIB=1
+endif
+endif
+
 # Applications
 
 libapps.a_files-y := apps/dummy.c
@@ -142,6 +156,7 @@ libapps.a_files-$(CONFIG_DEMO_CALCULATOR) += apps/calc.c
 libapps.a_files-$(CONFIG_DEMO_SPLINE) += apps/spline.c
 libapps.a_files-$(CONFIG_DEMO_ANIMATION) += apps/animation.c
 libapps.a_files-$(CONFIG_DEMO_IMAGE) += apps/image.c
+libapps.a_files-$(CONFIG_DEMO_LOTTIE) += apps/lottie.c
 
 libapps.a_includes-y := include
 # Emscripten size optimization
@@ -268,7 +283,6 @@ endif
 # Build system integration
 
 CFLAGS += -include config.h
-
 # Ensure composite-decls.h exists before including build rules
 # (needed for dependency generation in mk/common.mk)
 ifeq ($(filter config defconfig clean,$(MAKECMDGOALS)),)

@@ -9,14 +9,14 @@
 
 twin_time_t twin_animation_get_current_delay(const twin_animation_t *anim)
 {
-    if (!anim)
+    if (!anim || !anim->iter)
         return 0;
     return anim->iter->current_delay;
 }
 
 twin_pixmap_t *twin_animation_get_current_frame(const twin_animation_t *anim)
 {
-    if (!anim)
+    if (!anim || !anim->iter)
         return NULL;
     return anim->iter->current_frame;
 }
@@ -25,6 +25,14 @@ void twin_animation_advance_frame(twin_animation_t *anim)
 {
     if (!anim)
         return;
+
+    /* Lottie needs on-demand rendering */
+    if (twin_animation_is_lottie(anim)) {
+        twin_lottie_advance_frame(anim);
+        return;
+    }
+
+    /* Standard GIF-style animation */
     twin_animation_iter_advance(anim->iter);
 }
 
@@ -32,6 +40,12 @@ void twin_animation_destroy(twin_animation_t *anim)
 {
     if (!anim)
         return;
+
+    /* Lottie has special cleanup */
+    if (twin_animation_is_lottie(anim)) {
+        twin_lottie_animation_destroy(anim);
+        return;
+    }
 
     free(anim->iter);
     for (twin_count_t i = 0; i < anim->n_frames; i++) {

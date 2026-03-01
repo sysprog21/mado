@@ -69,7 +69,7 @@ relies on certain third-party packages for full functionality and access to all
 its features. We encourage the development environment to be installed with all optional
 packages, including [libjpeg](https://www.ijg.org/) and [libpng](https://github.com/pnggroup/libpng).
 * macOS: `brew install jpeg libpng`
-* Ubuntu Linux / Debian: `sudo apt install libjpeg-dev libpng-dev`
+* Ubuntu Linux / Debian: `sudo apt install libjpeg-dev libpng-dev librlottie-dev libzip-dev`
 
 The renderer implementation can either use the built-in pixel manipulation or be based on [Pixman](https://pixman.org/).
 The built-in renderer is simple and performs adequately on platforms without SIMD instructions,

@@ -25,6 +25,10 @@
 #define CONFIG_LOADER_TVG 0
 #endif
 
+#if !defined(CONFIG_LOADER_LOTTIE)
+#define CONFIG_LOADER_LOTTIE 0
+#endif
+
 /* Feature test macro */
 #define LOADER_HAS(x) CONFIG_LOADER_##x
 
@@ -41,6 +45,9 @@
     )                           \
     IIF(LOADER_HAS(TVG))(       \
         _(tvg)                  \
+    )                           \
+    IIF(LOADER_HAS(LOTTIE))(    \
+        _(lottie)               \
     )
 /* clang-format on */
 
@@ -63,6 +70,8 @@ typedef enum {
  *   https://www.file-recovery.com/gif-signature-format.htm
  * - TinyVG:
  *   https://tinyvg.tech/download/specification.pdf
+ * - Lottie:
+ *   JSON format - starts with '{' and contains "v" version key
  */
 static const uint8_t header_png[8] = {
     0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
@@ -70,6 +79,34 @@ static const uint8_t header_png[8] = {
 static const uint8_t header_jpeg[3] = {0xFF, 0xD8, 0xFF};
 static const uint8_t header_gif[4] = {0x47, 0x49, 0x46, 0x38};
 static const uint8_t header_tvg[2] = {0x72, 0x56};
+/* ZIP magic for dotLottie detection */
+static const uint8_t header_zip[4] = {0x50, 0x4B, 0x03, 0x04};
+
+#if LOADER_HAS(LOTTIE)
+/**
+ * Check if the file content looks like a Lottie JSON file.
+ */
+static bool is_lottie_json(const uint8_t *header, size_t len)
+{
+    /* Skip leading whitespace */
+    size_t i = 0;
+    while (i < len && (header[i] == ' ' || header[i] == '\t' ||
+                       header[i] == '\n' || header[i] == '\r')) {
+        i++;
+    }
+
+    /* Must start with '{' */
+    if (i >= len || header[i] != '{')
+        return false;
+
+    /* Look for "v" key which indicates Lottie version */
+    const char *str = (const char *)header;
+    if (strstr(str, "\"v\"") || strstr(str, "\"v\":"))
+        return true;
+
+    return false;
+}
+#endif
 
 static twin_image_format_t image_type_detect(const char *path)
 {
@@ -104,6 +141,11 @@ static twin_image_format_t image_type_detect(const char *path)
 #if LOADER_HAS(TVG)
     else if (!memcmp(header, header_tvg, sizeof(header_tvg))) {
         type = IMAGE_TYPE_tvg;
+    }
+#endif
+#if LOADER_HAS(LOTTIE)
+    else if (!memcmp(header, header_zip, sizeof(header_zip)) || is_lottie_json(header, bytes_read)) {
+        return IMAGE_TYPE_lottie;
     }
 #endif
 

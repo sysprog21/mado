@@ -1507,6 +1507,65 @@ void twin_custom_widget_queue_paint(twin_custom_widget_t *custom);
 /** Get the drawing pixmap for a custom widget */
 twin_pixmap_t *twin_custom_widget_pixmap(twin_custom_widget_t *custom);
 
+/*
+ * image-lottie.c
+ */
+
+/* Lottie image context (opaque type) */
+typedef struct _mado_lottie_image mado_lottie_image_t;
+
+/*
+ * Lottie image creation
+ */
+mado_lottie_image_t *mado_lottie_from_file(const char *path,
+                                           size_t width,
+                                           size_t height);
+
+void mado_lottie_destroy(mado_lottie_image_t *lottie);
+
+/*
+ * Lottie rendering
+ */
+void mado_lottie_render(mado_lottie_image_t *lottie);
+
+void mado_lottie_render_to_pixmap(mado_lottie_image_t *lottie,
+                                  twin_pixmap_t *pixmap);
+
+uint32_t *mado_lottie_get_buffer(const mado_lottie_image_t *lottie);
+
+/*
+ * Lottie animation control
+ */
+bool mado_lottie_advance_frame(mado_lottie_image_t *lottie);
+/*
+ * Lottie control API - defined in image-lottie.c
+ */
+/* Query functions */
+bool mado_lottie_is_playing(const mado_lottie_image_t *lottie);
+bool mado_lottie_is_looping(const mado_lottie_image_t *lottie);
+twin_time_t mado_lottie_get_frame_delay(const mado_lottie_image_t *lottie);
+
+/* Control functions */
+void mado_lottie_set_progress(mado_lottie_image_t *lottie, float progress);
+void mado_lottie_set_playback(mado_lottie_image_t *lottie, bool playing);
+void mado_lottie_set_loop(mado_lottie_image_t *lottie, bool loop);
+
+/* Animation integration */
+bool twin_animation_is_lottie(const twin_animation_t *anim);
+mado_lottie_image_t *twin_animation_get_lottie(twin_animation_t *anim);
+
+/*
+ * Lottie pixmap loader (parallel to twin_tvg_to_pixmap_scale)
+ */
+twin_pixmap_t *twin_lottie_to_pixmap_scale(const char *filepath,
+                                           twin_format_t fmt,
+                                           twin_coord_t w,
+                                           twin_coord_t h);
+
+bool twin_animation_is_lottie(const twin_animation_t *anim);
+void twin_lottie_advance_frame(twin_animation_t *anim);
+void twin_lottie_animation_destroy(twin_animation_t *anim);
+
 /**
  * Create window with decorations and event handling
  * @screen : Screen to display window on

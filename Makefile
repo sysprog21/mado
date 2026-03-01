@@ -271,7 +271,7 @@ CFLAGS += -include config.h
 
 # Ensure composite-decls.h exists before including build rules
 # (needed for dependency generation in mk/common.mk)
-ifeq ($(filter config defconfig clean,$(MAKECMDGOALS)),)
+ifeq ($(filter config defconfig clean distclean,$(MAKECMDGOALS)),)
     ifeq ($(wildcard src/composite-decls.h),)
         $(shell scripts/gen-composite-decls.py > src/composite-decls.h)
     endif
@@ -287,14 +287,11 @@ else ifeq ($(check_goal),)
 endif
 # Otherwise, only config/defconfig targets - skip mk/common.mk
 
+KCONFIGLIB_REPO := https://github.com/sysprog21/Kconfiglib
 KCONFIGLIB := tools/kconfig/kconfiglib.py
 $(KCONFIGLIB):
-	@if [ -d .git ]; then \
-	    git submodule update --init tools/kconfig; \
-	else \
-	    echo "Error: Kconfig tools not found"; \
-	    exit 1; \
-	fi
+	$(RM) -r tools/kconfig
+	git clone --depth=1 $(KCONFIGLIB_REPO) tools/kconfig
 
 # Load default configuration
 .PHONY: defconfig
@@ -307,6 +304,11 @@ defconfig: $(KCONFIGLIB)
 config: $(KCONFIGLIB) configs/Kconfig
 	@tools/kconfig/menuconfig.py configs/Kconfig
 	@tools/kconfig/genconfig.py configs/Kconfig
+
+# Remove Kconfiglib and build artifacts
+.PHONY: distclean
+distclean: clean
+	$(RM) -r tools/kconfig
 
 # WebAssembly post-build: Copy artifacts to assets/web/
 .PHONY: wasm-install

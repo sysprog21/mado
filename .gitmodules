@@ -1,3 +1,0 @@
-[submodule "tools/kconfig"]
-	path = tools/kconfig
-	url = https://github.com/sysprog21/Kconfiglib

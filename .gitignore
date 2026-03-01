@@ -28,6 +28,9 @@ tags
 __pycache__/
 *.pyc
 
+# Kconfiglib (cloned on demand via 'make config')
+tools/kconfig/
+
 # Configuration
 .config*
 config.h

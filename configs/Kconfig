@@ -9,20 +9,20 @@ menu "Toolchain Configuration"
 # Compiler detection using scripts/detect-compiler.py
 config COMPILER_TYPE
     string
-    default "$(shell,scripts/detect-compiler.py 2>/dev/null || echo Unknown)"
+    default "$(shell,python3 scripts/detect-compiler.py 2>/dev/null || echo Unknown)"
 
 config CC_IS_EMCC
-    def_bool $(shell,scripts/detect-compiler.py --is Emscripten 2>/dev/null && echo y || echo n)
+    def_bool $(python,assert run(sys.executable, 'scripts/detect-compiler.py', '--is', 'Emscripten'))
 
 config CC_IS_CLANG
-    def_bool $(shell,scripts/detect-compiler.py --is Clang 2>/dev/null && echo y || echo n)
+    def_bool $(python,assert run(sys.executable, 'scripts/detect-compiler.py', '--is', 'Clang'))
 
 config CC_IS_GCC
-    def_bool $(shell,scripts/detect-compiler.py --is GCC 2>/dev/null && echo y || echo n)
+    def_bool $(python,assert run(sys.executable, 'scripts/detect-compiler.py', '--is', 'GCC'))
 
 # Cross-compilation support detection
 config CROSS_COMPILE_ENABLED
-    def_bool $(shell,test -n "$(CROSS_COMPILE)" && echo y || echo n)
+    def_bool $(python,assert os.environ.get('CROSS_COMPILE'))
 
 config CROSS_COMPILE_PREFIX
     string
@@ -41,32 +41,32 @@ comment "Build mode: Native"
 
 endmenu
 
-# Dependency detection using Kconfiglib shell function
+# Dependency detection using Kconfiglib $(python,...) preprocessor function
 # For Emscripten builds, libraries are provided via ports system (-sUSE_*)
 # and do not require host pkg-config detection
 
 config HAVE_SDL2
     bool
     default n if CC_IS_EMCC
-    default $(shell,pkg-config --exists sdl2 && echo y || echo n) if !CC_IS_EMCC
+    default $(python,assert run('pkg-config', '--exists', 'sdl2')) if !CC_IS_EMCC
 
 config HAVE_PIXMAN
     default n if CC_IS_EMCC
-    def_bool $(shell,pkg-config --exists pixman-1 && echo y || echo n) if !CC_IS_EMCC
+    def_bool $(python,assert run('pkg-config', '--exists', 'pixman-1')) if !CC_IS_EMCC
 
 config HAVE_LIBPNG
     bool
     default y if CC_IS_EMCC
-    default $(shell,pkg-config --exists libpng && echo y || echo n) if !CC_IS_EMCC
+    default $(python,assert run('pkg-config', '--exists', 'libpng')) if !CC_IS_EMCC
 
 config HAVE_LIBJPEG
     bool
     default y if CC_IS_EMCC
-    default $(shell,pkg-config --exists libjpeg && echo y || echo n) if !CC_IS_EMCC
+    default $(python,assert run('pkg-config', '--exists', 'libjpeg')) if !CC_IS_EMCC
 
 config HAVE_CAIRO
     default n if CC_IS_EMCC
-    def_bool $(shell,pkg-config --exists cairo && echo y || echo n) if !CC_IS_EMCC
+    def_bool $(python,assert run('pkg-config', '--exists', 'cairo')) if !CC_IS_EMCC
 
 choice
     prompt "Backend Selection"

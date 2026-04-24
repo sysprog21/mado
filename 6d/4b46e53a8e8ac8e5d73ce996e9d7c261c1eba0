@@ -1,0 +1,36 @@
+tools/headless-ctl.c
+  b4de515cfe7530ed 89-90,92-93,95-97,124,126-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "6d4b46e53a8e8ac8e5d73ce996e9d7c261c1eba0",
+  "prompts": {
+    "b083845704bbdbfa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef87b612-41d5-48a4-b52b-a300f07536c1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Jim Huang",
+      "messages": [],
+      "total_additions": 31,
+      "total_deletions": 57,
+      "accepted_lines": 42,
+      "overriden_lines": 0
+    },
+    "b4de515cfe7530ed": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfb7aeb-723c-473b-9665-8379bac937a4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Jim Huang",
+      "messages": [],
+      "total_additions": 16,
+      "total_deletions": 18,
+      "accepted_lines": 480,
+      "overriden_lines": 0
+    }
+  }
+}

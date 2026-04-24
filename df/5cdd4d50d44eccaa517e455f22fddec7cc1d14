@@ -1,0 +1,29 @@
+apps/image.c
+  61eaa1a50f6845a4 65-66
+configs/Kconfig
+  61eaa1a50f6845a4 266
+src/image-tvg.c
+  61eaa1a50f6845a4 33-38,1341-1346
+src/pixmap.c
+  61eaa1a50f6845a4 29-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "df5cdd4d50d44eccaa517e455f22fddec7cc1d14",
+  "prompts": {
+    "61eaa1a50f6845a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8010c330-a239-4dfd-838b-e814b074b27c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Jim Huang",
+      "messages": [],
+      "total_additions": 27,
+      "total_deletions": 9,
+      "accepted_lines": 513,
+      "overriden_lines": 0
+    }
+  }
+}

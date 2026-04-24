@@ -87,13 +87,22 @@ static int save_png(const char *filename,
     if (width <= 0 || height <= 0)
         return -1;
 
-    /* Guard against integer overflow in raw_size calculation.
-     * row_size = 1 + width*4, raw_size = height * row_size.
-     * Also ensure idat_size fits in a 32-bit PNG chunk length.
+    /* Guard against integer overflow in size calculations.
+     * Check each multiplication step before it executes, so wrapped
+     * results never feed into downstream arithmetic.
      */
+    if ((size_t) width > (SIZE_MAX - 1) / 4)
+        return -1;
     size_t row_size = 1 + (size_t) width * 4;
+    if ((size_t) height > SIZE_MAX / row_size)
+        return -1;
     size_t raw_sz = (size_t) height * row_size;
-    if (raw_sz / row_size != (size_t) height || raw_sz > UINT32_MAX)
+    /* Uncompressed DEFLATE: 2 (zlib hdr) + 5 per block + raw + 4 (adler).
+     * Ensure the total fits in a 32-bit PNG chunk length field.
+     */
+    size_t nblocks = (raw_sz + 65534) / 65535;
+    size_t idat_bound = 2 + nblocks * 5 + raw_sz + 4;
+    if (idat_bound > UINT32_MAX)
         return -1;
 
     FILE *fp = fopen(filename, "wb");
@@ -137,13 +146,9 @@ static int save_png(const char *filename,
     crc = crc32(crc, ihdr, 13);
     PUT_U32(crc);
 
-    /* Write IDAT chunk (raw_sz validated above) */
+    /* Write IDAT chunk (sizes validated above) */
     size_t raw_size = raw_sz;
-    /* Uncompressed DEFLATE: 5-byte header per 65535-byte block + 2 zlib +
-     * 4 adler
-     */
-    size_t nblocks = (raw_size + 65534) / 65535;
-    size_t max_deflate_size = 2 + nblocks * 5 + raw_size + 4;
+    size_t max_deflate_size = idat_bound;
 
     uint8_t *idat = malloc(max_deflate_size);
     if (!idat) {

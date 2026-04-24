@@ -233,6 +233,8 @@ static void _twin_edge_fill(twin_pixmap_t *pixmap,
     twin_edge_t *active, *a, *n, **prev;
     twin_sfixed_t x0 = 0;
 
+    if (nedges <= 0)
+        return;
     qsort(edges, nedges, sizeof(twin_edge_t), _edge_compare_y);
     int e = 0;
     twin_sfixed_t y = edges[0].top;
@@ -295,15 +297,27 @@ static void _twin_edge_fill(twin_pixmap_t *pixmap,
 void twin_fill_path(twin_pixmap_t *pixmap,
                     twin_path_t *path,
                     twin_coord_t dx,
-                    twin_coord_t dy)
+                    twin_coord_t dy,
+                    twin_scratch_t *scratch)
 {
     twin_sfixed_t sdx = twin_int_to_sfixed(dx + pixmap->origin_x);
     twin_sfixed_t sdy = twin_int_to_sfixed(dy + pixmap->origin_y);
 
     int nalloc = path->npoints + path->nsublen + 1;
-    twin_edge_t *edges = malloc(sizeof(twin_edge_t) * nalloc);
-    if (!edges)
-        return;
+    size_t edge_bytes = sizeof(twin_edge_t) * nalloc;
+    bool from_scratch = false;
+    twin_edge_t *edges = NULL;
+
+    if (scratch)
+        edges = twin_scratch_alloc(scratch, edge_bytes, _Alignof(twin_edge_t));
+    if (edges) {
+        from_scratch = true;
+    } else {
+        edges = twin_malloc(edge_bytes);
+        if (!edges)
+            return;
+    }
+
     int p = 0;
     int nedges = 0;
     for (int s = 0; s <= path->nsublen; s++) {
@@ -322,5 +336,6 @@ void twin_fill_path(twin_pixmap_t *pixmap,
         }
     }
     _twin_edge_fill(pixmap, edges, nedges);
-    free(edges);
+    if (!from_scratch)
+        twin_free(edges);
 }

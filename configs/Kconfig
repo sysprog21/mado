@@ -171,6 +171,15 @@ config LOGGING_CALLBACK
       Allow custom callback functions for log handling.
       Enables application-specific log processing.
 
+config MEMORY_STATS
+    bool "Enable memory usage tracking"
+    default y
+    help
+      Track heap allocation statistics including current usage,
+      peak usage, and allocation counts. Adds small overhead per
+      malloc/free call. Useful for profiling memory consumption
+      on constrained devices.
+
 comment "Logging is disabled"
     depends on !LOGGING
 
@@ -250,6 +259,17 @@ config LOADER_TVG
     help
       Enable TinyVG vector graphics format support.
       Compact binary format for scalable graphics.
+
+config TVG_MEMORY_BUDGET
+    int "TVG rendering memory budget (KB)"
+    default 0
+    range 0 32768
+    depends on LOADER_TVG
+    help
+      Maximum memory in kilobytes for a single TVG pixmap.
+      The renderer auto-scales the output to fit within this
+      budget while preserving aspect ratio.
+      Set to 0 for unlimited (use native document dimensions).
 
 endmenu
 

@@ -57,7 +57,25 @@ void twin_destroy(twin_context_t *ctx)
 
     assert(g_twin_backend.exit && "Backend not registered");
 
+    /* Screen teardown may emit damage callbacks through backend-owned closure.
+     */
+    if (ctx->screen) {
+        twin_screen_destroy(ctx->screen);
+        ctx->screen = NULL;
+    }
+
+    /* Backend frees its private data and ctx */
     g_twin_backend.exit(ctx);
+
+    /* Report memory statistics after all teardown */
+    twin_memory_info_t mem;
+    twin_memory_get_info(&mem);
+    if (mem.peak_bytes)
+        log_info(
+            "Memory: current %zu bytes, peak %zu bytes, "
+            "allocs %zu, frees %zu",
+            mem.current_bytes, mem.peak_bytes, mem.total_allocs,
+            mem.total_frees);
 }
 
 /**

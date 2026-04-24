@@ -110,7 +110,7 @@ twin_button_t *twin_button_create(twin_box_t *parent,
                                   twin_fixed_t font_size,
                                   twin_style_t font_style)
 {
-    twin_button_t *button = malloc(sizeof(twin_button_t));
+    twin_button_t *button = twin_malloc(sizeof(twin_button_t));
     if (!button)
         return NULL;
 

@@ -227,7 +227,7 @@ twin_widget_t *twin_widget_create(twin_box_t *parent,
                                   twin_stretch_t stretch_width,
                                   twin_stretch_t stretch_height)
 {
-    twin_widget_t *widget = malloc(sizeof(twin_widget_t));
+    twin_widget_t *widget = twin_malloc(sizeof(twin_widget_t));
     if (!widget)
         return NULL;
 
@@ -271,7 +271,7 @@ twin_widget_t *twin_widget_create_with_handler(twin_box_t *parent,
                                                twin_stretch_t stretch_height,
                                                twin_widget_proc_t handler)
 {
-    twin_widget_t *widget = malloc(sizeof(twin_widget_t));
+    twin_widget_t *widget = twin_malloc(sizeof(twin_widget_t));
     if (!widget)
         return NULL;
 
@@ -300,7 +300,7 @@ static void register_custom_widget(twin_widget_t *widget,
                                    twin_custom_widget_t *custom,
                                    twin_widget_proc_t user_dispatch)
 {
-    custom_widget_map_t *entry = malloc(sizeof(custom_widget_map_t));
+    custom_widget_map_t *entry = twin_malloc(sizeof(custom_widget_map_t));
     if (!entry)
         return;
     entry->widget = widget;
@@ -332,7 +332,7 @@ static void unregister_custom_widget(twin_widget_t *widget)
     while (entry) {
         if (entry->widget == widget) {
             *prev = entry->next;
-            free(entry);
+            twin_free(entry);
             return;
         }
         prev = &entry->next;
@@ -392,14 +392,14 @@ twin_custom_widget_t *twin_custom_widget_create(twin_box_t *parent,
                                                 twin_widget_proc_t handler,
                                                 size_t data_size)
 {
-    twin_custom_widget_t *custom = malloc(sizeof(twin_custom_widget_t));
+    twin_custom_widget_t *custom = twin_malloc(sizeof(twin_custom_widget_t));
     if (!custom)
         return NULL;
 
     if (data_size > 0) {
-        custom->data = malloc(data_size);
+        custom->data = twin_malloc(data_size);
         if (!custom->data) {
-            free(custom);
+            twin_free(custom);
             return NULL;
         }
         memset(custom->data, 0, data_size);
@@ -411,8 +411,8 @@ twin_custom_widget_t *twin_custom_widget_create(twin_box_t *parent,
                                                      height, hstretch, vstretch,
                                                      custom_widget_dispatch);
     if (!custom->widget) {
-        free(custom->data);
-        free(custom);
+        twin_free(custom->data);
+        twin_free(custom);
         return NULL;
     }
 
@@ -433,8 +433,8 @@ void twin_custom_widget_destroy(twin_custom_widget_t *custom)
         unregister_custom_widget(custom->widget);
         /* Note: widget destruction should be handled by the parent/container */
     }
-    free(custom->data);
-    free(custom);
+    twin_free(custom->data);
+    twin_free(custom);
 }
 
 twin_pixmap_t *twin_widget_pixmap(twin_widget_t *widget)

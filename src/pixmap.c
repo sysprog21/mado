@@ -18,6 +18,28 @@
          ? (((sz) + (alignment) - 1) & ~((alignment) - 1)) \
          : ((((sz) + (alignment) - 1) / (alignment)) * (alignment)))
 
+static bool twin_pixmap_alloc_size(twin_format_t format,
+                                   twin_coord_t width,
+                                   twin_coord_t height,
+                                   size_t *size_out)
+{
+    if (width <= 0 || height <= 0)
+        return false;
+
+    size_t bpp = (size_t) twin_bytes_per_pixel(format);
+    if (bpp == 0 || (size_t) width > SIZE_MAX / bpp)
+        return false;
+    size_t stride = bpp * (size_t) width;
+    if (stride > SIZE_MAX - 3)
+        return false;
+    stride = ALIGN_UP(stride, 4);
+    if ((size_t) height > (SIZE_MAX - sizeof(twin_pixmap_t)) / stride)
+        return false;
+
+    *size_out = sizeof(twin_pixmap_t) + stride * (size_t) height;
+    return true;
+}
+
 twin_pixmap_t *twin_pixmap_create(twin_format_t format,
                                   twin_coord_t width,
                                   twin_coord_t height)
@@ -29,7 +51,7 @@ twin_pixmap_t *twin_pixmap_create(twin_format_t format,
 
     twin_area_t space = (twin_area_t) stride * height;
     twin_area_t size = sizeof(twin_pixmap_t) + space;
-    twin_pixmap_t *pixmap = malloc(size);
+    twin_pixmap_t *pixmap = twin_malloc(size);
     if (!pixmap)
         return NULL;
 
@@ -59,13 +81,61 @@ twin_pixmap_t *twin_pixmap_create(twin_format_t format,
     return pixmap;
 }
 
+twin_pixmap_t *twin_pixmap_create_budget(twin_format_t format,
+                                         twin_coord_t max_width,
+                                         twin_coord_t max_height,
+                                         size_t memory_budget)
+{
+    if (max_width <= 0 || max_height <= 0)
+        return NULL;
+
+    size_t full_size;
+    if (!twin_pixmap_alloc_size(format, max_width, max_height, &full_size))
+        return NULL;
+
+    if (full_size <= memory_budget)
+        return twin_pixmap_create(format, max_width, max_height);
+
+    if (memory_budget <= sizeof(twin_pixmap_t))
+        return NULL;
+
+    twin_coord_t lo = 1;
+    twin_coord_t hi = max_height;
+    twin_coord_t best_w = 0;
+    twin_coord_t best_h = 0;
+
+    while (lo <= hi) {
+        twin_coord_t mid_h = lo + (hi - lo) / 2;
+        twin_coord_t mid_w =
+            (twin_coord_t) (((int32_t) max_width * mid_h) / max_height);
+        size_t candidate_size;
+
+        if (mid_w < 1)
+            mid_w = 1;
+
+        if (twin_pixmap_alloc_size(format, mid_w, mid_h, &candidate_size) &&
+            candidate_size <= memory_budget) {
+            best_w = mid_w;
+            best_h = mid_h;
+            lo = mid_h + 1;
+        } else {
+            hi = mid_h - 1;
+        }
+    }
+
+    if (best_w == 0 || best_h == 0)
+        return NULL;
+
+    return twin_pixmap_create(format, best_w, best_h);
+}
+
 twin_pixmap_t *twin_pixmap_create_const(twin_format_t format,
                                         twin_coord_t width,
                                         twin_coord_t height,
                                         twin_coord_t stride,
                                         twin_pointer_t pixels)
 {
-    twin_pixmap_t *pixmap = malloc(sizeof(twin_pixmap_t));
+    twin_pixmap_t *pixmap = twin_malloc(sizeof(twin_pixmap_t));
     if (!pixmap)
         return NULL;
 
@@ -94,8 +164,18 @@ void twin_pixmap_destroy(twin_pixmap_t *pixmap)
 {
     if (pixmap->screen)
         twin_pixmap_hide(pixmap);
-    free(pixmap->xform_cache); /* Free xform buffer cache */
-    free(pixmap);
+    twin_pixmap_reset_xform_cache(pixmap);
+    twin_free(pixmap);
+}
+
+void twin_pixmap_reset_xform_cache(twin_pixmap_t *pixmap)
+{
+    if (!pixmap)
+        return;
+
+    twin_free(pixmap->xform_cache);
+    pixmap->xform_cache = NULL;
+    pixmap->xform_cache_size = 0;
 }
 
 void twin_pixmap_show(twin_pixmap_t *pixmap,

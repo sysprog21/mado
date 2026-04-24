@@ -20,8 +20,18 @@ static inline twin_pixmap_t *_apps_image_pixmap(twin_custom_widget_t *image)
 #define APP_WIDTH 400
 #define APP_HEIGHT 400
 
+static twin_pixmap_t *load_tvg(const char *path)
+{
+#if defined(CONFIG_TVG_MEMORY_BUDGET) && CONFIG_TVG_MEMORY_BUDGET > 0
+    return twin_tvg_to_pixmap_budget(path, TWIN_ARGB32,
+                                     (size_t) CONFIG_TVG_MEMORY_BUDGET * 1024);
+#else
+    return twin_tvg_to_pixmap_scale(path, TWIN_ARGB32, APP_WIDTH, APP_HEIGHT);
+#endif
+}
+
 typedef struct {
-    twin_pixmap_t **pixes;
+    twin_pixmap_t *current_pix; /* only the visible image is kept */
     int image_idx;
 } apps_image_data_t;
 
@@ -44,13 +54,16 @@ static void _apps_image_paint(twin_custom_widget_t *custom)
 {
     apps_image_data_t *img =
         (apps_image_data_t *) twin_custom_widget_data(custom);
+    if (!img->current_pix)
+        return;
     twin_operand_t srcop = {
         .source_kind = TWIN_PIXMAP,
-        .u.pixmap = img->pixes[img->image_idx],
+        .u.pixmap = img->current_pix,
     };
 
     twin_composite(_apps_image_pixmap(custom), 0, 0, &srcop, 0, 0, NULL, 0, 0,
-                   TWIN_SOURCE, APP_WIDTH, APP_HEIGHT);
+                   TWIN_SOURCE, img->current_pix->width,
+                   img->current_pix->height);
 }
 
 static twin_dispatch_result_t _apps_image_dispatch(twin_widget_t *widget,
@@ -67,6 +80,15 @@ static twin_dispatch_result_t _apps_image_dispatch(twin_widget_t *widget,
     case TwinEventPaint:
         _apps_image_paint(custom);
         break;
+    case TwinEventDestroy: {
+        apps_image_data_t *img =
+            (apps_image_data_t *) twin_custom_widget_data(custom);
+        if (img->current_pix) {
+            twin_pixmap_destroy(img->current_pix);
+            img->current_pix = NULL;
+        }
+        break;
+    }
     default:
         break;
     }
@@ -87,13 +109,15 @@ static twin_dispatch_result_t _apps_image_button_clicked(twin_widget_t *widget,
         (apps_image_data_t *) twin_custom_widget_data(custom);
     const int n = sizeof(tvg_files) / sizeof(tvg_files[0]);
     img->image_idx = img->image_idx == n - 1 ? 0 : img->image_idx + 1;
-    if (!img->pixes[img->image_idx]) {
-        twin_pixmap_t *pix = twin_tvg_to_pixmap_scale(
-            tvg_files[img->image_idx], TWIN_ARGB32, APP_WIDTH, APP_HEIGHT);
-        if (!pix)
-            return TwinDispatchContinue;
-        img->pixes[img->image_idx] = pix;
+
+    /* Evict the old pixmap before loading the new one */
+    if (img->current_pix) {
+        twin_pixmap_destroy(img->current_pix);
+        img->current_pix = NULL;
     }
+    img->current_pix = load_tvg(tvg_files[img->image_idx]);
+    if (!img->current_pix)
+        return TwinDispatchContinue;
     twin_custom_widget_queue_paint(custom);
     return TwinDispatchDone;
 }
@@ -109,10 +133,7 @@ static twin_custom_widget_t *_apps_image_init(twin_box_t *parent)
     apps_image_data_t *img =
         (apps_image_data_t *) twin_custom_widget_data(custom);
     img->image_idx = 0;
-    img->pixes = calloc(sizeof(tvg_files) / sizeof(tvg_files[0]),
-                        sizeof(twin_pixmap_t *));
-    img->pixes[0] = twin_tvg_to_pixmap_scale(tvg_files[0], TWIN_ARGB32,
-                                             APP_WIDTH, APP_HEIGHT);
+    img->current_pix = load_tvg(tvg_files[0]);
 
     twin_button_t *button =
         twin_button_create(parent, "Next Image", 0xFF482722, D(10),

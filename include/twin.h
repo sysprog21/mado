@@ -348,6 +348,21 @@ struct _twin_screen {
     twin_argb32_t *span_cache;     /**< Cached span buffer */
     twin_coord_t span_cache_width; /**< Cached span buffer width */
 
+    /* Scratch arena for per-frame temporary allocations */
+    void *scratch_buf;   /**< Scratch buffer (bump allocator) */
+    size_t scratch_size; /**< Scratch buffer capacity in bytes */
+
+    /* Reusable path object cache to avoid repeated alloc/free */
+#define TWIN_PATH_CACHE_SIZE 4
+    struct _twin_path *path_cache[TWIN_PATH_CACHE_SIZE];
+    int path_cache_count;
+
+    /* Cached A8 mask pixmap for twin_composite_path -- avoids
+     * per-composite malloc for masks larger than the scratch arena. */
+    twin_pixmap_t *mask_cache;
+    twin_coord_t mask_cache_width;
+    twin_coord_t mask_cache_height;
+
     /* Event processing: event filter callback */
     bool (*event_filter)(twin_screen_t *screen, twin_event_t *event);
 };
@@ -1581,6 +1596,28 @@ twin_pixmap_t *twin_tvg_to_pixmap_scale(const char *filepath,
                                         twin_format_t fmt,
                                         twin_coord_t w,
                                         twin_coord_t h);
+
+twin_pixmap_t *twin_tvg_to_pixmap_budget(const char *filepath,
+                                         twin_format_t fmt,
+                                         size_t memory_budget);
+
+twin_pixmap_t *twin_pixmap_create_budget(twin_format_t format,
+                                         twin_coord_t max_width,
+                                         twin_coord_t max_height,
+                                         size_t memory_budget);
+
+/**
+ * Memory usage statistics (requires CONFIG_MEMORY_STATS)
+ */
+typedef struct _twin_memory_info {
+    size_t current_bytes; /**< Currently allocated heap bytes */
+    size_t peak_bytes;    /**< High-water mark */
+    size_t total_allocs;  /**< Lifetime allocation count */
+    size_t total_frees;   /**< Lifetime free count */
+} twin_memory_info_t;
+
+void twin_memory_get_info(twin_memory_info_t *info);
+void twin_memory_reset_peak(void);
 
 twin_context_t *twin_create(int width, int height);
 

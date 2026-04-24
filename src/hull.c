@@ -28,18 +28,29 @@ static void _twin_slope_init(twin_slope_t *slope,
     slope->dy = b->y - a->y;
 }
 
-static twin_hull_t *_twin_hull_create(const twin_path_t *path, int *nhull)
+static twin_hull_t *_twin_hull_create(const twin_path_t *path,
+                                      int *nhull,
+                                      twin_scratch_t *scratch,
+                                      bool *from_scratch)
 {
     int n = path->npoints;
     const twin_spoint_t *p = path->points;
-    twin_hull_t *hull;
+    twin_hull_t *hull = NULL;
 
     int e = 0;
     for (int i = 1; i < n; i++)
         if (p[i].y < p[e].y || (p[i].y == p[e].y && p[i].x < p[e].x))
             e = i;
 
-    hull = malloc(n * sizeof(twin_hull_t));
+    *from_scratch = false;
+    if (scratch) {
+        hull = twin_scratch_alloc(scratch, n * sizeof(twin_hull_t),
+                                  _Alignof(twin_hull_t));
+        if (hull)
+            *from_scratch = true;
+    }
+    if (!hull)
+        hull = twin_malloc(n * sizeof(twin_hull_t));
     if (!hull)
         return NULL;
     *nhull = n;
@@ -183,6 +194,8 @@ static void _twin_hull_eliminate_concave(twin_hull_t *hull, int num_hull)
 static twin_path_t *_twin_hull_to_path(const twin_hull_t *hull, int num_hull)
 {
     twin_path_t *path = twin_path_create();
+    if (!path)
+        return NULL;
 
     for (int i = 0; i < num_hull; i++) {
         if (hull[i].discard)
@@ -197,13 +210,14 @@ static twin_path_t *_twin_hull_to_path(const twin_hull_t *hull, int num_hull)
  * Given a path, return the convex hull using the Graham scan algorithm.
  */
 
-twin_path_t *twin_path_convex_hull(twin_path_t *path)
+twin_path_t *twin_path_convex_hull(twin_path_t *path, twin_scratch_t *scratch)
 {
     twin_hull_t *hull;
     int num_hull;
     twin_path_t *convex_path;
+    bool hull_from_scratch = false;
 
-    hull = _twin_hull_create(path, &num_hull);
+    hull = _twin_hull_create(path, &num_hull, scratch, &hull_from_scratch);
     if (!hull)
         return NULL;
 
@@ -214,7 +228,8 @@ twin_path_t *twin_path_convex_hull(twin_path_t *path)
 
     convex_path = _twin_hull_to_path(hull, num_hull);
 
-    free(hull);
+    if (!hull_from_scratch)
+        twin_free(hull);
 
     return convex_path;
 }

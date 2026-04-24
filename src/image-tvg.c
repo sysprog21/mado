@@ -17,6 +17,32 @@
 #define GET_COLOR(ctx, idx) ctx->colors[idx]
 #define PIXEL_ARGB(a, r, g, b) (((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
+#define ALIGN_UP(sz, alignment)                            \
+    (((alignment) & ((alignment) - 1)) == 0                \
+         ? (((sz) + (alignment) - 1) & ~((alignment) - 1)) \
+         : ((((sz) + (alignment) - 1) / (alignment)) * (alignment)))
+
+static bool tvg_pixmap_alloc_size(twin_format_t fmt,
+                                  uint32_t width,
+                                  uint32_t height,
+                                  size_t *size_out)
+{
+    if (width == 0 || height == 0)
+        return false;
+
+    size_t bpp = (size_t) twin_bytes_per_pixel(fmt);
+    if (bpp == 0 || (size_t) width > SIZE_MAX / bpp)
+        return false;
+    size_t stride = bpp * (size_t) width;
+    if (stride > SIZE_MAX - 3)
+        return false;
+    stride = ALIGN_UP(stride, 4);
+    if ((size_t) height > (SIZE_MAX - sizeof(twin_pixmap_t)) / stride)
+        return false;
+
+    *size_out = sizeof(twin_pixmap_t) + stride * (size_t) height;
+    return true;
+}
 
 enum {
     /* end of document This command determines the end of file. */
@@ -482,7 +508,7 @@ static tvg_result_t tvg_parse_header(tvg_context_t *ctx, int dim_only)
     if (color_count == 0) {
         return TVG_E_INVALID_FORMAT;
     }
-    ctx->colors = malloc(color_count * sizeof(twin_argb32_t));
+    ctx->colors = twin_malloc(color_count * sizeof(twin_argb32_t));
     if (!ctx->colors) {
         return TVG_E_OUT_OF_MEMORY;
     }
@@ -490,7 +516,7 @@ static tvg_result_t tvg_parse_header(tvg_context_t *ctx, int dim_only)
     for (size_t i = 0; i < ctx->colors_size; ++i) {
         res = tvg_read_color(ctx, &ctx->colors[i]);
         if (res != TVG_SUCCESS) {
-            free(ctx->colors);
+            twin_free(ctx->colors);
             ctx->colors = NULL;
             return res;
         }
@@ -832,7 +858,7 @@ static tvg_result_t tvg_parse_fill_paths(tvg_context_t *ctx,
                                          const tvg_style_t *style)
 {
     tvg_result_t res = TVG_SUCCESS;
-    uint32_t *sizes = malloc(size * sizeof(uint32_t));
+    uint32_t *sizes = twin_malloc(size * sizeof(uint32_t));
     if (!sizes) {
         return TVG_E_OUT_OF_MEMORY;
     }
@@ -850,7 +876,7 @@ static tvg_result_t tvg_parse_fill_paths(tvg_context_t *ctx,
     _fill_path_with_style(ctx, style);
     twin_path_empty(path);
 error:
-    free(sizes);
+    twin_free(sizes);
     return res;
 }
 
@@ -860,7 +886,7 @@ static tvg_result_t tvg_parse_line_paths(tvg_context_t *ctx,
                                          float line_width)
 {
     tvg_result_t res = TVG_SUCCESS;
-    uint32_t *sizes = malloc(size * sizeof(uint32_t));
+    uint32_t *sizes = twin_malloc(size * sizeof(uint32_t));
     if (!sizes) {
         return TVG_E_OUT_OF_MEMORY;
     }
@@ -878,7 +904,7 @@ static tvg_result_t tvg_parse_line_paths(tvg_context_t *ctx,
     _stroke_path_with_style(ctx, line_style, D(line_width));
     twin_path_empty(path);
 error:
-    free(sizes);
+    twin_free(sizes);
     return res;
 }
 
@@ -889,7 +915,7 @@ static tvg_result_t tvg_parse_line_fill_paths(tvg_context_t *ctx,
                                               float line_width)
 {
     tvg_result_t res = TVG_SUCCESS;
-    uint32_t *sizes = malloc(size * sizeof(uint32_t));
+    uint32_t *sizes = twin_malloc(size * sizeof(uint32_t));
     if (!sizes) {
         return TVG_E_OUT_OF_MEMORY;
     }
@@ -912,7 +938,7 @@ static tvg_result_t tvg_parse_line_fill_paths(tvg_context_t *ctx,
     _stroke_path_with_style(ctx, line_style, D(line_width));
     twin_path_empty(path);
 error:
-    free(sizes);
+    twin_free(sizes);
     return res;
 }
 
@@ -1168,7 +1194,7 @@ error:
         ctx.path = NULL;
     }
     if (ctx.colors) {
-        free(ctx.colors);
+        twin_free(ctx.colors);
         ctx.colors = NULL;
         ctx.colors_size = 0;
     }
@@ -1187,12 +1213,6 @@ twin_pixmap_t *_twin_tvg_to_pixmap(const char *filepath, twin_format_t fmt)
     twin_pixmap_t *pix = NULL;
     uint32_t width, height;
     tvg_result_t res;
-
-    /* Current implementation only produces TWIN_ARGB32 */
-    if (fmt != TWIN_ARGB32) {
-        log_error("Unsupported color format");
-        goto bail;
-    }
 
     if (!filepath) {
         log_error("Invalid filepath");
@@ -1250,12 +1270,6 @@ twin_pixmap_t *twin_tvg_to_pixmap_scale(const char *filepath,
     uint32_t width, height;
     tvg_result_t res;
 
-    /* Current implementation only produces TWIN_ARGB32 */
-    if (fmt != TWIN_ARGB32) {
-        log_error("Unsupported color format");
-        goto bail;
-    }
-
     if (!filepath) {
         log_error("Invalid filepath");
         goto bail;
@@ -1295,4 +1309,78 @@ bail_infile:
     fclose(infile);
 bail:
     return NULL;
+}
+
+twin_pixmap_t *twin_tvg_to_pixmap_budget(const char *filepath,
+                                         twin_format_t fmt,
+                                         size_t memory_budget)
+{
+    FILE *infile = NULL;
+    uint32_t width, height;
+
+    if (!filepath)
+        return NULL;
+
+    infile = fopen(filepath, "rb");
+    if (!infile)
+        return NULL;
+
+    tvg_result_t res =
+        tvg_document_dimensions(inp_func, infile, &width, &height);
+    fclose(infile);
+    if (res != TVG_SUCCESS)
+        return NULL;
+
+    /* Compute the largest output dimensions that fit within budget */
+    if (width == 0 || height == 0)
+        return NULL;
+    size_t full_size;
+    if (!tvg_pixmap_alloc_size(fmt, width, height, &full_size))
+        return NULL;
+
+    /* Clamp to twin_coord_t range (int16_t max = 32767) */
+    if (width > 32767)
+        width = 32767;
+    if (height > 32767)
+        height = 32767;
+
+    twin_coord_t out_w, out_h;
+    if (full_size <= memory_budget) {
+        out_w = (twin_coord_t) width;
+        out_h = (twin_coord_t) height;
+    } else {
+        if (memory_budget <= sizeof(twin_pixmap_t))
+            return NULL;
+
+        uint32_t lo = 1;
+        uint32_t hi = height;
+        uint32_t best_w = 0;
+        uint32_t best_h = 0;
+
+        while (lo <= hi) {
+            uint32_t mid_h = lo + (hi - lo) / 2;
+            uint32_t mid_w = ((uint64_t) width * mid_h) / height;
+            size_t candidate_size;
+
+            if (mid_w < 1)
+                mid_w = 1;
+
+            if (tvg_pixmap_alloc_size(fmt, mid_w, mid_h, &candidate_size) &&
+                candidate_size <= memory_budget) {
+                best_w = mid_w;
+                best_h = mid_h;
+                lo = mid_h + 1;
+            } else {
+                hi = mid_h - 1;
+            }
+        }
+
+        if (best_w == 0 || best_h == 0)
+            return NULL;
+
+        out_w = (twin_coord_t) best_w;
+        out_h = (twin_coord_t) best_h;
+    }
+
+    return twin_tvg_to_pixmap_scale(filepath, fmt, out_w, out_h);
 }

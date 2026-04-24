@@ -29,40 +29,43 @@
  * Load the background pixmap from storage.
  * Return a default pattern if the load of @path or image loader fails.
  */
+/*
+ * Load the background pixmap from storage.
+ * The screen compositor tiles backgrounds smaller than the screen,
+ * so scaling is only needed when the source is larger.  When the
+ * source fits, use it directly to avoid a full-screen allocation.
+ */
 static twin_pixmap_t *load_background(twin_screen_t *screen, const char *path)
 {
     twin_pixmap_t *raw_background = twin_pixmap_from_file(path, TWIN_ARGB32);
-    if (!raw_background) /* Fallback to a default pattern */
+    if (!raw_background)
         return twin_make_pattern();
 
-    if (screen->height == raw_background->height &&
-        screen->width == raw_background->width)
+    /* Source fits on screen -- use directly (tiles if smaller) */
+    if (raw_background->width <= screen->width &&
+        raw_background->height <= screen->height)
         return raw_background;
 
-    /* Scale as needed. */
-    twin_pixmap_t *scaled_background =
+    /* Source is larger -- scale down to screen size */
+    twin_pixmap_t *scaled =
         twin_pixmap_create(TWIN_ARGB32, screen->width, screen->height);
-    if (!scaled_background) {
+    if (!scaled) {
         twin_pixmap_destroy(raw_background);
         return twin_make_pattern();
     }
-    twin_fixed_t sx, sy;
-    sx = twin_fixed_div(twin_int_to_fixed(raw_background->width),
-                        twin_int_to_fixed(screen->width));
-    sy = twin_fixed_div(twin_int_to_fixed(raw_background->height),
-                        twin_int_to_fixed(screen->height));
-
+    twin_fixed_t sx = twin_fixed_div(twin_int_to_fixed(raw_background->width),
+                                     twin_int_to_fixed(screen->width));
+    twin_fixed_t sy = twin_fixed_div(twin_int_to_fixed(raw_background->height),
+                                     twin_int_to_fixed(screen->height));
     twin_matrix_scale(&raw_background->transform, sx, sy);
     twin_operand_t srcop = {
         .source_kind = TWIN_PIXMAP,
         .u.pixmap = raw_background,
     };
-    twin_composite(scaled_background, 0, 0, &srcop, 0, 0, NULL, 0, 0,
-                   TWIN_SOURCE, screen->width, screen->height);
-
+    twin_composite(scaled, 0, 0, &srcop, 0, 0, NULL, 0, 0, TWIN_SOURCE,
+                   screen->width, screen->height);
     twin_pixmap_destroy(raw_background);
-
-    return scaled_background;
+    return scaled;
 }
 
 static twin_context_t *tx = NULL;

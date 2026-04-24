@@ -1,0 +1,36 @@
+src/pixmap.c
+  76a90651a57aa083 257-258
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "7bdd7b628ddc05ede50823a71519e1c10b673160",
+  "prompts": {
+    "76a90651a57aa083": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ac4f223d-fff9-4c42-b8ab-b84c1694f7e7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Jim Huang",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 163,
+      "overriden_lines": 0
+    },
+    "b083845704bbdbfa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef87b612-41d5-48a4-b52b-a300f07536c1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Jim Huang",
+      "messages": [],
+      "total_additions": 94,
+      "total_deletions": 1,
+      "accepted_lines": 196,
+      "overriden_lines": 0
+    }
+  }
+}

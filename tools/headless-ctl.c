@@ -47,18 +47,6 @@ static double time_diff_ms(uint64_t start, uint64_t end)
 
 /* Writes PNG files without external dependencies */
 
-/* Portable byte swap for 32-bit values */
-#if defined(__GNUC__) || defined(__clang__)
-#define BSWAP32(x) __builtin_bswap32(x)
-#else
-static inline uint32_t bswap32(uint32_t x)
-{
-    return ((x & 0x000000ff) << 24) | ((x & 0x0000ff00) << 8) |
-           ((x & 0x00ff0000) >> 8) | ((x & 0xff000000) >> 24);
-}
-#define BSWAP32(x) bswap32(x)
-#endif
-
 /* CRC32 table for PNG chunk verification */
 static const uint32_t crc32_table[16] = {
     0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac, 0x76dc4190, 0x6b6b51f4,
@@ -98,10 +86,15 @@ static int save_png(const char *filename,
         return -1;
     size_t raw_sz = (size_t) height * row_size;
     /* Uncompressed DEFLATE: 2 (zlib hdr) + 5 per block + raw + 4 (adler).
-     * Ensure the total fits in a 32-bit PNG chunk length field.
+     * Guard every intermediate addition against size_t wrap before
+     * checking the total against the 32-bit PNG chunk length limit.
      */
+    if (raw_sz > SIZE_MAX - 65534)
+        return -1;
     size_t nblocks = (raw_sz + 65534) / 65535;
-    size_t idat_bound = 2 + nblocks * 5 + raw_sz + 4;
+    if (nblocks > (SIZE_MAX - 6 - raw_sz) / 5)
+        return -1;
+    size_t idat_bound = raw_sz + 6 + nblocks * 5;
     if (idat_bound > UINT32_MAX)
         return -1;
 
@@ -128,11 +121,16 @@ static int save_png(const char *filename,
 
 #define PUT_BYTES(buf, len) fwrite(buf, 1, len, fp)
 
-    /* Write IHDR chunk */
+    /* Write IHDR chunk (byte-level writes avoid unaligned access) */
     uint8_t ihdr[13];
-    uint32_t *p32 = (uint32_t *) ihdr;
-    p32[0] = BSWAP32(width);
-    p32[1] = BSWAP32(height);
+    ihdr[0] = (width >> 24) & 0xff;
+    ihdr[1] = (width >> 16) & 0xff;
+    ihdr[2] = (width >> 8) & 0xff;
+    ihdr[3] = width & 0xff;
+    ihdr[4] = (height >> 24) & 0xff;
+    ihdr[5] = (height >> 16) & 0xff;
+    ihdr[6] = (height >> 8) & 0xff;
+    ihdr[7] = height & 0xff;
     ihdr[8] = 8;  /* bit depth */
     ihdr[9] = 6;  /* color type: RGBA */
     ihdr[10] = 0; /* compression */

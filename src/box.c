@@ -24,7 +24,7 @@ void _twin_box_init(twin_box_t *box,
 
 static twin_dispatch_result_t _twin_box_query_geometry(twin_box_t *box)
 {
-    twin_event_t ev;
+    twin_event_t ev = {0};
     twin_widget_layout_t preferred = {.width = 0, .height = 0};
 
     if (box->dir == TwinBoxHorz) {
@@ -69,8 +69,8 @@ static twin_dispatch_result_t _twin_box_configure(twin_box_t *box)
     twin_coord_t height = _twin_widget_height(box);
     twin_coord_t actual;
     twin_coord_t pref;
-    twin_coord_t delta;
-    twin_coord_t delta_remain;
+    int32_t delta;
+    int32_t delta_remain;
     twin_coord_t stretch = 0;
     twin_coord_t pos = 0;
     twin_widget_t *child;
@@ -88,9 +88,9 @@ static twin_dispatch_result_t _twin_box_configure(twin_box_t *box)
         stretch = 1;
     delta = delta_remain = actual - pref;
     for (child = box->children; child; child = child->next) {
-        twin_event_t ev;
+        twin_event_t ev = {0};
         twin_coord_t stretch_this;
-        twin_coord_t delta_this;
+        int32_t delta_this;
         twin_rect_t extents;
 
         if (!child->next)
@@ -100,7 +100,7 @@ static twin_dispatch_result_t _twin_box_configure(twin_box_t *box)
                 stretch_this = child->preferred.stretch_width;
             else
                 stretch_this = child->preferred.stretch_height;
-            delta_this = delta * stretch_this / stretch;
+            delta_this = (int32_t) delta * stretch_this / stretch;
         }
         if (delta_remain < 0) {
             if (delta_this < delta_remain)
@@ -123,10 +123,10 @@ static twin_dispatch_result_t _twin_box_configure(twin_box_t *box)
             extents.top = pos;
             pos = extents.bottom = pos + child_h + delta_this;
         }
-        if (extents.left != ev.u.configure.extents.left ||
-            extents.top != ev.u.configure.extents.top ||
-            extents.right != ev.u.configure.extents.right ||
-            extents.bottom != ev.u.configure.extents.bottom) {
+        if (extents.left != child->extents.left ||
+            extents.top != child->extents.top ||
+            extents.right != child->extents.right ||
+            extents.bottom != child->extents.bottom) {
             ev.kind = TwinEventConfigure;
             ev.u.configure.extents = extents;
             child->handler(child, &ev, child->callback_data);
@@ -152,7 +152,7 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
                                           void *closure)
 {
     twin_box_t *box = (twin_box_t *) widget;
-    twin_event_t ev;
+    twin_event_t ev = {0};
     twin_widget_t *child;
 
     if (event->kind != TwinEventPaint &&

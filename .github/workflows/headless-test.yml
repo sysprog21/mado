@@ -94,8 +94,23 @@ jobs:
         ./headless-ctl shutdown
         wait $PID2 || true
 
+        # Verify PNGs are valid before comparing
+        for f in run1.png run2.png; do
+          if ! identify "$f" > /dev/null 2>&1; then
+            echo "ERROR: $f is not a valid PNG"
+            exit 1
+          fi
+        done
+
         # Compare images (allowing minor differences)
-        DIFF=$(compare -metric AE run1.png run2.png null: 2>&1 || echo "0")
+        # compare writes the metric to stderr, stdout gets the diff image
+        DIFF=$(compare -metric AE run1.png run2.png null: 2>&1) || true
+        # Extract just the numeric value (AE metric is an integer)
+        DIFF=$(echo "$DIFF" | grep -oE '^[0-9]+' | head -1)
+        if [ -z "$DIFF" ]; then
+          echo "ERROR: Failed to get pixel difference from compare"
+          exit 1
+        fi
         echo "Pixel difference: $DIFF"
 
         if [ "$DIFF" -gt "100" ]; then

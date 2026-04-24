@@ -84,6 +84,18 @@ static int save_png(const char *filename,
                     int width,
                     int height)
 {
+    if (width <= 0 || height <= 0)
+        return -1;
+
+    /* Guard against integer overflow in raw_size calculation.
+     * row_size = 1 + width*4, raw_size = height * row_size.
+     * Also ensure idat_size fits in a 32-bit PNG chunk length.
+     */
+    size_t row_size = 1 + (size_t) width * 4;
+    size_t raw_sz = (size_t) height * row_size;
+    if (raw_sz / row_size != (size_t) height || raw_sz > UINT32_MAX)
+        return -1;
+
     FILE *fp = fopen(filename, "wb");
     if (!fp)
         return -1;
@@ -125,10 +137,13 @@ static int save_png(const char *filename,
     crc = crc32(crc, ihdr, 13);
     PUT_U32(crc);
 
-    /* Write IDAT chunk */
-    size_t raw_size = height * (1 + width * 4); /* filter byte + RGBA per row */
-    size_t max_deflate_size =
-        raw_size + ((raw_size + 7) >> 3) + ((raw_size + 63) >> 6) + 11;
+    /* Write IDAT chunk (raw_sz validated above) */
+    size_t raw_size = raw_sz;
+    /* Uncompressed DEFLATE: 5-byte header per 65535-byte block + 2 zlib +
+     * 4 adler
+     */
+    size_t nblocks = (raw_size + 65534) / 65535;
+    size_t max_deflate_size = 2 + nblocks * 5 + raw_size + 4;
 
     uint8_t *idat = malloc(max_deflate_size);
     if (!idat) {
@@ -181,12 +196,15 @@ static int save_png(const char *filename,
         pos += chunk;
     }
 
-    /* ADLER32 checksum */
-    uint32_t adler = 1;
+    /* ADLER32 checksum: A = 1 + sum(bytes) mod 65521,
+     * B = sum(running A) mod 65521, result = (B << 16) | A
+     */
+    uint32_t adler_a = 1, adler_b = 0;
     for (size_t i = 0; i < raw_size; i++) {
-        adler = (adler + raw_data[i]) % 65521 +
-                ((((adler >> 16) + raw_data[i]) % 65521) << 16);
+        adler_a = (adler_a + raw_data[i]) % 65521;
+        adler_b = (adler_b + adler_a) % 65521;
     }
+    uint32_t adler = (adler_b << 16) | adler_a;
     idat[idat_size++] = (adler >> 24) & 0xff;
     idat[idat_size++] = (adler >> 16) & 0xff;
     idat[idat_size++] = (adler >> 8) & 0xff;

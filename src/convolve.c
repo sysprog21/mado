@@ -185,11 +185,14 @@ static void _twin_subpath_convolve(twin_path_t *path,
 
 void twin_path_convolve(twin_path_t *path,
                         twin_path_t *stroke,
-                        twin_path_t *pen)
+                        twin_path_t *pen,
+                        twin_scratch_t *scratch)
 {
     int p;
     int s;
-    twin_path_t *hull = twin_path_convex_hull(pen);
+    twin_path_t *hull = twin_path_convex_hull(pen, scratch);
+    if (!hull)
+        return;
 
     p = 0;
     for (s = 0; s <= stroke->nsublen; s++) {

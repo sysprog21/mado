@@ -35,8 +35,8 @@ jobs:
 
     - name: Run basic headless test
       run: |
-        # Start demo in background
-        timeout 30s ./demo-headless &
+        # Start demo in background, capture stderr for memory stats
+        timeout 30s ./demo-headless 2>demo_stderr.log &
         DEMO_PID=$!
         echo "Started demo-headless with PID $DEMO_PID"
 
@@ -61,6 +61,13 @@ jobs:
         # Wait for process to exit
         wait $DEMO_PID || true
         echo "Basic test completed"
+
+    - name: Report memory statistics
+      if: always()
+      run: |
+        echo "=== Mado Memory Statistics ==="
+        grep -i "memory" demo_stderr.log 2>/dev/null || echo "(no memory stats in output)"
+        cat demo_stderr.log 2>/dev/null || true
 
     - name: Verify screenshot output
       run: |
@@ -106,7 +113,7 @@ jobs:
           --errors-for-leak-kinds=definite \
           --error-exitcode=1 \
           --log-file=valgrind.log \
-          ./demo-headless &
+          ./demo-headless 2>valgrind_demo_stderr.log &
         VALGRIND_PID=$!
 
         sleep 5
@@ -123,6 +130,10 @@ jobs:
         echo "=== Valgrind Summary ==="
         grep -A 10 "LEAK SUMMARY" valgrind.log || true
         grep "ERROR SUMMARY" valgrind.log || true
+
+        # Display memory statistics from twin_destroy
+        echo "=== Mado Memory Statistics (Valgrind run) ==="
+        grep -i "memory" valgrind_demo_stderr.log 2>/dev/null || true
 
         # Check for definite leaks
         if grep -q "definitely lost: [1-9]" valgrind.log; then

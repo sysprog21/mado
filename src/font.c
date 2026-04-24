@@ -400,7 +400,7 @@ void twin_path_ucs4(twin_path_t *path, twin_ucs4_t ucs4)
     }
 
     if (font->type == TWIN_FONT_TYPE_STROKE) {
-        twin_path_convolve(path, stroke, pen);
+        twin_path_convolve(path, stroke, pen, NULL);
         twin_path_destroy(pen);
     } else
         twin_path_append(path, stroke);

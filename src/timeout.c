@@ -70,7 +70,7 @@ twin_timeout_t *twin_set_timeout(twin_timeout_proc_t timeout_proc,
                                  twin_time_t delay,
                                  void *closure)
 {
-    twin_timeout_t *timeout = malloc(sizeof(twin_timeout_t));
+    twin_timeout_t *timeout = twin_malloc(sizeof(twin_timeout_t));
     if (!timeout)
         return NULL;
 
@@ -78,7 +78,7 @@ twin_timeout_t *twin_set_timeout(twin_timeout_proc_t timeout_proc,
     if (closure) {
         if (!_twin_closure_register(closure)) {
             /* Failed to register closure */
-            free(timeout);
+            twin_free(timeout);
             return NULL;
         }
         /* Add reference for this timeout */
@@ -105,7 +105,7 @@ void twin_clear_timeout(twin_timeout_t *timeout)
     if (timeout->closure)
         _twin_closure_unref(timeout->closure);
 
-    free(timeout);
+    twin_free(timeout);
 }
 
 twin_time_t _twin_timeout_delay(void)

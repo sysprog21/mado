@@ -9,10 +9,72 @@
 #define _TWIN_PRIVATE_H_
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "twin.h"
+
+/* Portability: _Alignof is C11; older toolchains may need __alignof__ */
+#if !defined(_Alignof) && !defined(__cplusplus)
+#if defined(__GNUC__) || defined(__clang__)
+#define _Alignof(t) __alignof__(t)
+#elif defined(_MSC_VER)
+#define _Alignof(t) __alignof(t)
+#endif
+#endif
+
+/*
+ * Scratch arena -- bump allocator for per-frame temporary allocations.
+ * Eliminates malloc/free in the rendering hot path.  Reset once per
+ * screen update; individual allocations are never freed.  Falls back
+ * to malloc when the arena is exhausted.
+ */
+typedef struct _twin_scratch {
+    uint8_t *buf;
+    size_t size;
+    size_t used;
+    size_t high_water; /* peak usage for diagnostics */
+} twin_scratch_t;
+
+static inline void twin_scratch_init(twin_scratch_t *s, void *buf, size_t sz)
+{
+    s->buf = buf;
+    s->size = sz;
+    s->used = 0;
+    s->high_water = 0;
+}
+
+static inline void twin_scratch_reset(twin_scratch_t *s)
+{
+    s->used = 0;
+}
+
+static inline size_t twin_scratch_save(twin_scratch_t *s)
+{
+    return s->used;
+}
+
+static inline void twin_scratch_restore(twin_scratch_t *s, size_t saved)
+{
+    s->used = saved;
+}
+
+static inline void *twin_scratch_alloc(twin_scratch_t *s,
+                                       size_t n,
+                                       size_t align)
+{
+    if (!align || (align & (align - 1)))
+        return NULL;
+    size_t off = (s->used + align - 1) & ~(align - 1);
+    /* Overflow-safe bounds check */
+    if (n > s->size || off > s->size - n)
+        return NULL;
+    s->used = off + n;
+    if (s->used > s->high_water)
+        s->high_water = s->used;
+    return s->buf + off;
+}
 
 /* FIXME: Both twin_private.h and log.h are private header files. They should
  * be moved to src/ directory.
@@ -353,6 +415,18 @@ typedef struct _twin_spoint {
     twin_sfixed_t x, y;
 } twin_spoint_t;
 
+/*
+ * Inline storage for small paths avoids heap allocation in the common
+ * case (rectangles, circles, rounded rects).  Only paths exceeding
+ * these limits spill to malloc.
+ */
+#ifndef TWIN_PATH_INLINE_POINTS
+#define TWIN_PATH_INLINE_POINTS 64
+#endif
+#ifndef TWIN_PATH_INLINE_SUBLEN
+#define TWIN_PATH_INLINE_SUBLEN 4
+#endif
+
 struct _twin_path {
     twin_spoint_t *points;
     int size_points;
@@ -361,6 +435,8 @@ struct _twin_path {
     int size_sublen;
     int nsublen;
     twin_state_t state;
+    twin_spoint_t inline_points[TWIN_PATH_INLINE_POINTS];
+    int inline_sublen[TWIN_PATH_INLINE_SUBLEN];
 };
 
 typedef struct _twin_gpoint {
@@ -743,7 +819,8 @@ extern const uint8_t _twin_cursor_default[];
 /* Low-level drawing operations */
 void twin_path_convolve(twin_path_t *dest,
                         twin_path_t *stroke,
-                        twin_path_t *pen);
+                        twin_path_t *pen,
+                        twin_scratch_t *scratch);
 
 void twin_premultiply_alpha(twin_pixmap_t *px);
 
@@ -756,14 +833,16 @@ void twin_cover(twin_pixmap_t *dst,
 void twin_fill_path(twin_pixmap_t *pixmap,
                     twin_path_t *path,
                     twin_coord_t dx,
-                    twin_coord_t dy);
+                    twin_coord_t dy,
+                    twin_scratch_t *scratch);
 
 void twin_composite_path(twin_pixmap_t *dst,
                          twin_operand_t *src,
                          twin_coord_t src_x,
                          twin_coord_t src_y,
                          twin_path_t *path,
-                         twin_operator_t operator);
+                         twin_operator_t operator,
+                         twin_scratch_t * scratch);
 
 void twin_composite_stroke(twin_pixmap_t *dst,
                            twin_operand_t *src,
@@ -771,7 +850,8 @@ void twin_composite_stroke(twin_pixmap_t *dst,
                            twin_coord_t src_y,
                            twin_path_t *stroke,
                            twin_fixed_t pen_width,
-                           twin_operator_t operator);
+                           twin_operator_t operator,
+                           twin_scratch_t * scratch);
 
 /* Internal event handling */
 void twin_event_enqueue(const twin_event_t *event);
@@ -780,6 +860,7 @@ void twin_event_enqueue(const twin_event_t *event);
 twin_pointer_t twin_pixmap_pointer(twin_pixmap_t *pixmap,
                                    twin_coord_t x,
                                    twin_coord_t y);
+void twin_pixmap_reset_xform_cache(twin_pixmap_t *pixmap);
 void twin_pixmap_origin_to_clip(twin_pixmap_t *pixmap);
 void twin_pixmap_offset(twin_pixmap_t *pixmap,
                         twin_coord_t offx,
@@ -796,8 +877,12 @@ void twin_screen_register_damaged(twin_screen_t *screen,
 void twin_widget_children_paint(twin_box_t *box);
 void twin_custom_widget_destroy(twin_custom_widget_t *custom);
 
+/* Reusable path acquisition -- avoids malloc/free per draw call */
+twin_path_t *_twin_path_acquire(twin_screen_t *screen);
+void _twin_path_release(twin_screen_t *screen, twin_path_t *path);
+
 /* Path convex hull computation */
-twin_path_t *twin_path_convex_hull(twin_path_t *path);
+twin_path_t *twin_path_convex_hull(twin_path_t *path, twin_scratch_t *scratch);
 
 /*
  * Memory pointer validation
@@ -882,5 +967,39 @@ bool _twin_closure_is_valid(void *closure);
 
 /* Mark a closure as being freed (prevents new references) */
 void _twin_closure_mark_for_free(void *closure);
+
+/*
+ * Memory allocation wrappers.
+ *
+ * When CONFIG_MEMORY_STATS is enabled, all allocations are routed
+ * through tracking functions that maintain current/peak usage counters.
+ * When disabled, the macros expand to raw malloc/free -- zero overhead.
+ */
+/*
+ * Internal memory statistics counters.
+ */
+typedef struct {
+    size_t current_bytes;
+    size_t peak_bytes;
+    size_t total_allocs;
+    size_t total_frees;
+    size_t total_bytes;
+} twin_memstats_t;
+
+#if defined(CONFIG_MEMORY_STATS)
+void *_twin_malloc(size_t size, const char *file, int line);
+void *_twin_calloc(size_t n, size_t size, const char *file, int line);
+void *_twin_realloc(void *ptr, size_t size, const char *file, int line);
+void _twin_free(void *ptr, const char *file, int line);
+#define twin_malloc(sz) _twin_malloc(sz, __FILE__, __LINE__)
+#define twin_calloc(n, sz) _twin_calloc(n, sz, __FILE__, __LINE__)
+#define twin_realloc(p, sz) _twin_realloc(p, sz, __FILE__, __LINE__)
+#define twin_free(p) _twin_free(p, __FILE__, __LINE__)
+#else
+#define twin_malloc(sz) malloc(sz)
+#define twin_calloc(n, sz) calloc(n, sz)
+#define twin_realloc(p, sz) realloc(p, sz)
+#define twin_free(p) free(p)
+#endif
 
 #endif /* _TWIN_PRIVATE_H_ */

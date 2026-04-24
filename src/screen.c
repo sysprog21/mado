@@ -16,7 +16,7 @@ twin_screen_t *twin_screen_create(twin_coord_t width,
                                   void *closure)
 {
     static bool closure_tracker_initialized = false;
-    twin_screen_t *screen = calloc(1, sizeof(twin_screen_t));
+    twin_screen_t *screen = twin_calloc(1, sizeof(twin_screen_t));
     if (!screen)
         return NULL;
 
@@ -43,6 +43,13 @@ twin_screen_t *twin_screen_create(twin_coord_t width,
     screen->button_x = screen->button_y = -1;
     screen->span_cache = NULL;
     screen->span_cache_width = 0;
+
+#ifndef TWIN_SCRATCH_SIZE
+#define TWIN_SCRATCH_SIZE (32 * 1024)
+#endif
+    screen->scratch_buf = twin_malloc(TWIN_SCRATCH_SIZE);
+    screen->scratch_size = screen->scratch_buf ? TWIN_SCRATCH_SIZE : 0;
+
     return screen;
 }
 
@@ -50,8 +57,13 @@ void twin_screen_destroy(twin_screen_t *screen)
 {
     while (screen->bottom)
         twin_pixmap_hide(screen->bottom);
-    free(screen->span_cache); /* Free span buffer cache */
-    free(screen);
+    for (int i = 0; i < screen->path_cache_count; i++)
+        twin_path_destroy(screen->path_cache[i]);
+    if (screen->mask_cache)
+        twin_pixmap_destroy(screen->mask_cache);
+    twin_free(screen->span_cache);
+    twin_free(screen->scratch_buf);
+    twin_free(screen);
 }
 
 void twin_screen_register_damaged(twin_screen_t *screen,
@@ -195,7 +207,7 @@ void twin_screen_update(twin_screen_t *screen)
         } else {
             /* Need larger cache - reallocate */
             twin_argb32_t *new_cache =
-                realloc(screen->span_cache, width * sizeof(twin_argb32_t));
+                twin_realloc(screen->span_cache, width * sizeof(twin_argb32_t));
             if (!new_cache)
                 return;
             screen->span_cache = new_cache;

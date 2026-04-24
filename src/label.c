@@ -77,7 +77,7 @@ twin_dispatch_result_t _twin_label_dispatch(twin_widget_t *widget,
     case TwinEventDestroy:
         /* Free the label text */
         if (label->label)
-            free(label->label);
+            twin_free(label->label);
         break;
     default:
         break;
@@ -92,11 +92,11 @@ void twin_label_set(twin_label_t *label,
                     twin_style_t font_style)
 {
     if (value) {
-        char *new = malloc(strlen(value) + 1);
+        char *new = twin_malloc(strlen(value) + 1);
 
         if (new) {
             if (label->label)
-                free(label->label);
+                twin_free(label->label);
             label->label = new;
             strcpy(label->label, value);
         }
@@ -131,7 +131,7 @@ twin_label_t *twin_label_create(twin_box_t *parent,
                                 twin_fixed_t font_size,
                                 twin_style_t font_style)
 {
-    twin_label_t *label = malloc(sizeof(twin_label_t));
+    twin_label_t *label = twin_malloc(sizeof(twin_label_t));
     if (!label)
         return NULL;
 

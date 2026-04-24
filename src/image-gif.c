@@ -114,7 +114,7 @@ static twin_gif_t *gif_open(const char *fname)
     /* Aspect Ratio */
     read(fd, &aspect, 1);
     /* Create twin_gif_t Structure. */
-    gif = calloc(1, sizeof(*gif));
+    gif = twin_calloc(1, sizeof(*gif));
     if (!gif)
         goto fail;
     gif->fd = fd;
@@ -126,9 +126,9 @@ static twin_gif_t *gif_open(const char *fname)
     read(fd, gif->gct.colors, 3 * gif->gct.size);
     gif->palette = &gif->gct;
     gif->bgindex = bgidx;
-    gif->frame = calloc(4, width * height);
+    gif->frame = twin_calloc(4, width * height);
     if (!gif->frame) {
-        free(gif);
+        twin_free(gif);
         goto fail;
     }
     gif->canvas = &gif->frame[width * height];
@@ -160,7 +160,7 @@ static void discard_sub_blocks(twin_gif_t *gif)
 static table_t *table_new(int key_size)
 {
     int init_bulk = MAX(1 << (key_size + 1), 0x100);
-    table_t *table = malloc(sizeof(*table) + sizeof(entry_t) * init_bulk);
+    table_t *table = twin_malloc(sizeof(*table) + sizeof(entry_t) * init_bulk);
     if (table) {
         table->bulk = init_bulk;
         table->n_entries = (1 << key_size) + 2;
@@ -187,7 +187,8 @@ static int entry_add(table_t **table_p,
     table_t *table = *table_p;
     if (table->n_entries == table->bulk) {
         table->bulk *= 2;
-        table = realloc(table, sizeof(*table) + sizeof(entry_t) * table->bulk);
+        table =
+            twin_realloc(table, sizeof(*table) + sizeof(entry_t) * table->bulk);
         if (!table)
             return -1;
         table->entries = (entry_t *) &table[1];
@@ -298,7 +299,7 @@ static int read_image_data(twin_gif_t *gif, int interlace)
         } else if (!is_table_full) {
             ret = entry_add(&table, str_len + 1, key, entry.suffix);
             if (ret == -1) {
-                free(table);
+                twin_free(table);
                 return -1;
             }
             if (table->n_entries == 0x1000) {
@@ -333,7 +334,7 @@ static int read_image_data(twin_gif_t *gif, int interlace)
         if (key < table->n_entries - 1 && !is_table_full)
             table->entries[table->n_entries - 1].suffix = entry.suffix;
     }
-    free(table);
+    twin_free(table);
     if (key == stop)
         read(gif->fd, &sub_len, 1); /* Must be zero! */
     lseek(gif->fd, end, SEEK_SET);
@@ -530,19 +531,19 @@ static void gif_rewind(twin_gif_t *gif)
 static void gif_close(twin_gif_t *gif)
 {
     close(gif->fd);
-    free(gif->frame);
-    free(gif);
+    twin_free(gif->frame);
+    twin_free(gif);
 }
 
 static twin_animation_t *_twin_animation_from_gif_file(const char *path)
 {
-    twin_animation_t *anim = malloc(sizeof(twin_animation_t));
+    twin_animation_t *anim = twin_malloc(sizeof(twin_animation_t));
     if (!anim)
         return NULL;
 
     twin_gif_t *gif = gif_open(path);
     if (!gif) {
-        free(anim);
+        twin_free(anim);
         return NULL;
     }
 
@@ -558,27 +559,27 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
         frame_count++;
 
     anim->n_frames = frame_count;
-    anim->frames = malloc(sizeof(twin_pixmap_t *) * frame_count);
+    anim->frames = twin_malloc(sizeof(twin_pixmap_t *) * frame_count);
     if (!anim->frames) {
-        free(anim);
+        twin_free(anim);
         gif_close(gif);
         return NULL;
     }
-    anim->frame_delays = malloc(sizeof(twin_time_t) * frame_count);
+    anim->frame_delays = twin_malloc(sizeof(twin_time_t) * frame_count);
     if (!anim->frame_delays) {
-        free(anim->frames);
-        free(anim);
+        twin_free(anim->frames);
+        twin_free(anim);
         gif_close(gif);
         return NULL;
     }
 
     gif_rewind(gif);
     uint8_t *color, *frame;
-    frame = malloc(gif->width * gif->height * 3);
+    frame = twin_malloc(gif->width * gif->height * 3);
     if (!frame) {
-        free(anim->frame_delays);
-        free(anim->frames);
-        free(anim);
+        twin_free(anim->frame_delays);
+        twin_free(anim->frames);
+        twin_free(anim);
         gif_close(gif);
         return NULL;
     }
@@ -589,10 +590,10 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
             /* Free previously allocated pixmaps */
             for (twin_count_t j = 0; j < i; j++)
                 twin_pixmap_destroy(anim->frames[j]);
-            free(frame);
-            free(anim->frame_delays);
-            free(anim->frames);
-            free(anim);
+            twin_free(frame);
+            twin_free(anim->frame_delays);
+            twin_free(anim->frames);
+            twin_free(anim);
             gif_close(gif);
             return NULL;
         }
@@ -628,14 +629,14 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
         /* Free all allocated pixmaps */
         for (twin_count_t i = 0; i < frame_count; i++)
             twin_pixmap_destroy(anim->frames[i]);
-        free(frame);
-        free(anim->frame_delays);
-        free(anim->frames);
-        free(anim);
+        twin_free(frame);
+        twin_free(anim->frame_delays);
+        twin_free(anim->frames);
+        twin_free(anim);
         gif_close(gif);
         return NULL;
     }
-    free(frame);
+    twin_free(frame);
     gif_close(gif);
     return anim;
 }

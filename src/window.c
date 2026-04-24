@@ -28,7 +28,7 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
                                   twin_coord_t width,
                                   twin_coord_t height)
 {
-    twin_window_t *window = malloc(sizeof(twin_window_t));
+    twin_window_t *window = twin_malloc(sizeof(twin_window_t));
     twin_coord_t left, top, right, bottom;
 
     if (!window)
@@ -101,8 +101,8 @@ void twin_window_destroy(twin_window_t *window)
         (*window->destroy)(window);
 
     twin_pixmap_destroy(window->pixmap);
-    free(window->name);
-    free(window);
+    twin_free(window->name);
+    twin_free(window);
 }
 
 void twin_window_show(twin_window_t *window)
@@ -209,8 +209,8 @@ void twin_window_style_size(twin_window_style_t style, twin_rect_t *size)
 
 void twin_window_set_name(twin_window_t *window, const char *name)
 {
-    free(window->name);
-    window->name = malloc(strlen(name) + 1);
+    twin_free(window->name);
+    window->name = twin_malloc(strlen(name) + 1);
     if (window->name)
         strcpy(window->name, name);
     else

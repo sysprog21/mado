@@ -677,7 +677,7 @@ static twin_xform_t *twin_pixmap_init_xform(twin_pixmap_t *pixmap,
         xform = (twin_xform_t *) pixmap->xform_cache;
     } else {
         /* Need larger cache - reallocate */
-        void *new_cache = realloc(pixmap->xform_cache, required_size);
+        void *new_cache = twin_realloc(pixmap->xform_cache, required_size);
         if (!new_cache)
             return NULL;
         pixmap->xform_cache = new_cache;

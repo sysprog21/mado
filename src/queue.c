@@ -74,6 +74,6 @@ void _twin_queue_review_order(twin_queue_t *first)
         o = q->order;
         q->order = 0;
         if (q->deleted)
-            free(q);
+            twin_free(q);
     }
 }

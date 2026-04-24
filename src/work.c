@@ -49,7 +49,7 @@ twin_work_t *twin_set_work(twin_work_proc_t work_proc,
                            int priority,
                            void *closure)
 {
-    twin_work_t *work = malloc(sizeof(twin_work_t));
+    twin_work_t *work = twin_malloc(sizeof(twin_work_t));
     if (!work)
         return NULL;
 
@@ -57,7 +57,7 @@ twin_work_t *twin_set_work(twin_work_proc_t work_proc,
     if (closure) {
         if (!_twin_closure_register(closure)) {
             /* Failed to register closure */
-            free(work);
+            twin_free(work);
             return NULL;
         }
         /* Add reference for this work item */
@@ -82,5 +82,5 @@ void twin_clear_work(twin_work_t *work)
     if (work->closure)
         _twin_closure_unref(work->closure);
 
-    free(work);
+    twin_free(work);
 }

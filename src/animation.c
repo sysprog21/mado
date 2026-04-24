@@ -5,7 +5,7 @@
  */
 #include <stdlib.h>
 
-#include "twin.h"
+#include "twin_private.h"
 
 twin_time_t twin_animation_get_current_delay(const twin_animation_t *anim)
 {
@@ -33,18 +33,18 @@ void twin_animation_destroy(twin_animation_t *anim)
     if (!anim)
         return;
 
-    free(anim->iter);
+    twin_free(anim->iter);
     for (twin_count_t i = 0; i < anim->n_frames; i++) {
         twin_pixmap_destroy(anim->frames[i]);
     }
-    free(anim->frames);
-    free(anim->frame_delays);
-    free(anim);
+    twin_free(anim->frames);
+    twin_free(anim->frame_delays);
+    twin_free(anim);
 }
 
 twin_animation_iter_t *twin_animation_iter_init(twin_animation_t *anim)
 {
-    twin_animation_iter_t *iter = malloc(sizeof(twin_animation_iter_t));
+    twin_animation_iter_t *iter = twin_malloc(sizeof(twin_animation_iter_t));
     if (!iter || !anim)
         return NULL;
     iter->current_index = 0;

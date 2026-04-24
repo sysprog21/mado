@@ -120,7 +120,7 @@ twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
         break;
     }
 
-    rowp = malloc(height * sizeof(png_bytep));
+    rowp = twin_malloc(height * sizeof(png_bytep));
     if (!rowp)
         goto bail_free;
     pix = twin_pixmap_create(fmt, width, height);
@@ -142,7 +142,7 @@ twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
     }
 
 bail_free:
-    free(rowp);
+    twin_free(rowp);
     png_destroy_read_struct(&png, &info, NULL);
 bail_close:
     close(fd);

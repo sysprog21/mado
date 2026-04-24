@@ -228,7 +228,7 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
 
 twin_box_t *twin_box_create(twin_box_t *parent, twin_box_dir_t dir)
 {
-    twin_box_t *box = malloc(sizeof(twin_box_t));
+    twin_box_t *box = twin_malloc(sizeof(twin_box_t));
     if (!box)
         return NULL;
 

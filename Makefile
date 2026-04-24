@@ -87,6 +87,7 @@ src/composite-decls.h: scripts/gen-composite-decls.py
 
 libtwin.a_files-$(CONFIG_LOGGING) += src/log.c
 libtwin.a_files-$(CONFIG_CURSOR) += src/cursor.c
+libtwin.a_files-y += src/memstats.c
 
 # Rendering backends
 # Screen compositing operations (always needed for screen buffer management)

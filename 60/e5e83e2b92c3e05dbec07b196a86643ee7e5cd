@@ -1,0 +1,40 @@
+src/draw-common.c
+  decc93c8a1e63f9a 229-231,235,239-420,422-440
+src/window.c
+  d5d695a5df16ee0a 362,395-407,409-410
+src/twin_private.h
+  decc93c8a1e63f9a 720-726,728-730
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "60e5e83e2b92c3e05dbec07b196a86643ee7e5cd",
+  "prompts": {
+    "d5d695a5df16ee0a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dbfa7-6939-7af1-ad22-4f59acd73ab1",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Jim Huang",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 5,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    },
+    "decc93c8a1e63f9a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "70b2f463-3ce9-4d4f-85c5-e773d3fab397",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Jim Huang",
+      "messages": [],
+      "total_additions": 798,
+      "total_deletions": 118,
+      "accepted_lines": 795,
+      "overriden_lines": 0
+    }
+  }
+}

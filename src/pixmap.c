@@ -33,6 +33,9 @@ static bool twin_pixmap_alloc_size(twin_format_t format,
     if (stride > SIZE_MAX - 3)
         return false;
     stride = ALIGN_UP(stride, 4);
+    /* Stride must fit in twin_coord_t (int16_t) for the pixmap struct. */
+    if (stride > INT16_MAX)
+        return false;
     if ((size_t) height > (SIZE_MAX - sizeof(twin_pixmap_t)) / stride)
         return false;
 
@@ -44,13 +47,20 @@ twin_pixmap_t *twin_pixmap_create(twin_format_t format,
                                   twin_coord_t width,
                                   twin_coord_t height)
 {
-    twin_coord_t stride = twin_bytes_per_pixel(format) * width;
-    /* Align stride to 4 bytes for proper uint32_t access in Pixman. */
-    if (!IS_ALIGNED(stride, 4))
-        stride = ALIGN_UP(stride, 4);
+    size_t size;
+    if (!twin_pixmap_alloc_size(format, width, height, &size))
+        return NULL;
 
-    twin_area_t space = (twin_area_t) stride * height;
-    twin_area_t size = sizeof(twin_pixmap_t) + space;
+    /* Compute stride in size_t to avoid int16_t overflow. */
+    size_t stride_sz =
+        ALIGN_UP((size_t) twin_bytes_per_pixel(format) * (size_t) width, 4);
+    size_t space = stride_sz * (size_t) height;
+
+    /* Stride must fit in twin_coord_t for the pixmap struct field. */
+    if (stride_sz > INT16_MAX)
+        return NULL;
+    twin_coord_t stride = (twin_coord_t) stride_sz;
+
     twin_pixmap_t *pixmap = twin_malloc(size);
     if (!pixmap)
         return NULL;
@@ -90,10 +100,8 @@ twin_pixmap_t *twin_pixmap_create_budget(twin_format_t format,
         return NULL;
 
     size_t full_size;
-    if (!twin_pixmap_alloc_size(format, max_width, max_height, &full_size))
-        return NULL;
-
-    if (full_size <= memory_budget)
+    if (twin_pixmap_alloc_size(format, max_width, max_height, &full_size) &&
+        full_size <= memory_budget)
         return twin_pixmap_create(format, max_width, max_height);
 
     if (memory_budget <= sizeof(twin_pixmap_t))
@@ -246,8 +254,8 @@ twin_pointer_t twin_pixmap_pointer(twin_pixmap_t *pixmap,
 {
     twin_pointer_t p;
 
-    p.b = (pixmap->p.b + y * pixmap->stride +
-           x * twin_bytes_per_pixel(pixmap->format));
+    p.b = (pixmap->p.b + (int32_t) y * pixmap->stride +
+           (int32_t) x * twin_bytes_per_pixel(pixmap->format));
     return p;
 }
 

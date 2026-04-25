@@ -1,0 +1,29 @@
+CONTRIBUTING.md
+  20f6269fda0cd78a 47
+.github/workflows/main.yml
+  20f6269fda0cd78a 12,15,41,45,57,60-63
+.github/workflows/headless-test.yml
+  20f6269fda0cd78a 10
+.ci/check-format.sh
+  20f6269fda0cd78a 5,7-10,12-16,18-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "a0b7d1e4210de0bf1bafc63a6e08edcb9713a01c",
+  "prompts": {
+    "20f6269fda0cd78a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b960ac1c-e8a6-4a35-b552-3a584aee53f8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Jim Huang",
+      "messages": [],
+      "total_additions": 24,
+      "total_deletions": 17,
+      "accepted_lines": 23,
+      "overriden_lines": 0
+    }
+  }
+}

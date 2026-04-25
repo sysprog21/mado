@@ -46,11 +46,12 @@ twin_dispatch_result_t _twin_button_dispatch(twin_widget_t *widget,
         _twin_button_set_label_offset(button);
 
         /* Invoke widget callback for button press */
-        if (widget->callback) {
+        if (_twin_widget_callback(widget)) {
             twin_event_t press_event = *event;
             press_event.kind = TwinEventButtonSignalDown;
             press_event.u.button_signal.signal = TwinButtonSignalDown;
-            (*widget->callback)(widget, &press_event, widget->callback_data);
+            _twin_widget_callback(widget)(widget, &press_event,
+                                          _twin_widget_callback_data(widget));
         }
         return TwinDispatchDone;
         break;
@@ -72,12 +73,12 @@ twin_dispatch_result_t _twin_button_dispatch(twin_widget_t *widget,
             _twin_button_set_label_offset(button);
 
             /* Invoke widget callback for button release (click) */
-            if (widget->callback) {
+            if (_twin_widget_callback(widget)) {
                 twin_event_t release_event = *event;
                 release_event.kind = TwinEventButtonSignalUp;
                 release_event.u.button_signal.signal = TwinButtonSignalUp;
-                (*widget->callback)(widget, &release_event,
-                                    widget->callback_data);
+                _twin_widget_callback(widget)(
+                    widget, &release_event, _twin_widget_callback_data(widget));
             }
         }
         return TwinDispatchDone;

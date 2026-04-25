@@ -88,7 +88,7 @@ twin_dispatch_result_t _twin_widget_dispatch(twin_widget_t *widget,
         if (widget->copy_geom) {
             twin_widget_t *copy = widget->copy_geom;
             if (copy->layout)
-                copy->handler(copy, event, copy->callback_data);
+                copy->handler(copy, event, _twin_widget_callback_data(copy));
             widget->preferred = copy->preferred;
             return TwinDispatchDone;
         }
@@ -101,7 +101,8 @@ twin_dispatch_result_t _twin_widget_dispatch(twin_widget_t *widget,
         widget->paint = false;
         break;
     case TwinEventDestroy:
-        /* Base widget has no special cleanup */
+        twin_free(widget->ext);
+        widget->ext = NULL;
         break;
     default:
         break;
@@ -128,17 +129,15 @@ void _twin_widget_init(twin_widget_t *widget,
 
     widget->window = window;
     widget->parent = parent;
+    widget->ext = NULL;
     widget->copy_geom = NULL;
     widget->paint = true;
     widget->layout = true;
-    widget->want_focus = false;
     widget->background = 0x00000000;
     widget->extents.left = widget->extents.top = 0;
     widget->extents.right = widget->extents.bottom = 0;
     widget->preferred = preferred;
     widget->handler = handler;
-    widget->callback = NULL;
-    widget->callback_data = NULL;
     widget->shape = TwinShapeRectangle;
     widget->radius = twin_int_to_fixed(12);
 }
@@ -486,6 +485,28 @@ void twin_widget_set_callback(twin_widget_t *widget,
 {
     if (!widget)
         return;
-    widget->callback = callback;
-    widget->callback_data = data;
+    twin_widget_ext_t *ext = _twin_widget_ensure_ext(widget);
+    if (!ext)
+        return;
+    ext->callback = callback;
+    ext->callback_data = data;
+}
+
+void twin_widget_set_focusable(twin_widget_t *widget, bool focusable)
+{
+    if (!widget)
+        return;
+
+    if (!focusable) {
+        if (widget->ext)
+            widget->ext->want_focus = false;
+        if (widget->parent && widget->parent->focus == widget)
+            widget->parent->focus = NULL;
+        return;
+    }
+
+    twin_widget_ext_t *ext = _twin_widget_ensure_ext(widget);
+    if (!ext)
+        return;
+    ext->want_focus = true;
 }

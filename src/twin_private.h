@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "twin.h"
@@ -762,7 +763,9 @@ static inline int twin_clzll(uint64_t v)
 #else /* generic implementation */
 static inline int twin_clz(uint32_t v)
 {
-    /* http://graphics.stanford.edu/~seander/bithacks.html#IntegerLogDeBruijn */
+    /* De Bruijn log2floor + inversion to get count of leading zeros.
+     * http://graphics.stanford.edu/~seander/bithacks.html#IntegerLogDeBruijn
+     */
     static const uint8_t mul_debruijn[] = {
         0, 9,  1,  10, 13, 21, 2,  29, 11, 14, 16, 18, 22, 25, 3, 30,
         8, 12, 20, 28, 15, 17, 24, 7,  19, 27, 23, 6,  26, 5,  4, 31,
@@ -774,27 +777,15 @@ static inline int twin_clz(uint32_t v)
     v |= v >> 8;
     v |= v >> 16;
 
-    return mul_debruijn[(uint32_t) (v * 0x07C4ACDDU) >> 27];
+    return 31 - (int) mul_debruijn[(uint32_t) (v * 0x07C4ACDDU) >> 27];
 }
 static inline int twin_clzll(uint64_t v)
 {
-    /* https://stackoverflow.com/questions/21888140/de-bruijn-algorithm-binary-digit-count-64bits-c-sharp
+    /* Split into high/low 32-bit halves and reuse the verified 32-bit
+     * de Bruijn CLZ.  Avoids a separate 64-bit lookup table.
      */
-    static const uint8_t mul_debruijn[] = {
-        0,  1,  2,  53, 3,  7,  54, 27, 4,  38, 41, 8,  34, 55, 48, 28,
-        62, 5,  39, 46, 44, 42, 22, 9,  24, 35, 59, 56, 49, 18, 29, 11,
-        63, 52, 6,  26, 37, 40, 33, 47, 61, 45, 43, 21, 23, 58, 17, 10,
-        51, 25, 36, 32, 60, 20, 57, 16, 50, 31, 19, 15, 30, 14, 13, 12,
-    };
-
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v |= v >> 32;
-
-    return mul_debruijn[(uint64_t) (v * 0x022fdd63cc95386dUL) >> 58];
+    uint32_t hi = (uint32_t) (v >> 32);
+    return hi ? twin_clz(hi) : 32 + twin_clz((uint32_t) v);
 }
 #endif
 
@@ -999,6 +990,37 @@ typedef struct {
     size_t total_bytes;
 } twin_memstats_t;
 
+/*
+ * Raw allocator backend.  When CONFIG_MEM_TLSF is enabled these route
+ * through a fixed-size TLSF pool; otherwise they are trivial wrappers
+ * around libc malloc/calloc/realloc/free.
+ */
+#if defined(CONFIG_MEM_TLSF)
+void twin_mem_pool_init(void);
+void *twin_raw_malloc(size_t size);
+void *twin_raw_calloc(size_t n, size_t size);
+void *twin_raw_realloc(void *ptr, size_t size);
+void twin_raw_free(void *ptr);
+#else
+static inline void twin_mem_pool_init(void) {}
+static inline void *twin_raw_malloc(size_t sz)
+{
+    return malloc(sz);
+}
+static inline void *twin_raw_calloc(size_t n, size_t sz)
+{
+    return calloc(n, sz);
+}
+static inline void *twin_raw_realloc(void *p, size_t sz)
+{
+    return realloc(p, sz);
+}
+static inline void twin_raw_free(void *p)
+{
+    free(p);
+}
+#endif
+
 #if defined(CONFIG_MEMORY_STATS)
 void *_twin_malloc(size_t size, const char *file, int line);
 void *_twin_calloc(size_t n, size_t size, const char *file, int line);
@@ -1009,10 +1031,43 @@ void _twin_free(void *ptr, const char *file, int line);
 #define twin_realloc(p, sz) _twin_realloc(p, sz, __FILE__, __LINE__)
 #define twin_free(p) _twin_free(p, __FILE__, __LINE__)
 #else
-#define twin_malloc(sz) malloc(sz)
-#define twin_calloc(n, sz) calloc(n, sz)
-#define twin_realloc(p, sz) realloc(p, sz)
-#define twin_free(p) free(p)
+#define twin_malloc(sz) twin_raw_malloc(sz)
+#define twin_calloc(n, sz) twin_raw_calloc(n, sz)
+#define twin_realloc(p, sz) twin_raw_realloc(p, sz)
+#define twin_free(p) twin_raw_free(p)
 #endif
+
+/*
+ * Lazy widget extension accessors.
+ *
+ * The optional fields (callback, callback_data, want_focus) live in a
+ * separately allocated twin_widget_ext_t block. Widgets that never
+ * register a callback or request focus keep ext == NULL and pay only
+ * one pointer.
+ */
+
+/* Allocate the extension block if absent.  Returns ext or NULL on OOM. */
+static inline twin_widget_ext_t *_twin_widget_ensure_ext(twin_widget_t *w)
+{
+    if (w->ext)
+        return w->ext;
+    w->ext = twin_calloc(1, sizeof(twin_widget_ext_t));
+    return w->ext;
+}
+
+static inline twin_widget_proc_t _twin_widget_callback(const twin_widget_t *w)
+{
+    return w->ext ? w->ext->callback : NULL;
+}
+
+static inline void *_twin_widget_callback_data(const twin_widget_t *w)
+{
+    return w->ext ? w->ext->callback_data : NULL;
+}
+
+static inline bool _twin_widget_want_focus(const twin_widget_t *w)
+{
+    return w->ext ? w->ext->want_focus : false;
+}
 
 #endif /* _TWIN_PRIVATE_H_ */

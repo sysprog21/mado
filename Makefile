@@ -92,6 +92,7 @@ src/shadow-gaussian-lut.h: scripts/gen-shadow-lut.py
 libtwin.a_files-$(CONFIG_LOGGING) += src/log.c
 libtwin.a_files-$(CONFIG_CURSOR) += src/cursor.c
 libtwin.a_files-y += src/memstats.c
+libtwin.a_files-$(CONFIG_MEM_TLSF) += src/mem-tlsf.c
 
 # Rendering backends
 # Screen compositing operations (always needed for screen buffer management)

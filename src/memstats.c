@@ -15,6 +15,12 @@
 /* Small inline tracker storage keeps the common case allocation-free,
  * but the table can grow with libc realloc so usage accounting remains
  * correct when many allocations are live at once.
+ *
+ * The tracking table itself always uses libc malloc/realloc/free, never
+ * the raw allocator backend (twin_raw_*).  This avoids a circular
+ * dependency when CONFIG_MEM_TLSF is enabled: the TLSF pool allocations
+ * are tracked in the table, so the table storage must not come from the
+ * same pool.
  */
 #define MEMTBL_INLINE_CAPACITY 512
 
@@ -106,10 +112,10 @@ void *_twin_malloc(size_t size, const char *file, int line)
 {
     (void) file;
     (void) line;
-    void *ptr = malloc(size);
+    void *ptr = twin_raw_malloc(size);
     if (ptr) {
         if (!memtbl_insert(ptr, size)) {
-            free(ptr);
+            twin_raw_free(ptr);
             return NULL;
         }
         stats.current_bytes += size;
@@ -128,11 +134,11 @@ void *_twin_calloc(size_t n, size_t size, const char *file, int line)
     /* Overflow check */
     if (n && size > SIZE_MAX / n)
         return NULL;
-    void *ptr = calloc(n, size);
+    void *ptr = twin_raw_calloc(n, size);
     if (ptr) {
         size_t total = n * size;
         if (!memtbl_insert(ptr, total)) {
-            free(ptr);
+            twin_raw_free(ptr);
             return NULL;
         }
         stats.current_bytes += total;
@@ -154,7 +160,7 @@ void *_twin_realloc(void *old, size_t size, const char *file, int line)
         stats.current_bytes -= old_size;
         if (old)
             stats.total_frees++;
-        free(old);
+        twin_raw_free(old);
         return NULL;
     }
 
@@ -162,7 +168,7 @@ void *_twin_realloc(void *old, size_t size, const char *file, int line)
     if (old_idx < 0 && memtbl_count == memtbl_capacity && !memtbl_grow())
         return NULL;
 
-    void *ptr = realloc(old, size);
+    void *ptr = twin_raw_realloc(old, size);
     if (!ptr)
         return NULL;
 
@@ -197,7 +203,7 @@ void _twin_free(void *ptr, const char *file, int line)
     size_t sz = memtbl_remove(ptr);
     stats.current_bytes -= sz;
     stats.total_frees++;
-    free(ptr);
+    twin_raw_free(ptr);
 }
 
 void twin_memory_get_info(twin_memory_info_t *info)

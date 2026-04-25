@@ -644,26 +644,32 @@ typedef enum _twin_shape {
     TwinShapeEllipse /**< Elliptical shape */
 } twin_shape_t;
 
+/**
+ * Optional widget attributes, lazily allocated on first use.
+ * Widgets that never register a callback or request focus pay zero
+ * RAM cost for these fields. Allocated on first callback/focus use.
+ */
+typedef struct _twin_widget_ext {
+    twin_widget_proc_t callback; /**< Application callback (optional) */
+    void *callback_data;         /**< Callback user data */
+    bool want_focus;             /**< Focus request flag */
+} twin_widget_ext_t;
+
 struct _twin_widget {
     /* Widget hierarchy */
     twin_window_t *window; /**< Parent window */
     twin_widget_t *next;   /**< Next sibling widget */
     twin_box_t *parent;    /**< Parent container */
 
-    /* Event handling:
-     * - handler: Framework event handler (processes paint, configure, etc.)
-     * - callback: Application callback (optional, receives button clicks, etc.)
-     */
-    twin_widget_proc_t handler;  /**< Widget event handler (framework) */
-    twin_widget_proc_t callback; /**< Application callback (optional) */
-    void *callback_data;         /**< Callback user data */
-    twin_rect_t extents;         /**< Current geometry */
-    twin_widget_t *copy_geom;    /**< Geometry source widget */
+    /* Event handling */
+    twin_widget_proc_t handler; /**< Widget event handler (framework) */
+    twin_widget_ext_t *ext;     /**< Optional attributes (lazy, may be NULL) */
+    twin_rect_t extents;        /**< Current geometry */
+    twin_widget_t *copy_geom;   /**< Geometry source widget (optional) */
 
     /* Widget state */
-    bool paint;      /**< Needs painting */
-    bool layout;     /**< Needs layout */
-    bool want_focus; /**< Focus request flag */
+    bool paint;  /**< Needs painting */
+    bool layout; /**< Needs layout */
 
     /* Widget appearance */
     twin_argb32_t background;       /**< Background color */
@@ -752,6 +758,15 @@ twin_button_t *twin_button_create(twin_box_t *parent,
 void twin_widget_set_callback(twin_widget_t *widget,
                               twin_widget_proc_t callback,
                               void *data);
+
+/**
+ * Set whether a widget should take focus on pointer interaction.
+ * @widget      : Widget to configure
+ * @focusable   : true to route key/UCS4 events to this widget after click
+ *
+ * This is primarily used by custom widgets that handle keyboard input.
+ */
+void twin_widget_set_focusable(twin_widget_t *widget, bool focusable);
 
 /**
  * Create default mouse cursor pixmap

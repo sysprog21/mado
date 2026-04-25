@@ -235,7 +235,7 @@ static bool twin_fbdev_work(void *closure)
     return true;
 }
 
-twin_context_t *twin_fbdev_init(int width, int height)
+twin_context_t *twin_fbdev_init(int width maybe_unused, int height maybe_unused)
 {
     char *fbdev_path = getenv(FBDEV_NAME);
     if (!fbdev_path) {
@@ -283,6 +283,15 @@ twin_context_t *twin_fbdev_init(int width, int height)
         goto bail_vt_fd;
     }
 
+    /* Use actual framebuffer resolution instead of caller-supplied dimensions.
+     * The physical display size is authoritative -- the caller's width/height
+     * are only hints suitable for resizable backends like SDL.
+     * Read directly from fb_var which was already validated by
+     * twin_fbdev_apply_config() above -- no redundant ioctl needed.
+     */
+    int fb_width = tx->fb_var.xres;
+    int fb_height = tx->fb_var.yres;
+
     const twin_put_span_t fbdev_put_spans[] = {
         _twin_fbdev_put_span16,
         _twin_fbdev_put_span24,
@@ -290,8 +299,8 @@ twin_context_t *twin_fbdev_init(int width, int height)
     };
     /* Create TWIN screen */
     ctx->screen = twin_screen_create(
-        width, height, NULL, fbdev_put_spans[tx->fb_var.bits_per_pixel / 8 - 2],
-        ctx);
+        fb_width, fb_height, NULL,
+        fbdev_put_spans[tx->fb_var.bits_per_pixel / 8 - 2], ctx);
     if (!ctx->screen) {
         log_error("Failed to create screen");
         goto bail_fb_unmap;

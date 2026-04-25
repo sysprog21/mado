@@ -63,17 +63,19 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
     width += left + right;
     height += top + bottom;
 #else
-    /* No-WM: ignore position, clamp to screen, no decorations */
+    /* No-WM: the single window always covers the entire screen
+     * regardless of what the application requested.  The screen
+     * dimensions are authoritative -- they come from the backend
+     * (hardware resolution for fbdev, window size for SDL, etc.).
+     */
     left = 0;
     top = 0;
     right = 0;
     bottom = 0;
     x = 0;
     y = 0;
-    if (width > screen->width)
-        width = screen->width;
-    if (height > screen->height)
-        height = screen->height;
+    width = screen->width;
+    height = screen->height;
 #endif
 
     window->client.left = left;
@@ -156,14 +158,12 @@ void twin_window_configure(twin_window_t *window,
 #if defined(CONFIG_WINDOW_MANAGER)
     _twin_window_style_size(style, &border);
 #else
-    /* No-WM: ignore position, clamp to screen, zero margins */
+    /* No-WM: always match the screen provided by the backend. */
     border.left = border.right = border.top = border.bottom = 0;
     x = 0;
     y = 0;
-    if (width > window->screen->width)
-        width = window->screen->width;
-    if (height > window->screen->height)
-        height = window->screen->height;
+    width = window->screen->width;
+    height = window->screen->height;
 #endif
 
     twin_pixmap_disable_update(window->pixmap);

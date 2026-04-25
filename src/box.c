@@ -41,7 +41,7 @@ static twin_dispatch_result_t _twin_box_query_geometry(twin_box_t *box)
     for (twin_widget_t *child = box->children; child; child = child->next) {
         if (child->layout) {
             ev.kind = TwinEventQueryGeometry;
-            child->handler(child, &ev, child->callback_data);
+            child->handler(child, &ev, _twin_widget_callback_data(child));
         }
         if (box->dir == TwinBoxHorz) {
             preferred.width += child->preferred.width;
@@ -129,7 +129,7 @@ static twin_dispatch_result_t _twin_box_configure(twin_box_t *box)
             extents.bottom != child->extents.bottom) {
             ev.kind = TwinEventConfigure;
             ev.u.configure.extents = extents;
-            child->handler(child, &ev, child->callback_data);
+            child->handler(child, &ev, _twin_widget_callback_data(child));
         }
     }
     return TwinDispatchContinue;
@@ -167,7 +167,7 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
 
             /* Send destroy event to child */
             ev.kind = TwinEventDestroy;
-            child->handler(child, &ev, child->callback_data);
+            child->handler(child, &ev, _twin_widget_callback_data(child));
         }
         break;
     case TwinEventQueryGeometry:
@@ -178,7 +178,7 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
         twin_window_show(widget->window);
         box->button_down =
             _twin_box_xy_to_widget(box, event->u.pointer.x, event->u.pointer.y);
-        if (box->button_down && box->button_down->want_focus)
+        if (box->button_down && _twin_widget_want_focus(box->button_down))
             box->focus = box->button_down;
         fallthrough;
     case TwinEventButtonUp:
@@ -188,7 +188,8 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
             ev = *event;
             ev.u.pointer.x -= child->extents.left;
             ev.u.pointer.y -= child->extents.top;
-            return child->handler(child, &ev, child->callback_data);
+            return child->handler(child, &ev,
+                                  _twin_widget_callback_data(child));
         }
         break;
     case TwinEventKeyDown:
@@ -196,7 +197,7 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
     case TwinEventUcs4:
         if (box->focus)
             return box->focus->handler(box->focus, event,
-                                       box->focus->callback_data);
+                                       _twin_widget_callback_data(box->focus));
         break;
     case TwinEventPaint:
         box->widget.paint = false;
@@ -215,7 +216,7 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
                 twin_pixmap_set_clip(pixmap, child->extents);
                 twin_pixmap_origin_to_clip(pixmap);
                 child->paint = false;
-                child->handler(child, event, child->callback_data);
+                child->handler(child, event, _twin_widget_callback_data(child));
                 twin_pixmap_restore_clip(pixmap, clip);
                 twin_pixmap_set_origin(pixmap, ox, oy);
             }

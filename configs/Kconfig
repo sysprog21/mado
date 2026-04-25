@@ -180,6 +180,31 @@ config MEMORY_STATS
       malloc/free call. Useful for profiling memory consumption
       on constrained devices.
 
+config MEM_TLSF
+    bool "Use TLSF allocator for heap"
+    default n
+    help
+      Replace system malloc with the TLSF (Two-Level Segregated Fit)
+      allocator backed by a fixed-size memory pool. Provides O(1)
+      allocation and deallocation with bounded fragmentation, suitable
+      for real-time embedded targets without a system heap.
+
+      When disabled, the system malloc/free is used directly.
+
+config MEM_TLSF_POOL_SIZE
+    int "TLSF pool size in bytes"
+    default 65536
+    range 4096 8388608
+    depends on MEM_TLSF
+    help
+      Size of the static memory pool backing the TLSF allocator.
+      Must be large enough for all runtime allocations including
+      pixmap buffers. A 640x480 ARGB32 screen pixmap alone needs
+      ~1.2 MB; the SDL demo with multiple windows peaks at ~8 MB.
+      Embedded targets with small displays need far less (e.g.
+      320x240 RGB565 = ~150 KB framebuffer + widget overhead).
+      Requests exceeding pool capacity return NULL.
+
 comment "Logging is disabled"
     depends on !LOGGING
 

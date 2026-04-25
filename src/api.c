@@ -22,6 +22,9 @@ extern twin_backend_t g_twin_backend;
  */
 twin_context_t *twin_create(int width, int height)
 {
+    /* Initialize the memory pool before any allocations occur. */
+    twin_mem_pool_init();
+
     /* Runtime check for missing backend */
     if (!g_twin_backend.init) {
         log_error("Backend not registered - no init function");

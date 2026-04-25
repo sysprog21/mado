@@ -191,9 +191,27 @@ config CURSOR
       Enable custom cursor rendering and manipulation.
       Allows application control over cursor appearance.
 
+config WINDOW_MANAGER
+    bool "Enable window manager"
+    default y
+    help
+      Enable the window management subsystem: title bars,
+      decorations, drag-move, click-to-raise, iconify/restore,
+      and resize handles.
+
+      When disabled, windows are placed at (0,0) and clamped to
+      screen size. No decorations are drawn; the client area
+      covers the full pixmap. Pointer events route directly to
+      the window event handler without WM interpretation. The
+      demo launcher starts only the first enabled demo in this
+      mode to avoid inaccessible overlapping windows.
+
+      Disabling saves ~3-4 KB .text on ARM Cortex-M class targets.
+
 config DROP_SHADOW
     bool "Render drop shadow for active window"
     default y
+    depends on WINDOW_MANAGER
     help
       Add drop shadow effect to active window.
       Provides visual depth and window focus indication.
@@ -298,10 +316,12 @@ config DEMO_APPLICATIONS
 config DEMO_MULTI
     bool "Build multi demo"
     default y
-    depends on DEMO_APPLICATIONS
+    depends on DEMO_APPLICATIONS && WINDOW_MANAGER
     help
       Comprehensive demo with multiple windows and widgets.
       Demonstrates window management and event handling.
+      Requires window manager for staggered placement and
+      overlapping window interaction.
 
 config DEMO_CLOCK
     bool "Build clock demo"

@@ -8,8 +8,6 @@
 #include "shadow-gaussian-lut.h"
 #include "twin_private.h"
 
-#define TWIN_TITLE_HEIGHT 20
-
 static void _twin_apply_stack_blur(twin_pixmap_t *trg_px,
                                    twin_pixmap_t *src_px,
                                    int radius,
@@ -153,6 +151,9 @@ void twin_stack_blur(twin_pixmap_t *px,
 }
 
 #if defined(CONFIG_DROP_SHADOW)
+
+#define TWIN_TITLE_HEIGHT 20
+
 /* Reuse bottom-strip weights between frames when width is unchanged. */
 static twin_a8_t *shadow_bottom_cache_weights;
 static twin_coord_t shadow_bottom_cache_capacity;

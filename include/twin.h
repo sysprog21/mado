@@ -261,9 +261,7 @@ typedef struct _twin_pixmap {
     twin_animation_t *animation; /**< Animation data if animated */
     twin_pointer_t p;            /**< Pixel data pointer */
 
-#if defined(CONFIG_DROP_SHADOW)
     bool shadow; /**< Drop shadow for active windows */
-#endif
 
     twin_window_t *window; /**< Associated window (if any) */
 
@@ -527,9 +525,6 @@ extern twin_font_t twin_Default_Font_Roman;
 typedef enum _twin_window_style {
     TwinWindowPlain /**< Plain window without decorations */,
     TwinWindowApplication /**< Standard application window */,
-    TwinWindowFullScreen /**< Full screen window */,
-    TwinWindowDialog /**< Dialog window */,
-    TwinWindowAlert /**< Alert/popup window */
 } twin_window_style_t;
 
 typedef void (*twin_draw_func_t)(twin_window_t *window);
@@ -543,9 +538,7 @@ struct _twin_window {
     twin_screen_t *screen; /**< Parent screen */
     twin_pixmap_t *pixmap; /**< Window pixmap */
 
-#if defined(CONFIG_DROP_SHADOW)
     twin_coord_t shadow_x, shadow_y; /**< Shadow offset */
-#endif
 
     /* Window properties */
     twin_window_style_t style; /**< Window style */
@@ -556,7 +549,6 @@ struct _twin_window {
     bool active;      /**< Active window flag */
     bool iconify;     /**< Iconified state */
     bool client_grab; /**< Mouse grab state */
-    bool want_focus;  /**< Focus request flag */
     bool draw_queued; /**< Draw pending flag */
 
     /* Window data */
@@ -1526,11 +1518,11 @@ twin_pixmap_t *twin_custom_widget_pixmap(twin_custom_widget_t *custom);
  * Create window with decorations and event handling
  * @screen : Screen to display window on
  * @format : Pixel format for window contents
- * @style  : Window style (plain, application, fullscreen, etc.)
+ * @style  : Window style (plain or application)
  * @x      : Initial X position
  * @y      : Initial Y position
- * @width  : Window width including decorations
- * @height : Window height including decorations
+ * @width  : Client area width (decorations added internally)
+ * @height : Client area height (decorations added internally)
  *
  * Return Newly created window, or NULL on failure
  */
@@ -1561,13 +1553,6 @@ void twin_window_configure(twin_window_t *window,
                            twin_coord_t width,
                            twin_coord_t height);
 
-/* Check if the coordinates are within the window's range. */
-bool twin_window_valid_range(twin_window_t *window,
-                             twin_coord_t x,
-                             twin_coord_t y);
-
-void twin_window_style_size(twin_window_style_t style, twin_rect_t *size);
-
 void twin_window_set_name(twin_window_t *window, const char *name);
 
 void twin_window_draw(twin_window_t *window);
@@ -1579,8 +1564,6 @@ void twin_window_damage(twin_window_t *window,
                         twin_coord_t bottom);
 
 void twin_window_queue_paint(twin_window_t *window);
-
-bool twin_window_dispatch(twin_window_t *window, twin_event_t *event);
 
 #define TWIN_WORK_REDISPLAY 0
 #define TWIN_WORK_PAINT 1

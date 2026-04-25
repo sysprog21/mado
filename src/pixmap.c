@@ -9,8 +9,10 @@
 
 #include "twin_private.h"
 
+#if defined(CONFIG_WINDOW_MANAGER)
 #define TWIN_BW 0
 #define TWIN_TITLE_HEIGHT 20
+#endif
 
 #define IS_ALIGNED(p, alignment) ((p % alignment) == 0)
 #define ALIGN_UP(sz, alignment)                            \
@@ -80,9 +82,7 @@ twin_pixmap_t *twin_pixmap_create(twin_format_t format,
     pixmap->stride = stride;
     pixmap->disable = 0;
     pixmap->animation = NULL;
-#if defined(CONFIG_DROP_SHADOW)
     pixmap->shadow = false;
-#endif
     pixmap->window = NULL; /* Initialize window field */
     pixmap->xform_cache = NULL;
     pixmap->xform_cache_size = 0;
@@ -418,6 +418,7 @@ bool twin_pixmap_transparent(twin_pixmap_t *pixmap,
 
 bool twin_pixmap_is_iconified(twin_pixmap_t *pixmap, twin_coord_t y)
 {
+#if defined(CONFIG_WINDOW_MANAGER)
     /*
      * Check whether the specified area within the pixmap corresponds to an
      * iconified window.
@@ -426,6 +427,10 @@ bool twin_pixmap_is_iconified(twin_pixmap_t *pixmap, twin_coord_t y)
         (pixmap->window->iconify &&
          y >= pixmap->y + TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW))
         return true;
+#else
+    (void) y;
+    (void) pixmap;
+#endif
     return false;
 }
 
@@ -440,6 +445,6 @@ void twin_pixmap_move(twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y)
 bool twin_pixmap_dispatch(twin_pixmap_t *pixmap, twin_event_t *event)
 {
     if (pixmap->window)
-        return twin_window_dispatch(pixmap->window, event);
+        return _twin_window_dispatch(pixmap->window, event);
     return false;
 }

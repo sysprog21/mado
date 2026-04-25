@@ -859,6 +859,13 @@ void twin_composite_stroke(twin_pixmap_t *dst,
                            twin_operator_t operator,
                            twin_scratch_t * scratch);
 
+/* Internal window management helpers */
+void _twin_window_style_size(twin_window_style_t style, twin_rect_t *size);
+bool _twin_window_valid_range(twin_window_t *window,
+                              twin_coord_t x,
+                              twin_coord_t y);
+bool _twin_window_dispatch(twin_window_t *window, twin_event_t *event);
+
 /* Internal event handling */
 void twin_event_enqueue(const twin_event_t *event);
 

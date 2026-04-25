@@ -9,6 +9,8 @@
 
 #include "twin_private.h"
 
+#if defined(CONFIG_WINDOW_MANAGER)
+
 #define TWIN_ACTIVE_BG 0xd03b80ae
 #define TWIN_INACTIVE_BG 0xffb0b0b0
 #define TWIN_FRAME_TEXT 0xffffffff
@@ -21,6 +23,8 @@
 
 /* Shadow color for CSS-style effect: semi-transparent black (50% opacity). */
 #define SHADOW_COLOR 0x80000000
+
+#endif /* CONFIG_WINDOW_MANAGER */
 
 twin_window_t *twin_window_create(twin_screen_t *screen,
                                   twin_format_t format,
@@ -39,6 +43,8 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
     window->style = style;
     window->active = false;
     window->iconify = false;
+
+#if defined(CONFIG_WINDOW_MANAGER)
     switch (window->style) {
     case TwinWindowApplication:
         left = TWIN_BW;
@@ -56,6 +62,20 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
     }
     width += left + right;
     height += top + bottom;
+#else
+    /* No-WM: ignore position, clamp to screen, no decorations */
+    left = 0;
+    top = 0;
+    right = 0;
+    bottom = 0;
+    x = 0;
+    y = 0;
+    if (width > screen->width)
+        width = screen->width;
+    if (height > screen->height)
+        height = screen->height;
+#endif
+
     window->client.left = left;
     window->client.top = top;
     window->client.right = width - right;
@@ -73,6 +93,8 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
     window->pixmap = twin_pixmap_create(format, width + window->shadow_x,
                                         height + window->shadow_y);
 #else
+    window->shadow_x = 0;
+    window->shadow_y = 0;
     window->pixmap = twin_pixmap_create(format, width, height);
 #endif
     if (!window->pixmap) {
@@ -86,7 +108,6 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
     twin_pixmap_move(window->pixmap, x, y);
     window->damage = window->client;
     window->client_grab = false;
-    window->want_focus = false;
     window->draw_queued = false;
     window->client_data = 0;
     window->name = 0;
@@ -132,16 +153,24 @@ void twin_window_configure(twin_window_t *window,
     bool need_layout = false;
     twin_rect_t border;
 
-    twin_window_style_size(style, &border);
+#if defined(CONFIG_WINDOW_MANAGER)
+    _twin_window_style_size(style, &border);
+#else
+    /* No-WM: ignore position, clamp to screen, zero margins */
+    border.left = border.right = border.top = border.bottom = 0;
+    x = 0;
+    y = 0;
+    if (width > window->screen->width)
+        width = window->screen->width;
+    if (height > window->screen->height)
+        height = window->screen->height;
+#endif
 
     twin_pixmap_disable_update(window->pixmap);
     if (width != window->pixmap->width || height != window->pixmap->height) {
         twin_pixmap_t *old = window->pixmap;
-        twin_coord_t pix_w = width, pix_h = height;
-#if defined(CONFIG_DROP_SHADOW)
-        pix_w += window->shadow_x;
-        pix_h += window->shadow_y;
-#endif
+        twin_coord_t pix_w = width + window->shadow_x;
+        twin_coord_t pix_h = height + window->shadow_y;
         twin_pixmap_t *new_pixmap =
             twin_pixmap_create(old->format, pix_w, pix_h);
         if (!new_pixmap) {
@@ -185,19 +214,14 @@ void twin_window_configure(twin_window_t *window,
     twin_pixmap_enable_update(window->pixmap);
 }
 
-bool twin_window_valid_range(twin_window_t *window,
-                             twin_coord_t x,
-                             twin_coord_t y)
+#if defined(CONFIG_WINDOW_MANAGER)
+
+bool _twin_window_valid_range(twin_window_t *window,
+                              twin_coord_t x,
+                              twin_coord_t y)
 {
-    twin_coord_t offset_x = 0, offset_y = 0;
-#if defined(CONFIG_DROP_SHADOW)
-    /* Handle drop shadow. */
-    /*
-     * When the click coordinates fall within the drop shadow area, it will not
-     * be in the valid range of the window.
-     */
-    offset_x = window->shadow_x, offset_y = window->shadow_y;
-#endif
+    twin_coord_t offset_x = window->shadow_x;
+    twin_coord_t offset_y = window->shadow_y;
 
     switch (window->style) {
     case TwinWindowPlain:
@@ -221,7 +245,7 @@ bool twin_window_valid_range(twin_window_t *window,
     }
 }
 
-void twin_window_style_size(twin_window_style_t style, twin_rect_t *size)
+void _twin_window_style_size(twin_window_style_t style, twin_rect_t *size)
 {
     switch (style) {
     case TwinWindowPlain:
@@ -237,6 +261,27 @@ void twin_window_style_size(twin_window_style_t style, twin_rect_t *size)
     }
 }
 
+#else /* !CONFIG_WINDOW_MANAGER */
+
+bool _twin_window_valid_range(twin_window_t *window,
+                              twin_coord_t x,
+                              twin_coord_t y)
+{
+    /* Simple bounds check without frame or shadow logic */
+    return window->pixmap->x <= x &&
+           x < window->pixmap->x + window->pixmap->width &&
+           window->pixmap->y <= y &&
+           y < window->pixmap->y + window->pixmap->height;
+}
+
+void _twin_window_style_size(twin_window_style_t style, twin_rect_t *size)
+{
+    (void) style;
+    size->left = size->right = size->top = size->bottom = 0;
+}
+
+#endif /* CONFIG_WINDOW_MANAGER */
+
 void twin_window_set_name(twin_window_t *window, const char *name)
 {
     if (!name)
@@ -249,6 +294,8 @@ void twin_window_set_name(twin_window_t *window, const char *name)
     window->name = new_name;
     twin_window_draw(window);
 }
+
+#if defined(CONFIG_WINDOW_MANAGER)
 
 static void twin_window_frame(twin_window_t *window)
 {
@@ -438,12 +485,15 @@ static void twin_window_drop_shadow(twin_window_t *window)
                     shadow_left + active_pix->window->shadow_x, shadow_top,
                     shadow_top + active_pix->window->shadow_y);
 }
-#endif
+#endif /* CONFIG_DROP_SHADOW */
+
+#endif /* CONFIG_WINDOW_MANAGER */
 
 void twin_window_draw(twin_window_t *window)
 {
     twin_pixmap_t *pixmap = window->pixmap;
 
+#if defined(CONFIG_WINDOW_MANAGER)
     switch (window->style) {
     case TwinWindowPlain:
     default:
@@ -452,6 +502,7 @@ void twin_window_draw(twin_window_t *window)
         twin_window_frame(window);
         break;
     }
+#endif
 
     /* if no draw function or no damage, return */
     if (window->draw == NULL || (window->damage.left >= window->damage.right ||
@@ -531,7 +582,9 @@ void twin_window_queue_paint(twin_window_t *window)
     }
 }
 
-bool twin_window_dispatch(twin_window_t *window, twin_event_t *event)
+#if defined(CONFIG_WINDOW_MANAGER)
+
+bool _twin_window_dispatch(twin_window_t *window, twin_event_t *event)
 {
     twin_event_t ev = *event;
     bool delegate = true;
@@ -548,6 +601,8 @@ bool twin_window_dispatch(twin_window_t *window, twin_event_t *event)
     twin_fixed_t title_right;
     twin_path_t *path = twin_path_create();
     const char *name = window->name;
+    if (!name)
+        name = "twin";
 
     text_width = twin_width_utf8(path, name);
     twin_path_destroy(path);
@@ -563,6 +618,26 @@ bool twin_window_dispatch(twin_window_t *window, twin_event_t *event)
     int local_x, local_y;
 
     switch (ev.kind) {
+    case TwinEventActivate:
+        /*
+         * Pure focus transition -- no pointer data in the event union.
+         * Update frame visuals but do not touch pointer coordinates.
+         */
+        if (window->iconify)
+            window->active = false;
+        else
+            window->active = true;
+        twin_window_frame(window);
+        if (window->screen->top && window->screen->top->window &&
+            window != window->screen->top->window) {
+            window->screen->top->window->active = false;
+            twin_window_frame(window->screen->top->window);
+        }
+#if defined(CONFIG_DROP_SHADOW)
+        twin_window_drop_shadow(window);
+#endif
+        delegate = false;
+        break;
     case TwinEventButtonDown:
         local_y = ev.u.pointer.screen_y - window->pixmap->y;
         if (local_y >= 0 && local_y <= TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW) {
@@ -579,15 +654,7 @@ bool twin_window_dispatch(twin_window_t *window, twin_event_t *event)
                                    window->pixmap->height);
             }
         }
-    case TwinEventActivate:
-        /* Set window active. */
-        /*
-         * A iconified window is inactive. When the box is triggered by
-         * TwinEventButtonDown and the window is not iconified, it becomes
-         * active. For a window to be considered active, it must be the topmost
-         * window on the screen. The window's title bar turns blue to indicate
-         * the active state.
-         */
+        /* Activate the window on click */
         if (window->iconify)
             window->active = false;
         else
@@ -599,7 +666,6 @@ bool twin_window_dispatch(twin_window_t *window, twin_event_t *event)
             twin_window_frame(window->screen->top->window);
         }
 #if defined(CONFIG_DROP_SHADOW)
-        /* Handle drop shadow. */
         twin_window_drop_shadow(window);
 #endif
         if (window->client.left <= ev.u.pointer.x &&
@@ -671,3 +737,33 @@ bool twin_window_dispatch(twin_window_t *window, twin_event_t *event)
     }
     return false;
 }
+
+#else /* !CONFIG_WINDOW_MANAGER */
+
+bool _twin_window_dispatch(twin_window_t *window, twin_event_t *event)
+{
+    twin_event_t ev = *event;
+
+    /*
+     * No-WM dispatch: adjust pointer coordinates by client offset (both
+     * zero in No-WM mode, so effectively a no-op) and delegate directly
+     * to window->event. No drag, no iconify, no click-to-raise.
+     */
+    switch (ev.kind) {
+    case TwinEventButtonDown:
+    case TwinEventButtonUp:
+    case TwinEventMotion:
+        ev.u.pointer.x -= window->client.left;
+        ev.u.pointer.y -= window->client.top;
+        break;
+    default:
+        break;
+    }
+
+    if (window->event)
+        return (*window->event)(window, &ev);
+
+    return false;
+}
+
+#endif /* CONFIG_WINDOW_MANAGER */

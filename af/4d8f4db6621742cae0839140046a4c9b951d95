@@ -1,0 +1,38 @@
+backend/fbdev.c
+  36f07dd1b6bc294b 238,286-294,302-303
+src/window.c
+  36f07dd1b6bc294b 66-70,77-78,161,165-166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "af4d8f4db6621742cae0839140046a4c9b951d95",
+  "prompts": {
+    "36f07dd1b6bc294b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0b12336e-a417-4fe3-b434-c995aae1f708",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Jim Huang",
+      "messages": [],
+      "total_additions": 33,
+      "total_deletions": 25,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    },
+    "86373f79bfae9bdb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dc4f8-6b8e-7133-97f4-fc54bad36735",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Jim Huang",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 9,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}

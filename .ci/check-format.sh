@@ -2,13 +2,13 @@
 
 set -e -u -o pipefail
 
-SOURCES=$(find $(git rev-parse --show-toplevel) | egrep "\.(c|cxx|cpp|h|hpp)\$")
+cd "$(git rev-parse --show-toplevel)"
 
-set -x
+FAIL=0
+while IFS= read -r -d '' file; do
+    if ! clang-format-20 -- "${file}" | diff -u -p --label="${file}" --label="expected coding style" "${file}" -; then
+        FAIL=1
+    fi
+done < <(git ls-files -z '*.c' '*.h' '*.cxx' '*.cpp' '*.hpp')
 
-for file in ${SOURCES};
-do
-    clang-format-18 ${file} > expected-format
-    diff -u -p --label="${file}" --label="expected coding style" ${file} expected-format
-done
-exit $(clang-format-18 --output-replacements-xml ${SOURCES} | egrep -c "</replacement>")
+exit ${FAIL}

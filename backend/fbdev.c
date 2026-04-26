@@ -102,14 +102,7 @@ static inline bool twin_fbdev_is_rgb565(twin_fbdev_t *tx)
            tx->fb_var.blue.offset == 0 && tx->fb_var.blue.length == 5;
 }
 
-static inline bool twin_fbdev_is_rgb888(twin_fbdev_t *tx)
-{
-    return tx->fb_var.red.offset == 16 && tx->fb_var.red.length == 8 &&
-           tx->fb_var.green.offset == 8 && tx->fb_var.green.length == 8 &&
-           tx->fb_var.blue.offset == 0 && tx->fb_var.blue.length == 8;
-}
-
-static inline bool twin_fbdev_is_argb32(twin_fbdev_t *tx)
+static inline bool twin_fbdev_is_rgb888_or_argb32(twin_fbdev_t *tx)
 {
     return tx->fb_var.red.offset == 16 && tx->fb_var.red.length == 8 &&
            tx->fb_var.green.offset == 8 && tx->fb_var.green.length == 8 &&
@@ -147,14 +140,10 @@ static bool twin_fbdev_apply_config(twin_fbdev_t *tx)
         }
         break;
     case 24: /* RGB888 */
-        if (!twin_fbdev_is_rgb888(tx)) {
-            log_error("Invalid framebuffer format for 24 bpp");
-            return false;
-        }
-        break;
     case 32: /* ARGB32 */
-        if (!twin_fbdev_is_argb32(tx)) {
-            log_error("Invalid framebuffer format for 32 bpp");
+        if (!twin_fbdev_is_rgb888_or_argb32(tx)) {
+            log_error("Invalid framebuffer format for %u bpp",
+                      tx->fb_var.bits_per_pixel);
             return false;
         }
         break;

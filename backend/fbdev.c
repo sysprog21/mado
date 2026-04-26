@@ -45,35 +45,37 @@ typedef struct {
 } twin_fbdev_t;
 
 /* color conversion */
-#define ARGB32_TO_RGB565_PERLINE(dest, pixels, width)   \
-    do {                                                \
-        for (int i = 0; i < width; i++)                 \
-            dest[i] = ((pixels[i] & 0x00f80000) >> 8) | \
-                      ((pixels[i] & 0x0000fc00) >> 5) | \
-                      ((pixels[i] & 0x000000f8) >> 3);  \
+#define ARGB32_TO_RGB565_PERLINE(dest, pixels, width)    \
+    do {                                                 \
+        uint16_t *_dest = (uint16_t *) dest;             \
+        for (int i = 0; i < width; i++)                  \
+            _dest[i] = ((pixels[i] & 0x00f80000) >> 8) | \
+                       ((pixels[i] & 0x0000fc00) >> 5) | \
+                       ((pixels[i] & 0x000000f8) >> 3);  \
     } while (0)
 
 /* Requires validation in 24-bit per pixel environments */
 #define ARGB32_TO_RGB888_PERLINE(dest, pixels, width) \
     do {                                              \
+        uint32_t *_dest = (uint32_t *) dest;          \
         for (int i = 0; i < width; i++)               \
-            dest[i] = 0xff000000 | pixels[i];         \
+            _dest[i] = 0xff000000 | pixels[i];        \
     } while (0)
 
 #define ARGB32_TO_ARGB32_PERLINE(dest, pixels, width) \
-    memcpy(dest, pixels, width * sizeof(*dest))
+    memcpy((uint32_t *) dest, pixels, width * 4)
 
-#define FBDEV_PUT_SPAN_IMPL(bpp, op)                                     \
-    static void _twin_fbdev_put_span##bpp(                               \
-        twin_coord_t left, twin_coord_t top, twin_coord_t right,         \
-        twin_argb32_t *pixels, void *closure)                            \
-    {                                                                    \
-        uint32_t *dest;                                                  \
-        twin_fbdev_t *tx = PRIV(closure);                                \
-        off_t off = sizeof(*dest) * left + top * tx->fb_fix.line_length; \
-        dest = (uint32_t *) ((uintptr_t) tx->fb_base + off);             \
-        twin_coord_t width = right - left;                               \
-        op(dest, pixels, width);                                         \
+#define FBDEV_PUT_SPAN_IMPL(bpp, op)                                 \
+    static void _twin_fbdev_put_span##bpp(                           \
+        twin_coord_t left, twin_coord_t top, twin_coord_t right,     \
+        twin_argb32_t *pixels, void *closure)                        \
+    {                                                                \
+        uintptr_t dest;                                              \
+        twin_fbdev_t *tx = PRIV(closure);                            \
+        off_t off = (bpp / 8) * left + top * tx->fb_fix.line_length; \
+        dest = (uintptr_t) tx->fb_base + off;                        \
+        twin_coord_t width = right - left;                           \
+        op(dest, pixels, width);                                     \
     }
 
 FBDEV_PUT_SPAN_IMPL(16, ARGB32_TO_RGB565_PERLINE)

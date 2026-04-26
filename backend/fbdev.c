@@ -55,11 +55,14 @@ typedef struct {
     } while (0)
 
 /* Requires validation in 24-bit per pixel environments */
-#define ARGB32_TO_RGB888_PERLINE(dest, pixels, width) \
-    do {                                              \
-        uint32_t *_dest = (uint32_t *) dest;          \
-        for (int i = 0; i < width; i++)               \
-            _dest[i] = 0xff000000 | pixels[i];        \
+#define ARGB32_TO_RGB888_PERLINE(dest, pixels, width)            \
+    do {                                                         \
+        uint8_t *_dest = (uint8_t *) dest;                       \
+        for (int i = 0; i < width; i++) {                        \
+            _dest[i * 3] = pixels[i] & 0xFF;                     \
+            _dest[i * 3 + 1] = ((pixels[i] & 0x0000FF00) >> 8);  \
+            _dest[i * 3 + 2] = ((pixels[i] & 0x00FF0000) >> 16); \
+        }                                                        \
     } while (0)
 
 #define ARGB32_TO_ARGB32_PERLINE(dest, pixels, width) \

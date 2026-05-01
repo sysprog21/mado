@@ -160,6 +160,34 @@ Use Cases:
 - Boot splash screens
 - Lightweight desktop environments
 
+### Linux DRM (Direct Rendering Manager)
+The modern Linux graphics subsystem. By accessing the primary device node (/dev/dri/cardX),
+it handles direct display configuration (KMS) and memory management, providing a robust
+alternative to the legacy framebuffer device.
+
+Features:
+- Kernel Mode Setting (KMS) for display configuration
+- Virtual terminal switching support
+- Linux input subsystem integration
+
+Dependencies:
+Install `libdrm` and `libudev`:
+* Ubuntu Linux / Debian: `sudo apt install libdrm-dev libudev-dev`
+
+Build:
+```shell
+make defconfig
+python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig \
+    BACKEND_DRM=y \
+    BACKEND_SDL=n
+make
+```
+
+Run:
+```shell
+sudo ./demo-drm
+```
+
 ### VNC Backend
 Provides remote display capabilities through the VNC (Virtual Network Computing) protocol.
 
@@ -429,6 +457,11 @@ Each backend may have specific configuration options:
 - Device path (default: `/dev/fb0`)
 - Input device configuration
 - Cursor settings
+- Color depth adaptation
+
+### Linux DRM Backend
+- DRM device path (default: `/dev/dri/card0`, configurable via `DRMDEVICE`)
+- Input device configuration
 - Color depth adaptation
 
 ### VNC Backend

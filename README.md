@@ -84,6 +84,7 @@ Install [Pixman](https://pixman.org/) before selecting the corresponding rendere
 `Mado` supports multiple graphics backends. Choose one based on your deployment scenario:
 - SDL: Cross-platform desktop development with hardware acceleration
 - WebAssembly: Lightweight browser deployment using native Canvas API
+- Linux DRM (drm): Modern Linux display management for embedded systems
 - Linux framebuffer (fbdev): Direct hardware access for embedded Linux
 - VNC: Remote display via Virtual Network Computing protocol
 - Headless: Testing and automation without display output

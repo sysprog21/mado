@@ -76,6 +76,10 @@ choice
       Select the display backend for window system rendering.
       Only one backend can be active at a time.
 
+config BACKEND_DRM
+    bool "Linux DRM support"
+    select CURSOR
+
 config BACKEND_SDL
     bool "SDL video output support"
     depends on HAVE_SDL2 && !CC_IS_EMCC

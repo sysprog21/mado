@@ -1684,9 +1684,16 @@ bool _twin_window_hit(twin_window_t *window, twin_coord_t x, twin_coord_t y);
 bool _twin_window_dispatch(twin_window_t *window, twin_event_t *event);
 
 /* Internal pixmap operations */
-twin_pointer_t twin_pixmap_pointer(twin_pixmap_t *pixmap,
-                                   twin_coord_t x,
-                                   twin_coord_t y);
+/* Address of pixel (x, y): inline, as every span loop starts with it */
+static inline twin_pointer_t twin_pixmap_pointer(twin_pixmap_t *pixmap,
+                                                 twin_coord_t x,
+                                                 twin_coord_t y)
+{
+    twin_pointer_t p;
+    p.b = pixmap->p.b + (int32_t) y * pixmap->stride +
+          (int32_t) x * twin_bytes_per_pixel(pixmap->format);
+    return p;
+}
 void twin_pixmap_reset_xform_cache(twin_pixmap_t *pixmap);
 void twin_pixmap_origin_to_clip(twin_pixmap_t *pixmap);
 

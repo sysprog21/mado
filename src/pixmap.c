@@ -282,17 +282,6 @@ void twin_pixmap_set_shadow(twin_pixmap_t *pixmap,
 #endif
 }
 
-twin_pointer_t twin_pixmap_pointer(twin_pixmap_t *pixmap,
-                                   twin_coord_t x,
-                                   twin_coord_t y)
-{
-    twin_pointer_t p;
-
-    p.b = (pixmap->p.b + (int32_t) y * pixmap->stride +
-           (int32_t) x * twin_bytes_per_pixel(pixmap->format));
-    return p;
-}
-
 void twin_pixmap_enable_update(twin_pixmap_t *pixmap)
 {
     if (--pixmap->disable == 0) {

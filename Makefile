@@ -57,7 +57,6 @@ libtwin.a_files-y = \
 	src/screen.c \
 	src/window.c \
 	src/wm.c \
-	src/dispatch.c \
 	src/geom.c \
 	src/pattern.c \
 	src/spline.c \

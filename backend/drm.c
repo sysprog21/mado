@@ -30,7 +30,7 @@ typedef struct {
     twin_screen_t *screen;
 
     /* Linux input system */
-    void *input;
+    twin_linux_input_t *input;
 
     /* Linux virtual terminal (VT) */
     int vt_fd;
@@ -55,12 +55,6 @@ typedef struct {
     /* Initialization state */
     bool first_run;
 } twin_drm_t;
-
-static void twin_drm_get_screen_size(twin_drm_t *tx, int *width, int *height)
-{
-    *width = CONN(tx)->modes[0].hdisplay;
-    *height = CONN(tx)->modes[0].vdisplay;
-}
 
 static bool get_resources(int fd, drmModeResPtr *resources)
 {
@@ -447,8 +441,7 @@ bail_screen:
     twin_screen_destroy(ctx->screen);
 bail_vt_fd:
     /* Restore VT mode before closing */
-    ioctl(tx->vt_fd, VT_SETMODE, &tx->old_vtm);
-    twin_vt_mode(tx->vt_fd, KD_TEXT);
+    twin_vt_restore(tx->vt_fd, &tx->old_vtm);
     close(tx->vt_fd);
 bail_dri_dev_fd:
     close(tx->drm_dri_fd);
@@ -456,14 +449,6 @@ bail:
     free(ctx->priv);
     free(ctx);
     return NULL;
-}
-
-static void twin_drm_configure(twin_context_t *ctx)
-{
-    int width, height;
-    twin_drm_t *tx = PRIV(ctx);
-    twin_drm_get_screen_size(tx, &width, &height);
-    twin_screen_resize(SCREEN(ctx), width, height);
 }
 
 static void twin_drm_exit(twin_context_t *ctx)
@@ -475,8 +460,7 @@ static void twin_drm_exit(twin_context_t *ctx)
 
     /* Restore VT mode before cleanup */
     if (tx->vt_fd >= 0) {
-        ioctl(tx->vt_fd, VT_SETMODE, &tx->old_vtm);
-        twin_vt_mode(tx->vt_fd, KD_TEXT);
+        twin_vt_restore(tx->vt_fd, &tx->old_vtm);
     }
 
     drmModeFreeCrtc(CRTC(tx));
@@ -494,27 +478,19 @@ static void twin_drm_exit(twin_context_t *ctx)
  * The DRM backend uses linux_input background thread for event handling,
  * so this poll function just returns true to continue the main loop.
  */
-static bool twin_drm_poll(twin_context_t *ctx maybe_unused)
+/* Sleep in the input poll until input arrives or there is something to
+ * show; input is dispatched on this thread */
+static bool twin_drm_poll(twin_context_t *ctx)
 {
+    twin_linux_input_poll(PRIV(ctx)->input,
+                          (int) _twin_idle_timeout(SCREEN(ctx), -1));
     return true;
-}
-
-static void twin_drm_start(twin_context_t *ctx,
-                           void (*init_callback)(twin_context_t *))
-{
-    if (init_callback)
-        init_callback(ctx);
-
-    while (twin_dispatch_once(ctx))
-        ;
 }
 
 /* Register the Linux DRM backend */
 
 const twin_backend_t g_twin_backend = {
     .init = twin_drm_init,
-    .configure = twin_drm_configure,
     .poll = twin_drm_poll,
-    .start = twin_drm_start,
     .exit = twin_drm_exit,
 };

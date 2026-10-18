@@ -205,16 +205,6 @@ bail:
     return NULL;
 }
 
-static void twin_sdl_configure(twin_context_t *ctx)
-{
-    /* Screen pixels are the renderer's logical size, not the (scaled)
-     * window size; the pixel buffer was allocated for the former. */
-    int width, height;
-    SDL_RenderGetLogicalSize(PRIV(ctx)->render, &width, &height);
-    if (width > 0 && height > 0)
-        twin_screen_resize(ctx->screen, width, height);
-}
-
 /* Deliver a character to the focused window */
 static void _twin_sdl_ucs4(twin_screen_t *screen, twin_ucs4_t ucs4)
 {
@@ -229,14 +219,11 @@ static bool twin_sdl_poll(twin_context_t *ctx)
     twin_sdl_t *tx = PRIV(ctx);
 
     /* Sleep until input arrives or the next timeout is due instead of
-     * spinning, waking at least every 100 ms */
-    if (!twin_screen_damaged(screen)) {
-        twin_time_t wait = _twin_timeout_delay();
-        if (wait < 0 || wait > 100)
-            wait = 100;
-        if (wait > 0)
-            SDL_WaitEventTimeout(NULL, wait);
-    }
+     * spinning, waking at least every 100 ms; with NULL the event that
+     * wakes us stays queued for the loop below */
+    twin_time_t wait = _twin_idle_timeout(screen, 100);
+    if (wait > 0)
+        SDL_WaitEventTimeout(NULL, wait);
 
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
@@ -337,24 +324,10 @@ static void twin_sdl_exit(twin_context_t *ctx)
     free(ctx);
 }
 
-static void twin_sdl_start(twin_context_t *ctx,
-                           void (*init_callback)(twin_context_t *))
-{
-    /* Initialize immediately and enter standard dispatch loop */
-    if (init_callback)
-        init_callback(ctx);
-
-    /* Use twin_dispatch_once() to ensure work queue and timeouts run */
-    while (twin_dispatch_once(ctx))
-        ;
-}
-
 /* Register the SDL backend */
 
 const twin_backend_t g_twin_backend = {
     .init = twin_sdl_init,
-    .configure = twin_sdl_configure,
     .poll = twin_sdl_poll,
-    .start = twin_sdl_start,
     .exit = twin_sdl_exit,
 };

@@ -1012,6 +1012,11 @@ void _twin_run_timeout(void);
 
 twin_time_t _twin_timeout_delay(void);
 
+/* How long a backend may sleep waiting for input: not at all while the
+ * screen has damage to show, otherwise until the next timeout, at most
+ * @cap ms (@cap < 0: no cap, and -1 then means until input arrives) */
+twin_time_t _twin_idle_timeout(twin_screen_t *screen, twin_time_t cap);
+
 void _twin_run_work(void);
 
 /* Event dispatch - internal use only
@@ -1117,18 +1122,21 @@ typedef struct twin_backend {
     /* Initialize the backend */
     twin_context_t *(*init)(int width, int height);
 
-    /* Configure the device */
-    /* FIXME: Refine the parameter list */
-    void (*configure)(twin_context_t *ctx);
-
+    /* Wait for and dispatch input; false when the user asked to quit.
+     * Sleep with _twin_idle_timeout() rather than spin. */
     bool (*poll)(twin_context_t *ctx);
 
-    /* Start the main loop with application initialization callback */
+    /* Run the main loop after the application callback, for platforms
+     * that own the loop (the browser); NULL: twin_run() loops on
+     * twin_dispatch_once() */
     void (*start)(twin_context_t *ctx, void (*init_callback)(twin_context_t *));
 
     /* Device cleanup when drawing is done */
     void (*exit)(twin_context_t *ctx);
 } twin_backend_t;
+
+/* The backend linked into the program */
+extern const twin_backend_t g_twin_backend;
 
 /*
  * Window manager policy interface

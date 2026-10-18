@@ -25,7 +25,7 @@ typedef struct {
     twin_screen_t *screen;
 
     /* Linux input system */
-    void *input;
+    twin_linux_input_t *input;
 
     /* Linux virtual terminal (VT) */
     int vt_fd;
@@ -84,16 +84,6 @@ typedef struct {
 FBDEV_PUT_SPAN_IMPL(16, ARGB32_TO_RGB565_PERLINE)
 FBDEV_PUT_SPAN_IMPL(24, ARGB32_TO_RGB888_PERLINE)
 FBDEV_PUT_SPAN_IMPL(32, ARGB32_TO_ARGB32_PERLINE)
-
-static void twin_fbdev_get_screen_size(twin_fbdev_t *tx,
-                                       int *width,
-                                       int *height)
-{
-    struct fb_var_screeninfo info;
-    ioctl(tx->fb_fd, FBIOGET_VSCREENINFO, &info);
-    *width = info.xres;
-    *height = info.yres;
-}
 
 static inline bool twin_fbdev_is_rgb565(twin_fbdev_t *tx)
 {
@@ -303,8 +293,7 @@ bail_fb_unmap:
         munmap(tx->fb_base, tx->fb_len);
 bail_vt_fd:
     /* Restore VT mode before closing */
-    ioctl(tx->vt_fd, VT_SETMODE, &tx->old_vtm);
-    ioctl(tx->vt_fd, KDSETMODE, KD_TEXT);
+    twin_vt_restore(tx->vt_fd, &tx->old_vtm);
     close(tx->vt_fd);
 bail_fb_fd:
     close(tx->fb_fd);
@@ -312,14 +301,6 @@ bail:
     free(ctx->priv);
     free(ctx);
     return NULL;
-}
-
-static void twin_fbdev_configure(twin_context_t *ctx)
-{
-    int width, height;
-    twin_fbdev_t *tx = ctx->priv;
-    twin_fbdev_get_screen_size(tx, &width, &height);
-    twin_screen_resize(ctx->screen, width, height);
 }
 
 static void twin_fbdev_exit(twin_context_t *ctx)
@@ -331,8 +312,7 @@ static void twin_fbdev_exit(twin_context_t *ctx)
 
     /* Restore VT mode before cleanup */
     if (tx->vt_fd >= 0) {
-        ioctl(tx->vt_fd, VT_SETMODE, &tx->old_vtm);
-        ioctl(tx->vt_fd, KDSETMODE, KD_TEXT);
+        twin_vt_restore(tx->vt_fd, &tx->old_vtm);
     }
 
     munmap(tx->fb_base, tx->fb_len);
@@ -347,33 +327,18 @@ static void twin_fbdev_exit(twin_context_t *ctx)
  * The fbdev backend uses linux_input background thread for event handling,
  * so this poll function just returns true to continue the main loop.
  */
-static bool twin_fbdev_poll(twin_context_t *ctx maybe_unused)
+/* Sleep in the input poll until input arrives or there is something to
+ * show; input is dispatched on this thread */
+static bool twin_fbdev_poll(twin_context_t *ctx)
 {
+    twin_linux_input_poll(PRIV(ctx)->input,
+                          (int) _twin_idle_timeout(SCREEN(ctx), -1));
     return true;
-}
-
-/* Start function for fbdev backend
- * Note: fbdev uses Linux input system with background thread for events,
- * so we use the standard dispatcher for work queue and timeout processing.
- */
-static void twin_fbdev_start(twin_context_t *ctx,
-                             void (*init_callback)(twin_context_t *))
-{
-    if (init_callback)
-        init_callback(ctx);
-
-    /* Use standard dispatcher to ensure work queue and timeouts run.
-     * Events are handled by linux_input background thread.
-     */
-    while (twin_dispatch_once(ctx))
-        ;
 }
 
 /* Register the Linux framebuffer backend */
 const twin_backend_t g_twin_backend = {
     .init = twin_fbdev_init,
-    .configure = twin_fbdev_configure,
     .poll = twin_fbdev_poll,
-    .start = twin_fbdev_start,
     .exit = twin_fbdev_exit,
 };

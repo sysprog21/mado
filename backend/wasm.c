@@ -151,15 +151,6 @@ static twin_context_t *twin_wasm_init(int width, int height)
     return ctx;
 }
 
-static void twin_wasm_configure(twin_context_t *ctx)
-{
-    /* WebAssembly configuration
-     * For now, we use fixed canvas size from initialization.
-     * TODO: Support dynamic canvas resizing via JS callback.
-     */
-    (void) ctx;
-}
-
 /* Event polling - called by main loop
  * Events are injected via exported C functions from JavaScript
  */
@@ -331,7 +322,6 @@ void mado_wasm_shutdown(void)
 /* Register the WebAssembly backend */
 const twin_backend_t g_twin_backend = {
     .init = twin_wasm_init,
-    .configure = twin_wasm_configure,
     .poll = twin_wasm_poll,
     .start = twin_wasm_start,
     .exit = twin_wasm_exit,

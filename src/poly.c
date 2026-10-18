@@ -11,7 +11,6 @@
 #include "twin_private.h"
 
 typedef struct _twin_edge {
-    struct _twin_edge *next;
     twin_sfixed_t top, bot;
     twin_sfixed_t x;
     twin_sfixed_t e;
@@ -36,10 +35,28 @@ typedef struct _twin_edge {
 
 static int _edge_compare_y(const void *a, const void *b)
 {
-    const twin_edge_t *ae = a;
-    const twin_edge_t *be = b;
+    const twin_edge_t *ae = *(twin_edge_t *const *) a;
+    const twin_edge_t *be = *(twin_edge_t *const *) b;
 
     return (int) (ae->top - be->top);
+}
+
+/* Order @order (pointers into the edge array) by top.  Outlines arrive in
+ * long runs already in order, where insertion sort is near linear; only
+ * big paths go to qsort, which then moves pointers, not edges. */
+static void _edge_sort(twin_edge_t **order, int n)
+{
+    if (n > 48) {
+        qsort(order, n, sizeof(*order), _edge_compare_y);
+        return;
+    }
+    for (int i = 1; i < n; i++) {
+        twin_edge_t *e = order[i];
+        int j = i;
+        for (; j > 0 && order[j - 1]->top > e->top; j--)
+            order[j] = order[j - 1];
+        order[j] = e;
+    }
 }
 
 static void _edge_step_by(twin_edge_t *edge, twin_sfixed_t dy)
@@ -271,90 +288,129 @@ static void _span_fill(twin_pixmap_t *pixmap,
     }
 }
 
-static void _twin_edge_fill(twin_pixmap_t *pixmap,
-                            twin_edge_t *edges,
-                            int nedges)
+/* Insert @e into @aet[0..n), ordered by x, after any edge at the same x */
+static inline void _aet_insert(twin_edge_t **aet, int n, twin_edge_t *e)
 {
-    twin_edge_t *active, *a, *n, **prev;
+    int j = n;
+    for (; j > 0 && aet[j - 1]->x > e->x; j--)
+        aet[j] = aet[j - 1];
+    aet[j] = e;
+}
+
+/* Scan the edges top to bottom.  The active edges live in an array kept
+ * ordered by x: new edges are inserted in place, finished ones compacted
+ * out, and after each step one stable insertion pass restores the order,
+ * which costs a move per crossing rather than a rescan per crossing. */
+/* Banding state: the band holds mask rows [top, top + rows) */
+typedef struct {
+    const twin_band_t *b;
+    twin_pixmap_t *pixmap;
+    twin_coord_t top, rows;
+} _band_state_t;
+
+/* Hand the current band over and clear it for the next rows */
+static void _band_next(_band_state_t *st)
+{
+    twin_coord_t rows = min(st->rows, (twin_coord_t) (st->b->total - st->top));
+    st->b->flush(st->b->ctx, st->top, rows);
+    for (twin_coord_t r = 0; r < rows; r++)
+        memset(st->pixmap->p.a8 + r * st->pixmap->stride, 0,
+               (size_t) st->pixmap->width);
+    st->top += st->rows;
+}
+
+static void _twin_edge_fill(twin_pixmap_t *pixmap,
+                            twin_edge_t **order,
+                            twin_edge_t **aet,
+                            int nedges,
+                            _band_state_t *band)
+{
     twin_sfixed_t x0 = 0;
+    twin_coord_t bottom = band ? band->b->total : pixmap->clip.bottom;
 
     if (nedges <= 0)
         return;
-    qsort(edges, nedges, sizeof(twin_edge_t), _edge_compare_y);
-    int e = 0;
-    twin_sfixed_t y = edges[0].top;
-    active = 0;
+    _edge_sort(order, nedges);
+    int e = 0, na = 0;
+    twin_sfixed_t y = order[0]->top;
+    /* Every edge starts below the pixmap */
+    if (twin_sfixed_trunc(y) >= bottom)
+        return;
     for (;;) {
         /* add in new edges */
-        for (; e < nedges && edges[e].top <= y; e++) {
-            for (prev = &active; (a = *prev); prev = &(a->next))
-                if (a->x > edges[e].x)
-                    break;
-            edges[e].next = *prev;
-            *prev = &edges[e];
+        for (; e < nedges && order[e]->top <= y; e++)
+            _aet_insert(aet, na++, order[e]);
+
+        /* move the band down to this row */
+        twin_sfixed_t by = y;
+        if (band) {
+            while (twin_sfixed_trunc(y) >= band->top + band->rows)
+                _band_next(band);
+            by = y - twin_int_to_sfixed(band->top);
         }
 
         /* walk this y value marking coverage */
         int w = 0;
-        for (a = active; a; a = a->next) {
+        for (int i = 0; i < na; i++) {
+            twin_edge_t *a = aet[i];
             if (w == 0)
                 x0 = a->x;
             w += a->winding;
             if (w == 0)
-                _span_fill(pixmap, y, x0, a->x);
+                _span_fill(pixmap, by, x0, a->x);
         }
 
         /* step down, clipping to pixmap */
         y += TWIN_POLY_STEP;
 
-        if (twin_sfixed_trunc(y) >= pixmap->clip.bottom)
+        if (twin_sfixed_trunc(y) >= bottom)
             break;
 
         /* strip out dead edges */
-        for (prev = &active; (a = *prev);) {
-            if (a->bot <= y)
-                *prev = a->next;
-            else
-                prev = &a->next;
-        }
+        int k = 0;
+        for (int i = 0; i < na; i++)
+            if (aet[i]->bot > y)
+                aet[k++] = aet[i];
+        na = k;
 
         /* check for all done */
-        if (!active && e == nedges)
+        if (!na && e == nedges)
             break;
 
-        /* step all edges */
-        for (a = active; a; a = a->next)
-            _edge_step_row(a);
-
-        /* fix x sorting */
-        for (prev = &active; (a = *prev) && (n = a->next);) {
-            if (a->x > n->x) {
-                a->next = n->next;
-                n->next = a;
-                *prev = n;
-                prev = &active;
-            } else
-                prev = &a->next;
-        }
+        /* step all edges, then fix x sorting */
+        for (int i = 0; i < na; i++)
+            _edge_step_row(aet[i]);
+        for (int i = 1; i < na; i++)
+            if (aet[i - 1]->x > aet[i]->x)
+                _aet_insert(aet, i, aet[i]);
     }
 }
 
-void twin_fill_path(twin_pixmap_t *pixmap,
-                    twin_path_t *path,
-                    twin_coord_t dx,
-                    twin_coord_t dy,
-                    twin_scratch_t *scratch)
+static void _twin_fill(twin_pixmap_t *pixmap,
+                       twin_path_t *path,
+                       twin_coord_t dx,
+                       twin_coord_t dy,
+                       twin_scratch_t *scratch,
+                       _band_state_t *band)
 {
     twin_sfixed_t sdx = twin_int_to_sfixed(dx + pixmap->origin_x);
     twin_sfixed_t sdy = twin_int_to_sfixed(dy + pixmap->origin_y);
 
     int nalloc = path->npoints + path->nsublen + 1;
-    size_t edge_bytes = sizeof(twin_edge_t) * nalloc;
+    /* The edges, then two pointers per edge (sort order and active list),
+     * starting on a pointer boundary */
+    size_t ptr_off =
+        (sizeof(twin_edge_t) * nalloc + _Alignof(twin_edge_t *) - 1) &
+        ~(_Alignof(twin_edge_t *) - 1);
+    size_t edge_bytes = ptr_off + 2 * sizeof(twin_edge_t *) * nalloc;
     bool from_scratch = false;
     twin_edge_t *edges = NULL;
 
     if (scratch)
-        edges = twin_scratch_alloc(scratch, edge_bytes, _Alignof(twin_edge_t));
+        edges = twin_scratch_alloc(scratch, edge_bytes,
+                                   _Alignof(twin_edge_t) > _Alignof(void *)
+                                       ? _Alignof(twin_edge_t)
+                                       : _Alignof(void *));
     if (edges) {
         from_scratch = true;
     } else {
@@ -380,7 +436,33 @@ void twin_fill_path(twin_pixmap_t *pixmap,
             nedges += n;
         }
     }
-    _twin_edge_fill(pixmap, edges, nedges);
+    twin_edge_t **order = (twin_edge_t **) ((uint8_t *) edges + ptr_off);
+    for (int i = 0; i < nedges; i++)
+        order[i] = &edges[i];
+    _twin_edge_fill(pixmap, order, order + nalloc, nedges, band);
     if (!from_scratch)
         twin_free(edges);
+}
+
+void twin_fill_path(twin_pixmap_t *pixmap,
+                    twin_path_t *path,
+                    twin_coord_t dx,
+                    twin_coord_t dy,
+                    twin_scratch_t *scratch)
+{
+    _twin_fill(pixmap, path, dx, dy, scratch, NULL);
+}
+
+void twin_fill_path_banded(twin_pixmap_t *band,
+                           const twin_band_t *bands,
+                           twin_path_t *path,
+                           twin_coord_t dx,
+                           twin_coord_t dy,
+                           twin_scratch_t *scratch)
+{
+    _band_state_t st = {bands, band, 0, band->height};
+    _twin_fill(band, path, dx, dy, scratch, &st);
+    /* The rest, including bands the scan never reached */
+    while (st.top < bands->total)
+        _band_next(&st);
 }

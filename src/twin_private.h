@@ -1662,6 +1662,25 @@ void twin_fill_path(twin_pixmap_t *pixmap,
                     twin_coord_t dy,
                     twin_scratch_t *scratch);
 
+/*
+ * Rasterize a mask @total rows tall through @band, an A8 pixmap of fewer
+ * rows: whenever the scan leaves a band it calls @flush with the band's
+ * first row and height, then clears the band for the next.  Every band is
+ * flushed, in order, so the result matches one full-height mask.
+ */
+typedef struct {
+    twin_coord_t total;
+    void (*flush)(void *ctx, twin_coord_t top, twin_coord_t rows);
+    void *ctx;
+} twin_band_t;
+
+void twin_fill_path_banded(twin_pixmap_t *band,
+                           const twin_band_t *bands,
+                           twin_path_t *path,
+                           twin_coord_t dx,
+                           twin_coord_t dy,
+                           twin_scratch_t *scratch);
+
 void twin_composite_path(twin_pixmap_t *dst,
                          twin_operand_t *src,
                          twin_coord_t src_x,

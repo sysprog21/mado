@@ -331,10 +331,12 @@ config SCRATCH_SIZE
     default 16
     range 0 1024
     help
-      Per-screen arena that holds the coverage mask of each filled path.
-      A path whose mask does not fit takes a heap buffer for that one
-      call instead, so a smaller arena trades speed on large shapes for
-      resident memory.  0 always uses the heap.
+      Per-screen arena that holds the coverage mask and edges of each
+      filled path.  A shape whose mask does not fit is rasterized in
+      bands of rows that fill half the arena, so a full-size mask never
+      comes from the heap; a smaller arena means more bands on large
+      shapes.  Only when the arena cannot hold a band (0, or a shape
+      wider than the arena allows) does a small band come from the heap.
 
 config CACHE_SIZE
     int "Coverage cache budget (KiB)"

@@ -643,7 +643,8 @@ static bool _twin_path_mask(twin_pixmap_t *dst,
                             twin_mask_t *m,
                             twin_coord_t *mx,
                             twin_coord_t *my,
-                            twin_rect_t *vis)
+                            twin_rect_t *vis,
+                            bool *banded)
 {
     twin_rect_t b;
     twin_path_bounds(path, &b);
@@ -701,6 +702,10 @@ static bool _twin_path_mask(twin_pixmap_t *dst,
     if (pixels) {
         memset(pixels, 0, bytes);
         _twin_pixmap_init_a8(&m->hdr, w, h, stride, pixels);
+    } else if (banded) {
+        /* Larger than the scratch arena: the caller rasterizes in bands */
+        *banded = true;
+        return false;
     } else {
         /* Larger than the scratch arena: a heap mask for this call only, so
          * an idle screen holds no mask memory */
@@ -727,6 +732,80 @@ static void _twin_mask_release(twin_mask_t *m, twin_scratch_t *scratch)
         twin_pixmap_destroy(m->heap);
 }
 
+/* Bytes of mask a band may take: half the scratch arena, leaving room for
+ * the edges, or a small heap buffer without one */
+#define TWIN_BAND_HEAP_BYTES 4096
+
+/*
+ * Composite @path over the visible rectangle @vis one band of rows at a
+ * time, so a shape larger than the scratch arena needs a band-sized mask
+ * rather than a heap mask of its full size.  Edges that start above a band
+ * are stepped to it exactly, so the coverage matches a single pass.
+ */
+typedef struct {
+    twin_pixmap_t *dst, *band;
+    twin_operand_t *src;
+    twin_coord_t src_x, src_y;
+    twin_operator_t operator;
+    twin_rect_t vis;
+} _band_composite_t;
+
+static void _band_composite(void *ctx, twin_coord_t top, twin_coord_t rows)
+{
+    _band_composite_t *c = ctx;
+    twin_coord_t y = c->vis.top + top;
+    twin_operand_t msk = {.source_kind = TWIN_PIXMAP, .u.pixmap = c->band};
+    twin_composite(c->dst, c->vis.left, y, c->src, c->src_x + c->vis.left,
+                   c->src_y + y, &msk, 0, 0, c->operator,
+                   c->vis.right - c->vis.left, rows);
+    twin_pixmap_reset_xform_cache(c->band);
+}
+
+/*
+ * Composite @path over the visible rectangle @vis one band of rows at a
+ * time, so a shape larger than the scratch arena needs a band-sized mask
+ * rather than a heap mask of its full size.  The edges are built and
+ * sorted once; the scan hands each band over as it leaves it.
+ */
+static void _twin_composite_path_bands(twin_pixmap_t *dst,
+                                       twin_operand_t *src,
+                                       twin_coord_t src_x,
+                                       twin_coord_t src_y,
+                                       twin_path_t *path,
+                                       twin_operator_t operator,
+                                       twin_scratch_t * scratch,
+                                       twin_rect_t vis)
+{
+    twin_coord_t w = vis.right - vis.left, h = vis.bottom - vis.top;
+    twin_coord_t stride = _twin_a8_stride(w);
+    size_t budget = scratch ? scratch->size / 2 : TWIN_BAND_HEAP_BYTES;
+    twin_coord_t rows = (twin_coord_t) (budget / (size_t) stride);
+    if (rows < 1)
+        rows = 1;
+    if (rows > h)
+        rows = h;
+    size_t bytes = (size_t) stride * (size_t) rows;
+
+    size_t saved = scratch ? twin_scratch_save(scratch) : 0;
+    uint8_t *buf = scratch ? twin_scratch_alloc(scratch, bytes, 4) : NULL;
+    uint8_t *heap = NULL;
+    if (!buf) {
+        heap = twin_malloc(bytes);
+        if (!heap)
+            return;
+        buf = heap;
+    }
+    memset(buf, 0, bytes);
+    twin_pixmap_t band;
+    _twin_pixmap_init_a8(&band, w, rows, stride, buf);
+    _band_composite_t c = {dst, &band, src, src_x, src_y, operator, vis };
+    twin_band_t bands = {h, _band_composite, &c};
+    twin_fill_path_banded(&band, &bands, path, -vis.left, -vis.top, scratch);
+    if (scratch)
+        twin_scratch_restore(scratch, saved);
+    twin_free(heap);
+}
+
 void twin_composite_path(twin_pixmap_t *dst,
                          twin_operand_t *src,
                          twin_coord_t src_x,
@@ -738,9 +817,14 @@ void twin_composite_path(twin_pixmap_t *dst,
     twin_mask_t m;
     twin_coord_t mx, my;
     twin_rect_t vis;
+    bool banded = false;
 
-    if (!_twin_path_mask(dst, path, scratch, &m, &mx, &my, &vis))
+    if (!_twin_path_mask(dst, path, scratch, &m, &mx, &my, &vis, &banded)) {
+        if (banded)
+            _twin_composite_path_bands(dst, src, src_x, src_y, path, operator,
+                                       scratch, vis);
         return;
+    }
     twin_operand_t msk = {.source_kind = TWIN_PIXMAP, .u.pixmap = &m.hdr};
     twin_composite(dst, vis.left, vis.top, src, src_x + vis.left,
                    src_y + vis.top, &msk, vis.left - mx, vis.top - my, operator,
@@ -836,7 +920,7 @@ void twin_paint_path_linear(twin_pixmap_t *dst,
     twin_mask_t m;
     twin_coord_t mx, my;
     twin_rect_t vis;
-    if (!_twin_path_mask(dst, path, sp, &m, &mx, &my, &vis))
+    if (!_twin_path_mask(dst, path, sp, &m, &mx, &my, &vis, NULL))
         return;
 
     twin_operand_t msk = {.source_kind = TWIN_PIXMAP, .u.pixmap = &m.hdr};

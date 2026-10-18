@@ -34,7 +34,7 @@ music-now-playing-dark bf354c9e
 music-list-playing 8503b11f
 music-list-scrolled 7a3b5121
 music-list-reopened 9085b5b5
-photos-grid e6768493
+photos-grid 1f4043e5
 photos-viewer bf0917c3
 photos-viewer-first 76b2f0b1
 photos-viewer-bare d6a2ef66

@@ -296,12 +296,29 @@ static struct {
     twin_pixmap_t *mask; /* A8 rounded rectangle, THUMB x THUMB */
 } gallery;
 
+/* @pix as RGB16: photos are opaque, so the copy kept for the gallery's
+ * lifetime takes half the memory */
+static twin_pixmap_t *to_rgb16(twin_pixmap_t *pix)
+{
+    if (!pix)
+        return NULL;
+    twin_coord_t w = twin_pixmap_width(pix), h = twin_pixmap_height(pix);
+    twin_pixmap_t *out = twin_pixmap_create(TWIN_RGB16, w, h);
+    if (out) {
+        twin_operand_t src = {.source_kind = TWIN_PIXMAP, .u.pixmap = pix};
+        twin_composite(out, 0, 0, &src, 0, 0, NULL, 0, 0, TWIN_SOURCE, w, h);
+        twin_pixmap_destroy(pix);
+        return out;
+    }
+    return pix;
+}
+
 static void gallery_acquire(void)
 {
     if (gallery.refs++)
         return;
     for (int i = 0; i < N_PHOTOS; i++)
-        gallery.thumb[i] = load_photo(i, "thumbs", THUMB, THUMB);
+        gallery.thumb[i] = to_rgb16(load_photo(i, "thumbs", THUMB, THUMB));
     gallery.mask = twin_pixmap_create(TWIN_A8, THUMB, THUMB);
     if (gallery.mask) {
         twin_fill(gallery.mask, 0, TWIN_SOURCE, 0, 0, THUMB, THUMB);

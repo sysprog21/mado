@@ -56,7 +56,7 @@ static void _apps_image_paint(twin_custom_widget_t *custom)
     };
 
     twin_composite(_apps_image_pixmap(custom), 0, 0, &srcop, 0, 0, NULL, 0, 0,
-                   TWIN_SOURCE, twin_pixmap_width(img->current_pix),
+                   TWIN_OVER, twin_pixmap_width(img->current_pix),
                    twin_pixmap_height(img->current_pix));
 }
 

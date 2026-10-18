@@ -999,7 +999,8 @@ twin_time_t _twin_timeout_delay(void);
 
 /* How long a backend may sleep waiting for input: not at all while the
  * screen has damage to show, otherwise until the next timeout, at most
- * @cap ms (@cap < 0: no cap, and -1 then means until input arrives) */
+ * @cap ms (@cap < 0: no cap, and -1 then means until input arrives).  A
+ * NULL @screen is one that cannot show anything now: its damage waits. */
 twin_time_t _twin_idle_timeout(twin_screen_t *screen, twin_time_t cap);
 
 void _twin_run_work(void);

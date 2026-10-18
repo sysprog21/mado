@@ -12,193 +12,84 @@
 #include <twin.h>
 #include <unistd.h>
 
-#include "linux_input.h"
-#include "linux_vt.h"
-#include "twin_private.h"
+#include "linux_fb.h"
 
 #define FBDEV_NAME "FRAMEBUFFER"
 #define FBDEV_DEFAULT "/dev/fb0"
-#define SCREEN(x) ((twin_context_t *) x)->screen
-#define PRIV(x) ((twin_fbdev_t *) ((twin_context_t *) x)->priv)
 
 typedef struct {
-    twin_screen_t *screen;
-
-    /* Linux input system */
-    twin_linux_input_t *input;
-
-    /* Linux virtual terminal (VT) */
-    int vt_fd;
-    volatile sig_atomic_t vt_active; /* written by the VT signal handler */
-    struct vt_mode old_vtm;
-
-    /* Linux framebuffer */
+    twin_linux_fb_t fb; /* first: the shared core reads it from priv */
     int fb_fd;
     struct fb_var_screeninfo fb_var;
-    struct fb_fix_screeninfo fb_fix;
-    uint16_t cmap[3][256];
-    uint8_t *fb_base;
-    size_t fb_len;
-
-    /* Initialization state */
-    bool first_run; /* Track first work queue execution for initial damage */
 } twin_fbdev_t;
 
-/* color conversion */
-#define ARGB32_TO_RGB565_PERLINE(dest, pixels, width)    \
-    do {                                                 \
-        uint16_t *_dest = (uint16_t *) dest;             \
-        for (int i = 0; i < width; i++)                  \
-            _dest[i] = ((pixels[i] & 0x00f80000) >> 8) | \
-                       ((pixels[i] & 0x0000fc00) >> 5) | \
-                       ((pixels[i] & 0x000000f8) >> 3);  \
-    } while (0)
-
-/* Requires validation in 24-bit per pixel environments */
-#define ARGB32_TO_RGB888_PERLINE(dest, pixels, width)            \
-    do {                                                         \
-        uint8_t *_dest = (uint8_t *) dest;                       \
-        for (int i = 0; i < width; i++) {                        \
-            _dest[i * 3] = pixels[i] & 0xFF;                     \
-            _dest[i * 3 + 1] = ((pixels[i] & 0x0000FF00) >> 8);  \
-            _dest[i * 3 + 2] = ((pixels[i] & 0x00FF0000) >> 16); \
-        }                                                        \
-    } while (0)
-
-#define ARGB32_TO_ARGB32_PERLINE(dest, pixels, width) \
-    memcpy((uint32_t *) dest, pixels, width * 4)
-
-#define FBDEV_PUT_SPAN_IMPL(bpp, op)                                 \
-    static void _twin_fbdev_put_span##bpp(                           \
-        twin_coord_t left, twin_coord_t top, twin_coord_t right,     \
-        twin_argb32_t *pixels, void *closure)                        \
-    {                                                                \
-        uintptr_t dest;                                              \
-        twin_fbdev_t *tx = PRIV(closure);                            \
-        off_t off = (bpp / 8) * left + top * tx->fb_fix.line_length; \
-        dest = (uintptr_t) tx->fb_base + off;                        \
-        twin_coord_t width = right - left;                           \
-        op(dest, pixels, width);                                     \
-    }
-
-FBDEV_PUT_SPAN_IMPL(16, ARGB32_TO_RGB565_PERLINE)
-FBDEV_PUT_SPAN_IMPL(24, ARGB32_TO_RGB888_PERLINE)
-FBDEV_PUT_SPAN_IMPL(32, ARGB32_TO_ARGB32_PERLINE)
-
-static inline bool twin_fbdev_is_rgb565(twin_fbdev_t *tx)
+static bool _channels(const struct fb_var_screeninfo *v,
+                      int r,
+                      int rl,
+                      int g,
+                      int gl,
+                      int b,
+                      int bl)
 {
-    return tx->fb_var.red.offset == 11 && tx->fb_var.red.length == 5 &&
-           tx->fb_var.green.offset == 5 && tx->fb_var.green.length == 6 &&
-           tx->fb_var.blue.offset == 0 && tx->fb_var.blue.length == 5;
+    return v->red.offset == (unsigned) r && v->red.length == (unsigned) rl &&
+           v->green.offset == (unsigned) g &&
+           v->green.length == (unsigned) gl && v->blue.offset == (unsigned) b &&
+           v->blue.length == (unsigned) bl;
 }
 
-static inline bool twin_fbdev_is_rgb888_or_argb32(twin_fbdev_t *tx)
+/* Set the mode, check the pixel layout and map the framebuffer */
+static bool twin_fbdev_map(twin_linux_fb_t *fb)
 {
-    return tx->fb_var.red.offset == 16 && tx->fb_var.red.length == 8 &&
-           tx->fb_var.green.offset == 8 && tx->fb_var.green.length == 8 &&
-           tx->fb_var.blue.offset == 0 && tx->fb_var.blue.length == 8;
-}
+    twin_fbdev_t *tx = (twin_fbdev_t *) fb;
 
-static bool twin_fbdev_apply_config(twin_fbdev_t *tx)
-{
-    /* Read changable information of the framebuffer */
-    if (ioctl(tx->fb_fd, FBIOGET_VSCREENINFO, &tx->fb_var) == -1) {
-        log_error("Failed to get framebuffer information");
-        return false;
-    }
-
-    /* Set the virtual screen size to be the same as the physical screen */
-    tx->fb_var.xres_virtual = tx->fb_var.xres;
-    tx->fb_var.yres_virtual = tx->fb_var.yres;
-    if (ioctl(tx->fb_fd, FBIOPUT_VSCREENINFO, &tx->fb_var) < 0) {
-        log_error("Failed to set framebuffer mode");
-        return false;
-    }
-
-    /* Read changable information of the framebuffer again */
     if (ioctl(tx->fb_fd, FBIOGET_VSCREENINFO, &tx->fb_var) < 0) {
         log_error("Failed to get framebuffer information");
         return false;
     }
-
-    /* Examine the framebuffer format */
-    switch (tx->fb_var.bits_per_pixel) {
-    case 16: /* RGB565 */
-        if (!twin_fbdev_is_rgb565(tx)) {
-            log_error("Invalid framebuffer format for 16 bpp");
-            return false;
-        }
-        break;
-    case 24: /* RGB888 */
-    case 32: /* ARGB32 */
-        if (!twin_fbdev_is_rgb888_or_argb32(tx)) {
-            log_error("Invalid framebuffer format for %u bpp",
-                      tx->fb_var.bits_per_pixel);
-            return false;
-        }
-        break;
-    default:
-        log_error("Unsupported bits per pixel: %d", tx->fb_var.bits_per_pixel);
+    /* The virtual screen is the physical one: no panning */
+    tx->fb_var.xres_virtual = tx->fb_var.xres;
+    tx->fb_var.yres_virtual = tx->fb_var.yres;
+    if (ioctl(tx->fb_fd, FBIOPUT_VSCREENINFO, &tx->fb_var) < 0 ||
+        ioctl(tx->fb_fd, FBIOGET_VSCREENINFO, &tx->fb_var) < 0) {
+        log_error("Failed to set framebuffer mode");
         return false;
     }
 
-    /* Read unchangable information of the framebuffer */
-    ioctl(tx->fb_fd, FBIOGET_FSCREENINFO, &tx->fb_fix);
+    bool ok;
+    switch (tx->fb_var.bits_per_pixel) {
+    case 16:
+        ok = _channels(&tx->fb_var, 11, 5, 5, 6, 0, 5);
+        break;
+    case 24:
+    case 32:
+        ok = _channels(&tx->fb_var, 16, 8, 8, 8, 0, 8);
+        break;
+    default:
+        ok = false;
+        break;
+    }
+    if (!ok) {
+        log_error("Unsupported framebuffer format: %u bpp",
+                  tx->fb_var.bits_per_pixel);
+        return false;
+    }
 
-    /* Align the framebuffer memory address with the page size */
-    off_t pgsize = getpagesize();
-    off_t start = (off_t) tx->fb_fix.smem_start & (pgsize - 1);
-
-    /* Round up the framebuffer memory size to match the page size */
-    tx->fb_len = start + (size_t) tx->fb_fix.smem_len + (pgsize - 1);
-    tx->fb_len &= ~(pgsize - 1);
-
-    /* Map framebuffer device to the virtual memory */
-    tx->fb_base = mmap(NULL, tx->fb_len, PROT_READ | PROT_WRITE, MAP_SHARED,
+    struct fb_fix_screeninfo fix;
+    if (ioctl(tx->fb_fd, FBIOGET_FSCREENINFO, &fix) < 0) {
+        log_error("Failed to get framebuffer layout");
+        return false;
+    }
+    /* The mapping starts on a page boundary and covers whole pages */
+    size_t pgsize = (size_t) getpagesize();
+    size_t start = (size_t) fix.smem_start & (pgsize - 1);
+    fb->fb_len = (start + fix.smem_len + pgsize - 1) & ~(pgsize - 1);
+    fb->stride = fix.line_length;
+    fb->fb_base = mmap(NULL, fb->fb_len, PROT_READ | PROT_WRITE, MAP_SHARED,
                        tx->fb_fd, 0);
-    if (tx->fb_base == MAP_FAILED) {
+    if (fb->fb_base == MAP_FAILED) {
         log_error("Failed to mmap framebuffer");
         return false;
     }
-
-    return true;
-}
-
-static bool twin_fbdev_work(void *closure)
-{
-    twin_fbdev_t *tx = PRIV(closure);
-    twin_screen_t *screen = SCREEN(closure);
-
-    /* Mark entire screen as damaged on first run to ensure initial rendering.
-     * This is necessary because the screen content is not automatically
-     * rendered when the application starts. Using per-context state allows
-     * proper reinitialization if the backend is torn down and recreated.
-     */
-    if (tx->first_run) {
-        tx->first_run = false;
-        twin_screen_damage(screen, 0, 0, screen->width, screen->height);
-    }
-
-    if (tx->vt_active && (tx->fb_base != MAP_FAILED)) {
-        /* Unmap the fbdev */
-        munmap(tx->fb_base, tx->fb_len);
-        tx->fb_base = MAP_FAILED;
-    }
-
-    if (!tx->vt_active && (tx->fb_base == MAP_FAILED)) {
-        /* Restore the fbdev settings */
-        if (!twin_fbdev_apply_config(tx))
-            log_error("Failed to apply configurations to the fbdev");
-
-        /* Mark entire screen for refresh */
-        twin_screen_damage(screen, 0, 0, screen->width, screen->height);
-    }
-
-    /* No mapping (restoring it failed): keep the damage for the next try */
-    if (!tx->vt_active && tx->fb_base != MAP_FAILED &&
-        twin_screen_damaged(screen))
-        twin_screen_update(screen);
-
     return true;
 }
 
@@ -214,87 +105,33 @@ twin_context_t *twin_fbdev_init(int width maybe_unused, int height maybe_unused)
     twin_context_t *ctx = calloc(1, sizeof(twin_context_t));
     if (!ctx)
         return NULL;
-    ctx->priv = calloc(1, sizeof(twin_fbdev_t));
-    if (!ctx->priv)
+    twin_fbdev_t *tx = ctx->priv = calloc(1, sizeof(twin_fbdev_t));
+    if (!tx)
         goto bail;
+    tx->fb.fb_base = MAP_FAILED;
+    tx->fb.remap = twin_fbdev_map;
 
-    twin_fbdev_t *tx = ctx->priv;
-
-    /* Initialize first_run flag for initial screen damage */
-    tx->first_run = true;
-
-    /* Open the framebuffer device */
     tx->fb_fd = open(fbdev_path, O_RDWR);
-    if (tx->fb_fd == -1) {
+    if (tx->fb_fd < 0) {
         log_error("Failed to open %s", fbdev_path);
         goto bail;
     }
-
-    /* Set up virtual terminal environment */
-    if (!twin_vt_setup(&tx->vt_fd, &tx->old_vtm, &tx->vt_active)) {
+    if (!twin_linux_fb_take_vt(&tx->fb))
         goto bail_fb_fd;
-    }
+    if (!twin_fbdev_map(&tx->fb))
+        goto bail_vt;
 
-    /* Set up signal handlers for switching TTYs */
-    twin_vt_setup_signal_handler();
-
-    /* Apply configurations to the framebuffer device */
-    if (!twin_fbdev_apply_config(tx)) {
-        log_error("Failed to apply configurations to the framebuffer device");
-        goto bail_vt_fd;
-    }
-
-    /* Examine if framebuffer mapping is valid */
-    if (tx->fb_base == MAP_FAILED) {
-        log_error("Failed to map framebuffer memory");
-        goto bail_vt_fd;
-    }
-
-    /* Use actual framebuffer resolution instead of caller-supplied dimensions.
-     * The physical display size is authoritative -- the caller's width/height
-     * are only hints suitable for resizable backends like SDL.
-     * Read directly from fb_var which was already validated by
-     * twin_fbdev_apply_config() above -- no redundant ioctl needed.
-     */
-    int fb_width = tx->fb_var.xres;
-    int fb_height = tx->fb_var.yres;
-
-    const twin_put_span_t fbdev_put_spans[] = {
-        _twin_fbdev_put_span16,
-        _twin_fbdev_put_span24,
-        _twin_fbdev_put_span32,
-    };
-    /* Create TWIN screen */
-    ctx->screen = twin_screen_create(
-        fb_width, fb_height, NULL,
-        fbdev_put_spans[tx->fb_var.bits_per_pixel / 8 - 2], ctx);
-    if (!ctx->screen) {
-        log_error("Failed to create screen");
-        goto bail_fb_unmap;
-    }
-
-    /* Create Linux input system object */
-    tx->input = twin_linux_input_create(ctx->screen);
-    if (!tx->input) {
-        log_error("Failed to create Linux input system object");
-        goto bail_screen;
-    }
-
-    /* Setup file handler and work functions */
-    twin_set_work(twin_fbdev_work, TWIN_WORK_REDISPLAY, ctx);
-
-
+    /* The display's own resolution wins over the caller's hint, which
+     * only resizable backends such as SDL honor */
+    if (!twin_linux_fb_start(ctx, tx->fb_var.xres, tx->fb_var.yres,
+                             tx->fb_var.bits_per_pixel))
+        goto bail_unmap;
     return ctx;
 
-bail_screen:
-    twin_screen_destroy(ctx->screen);
-bail_fb_unmap:
-    if (tx->fb_base != MAP_FAILED)
-        munmap(tx->fb_base, tx->fb_len);
-bail_vt_fd:
-    /* Restore VT mode before closing */
-    twin_vt_restore(tx->vt_fd, &tx->old_vtm);
-    close(tx->vt_fd);
+bail_unmap:
+    twin_linux_fb_unmap(&tx->fb);
+bail_vt:
+    twin_linux_fb_release_vt(&tx->fb);
 bail_fb_fd:
     close(tx->fb_fd);
 bail:
@@ -307,38 +144,16 @@ static void twin_fbdev_exit(twin_context_t *ctx)
 {
     if (!ctx)
         return;
-
-    twin_fbdev_t *tx = PRIV(ctx);
-
-    /* Restore VT mode before cleanup */
-    if (tx->vt_fd >= 0) {
-        twin_vt_restore(tx->vt_fd, &tx->old_vtm);
-    }
-
-    munmap(tx->fb_base, tx->fb_len);
-    twin_linux_input_destroy(tx->input);
-    close(tx->vt_fd);
+    twin_fbdev_t *tx = ctx->priv;
+    twin_linux_fb_stop(&tx->fb);
+    twin_linux_fb_unmap(&tx->fb);
     close(tx->fb_fd);
     free(ctx->priv);
     free(ctx);
 }
 
-/* Poll function for fbdev backend
- * The fbdev backend uses linux_input background thread for event handling,
- * so this poll function just returns true to continue the main loop.
- */
-/* Sleep in the input poll until input arrives or there is something to
- * show; input is dispatched on this thread */
-static bool twin_fbdev_poll(twin_context_t *ctx)
-{
-    twin_linux_input_poll(PRIV(ctx)->input,
-                          (int) _twin_idle_timeout(SCREEN(ctx), -1));
-    return true;
-}
-
-/* Register the Linux framebuffer backend */
 const twin_backend_t g_twin_backend = {
     .init = twin_fbdev_init,
-    .poll = twin_fbdev_poll,
+    .poll = twin_linux_fb_poll,
     .exit = twin_fbdev_exit,
 };

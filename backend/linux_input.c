@@ -4,11 +4,14 @@
  * All rights reserved.
  */
 
+/* ppoll() */
+#define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
 #include <libudev.h>
 #include <linux/input.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -345,11 +348,30 @@ static void twin_linux_edev_open(twin_linux_input_t *tm)
 
 void twin_linux_input_poll(twin_linux_input_t *tm, int timeout_ms)
 {
-    if (poll(tm->pfds, 1 + tm->evdev_cnt, timeout_ms) <= 0)
+    /* The VT switch signals stay blocked outside this wait (see
+     * twin_vt_setup_signal_handler()): one sent just before it still ends
+     * it, with no window where the signal is handled and then slept on */
+    sigset_t during;
+    sigprocmask(SIG_BLOCK, NULL, &during);
+    sigdelset(&during, SIGUSR1);
+    sigdelset(&during, SIGUSR2);
+    struct timespec ts = {timeout_ms / 1000, (timeout_ms % 1000) * 1000000L};
+    if (ppoll(tm->pfds, 1 + tm->evdev_cnt, timeout_ms < 0 ? NULL : &ts,
+              &during) <= 0)
         return; /* timed out, or a signal (a VT switch) woke us */
 
     bool rescan = (tm->pfds[0].revents & POLLIN) && tm->mon &&
                   twin_linux_udev_update(tm->mon);
+    if (tm->pfds[0].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+        /* A broken monitor would wake every poll: carry on without
+         * hotplug */
+        log_warn("udev monitor failed; input hotplug disabled");
+        udev_monitor_unref(tm->mon);
+        udev_unref(tm->udev);
+        tm->mon = NULL;
+        tm->udev = NULL;
+        tm->pfds[0].fd = -1;
+    }
 
     struct input_event ev[64];
     for (int i = 0; i < tm->evdev_cnt; i++) {
@@ -410,11 +432,9 @@ twin_linux_input_t *twin_linux_input_create(twin_screen_t *screen)
     tm->pfds[0] = (struct pollfd) {.fd = udev_fd, .events = POLLIN};
 
     twin_linux_edev_open(tm);
-    if (tm->evdev_cnt == 0 && udev_fd < 0) {
-        log_error("Failed to open udev and evdev");
-        twin_linux_input_destroy(tm);
-        return NULL;
-    }
+    /* The display stays usable without input: poll then only sleeps */
+    if (tm->evdev_cnt == 0 && udev_fd < 0)
+        log_warn("No input devices and no udev: running without input");
     return tm;
 }
 

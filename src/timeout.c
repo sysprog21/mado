@@ -225,7 +225,7 @@ void twin_clear_timeout(twin_timeout_t *timeout)
 
 twin_time_t _twin_idle_timeout(twin_screen_t *screen, twin_time_t cap)
 {
-    if (twin_screen_damaged(screen))
+    if (screen && twin_screen_damaged(screen))
         return 0;
     twin_time_t wait = _twin_timeout_delay();
     if (cap >= 0 && (wait < 0 || wait > cap))

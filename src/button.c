@@ -49,7 +49,6 @@ twin_dispatch_result_t _twin_button_dispatch(twin_widget_t *widget,
         if (_twin_widget_callback(widget)) {
             twin_event_t press_event = *event;
             press_event.kind = TwinEventButtonSignalDown;
-            press_event.u.button_signal.signal = TwinButtonSignalDown;
             _twin_widget_callback(widget)(widget, &press_event,
                                           _twin_widget_callback_data(widget));
         }
@@ -76,7 +75,6 @@ twin_dispatch_result_t _twin_button_dispatch(twin_widget_t *widget,
             if (_twin_widget_callback(widget)) {
                 twin_event_t release_event = *event;
                 release_event.kind = TwinEventButtonSignalUp;
-                release_event.u.button_signal.signal = TwinButtonSignalUp;
                 _twin_widget_callback(widget)(
                     widget, &release_event, _twin_widget_callback_data(widget));
             }

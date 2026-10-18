@@ -94,8 +94,7 @@ static void _apps_calc_update_value(apps_calc_t *calc)
     char v[20];
 
     sprintf(v, "%d", calc->stack[0]);
-    twin_label_set(calc->display, v, APPS_CALC_VALUE_FG, APPS_CALC_VALUE_SIZE,
-                   APPS_CALC_VALUE_STYLE);
+    twin_label_set(calc->display, v);
 }
 
 static void _apps_calc_push(apps_calc_t *calc)
@@ -218,8 +217,7 @@ bool apps_calc_start(twin_screen_t *screen,
     if (!calc)
         return false;
 
-    calc->toplevel = twin_toplevel_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
+    calc->toplevel = twin_toplevel_create(screen, x, y, w, h, name);
     if (!calc->toplevel) {
         free(calc);
         return false;

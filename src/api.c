@@ -14,8 +14,16 @@ twin_context_t *twin_create(int width, int height)
     twin_mem_pool_init();
 
     twin_context_t *ctx = g_twin_backend.init(width, height);
-    if (!ctx)
+    if (!ctx) {
         log_error("Backend initialization failed (%dx%d)", width, height);
+        return NULL;
+    }
+#if defined(CONFIG_CURSOR)
+    /* Backends that draw no cursor of their own get the arrow */
+    twin_pixmap_t *cursor = _twin_make_cursor();
+    if (cursor)
+        twin_screen_set_cursor(ctx->screen, cursor, 0, 0);
+#endif
     return ctx;
 }
 
@@ -56,7 +64,7 @@ bool twin_dispatch_once(twin_context_t *ctx)
     return g_twin_backend.poll(ctx);
 }
 
-void twin_run(twin_context_t *ctx, void (*init_callback)(twin_context_t *))
+void twin_run(twin_context_t *ctx, void (*init_callback)(twin_screen_t *))
 {
     if (!ctx)
         return;
@@ -65,12 +73,7 @@ void twin_run(twin_context_t *ctx, void (*init_callback)(twin_context_t *))
         return;
     }
     if (init_callback)
-        init_callback(ctx);
+        init_callback(ctx->screen);
     while (twin_dispatch_once(ctx))
         ;
-}
-
-twin_screen_t *twin_context_screen(const twin_context_t *ctx)
-{
-    return ctx->screen;
 }

@@ -22,12 +22,7 @@ static inline twin_pixmap_t *_apps_image_pixmap(twin_custom_widget_t *image)
 
 static twin_pixmap_t *load_tvg(const char *path)
 {
-#if defined(CONFIG_TVG_MEMORY_BUDGET) && CONFIG_TVG_MEMORY_BUDGET > 0
-    return twin_tvg_to_pixmap_budget(path, TWIN_ARGB32,
-                                     (size_t) CONFIG_TVG_MEMORY_BUDGET * 1024);
-#else
-    return twin_tvg_to_pixmap_scale(path, TWIN_ARGB32, APP_WIDTH, APP_HEIGHT);
-#endif
+    return twin_tvg_to_pixmap(path, APP_WIDTH, APP_HEIGHT);
 }
 
 typedef struct {
@@ -66,16 +61,9 @@ static void _apps_image_paint(twin_custom_widget_t *custom)
                    twin_pixmap_height(img->current_pix));
 }
 
-static twin_dispatch_result_t _apps_image_dispatch(twin_widget_t *widget,
-                                                   twin_event_t *event,
-                                                   void *closure)
+static twin_dispatch_result_t _apps_image_dispatch(twin_custom_widget_t *custom,
+                                                   twin_event_t *event)
 {
-    (void) closure; /* unused parameter */
-
-    twin_custom_widget_t *custom = twin_widget_get_custom(widget);
-    if (!custom)
-        return TwinDispatchContinue;
-
     switch (event->kind) {
     case TwinEventPaint:
         _apps_image_paint(custom);
@@ -126,8 +114,7 @@ static twin_custom_widget_t *_apps_image_init(twin_box_t *parent,
                                               twin_coord_t height)
 {
     twin_custom_widget_t *custom = twin_custom_widget_create(
-        parent, 0, 0, height, 1, 1, _apps_image_dispatch,
-        sizeof(apps_image_data_t));
+        parent, 0, 0, height, _apps_image_dispatch, sizeof(apps_image_data_t));
     if (!custom)
         return NULL;
 
@@ -158,8 +145,7 @@ static twin_custom_widget_t *apps_image_create(twin_box_t *parent,
 bool apps_image_start(twin_screen_t *screen, const char *name, int x, int y)
 {
     twin_toplevel_t *toplevel =
-        twin_toplevel_create(screen, TWIN_ARGB32, TwinWindowApplication, x, y,
-                             APP_WIDTH, APP_HEIGHT, name);
+        twin_toplevel_create(screen, x, y, APP_WIDTH, APP_HEIGHT, name);
     if (!toplevel)
         return false;
     if (!apps_image_create(twin_toplevel_box(toplevel),

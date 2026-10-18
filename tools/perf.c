@@ -637,7 +637,7 @@ int main(void)
     printf("Sync time adjustment is %.4f msecs.\n\n", sync_time_adjustment);
 
     /* Create test pixmaps */
-    src32 = twin_pixmap_from_file("assets/tux.png", TWIN_ARGB32);
+    src32 = twin_pixmap_from_file("assets/tux.png");
     if (!src32) {
         /* Fallback: create a simple pixmap if file not found */
         src32 = twin_pixmap_create(TWIN_ARGB32, 256, 256);

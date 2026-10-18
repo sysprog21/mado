@@ -32,7 +32,7 @@
  */
 static twin_pixmap_t *load_background(twin_screen_t *screen, const char *path)
 {
-    twin_pixmap_t *raw_background = twin_pixmap_from_file(path, TWIN_ARGB32);
+    twin_pixmap_t *raw_background = twin_pixmap_from_file(path);
     if (!raw_background)
         return twin_make_pattern();
 
@@ -100,10 +100,8 @@ static const apps_entry_t *find_shell(void)
  * each other: start only the first one.
  * Shared by both native and WebAssembly builds.
  */
-static void init_demo_apps(twin_context_t *ctx)
+static void init_demo_apps(twin_screen_t *screen)
 {
-    twin_screen_t *screen = twin_context_screen(ctx);
-
     const apps_entry_t *sh = find_shell();
     if (sh) {
         if (sh->start(screen, 0, 0, sh->w, sh->h)) {
@@ -152,13 +150,6 @@ int main(void)
      */
     atexit(cleanup);
     signal(SIGINT, sigint_handler);
-
-#if defined(CONFIG_CURSOR)
-    int hx, hy;
-    twin_pixmap_t *cursor = twin_make_cursor(&hx, &hy);
-    if (cursor)
-        twin_screen_set_cursor(twin_context_screen(tx), cursor, hx, hy);
-#endif
 
     /* Start application with unified API (handles native and WebAssembly) */
     twin_run(tx, init_demo_apps);

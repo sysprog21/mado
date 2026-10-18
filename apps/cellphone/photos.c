@@ -256,7 +256,7 @@ static twin_pixmap_t *load_jpeg(const char *dir, const char *stem)
     for (size_t i = 0; i < sizeof(roots) / sizeof(roots[0]); i++) {
         snprintf(path, sizeof(path), "%s/%s/%s_%s.jpg", roots[i], dir, stem,
                  dir[0] == 't' ? "thumb" : "view");
-        twin_pixmap_t *pix = twin_pixmap_from_file(path, TWIN_ARGB32);
+        twin_pixmap_t *pix = twin_pixmap_from_file(path);
         if (pix)
             return pix;
     }
@@ -275,7 +275,6 @@ static twin_pixmap_t *load_photo(int idx,
 {
     twin_pixmap_t *pix = load_jpeg(dir, photos[idx].stem);
     if (pix && (twin_pixmap_width(pix) != w || twin_pixmap_height(pix) != h ||
-                twin_pixmap_format(pix) != TWIN_ARGB32 ||
                 twin_pixmap_animation(pix))) {
         /* Normalize once here so painting never scales a full picture */
         twin_pixmap_t *fit = twin_pixmap_create(TWIN_ARGB32, w, h);

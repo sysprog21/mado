@@ -822,13 +822,11 @@ static twin_dispatch_result_t count_destroy(twin_widget_t *widget,
     return TwinDispatchContinue;
 }
 
-static twin_dispatch_result_t custom_handler(twin_widget_t *widget,
-                                             twin_event_t *event,
-                                             void *closure)
+static twin_dispatch_result_t custom_handler(twin_custom_widget_t *custom,
+                                             twin_event_t *event)
 {
-    (void) widget;
+    (void) custom;
     (void) event;
-    (void) closure;
     return TwinDispatchContinue;
 }
 
@@ -839,16 +837,15 @@ static void test_widget_teardown(void)
     th_frame(t);
     size_t base = th_heap_net(t);
     for (int round = 0; round < 3; round++) {
-        twin_toplevel_t *top = twin_toplevel_create(
-            t->screen, TWIN_ARGB32, TwinWindowApplication, 0, 0, W, H, "t");
+        twin_toplevel_t *top = twin_toplevel_create(t->screen, 0, 0, W, H, "t");
         twin_box_t *row = twin_box_create(&top->box, TwinBoxHorz);
         twin_label_t *label = twin_label_create(
             row, "label", 0xff000000, twin_int_to_fixed(12), TwinStyleRoman);
         twin_button_t *button = twin_button_create(
             row, "button", 0xff000000, twin_int_to_fixed(12), TwinStyleRoman);
         twin_widget_set_callback(&button->label.widget, count_destroy, NULL);
-        twin_custom_widget_create(&top->box, 0xffffffff, 10, 10, 1, 1,
-                                  custom_handler, 64);
+        twin_custom_widget_create(&top->box, 0xffffffff, 10, 10, custom_handler,
+                                  64);
         (void) label;
         twin_toplevel_show(top);
         th_frame(t);
@@ -1039,8 +1036,7 @@ static void test_accessors(void)
     twin_window_destroy(w);
 
 #if defined(CONFIG_WIDGETS)
-    twin_toplevel_t *top = twin_toplevel_create(
-        t->screen, TWIN_ARGB32, TwinWindowApplication, 0, 0, W, H, "t");
+    twin_toplevel_t *top = twin_toplevel_create(t->screen, 0, 0, W, H, "t");
     CHECK(twin_toplevel_box(top) == &top->box, "toplevel box");
     twin_label_t *label =
         twin_label_create(twin_toplevel_box(top), "l", 0xff000000,
@@ -1081,7 +1077,7 @@ static twin_pixmap_t *load_bytes(const uint8_t *bytes, size_t len)
         return NULL;
     bool ok = write(fd, bytes, len) == (ssize_t) len;
     close(fd);
-    twin_pixmap_t *p = ok ? twin_pixmap_from_file(path, TWIN_ARGB32) : NULL;
+    twin_pixmap_t *p = ok ? twin_pixmap_from_file(path) : NULL;
     unlink(path);
     return p;
 }

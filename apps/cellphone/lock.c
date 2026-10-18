@@ -86,7 +86,8 @@ static twin_time_t lock_tick(ui_view_t *v)
     lock_t *l = (lock_t *) v;
     /* Breathe between 30% and 80% over ~1.8 s */
     l->phase = (l->phase + 4096 * 60 / 1800) & 4095;
-    twin_fixed_t c = twin_cos((twin_angle_t) l->phase);
+    twin_fixed_t c;
+    twin_sincos((twin_angle_t) l->phase, NULL, &c);
     int a =
         0x4d + (int) (((int64_t) (0xcc - 0x4d) * (TWIN_FIXED_ONE - c)) >> 17);
     if (a != l->hint_alpha) {

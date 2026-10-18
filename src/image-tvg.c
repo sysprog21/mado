@@ -1209,180 +1209,101 @@ static size_t inp_func(uint8_t *data, size_t to_read, void *state)
     return fread(data, 1, to_read, f);
 }
 
-twin_pixmap_t *_twin_tvg_to_pixmap(const char *filepath, twin_format_t fmt)
+/* Largest size within @budget bytes, keeping the w:h aspect; false if
+ * nothing fits */
+static bool tvg_fit_budget(twin_format_t fmt,
+                           uint32_t *w,
+                           uint32_t *h,
+                           size_t budget)
 {
-    FILE *infile = NULL;
-    twin_pixmap_t *pix = NULL;
-    uint32_t width, height;
-    tvg_result_t res;
-
-    if (!filepath) {
-        log_error("Invalid filepath");
-        goto bail;
+    size_t size;
+    if (tvg_pixmap_alloc_size(fmt, *w, *h, &size) && size <= budget)
+        return true;
+    uint32_t lo = 1, hi = *h, best_w = 0, best_h = 0;
+    while (lo <= hi) {
+        uint32_t mid_h = lo + (hi - lo) / 2;
+        uint32_t mid_w = (uint32_t) (((uint64_t) *w * mid_h) / *h);
+        if (mid_w < 1)
+            mid_w = 1;
+        if (tvg_pixmap_alloc_size(fmt, mid_w, mid_h, &size) && size <= budget) {
+            best_w = mid_w;
+            best_h = mid_h;
+            lo = mid_h + 1;
+        } else {
+            hi = mid_h - 1;
+        }
     }
-
-    infile = fopen(filepath, "rb");
-    if (!infile) {
-        log_error("Failed to open %s", filepath);
-        goto bail;
-    }
-
-    res = tvg_document_dimensions(inp_func, infile, &width, &height);
-    if (res != TVG_SUCCESS) {
-        log_error("Failed to get document dimensions");
-        goto bail_infile;
-    }
-
-    if (fseek(infile, 0, SEEK_SET) != 0) {
-        log_error("Failed to seek file");
-        goto bail_infile;
-    }
-
-    pix = twin_pixmap_create(fmt, width, height);
-    if (!pix) {
-        log_error("Failed to create pixmap");
-        goto bail_infile;
-    }
-
-    res = tvg_render_document(inp_func, infile, pix, TWIN_FIXED_ONE,
-                              TWIN_FIXED_ONE);
-    if (res != TVG_SUCCESS) {
-        log_error("Failed to render document");
-        goto bail_pixmap;
-    }
-
-    fclose(infile);
-    return pix;
-
-bail_pixmap:
-    twin_pixmap_destroy(pix);
-bail_infile:
-    fclose(infile);
-bail:
-    return NULL;
+    *w = best_w;
+    *h = best_h;
+    return best_w && best_h;
 }
 
-twin_pixmap_t *twin_tvg_to_pixmap_scale(const char *filepath,
-                                        twin_format_t fmt,
-                                        twin_coord_t w,
-                                        twin_coord_t h)
+/* Render @filepath into a @w x @h pixmap, the drawing scaled to fit (0 x 0:
+ * the document's own size), shrunk further to CONFIG_TVG_MEMORY_BUDGET */
+static twin_pixmap_t *tvg_load(const char *filepath,
+                               twin_format_t fmt,
+                               uint32_t w,
+                               uint32_t h)
 {
-    FILE *infile = NULL;
     twin_pixmap_t *pix = NULL;
-    uint32_t width, height;
-    tvg_result_t res;
-
-    if (!filepath) {
-        log_error("Invalid filepath");
-        goto bail;
-    }
-
-    infile = fopen(filepath, "rb");
-    if (!infile) {
-        log_error("Failed to open %s", filepath);
-        goto bail;
-    }
-
-    res = tvg_document_dimensions(inp_func, infile, &width, &height);
-    __goto_if_fail(res, bail_infile, "Failed to get document dimensions");
-
-    if (fseek(infile, 0, SEEK_SET) != 0) {
-        log_error("Failed to seek file");
-        goto bail_infile;
-    }
-
-    pix = twin_pixmap_create(fmt, w, h);
-    if (!pix) {
-        log_error("Failed to create pixmap");
-        goto bail_infile;
-    }
-    twin_fixed_t width_scale = D((double) w / (double) width);
-    twin_fixed_t height_scale = D((double) h / (double) height);
-    twin_fixed_t scale = MIN(width_scale, height_scale);
-    res = tvg_render_document(inp_func, infile, pix, scale, scale);
-    __goto_if_fail(res, bail_pixmap, "Failed to render document");
-
-    fclose(infile);
-    return pix;
-
-bail_pixmap:
-    twin_pixmap_destroy(pix);
-bail_infile:
-    fclose(infile);
-bail:
-    return NULL;
-}
-
-twin_pixmap_t *twin_tvg_to_pixmap_budget(const char *filepath,
-                                         twin_format_t fmt,
-                                         size_t memory_budget)
-{
-    FILE *infile = NULL;
     uint32_t width, height;
 
     if (!filepath)
         return NULL;
-
-    infile = fopen(filepath, "rb");
-    if (!infile)
+    FILE *infile = fopen(filepath, "rb");
+    if (!infile) {
+        log_error("Failed to open %s", filepath);
         return NULL;
-
+    }
     tvg_result_t res =
         tvg_document_dimensions(inp_func, infile, &width, &height);
-    fclose(infile);
-    if (res != TVG_SUCCESS)
-        return NULL;
-
-    /* Compute the largest output dimensions that fit within budget */
-    if (width == 0 || height == 0)
-        return NULL;
-    size_t full_size;
-    if (!tvg_pixmap_alloc_size(fmt, width, height, &full_size))
-        return NULL;
-
-    /* Clamp to twin_coord_t range (int16_t max = 32767) */
-    if (width > 32767)
-        width = 32767;
-    if (height > 32767)
-        height = 32767;
-
-    twin_coord_t out_w, out_h;
-    if (full_size <= memory_budget) {
-        out_w = (twin_coord_t) width;
-        out_h = (twin_coord_t) height;
-    } else {
-        if (memory_budget <= sizeof(twin_pixmap_t))
-            return NULL;
-
-        uint32_t lo = 1;
-        uint32_t hi = height;
-        uint32_t best_w = 0;
-        uint32_t best_h = 0;
-
-        while (lo <= hi) {
-            uint32_t mid_h = lo + (hi - lo) / 2;
-            uint32_t mid_w = ((uint64_t) width * mid_h) / height;
-            size_t candidate_size;
-
-            if (mid_w < 1)
-                mid_w = 1;
-
-            if (tvg_pixmap_alloc_size(fmt, mid_w, mid_h, &candidate_size) &&
-                candidate_size <= memory_budget) {
-                best_w = mid_w;
-                best_h = mid_h;
-                lo = mid_h + 1;
-            } else {
-                hi = mid_h - 1;
-            }
-        }
-
-        if (best_w == 0 || best_h == 0)
-            return NULL;
-
-        out_w = (twin_coord_t) best_w;
-        out_h = (twin_coord_t) best_h;
+    if (res != TVG_SUCCESS || !width || !height || fseek(infile, 0, SEEK_SET)) {
+        log_error("Failed to read %s", filepath);
+        goto bail;
     }
+    if (!w || !h) {
+        w = width;
+        h = height;
+    }
+    /* Pixmaps are indexed with twin_coord_t */
+    w = MIN(w, INT16_MAX);
+    h = MIN(h, INT16_MAX);
+#if defined(CONFIG_TVG_MEMORY_BUDGET) && CONFIG_TVG_MEMORY_BUDGET > 0
+    if (!tvg_fit_budget(fmt, &w, &h, (size_t) CONFIG_TVG_MEMORY_BUDGET * 1024))
+        goto bail;
+#else
+    (void) tvg_fit_budget;
+#endif
 
-    return twin_tvg_to_pixmap_scale(filepath, fmt, out_w, out_h);
+    pix = twin_pixmap_create(fmt, (twin_coord_t) w, (twin_coord_t) h);
+    if (!pix) {
+        log_error("Failed to create pixmap");
+        goto bail;
+    }
+    /* Fit the drawing: the smaller of the two ratios, in 16.16 */
+    twin_fixed_t sx = (twin_fixed_t) (((uint64_t) w << 16) / width);
+    twin_fixed_t sy = (twin_fixed_t) (((uint64_t) h << 16) / height);
+    twin_fixed_t scale = MIN(sx, sy);
+    res = tvg_render_document(inp_func, infile, pix, scale, scale);
+    if (res != TVG_SUCCESS) {
+        log_error("Failed to render document");
+        twin_pixmap_destroy(pix);
+        pix = NULL;
+    }
+bail:
+    fclose(infile);
+    return pix;
+}
+
+twin_pixmap_t *_twin_tvg_to_pixmap(const char *filepath, twin_format_t fmt)
+{
+    return tvg_load(filepath, fmt, 0, 0);
+}
+
+twin_pixmap_t *twin_tvg_to_pixmap(const char *filepath,
+                                  twin_coord_t w,
+                                  twin_coord_t h)
+{
+    return tvg_load(filepath, TWIN_ARGB32, w > 0 ? (uint32_t) w : 0,
+                    h > 0 ? (uint32_t) h : 0);
 }

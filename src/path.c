@@ -426,29 +426,6 @@ void twin_path_lozenge(twin_path_t *path,
     twin_path_rounded_rectangle(path, x, y, w, h, radius, radius);
 }
 
-void twin_path_tab(twin_path_t *path,
-                   twin_fixed_t x,
-                   twin_fixed_t y,
-                   twin_fixed_t w,
-                   twin_fixed_t h,
-                   twin_fixed_t x_radius,
-                   twin_fixed_t y_radius)
-{
-    twin_matrix_t save = path->state.matrix;
-
-    twin_path_translate(path, x, y);
-    twin_path_move(path, 0, y_radius);
-    twin_path_arc(path, x_radius, y_radius, x_radius, y_radius, TWIN_ANGLE_180,
-                  TWIN_ANGLE_90);
-    twin_path_draw(path, w - x_radius, 0);
-    twin_path_arc(path, w - x_radius, y_radius, x_radius, y_radius,
-                  TWIN_ANGLE_270, TWIN_ANGLE_90);
-    twin_path_draw(path, w, h);
-    twin_path_draw(path, 0, h);
-    twin_path_close(path);
-    twin_path_set_matrix(path, save);
-}
-
 void twin_path_set_matrix(twin_path_t *path, twin_matrix_t matrix)
 {
     path->state.matrix = matrix;

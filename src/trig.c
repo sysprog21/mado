@@ -7,13 +7,6 @@
 
 #include "twin_private.h"
 
-twin_fixed_t twin_cos(twin_angle_t a)
-{
-    twin_fixed_t cos_val = 0;
-    twin_sincos(a, NULL, &cos_val);
-    return cos_val;
-}
-
 static inline twin_fixed_t sin_poly(twin_angle_t x)
 {
     /* S(x) = x * 2^(-n) * (A1 - 2 ^ (q-p) * x * (2^-n) * x * 2^(-n) * (B1 - 2 ^

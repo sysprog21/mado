@@ -85,11 +85,7 @@ twin_dispatch_result_t _twin_label_dispatch(twin_widget_t *widget,
     return TwinDispatchContinue;
 }
 
-void twin_label_set(twin_label_t *label,
-                    const char *value,
-                    twin_argb32_t foreground,
-                    twin_fixed_t font_size,
-                    twin_style_t font_style)
+void twin_label_set(twin_label_t *label, const char *value)
 {
     if (value) {
         char *new = twin_malloc(strlen(value) + 1);
@@ -101,9 +97,6 @@ void twin_label_set(twin_label_t *label,
             strcpy(label->label, value);
         }
     }
-    label->font_size = font_size;
-    label->font_style = font_style;
-    label->foreground = foreground;
     _twin_widget_queue_layout(&label->widget);
 }
 
@@ -121,7 +114,10 @@ void _twin_label_init(twin_label_t *label,
     label->offset.x = 0;
     label->offset.y = 0;
     label->align = TwinAlignCenter;
-    twin_label_set(label, value, foreground, font_size, font_style);
+    label->font_size = font_size;
+    label->font_style = font_style;
+    label->foreground = foreground;
+    twin_label_set(label, value);
 }
 
 

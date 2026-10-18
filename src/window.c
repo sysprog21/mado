@@ -487,6 +487,7 @@ void twin_window_damage(twin_window_t *window,
     _twin_rect_list_add(window->damage, &window->n_damage,
                         TWIN_WINDOW_DAMAGE_RECTS,
                         (twin_rect_t) {left, right, top, bottom});
+    twin_window_queue_paint(window);
 }
 
 static bool _twin_window_repaint(void *closure)

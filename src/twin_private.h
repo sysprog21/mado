@@ -16,6 +16,13 @@
 
 #include "twin.h"
 
+/* Types the library uses internally */
+typedef uint16_t twin_a16_t;   /* 16-bit alpha channel value */
+typedef uint16_t twin_rgb16_t; /* 16-bit RGB color (5-6-5 format) */
+typedef int32_t twin_area_t;   /* Area measurement in pixels */
+typedef bool (*twin_work_proc_t)(void *closure);
+typedef struct _twin_work twin_work_t;
+
 #define twin_bytes_per_pixel(format) (1 << (twin_coord_t) (format))
 
 #define twin_fixed_ceil(f) (((f) + 0xffff) & ~0xffff)
@@ -371,7 +378,6 @@ struct _twin_widget {
     twin_argb32_t background;       /**< Background color */
     twin_widget_layout_t preferred; /**< Preferred dimensions */
     twin_shape_t shape;             /**< Widget shape */
-    twin_fixed_t radius;            /**< Corner radius */
 };
 
 struct _twin_box {
@@ -413,8 +419,9 @@ struct _twin_context {
  * Encapsulates a base widget and allows attaching custom data.
  */
 struct _twin_custom_widget {
-    twin_widget_t *widget; /**< Base widget functionality */
-    void *data;            /**< User-defined data */
+    twin_widget_t widget;       /**< First: the box lays it out and frees it */
+    twin_custom_proc_t handler; /**< Application event handler */
+    void *data;                 /**< Application data, in the same block */
 };
 
 /*
@@ -606,7 +613,6 @@ typedef int64_t twin_xfixed_t;
 #define twin_sfixed_to_fixed(s) (((twin_fixed_t) (s)) * 4096)
 #define twin_fixed_to_sfixed(f) ((twin_sfixed_t) ((f) >> 12))
 
-
 #define twin_xfixed_to_fixed(x) ((twin_fixed_t) ((x) >> 16))
 #define twin_fixed_to_xfixed(f) (((twin_xfixed_t) (f)) * 65536)
 
@@ -746,7 +752,6 @@ static inline twin_xfixed_t _twin_xfixed_div_32bit(twin_xfixed_t a,
 #define TWIN_SFIXED_MIN (-0x7fff)
 #define TWIN_SFIXED_MAX (0x7fff)
 
-
 #define TWIN_GFIXED_ONE (0x40)
 
 #define TWIN_XFIXED_ONE (0x100000000)
@@ -788,7 +793,6 @@ static inline uint32_t _twin_sat_lanes(uint32_t x)
 #define twin_add(s, d, i, t)                                                  \
     (((t) = twin_get_8(d, i) + twin_get_8(s, i)), (twin_argb32_t) twin_sat(t) \
                                                       << (i))
-
 
 #define twin_argb32_to_rgb16(s) \
     ((((s) >> 3) & 0x001f) | (((s) >> 5) & 0x07e0) | (((s) >> 8) & 0xf800))
@@ -1068,18 +1072,9 @@ void _twin_widget_init(twin_widget_t *widget,
                        twin_widget_layout_t preferred,
                        twin_widget_proc_t dispatch);
 
-void _twin_widget_paint_shape(twin_widget_t *widget,
-                              twin_shape_t shape,
-                              twin_coord_t left,
-                              twin_coord_t top,
-                              twin_coord_t right,
-                              twin_coord_t bottom,
-                              twin_fixed_t radius);
-
 twin_dispatch_result_t _twin_widget_dispatch(twin_widget_t *widget,
                                              twin_event_t *event,
                                              void *closure);
-
 
 void _twin_widget_queue_paint(twin_widget_t *widget);
 
@@ -1141,7 +1136,7 @@ typedef struct twin_backend {
     /* Run the main loop after the application callback, for platforms
      * that own the loop (the browser); NULL: twin_run() loops on
      * twin_dispatch_once() */
-    void (*start)(twin_context_t *ctx, void (*init_callback)(twin_context_t *));
+    void (*start)(twin_context_t *ctx, void (*init_callback)(twin_screen_t *));
 
     /* Device cleanup when drawing is done */
     void (*exit)(twin_context_t *ctx);
@@ -1174,8 +1169,9 @@ extern const twin_backend_t g_twin_backend;
 #define TWIN_WM_DECORATES 0
 #endif
 #if defined(CONFIG_WM_MOBILE)
-#define TWIN_WM_BARS 1 /* system bars and a work area: filter(), work_area() \
-                        */
+#define TWIN_WM_BARS                                        \
+    1 /* system bars and a work area: filter(), work_area() \
+       */
 #else
 #define TWIN_WM_BARS 0
 #endif
@@ -1254,6 +1250,9 @@ static inline bool _twin_wm_filter(twin_screen_t *screen, twin_event_t *event)
 
 /* window.c services used by policies */
 void _twin_window_relayout(twin_window_t *window);
+/* Run draw() for the pending damage on the next pass (twin_window_damage()
+ * does this itself) */
+void twin_window_queue_paint(twin_window_t *window);
 bool _twin_window_deliver(twin_window_t *window, twin_event_t *event);
 void _twin_window_evict(twin_window_t *window);
 bool _twin_window_restore(twin_window_t *window);
@@ -1464,14 +1463,6 @@ void twin_path_lozenge(twin_path_t *path,
                        twin_fixed_t w,
                        twin_fixed_t h);
 
-void twin_path_tab(twin_path_t *path,
-                   twin_fixed_t x,
-                   twin_fixed_t y,
-                   twin_fixed_t w,
-                   twin_fixed_t h,
-                   twin_fixed_t x_radius,
-                   twin_fixed_t y_radius);
-
 /**
  * Add filled outline of Unicode character to path
  * @path : Path to add character to
@@ -1622,6 +1613,13 @@ static inline int twin_clzll(uint64_t v)
 
 extern const uint8_t _twin_cursor_default[];
 
+/* The default arrow cursor, hotspot at its tip (CONFIG_CURSOR) */
+twin_pixmap_t *_twin_make_cursor(void);
+void twin_screen_set_cursor(twin_screen_t *screen,
+                            twin_pixmap_t *pixmap,
+                            twin_coord_t hotspot_x,
+                            twin_coord_t hotspot_y);
+
 /* Pattern Matching for C macros.
  * https://github.com/pfultz2/Cloak/wiki/C-Preprocessor-tricks,-tips,-and-idioms
  */
@@ -1649,7 +1647,6 @@ void twin_path_convolve(twin_path_t *dest,
                         twin_path_t *stroke,
                         twin_path_t *pen,
                         twin_scratch_t *scratch);
-
 
 void twin_fill_path(twin_pixmap_t *pixmap,
                     twin_path_t *path,
@@ -1867,5 +1864,103 @@ static inline void *_twin_widget_callback_data(const twin_widget_t *w)
 {
     return w->ext ? w->ext->callback_data : NULL;
 }
+
+/*
+ * Interfaces for the library, its backends, tests and tools; applications
+ * use include/twin.h only
+ */
+
+/* Work items run once per pass, lowest priority value first */
+#define TWIN_WORK_REDISPLAY 0
+#define TWIN_WORK_PAINT 1
+#define TWIN_WORK_LAYOUT 2
+
+twin_work_t *twin_set_work(twin_work_proc_t work_proc,
+                           int priority,
+                           void *closure);
+
+void twin_clear_work(twin_work_t *work);
+
+void twin_pixmap_show(twin_pixmap_t *pixmap,
+                      twin_screen_t *screen,
+                      twin_pixmap_t *higher);
+
+void twin_pixmap_hide(twin_pixmap_t *pixmap);
+
+void twin_pixmap_move(twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y);
+
+/**
+ * Set the constant opacity applied when the pixmap is scanned out
+ */
+void twin_pixmap_set_opacity(twin_pixmap_t *pixmap, twin_a8_t opacity);
+
+/**
+ * Attach a procedural drop shadow
+ * @pixmap : Pixmap casting the shadow
+ * @dx, dy : Offset of the shadow
+ * @blur   : Blur radius in pixels, 0 removes the shadow
+ * @alpha  : Peak opacity of the shadow
+ */
+void twin_pixmap_set_shadow(twin_pixmap_t *pixmap,
+                            twin_coord_t dx,
+                            twin_coord_t dy,
+                            twin_coord_t blur,
+                            twin_a8_t alpha);
+
+void twin_pixmap_enable_update(twin_pixmap_t *pixmap);
+
+void twin_pixmap_disable_update(twin_pixmap_t *pixmap);
+
+void twin_pixmap_reset_clip(twin_pixmap_t *pixmap);
+
+/* Low level: route keys to @pixmap without telling the window manager.
+ * Applications raise and focus a window with twin_window_activate(). */
+void twin_screen_set_active(twin_screen_t *screen, twin_pixmap_t *pixmap);
+
+/* Request widget repaint */
+void twin_widget_queue_paint(twin_widget_t *widget);
+
+/**
+ * Get total width of UTF-8 string
+ * @path   : Path with current font settings
+ * @string : UTF-8 encoded string
+ *
+ * Return Total string width in fixed-point format
+ */
+twin_fixed_t twin_width_utf8(twin_path_t *path, const char *string);
+
+/** Font ascent and descent (both positive) at @size */
+void twin_font_extents(twin_font_t *font,
+                       twin_fixed_t size,
+                       twin_fixed_t *ascent,
+                       twin_fixed_t *descent);
+
+/**
+ * Check if font contains specified Unicode character
+ * @font : Font to check
+ * @ucs4 : Unicode character code
+ *
+ * Return True if character is available in font
+ */
+bool twin_has_ucs4(twin_font_t *font, twin_ucs4_t ucs4);
+
+/** Select the font used by twin_path_utf8() and its measuring calls */
+void twin_path_set_font(twin_path_t *path, twin_font_t *font);
+
+void twin_path_bounds(twin_path_t *path, twin_rect_t *rect);
+
+/** Apply an easing curve to linear progress @t in [0, TWIN_FIXED_ONE] */
+twin_fixed_t twin_ease(twin_ease_t ease, twin_fixed_t t);
+
+/** Jump a tween to its end state (step callback sees TWIN_FIXED_ONE) */
+void twin_tween_finish(twin_tween_t *tween);
+
+void twin_cache_flush(void);
+
+void twin_cache_set_budget(size_t bytes);
+
+void twin_memory_reset_peak(void);
+
+twin_format_t twin_pixmap_format(const twin_pixmap_t *pixmap);
 
 #endif /* _TWIN_PRIVATE_H_ */

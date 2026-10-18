@@ -141,16 +141,12 @@ twin_sfixed_t _twin_matrix_dy(twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y)
                                 twin_fixed_mul(m->m[1][1], y));
 }
 
-twin_fixed_t twin_matrix_transform_x(const twin_matrix_t *m,
-                                     twin_fixed_t x,
-                                     twin_fixed_t y)
+void twin_matrix_transform(const twin_matrix_t *m,
+                           twin_fixed_t x,
+                           twin_fixed_t y,
+                           twin_fixed_t *ox,
+                           twin_fixed_t *oy)
 {
-    return twin_sfixed_to_fixed(_twin_matrix_x((twin_matrix_t *) m, x, y));
-}
-
-twin_fixed_t twin_matrix_transform_y(const twin_matrix_t *m,
-                                     twin_fixed_t x,
-                                     twin_fixed_t y)
-{
-    return twin_sfixed_to_fixed(_twin_matrix_y((twin_matrix_t *) m, x, y));
+    *ox = _twin_matrix_fx((twin_matrix_t *) m, x, y);
+    *oy = _twin_matrix_fy((twin_matrix_t *) m, x, y);
 }

@@ -125,8 +125,7 @@ static twin_dispatch_result_t repaint_on_destroy(twin_widget_t *widget,
 static void test_toplevel_destroy_repaint(void)
 {
     th_t *t = th_create(W, H);
-    twin_toplevel_t *top = twin_toplevel_create(
-        t->screen, TWIN_ARGB32, TwinWindowApplication, 0, 0, W, H, "t");
+    twin_toplevel_t *top = twin_toplevel_create(t->screen, 0, 0, W, H, "t");
     twin_label_t *label = twin_label_create(
         &top->box, "label", 0xff000000, twin_int_to_fixed(12), TwinStyleRoman);
     twin_widget_set_callback(&label->widget, repaint_on_destroy, NULL);

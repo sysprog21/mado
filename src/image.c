@@ -129,10 +129,10 @@ static loader_func_t image_loaders[] = {
 };
 /* clang-format on */
 
-twin_pixmap_t *twin_pixmap_from_file(const char *path, twin_format_t fmt)
+twin_pixmap_t *twin_pixmap_from_file(const char *path)
 {
     loader_func_t loader = image_loaders[image_type_detect(path)];
     if (!loader)
         return NULL;
-    return loader(path, fmt);
+    return loader(path, TWIN_ARGB32);
 }

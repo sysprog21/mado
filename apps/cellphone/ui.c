@@ -147,7 +147,6 @@ void ui_view_invalidate(ui_view_t *view, ui_rect_t r)
     twin_rect_t c = twin_window_client(w);
     twin_window_damage(w, r.left + c.left, r.top + c.top, r.right + c.left,
                        r.bottom + c.top);
-    twin_window_queue_paint(w);
 }
 
 void ui_view_invalidate_all(ui_view_t *view)

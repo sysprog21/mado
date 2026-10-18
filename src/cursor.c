@@ -108,15 +108,8 @@ const uint8_t _twin_cursor_default[] = {
     0x00, 0x00, 0x00, 0x00,
 };
 
-twin_pixmap_t *twin_make_cursor(int *hx, int *hy)
+twin_pixmap_t *_twin_make_cursor(void)
 {
     twin_pointer_t pixels = {.v = (void *) _twin_cursor_default};
-
-    twin_pixmap_t *cur =
-        twin_pixmap_create_const(TWIN_ARGB32, 14, 20, 14 * 4, pixels);
-    if (!cur)
-        return NULL;
-    *hx = 0;
-    *hy = 0;
-    return cur;
+    return twin_pixmap_create_const(TWIN_ARGB32, 14, 20, 14 * 4, pixels);
 }

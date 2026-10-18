@@ -142,7 +142,6 @@ static void _repaint_window(twin_window_t *w)
         return;
     twin_rect_t c = twin_window_client(w);
     twin_window_damage(w, c.left, c.top, c.right, c.bottom);
-    twin_window_queue_paint(w);
 }
 
 static int nav_state(void);
@@ -438,7 +437,6 @@ static twin_time_t status_tick(twin_time_t now, void *closure)
         /* Only the time label changes */
         twin_window_damage(w, PHONE_W / 2 - 30, 0, PHONE_W / 2 + 30,
                            PHONE_STATUS_H);
-        twin_window_queue_paint(w);
     }
     return 1000;
 }

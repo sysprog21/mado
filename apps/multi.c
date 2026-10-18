@@ -87,16 +87,9 @@ static int _multiline_hit_test(multiline_data_t *data,
     return -1;
 }
 
-static twin_dispatch_result_t _multiline_dispatch(twin_widget_t *widget,
-                                                  twin_event_t *event,
-                                                  void *closure)
+static twin_dispatch_result_t _multiline_dispatch(twin_custom_widget_t *custom,
+                                                  twin_event_t *event)
 {
-    (void) closure;
-
-    twin_custom_widget_t *custom = twin_widget_get_custom(widget);
-    if (!custom)
-        return TwinDispatchContinue;
-
     multiline_data_t *data =
         (multiline_data_t *) twin_custom_widget_data(custom);
 
@@ -144,14 +137,14 @@ static bool apps_multiline_start(twin_screen_t *screen,
                                  int w,
                                  int h)
 {
-    twin_toplevel_t *toplevel = twin_toplevel_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, "Lines");
+    twin_toplevel_t *toplevel =
+        twin_toplevel_create(screen, x, y, w, h, "Lines");
     if (!toplevel)
         return false;
 
     twin_custom_widget_t *custom = twin_custom_widget_create(
-        twin_toplevel_box(toplevel), 0xffffffff, 0, 0, 1, 1,
-        _multiline_dispatch, sizeof(multiline_data_t));
+        twin_toplevel_box(toplevel), 0xffffffff, 0, 0, _multiline_dispatch,
+        sizeof(multiline_data_t));
     if (!custom) {
         twin_toplevel_destroy(toplevel);
         return false;
@@ -475,7 +468,7 @@ static bool apps_blur(twin_screen_t *screen, int x, int y, int w, int h)
 {
     twin_pixmap_t *raw_background = NULL;
 #if defined(CONFIG_LOADER_PNG)
-    raw_background = twin_pixmap_from_file(ASSET_PATH "tux.png", TWIN_ARGB32);
+    raw_background = twin_pixmap_from_file(ASSET_PATH "tux.png");
 #endif
     if (!raw_background)
         return false;

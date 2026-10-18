@@ -203,16 +203,9 @@ static twin_time_t _apps_clock_timeout(twin_time_t now, void *closure)
     return _apps_clock_interval();
 }
 
-static twin_dispatch_result_t _apps_clock_dispatch(twin_widget_t *widget,
-                                                   twin_event_t *event,
-                                                   void *closure)
+static twin_dispatch_result_t _apps_clock_dispatch(twin_custom_widget_t *custom,
+                                                   twin_event_t *event)
 {
-    (void) closure; /* unused parameter */
-
-    twin_custom_widget_t *custom = twin_widget_get_custom(widget);
-    if (!custom)
-        return TwinDispatchContinue;
-
     switch (event->kind) {
     case TwinEventPaint:
         _apps_clock_paint(custom);
@@ -235,7 +228,7 @@ static twin_dispatch_result_t _apps_clock_dispatch(twin_widget_t *widget,
 static twin_custom_widget_t *_apps_clock_init(twin_box_t *parent)
 {
     twin_custom_widget_t *custom = twin_custom_widget_create(
-        parent, 0, 0, 0, 1, 1, _apps_clock_dispatch, sizeof(apps_clock_data_t));
+        parent, 0, 0, 0, _apps_clock_dispatch, sizeof(apps_clock_data_t));
     if (!custom)
         return NULL;
 
@@ -259,8 +252,7 @@ bool apps_clock_start(twin_screen_t *screen,
                       int w,
                       int h)
 {
-    twin_toplevel_t *toplevel = twin_toplevel_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
+    twin_toplevel_t *toplevel = twin_toplevel_create(screen, x, y, w, h, name);
     if (!toplevel)
         return false;
     if (!apps_clock_create(twin_toplevel_box(toplevel))) {

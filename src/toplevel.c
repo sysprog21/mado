@@ -99,8 +99,6 @@ void _twin_toplevel_init(twin_toplevel_t *toplevel,
 }
 
 twin_toplevel_t *twin_toplevel_create(twin_screen_t *screen,
-                                      twin_format_t format,
-                                      twin_window_style_t style,
                                       twin_coord_t x,
                                       twin_coord_t y,
                                       twin_coord_t width,
@@ -108,8 +106,8 @@ twin_toplevel_t *twin_toplevel_create(twin_screen_t *screen,
                                       const char *name)
 {
     twin_toplevel_t *toplevel;
-    twin_window_t *window =
-        twin_window_create(screen, format, style, x, y, width, height);
+    twin_window_t *window = twin_window_create(
+        screen, TWIN_ARGB32, TwinWindowApplication, x, y, width, height);
 
     if (!window)
         return NULL;

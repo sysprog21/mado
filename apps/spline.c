@@ -142,10 +142,9 @@ static twin_dispatch_result_t _apps_spline_update_pos(
     twin_fixed_t x = twin_int_to_fixed(event->u.pointer.x);
     twin_fixed_t y = twin_int_to_fixed(event->u.pointer.y);
 
-    spline->points[spline->which].x =
-        twin_matrix_transform_x(&(spline->inverse_transition), x, y);
-    spline->points[spline->which].y =
-        twin_matrix_transform_y(&(spline->inverse_transition), x, y);
+    twin_matrix_transform(&spline->inverse_transition, x, y,
+                          &spline->points[spline->which].x,
+                          &spline->points[spline->which].y);
     twin_custom_widget_queue_paint(custom);
     /* Parent will be repainted automatically */
     return TwinDispatchDone;
@@ -157,10 +156,9 @@ static int _apps_spline_hit(apps_spline_data_t *spline,
 {
     int i;
     for (i = 0; i < spline->n_points; i++) {
-        twin_fixed_t px = twin_matrix_transform_x(
-            &(spline->transition), spline->points[i].x, spline->points[i].y);
-        twin_fixed_t py = twin_matrix_transform_y(
-            &(spline->transition), spline->points[i].x, spline->points[i].y);
+        twin_fixed_t px, py;
+        twin_matrix_transform(&spline->transition, spline->points[i].x,
+                              spline->points[i].y, &px, &py);
         if (twin_fixed_abs(x - px) < twin_int_to_fixed(CONTROL_POINT_RADIUS) &&
             twin_fixed_abs(y - py) < twin_int_to_fixed(CONTROL_POINT_RADIUS))
             return i;
@@ -168,16 +166,10 @@ static int _apps_spline_hit(apps_spline_data_t *spline,
     return -1;
 }
 
-static twin_dispatch_result_t _apps_spline_dispatch(twin_widget_t *widget,
-                                                    twin_event_t *event,
-                                                    void *closure)
+static twin_dispatch_result_t _apps_spline_dispatch(
+    twin_custom_widget_t *custom,
+    twin_event_t *event)
 {
-    (void) closure; /* unused parameter */
-
-    twin_custom_widget_t *custom = twin_widget_get_custom(widget);
-    if (!custom)
-        return TwinDispatchContinue;
-
     apps_spline_data_t *spline =
         (apps_spline_data_t *) twin_custom_widget_data(custom);
 
@@ -216,7 +208,7 @@ static twin_custom_widget_t *_apps_spline_init(twin_box_t *parent,
                                                twin_coord_t height)
 {
     twin_custom_widget_t *custom = twin_custom_widget_create(
-        parent, 0xffffffff, 0, height, 1, 1, _apps_spline_dispatch,
+        parent, 0xffffffff, 0, height, _apps_spline_dispatch,
         sizeof(apps_spline_data_t));
     if (!custom)
         return NULL;
@@ -259,8 +251,7 @@ bool apps_spline_start(twin_screen_t *screen,
                        int w,
                        int h)
 {
-    twin_toplevel_t *toplevel = twin_toplevel_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
+    twin_toplevel_t *toplevel = twin_toplevel_create(screen, x, y, w, h, name);
     if (!toplevel)
         return false;
     if (!apps_spline_create(twin_toplevel_box(toplevel), 4,

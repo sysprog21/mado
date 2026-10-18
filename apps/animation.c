@@ -62,16 +62,10 @@ static twin_time_t _apps_animation_timeout(twin_time_t now, void *closure)
     return twin_animation_get_current_delay(a);
 }
 
-static twin_dispatch_result_t _apps_animation_dispatch(twin_widget_t *widget,
-                                                       twin_event_t *event,
-                                                       void *closure)
+static twin_dispatch_result_t _apps_animation_dispatch(
+    twin_custom_widget_t *custom,
+    twin_event_t *event)
 {
-    (void) closure; /* unused parameter */
-
-    twin_custom_widget_t *custom = twin_widget_get_custom(widget);
-    if (!custom)
-        return TwinDispatchContinue;
-
     switch (event->kind) {
     case TwinEventPaint:
         _apps_animation_paint(custom);
@@ -96,7 +90,7 @@ static twin_custom_widget_t *_apps_animation_init(twin_box_t *parent,
                                                   twin_pixmap_t *pix)
 {
     twin_custom_widget_t *custom = twin_custom_widget_create(
-        parent, 0xff000000, 0, 0, 1, 1, _apps_animation_dispatch,
+        parent, 0xff000000, 0, 0, _apps_animation_dispatch,
         sizeof(apps_animation_data_t));
     if (!custom)
         return NULL;
@@ -129,12 +123,11 @@ bool apps_animation_start(twin_screen_t *screen,
                           int x,
                           int y)
 {
-    twin_pixmap_t *pix = twin_pixmap_from_file(path, TWIN_ARGB32);
+    twin_pixmap_t *pix = twin_pixmap_from_file(path);
     if (!pix)
         return false;
     twin_toplevel_t *toplevel = twin_toplevel_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y,
-        twin_pixmap_width(pix), twin_pixmap_height(pix), name);
+        screen, x, y, twin_pixmap_width(pix), twin_pixmap_height(pix), name);
     if (!toplevel) {
         twin_pixmap_destroy(pix);
         return false;

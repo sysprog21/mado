@@ -99,7 +99,7 @@ void twin_window_activate(twin_window_t *window)
     _twin_wm_activate(window);
 }
 
-bool twin_window_back(twin_window_t *window)
+void twin_window_back(twin_window_t *window)
 {
     twin_screen_t *screen = window->screen;
     twin_event_t ev = {.kind = TwinEventBack};
@@ -110,7 +110,6 @@ bool twin_window_back(twin_window_t *window)
     if (!handled && !window->dead)
         twin_window_close(window);
     _twin_screen_idle(screen);
-    return handled;
 }
 
 void twin_screen_focus_next(twin_screen_t *screen)

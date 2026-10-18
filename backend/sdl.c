@@ -150,6 +150,10 @@ twin_context_t *twin_sdl_init(int width, int height)
         log_error("%s", SDL_GetError());
         goto bail_sdl;
     }
+#if defined(CONFIG_CURSOR)
+    /* The screen draws its own arrow: one pointer, not two */
+    SDL_ShowCursor(SDL_DISABLE);
+#endif
 
     tx->pixels = malloc(width * height * sizeof(*tx->pixels));
     if (!tx->pixels) {

@@ -1609,6 +1609,7 @@ extern const uint8_t _twin_cursor_default[];
 
 /* The default arrow cursor, hotspot at its tip (CONFIG_CURSOR) */
 twin_pixmap_t *_twin_make_cursor(void);
+/* @pixmap becomes the screen's: it is destroyed with the screen */
 void twin_screen_set_cursor(twin_screen_t *screen,
                             twin_pixmap_t *pixmap,
                             twin_coord_t hotspot_x,

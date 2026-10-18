@@ -86,6 +86,9 @@ void twin_screen_destroy(twin_screen_t *screen)
         twin_pixmap_hide(screen->bottom);
     if (screen->background)
         twin_pixmap_destroy(screen->background);
+    /* The screen owns its cursor (twin_create() installs it) */
+    if (screen->cursor)
+        twin_pixmap_destroy(screen->cursor);
     for (int i = 0; i < screen->path_cache_count; i++)
         twin_path_destroy(screen->path_cache[i]);
     twin_free(screen->span_cache);
@@ -769,8 +772,11 @@ void twin_screen_set_cursor(twin_screen_t *screen,
 {
     twin_screen_disable_update(screen);
 
-    if (screen->cursor)
+    if (screen->cursor) {
         twin_screen_damage_cursor(screen);
+        if (screen->cursor != pixmap)
+            twin_pixmap_destroy(screen->cursor);
+    }
 
     screen->cursor = pixmap;
     screen->curs_hx = hotspot_x;

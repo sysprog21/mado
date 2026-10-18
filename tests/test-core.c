@@ -12,6 +12,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "harness.h"
 
@@ -1068,6 +1069,59 @@ static void test_accessors(void)
     th_destroy(t);
 }
 
+#if defined(CONFIG_LOADER_GIF)
+/* Load @len bytes as a file; NULL is the only acceptable answer here */
+static twin_pixmap_t *load_bytes(const uint8_t *bytes, size_t len)
+{
+    char path[] = "/tmp/mado-gif-XXXXXX";
+    int fd = mkstemp(path);
+    if (fd < 0)
+        return NULL;
+    bool ok = write(fd, bytes, len) == (ssize_t) len;
+    close(fd);
+    twin_pixmap_t *p = ok ? twin_pixmap_from_file(path, TWIN_ARGB32) : NULL;
+    unlink(path);
+    return p;
+}
+
+/* Malformed GIFs fail to load instead of hanging or writing out of
+ * bounds: a frame that cannot be decoded and no trailer, a zero size, and
+ * a size that does not fit a pixmap */
+static void test_gif_malformed(void)
+{
+    /* 4x4, black/white palette, a 2x2 image placed at x=100, then EOF */
+    uint8_t bad[] = {'G',  'I', 'F', '8', '9', 'a', 4,    0,    4,    0,
+                     0x80, 0,   0,   0,   0,   0,   0xff, 0xff, 0xff, ',',
+                     100,  0,   0,   0,   2,   0,   2,    0,    0};
+    CHECK(!load_bytes(bad, sizeof(bad)), "undecodable frame rejected");
+
+    uint8_t zero[sizeof(bad)];
+    memcpy(zero, bad, sizeof(bad));
+    zero[6] = zero[7] = 0;
+    CHECK(!load_bytes(zero, sizeof(zero)), "zero width rejected");
+
+    uint8_t huge[sizeof(bad)];
+    memcpy(huge, bad, sizeof(bad));
+    huge[6] = huge[7] = huge[8] = huge[9] = 0xff;
+    CHECK(!load_bytes(huge, sizeof(huge)), "65535x65535 rejected");
+
+    /* Every truncation of a small image returns: a cut inside the data
+     * sub-blocks used to leave the block size unread and loop forever */
+    const uint8_t good[] = {'G',  'I',  'F', '8', '9',  'a',  2, 0,    2,
+                            0,    0x80, 0,   0,   0,    0,    0, 0xff, 0xff,
+                            0xff, ',',  0,   0,   0,    0,    2, 0,    2,
+                            0,    0,    2,   2,   0x44, 0x01, 0, ';'};
+    int returned = 0;
+    for (size_t cut = 0; cut <= sizeof(good); cut++) {
+        twin_pixmap_t *p = load_bytes(good, cut);
+        if (p)
+            twin_pixmap_destroy(p);
+        returned++;
+    }
+    CHECK_EQ(returned, (int) sizeof(good) + 1, "every truncated GIF returns");
+}
+#endif
+
 int main(void)
 {
     test_damage_merge();
@@ -1091,6 +1145,9 @@ int main(void)
     test_accessors();
 #if defined(CONFIG_WIDGETS)
     test_widget_teardown();
+#endif
+#if defined(CONFIG_LOADER_GIF)
+    test_gif_malformed();
 #endif
     test_leaks();
     twin_cache_flush();

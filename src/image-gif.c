@@ -58,11 +58,30 @@ typedef struct {
     entry_t *entries;
 } table_t;
 
+/* Read exactly @n bytes.  A truncated file reads as zeros past its end,
+ * which every caller treats as a terminator (a zero block size, a zero
+ * separator), so a short file ends decoding instead of feeding it
+ * uninitialized bytes or spinning on a size that never reaches zero. */
+static bool gif_read(int fd, void *buf, size_t n)
+{
+    uint8_t *p = buf;
+    while (n) {
+        ssize_t got = read(fd, p, n);
+        if (got <= 0) {
+            memset(p, 0, n);
+            return false;
+        }
+        p += got;
+        n -= (size_t) got;
+    }
+    return true;
+}
+
 static uint16_t read_num(int fd)
 {
     uint8_t bytes[2];
 
-    read(fd, bytes, 2);
+    gif_read(fd, bytes, 2);
     return bytes[0] + (((uint16_t) bytes[1]) << 8);
 }
 
@@ -83,13 +102,13 @@ static twin_gif_t *gif_open(const char *fname)
     setmode(fd, O_BINARY);
 #endif
     /* Header */
-    read(fd, sigver, 3);
+    gif_read(fd, sigver, 3);
     if (memcmp(sigver, "GIF", 3) != 0) {
         log_error("Invalid signature");
         goto fail;
     }
     /* Version */
-    read(fd, sigver, 3);
+    gif_read(fd, sigver, 3);
     if (memcmp(sigver, "89a", 3) != 0) {
         log_error("Invalid version");
         goto fail;
@@ -97,8 +116,13 @@ static twin_gif_t *gif_open(const char *fname)
     /* Width x Height */
     width = read_num(fd);
     height = read_num(fd);
+    /* Pixmaps index rows and columns with twin_coord_t */
+    if (!width || !height || width > INT16_MAX || height > INT16_MAX) {
+        log_error("Unsupported size %ux%u", width, height);
+        goto fail;
+    }
     /* FDSZ */
-    read(fd, &fdsz, 1);
+    gif_read(fd, &fdsz, 1);
     /* Presence of GCT */
     if (!(fdsz & 0x80)) {
         log_error("No global color table");
@@ -110,9 +134,9 @@ static twin_gif_t *gif_open(const char *fname)
     /* GCT Size */
     gct_sz = 1 << ((fdsz & 0x07) + 1);
     /* Background Color Index */
-    read(fd, &bgidx, 1);
+    gif_read(fd, &bgidx, 1);
     /* Aspect Ratio */
-    read(fd, &aspect, 1);
+    gif_read(fd, &aspect, 1);
     /* Create twin_gif_t Structure. */
     gif = twin_calloc(1, sizeof(*gif));
     if (!gif)
@@ -123,10 +147,10 @@ static twin_gif_t *gif_open(const char *fname)
     gif->depth = depth;
     /* Read GCT */
     gif->gct.size = gct_sz;
-    read(fd, gif->gct.colors, 3 * gif->gct.size);
+    gif_read(fd, gif->gct.colors, 3 * gif->gct.size);
     gif->palette = &gif->gct;
     gif->bgindex = bgidx;
-    gif->frame = twin_calloc(4, width * height);
+    gif->frame = twin_calloc(4, (size_t) width * height);
     if (!gif->frame) {
         twin_free(gif);
         goto fail;
@@ -152,7 +176,7 @@ static void discard_sub_blocks(twin_gif_t *gif)
     uint8_t size;
 
     do {
-        read(gif->fd, &size, 1);
+        gif_read(gif->fd, &size, 1);
         lseek(gif->fd, size, SEEK_CUR);
     } while (size);
 }
@@ -220,11 +244,11 @@ static uint16_t get_key(twin_gif_t *gif,
         if (rpad == 0) {
             /* Update byte. */
             if (*sub_len == 0) {
-                read(gif->fd, sub_len, 1); /* Must be nonzero! */
+                gif_read(gif->fd, sub_len, 1); /* Must be nonzero! */
                 if (*sub_len == 0)
                     return 0x1000;
             }
-            read(gif->fd, byte, 1);
+            gif_read(gif->fd, byte, 1);
             (*sub_len)--;
         }
         frag_size = MIN(key_size - bits_read, 8 - rpad);
@@ -272,7 +296,7 @@ static int read_image_data(twin_gif_t *gif, int interlace)
     entry_t entry = {0};
     off_t start, end;
 
-    read(gif->fd, &byte, 1);
+    gif_read(gif->fd, &byte, 1);
     key_size = (int) byte;
     if (key_size < 2 || key_size > 8)
         return -1;
@@ -284,6 +308,8 @@ static int read_image_data(twin_gif_t *gif, int interlace)
     clear = 1 << key_size;
     stop = clear + 1;
     table = table_new(key_size);
+    if (!table)
+        return -1;
     key_size++;
     init_key_size = key_size;
     sub_len = shift = 0;
@@ -318,6 +344,9 @@ static int read_image_data(twin_gif_t *gif, int interlace)
             key_size++;
         entry = table->entries[key];
         str_len = entry.length;
+        /* A string running past the frame ends a malformed stream */
+        if (str_len > frm_size - frm_off)
+            break;
         for (i = 0; i < str_len; i++) {
             p = frm_off + entry.length - 1;
             x = p % gif->fw;
@@ -336,7 +365,7 @@ static int read_image_data(twin_gif_t *gif, int interlace)
     }
     twin_free(table);
     if (key == stop)
-        read(gif->fd, &sub_len, 1); /* Must be zero! */
+        gif_read(gif->fd, &sub_len, 1); /* Must be zero! */
     lseek(gif->fd, end, SEEK_SET);
     return 0;
 }
@@ -362,14 +391,14 @@ static int read_image(twin_gif_t *gif)
     gif->fw = MIN(gif->fw, gif->width - gif->fx);
     gif->fh = MIN(gif->fh, gif->height - gif->fy);
 
-    read(gif->fd, &fisrz, 1);
+    gif_read(gif->fd, &fisrz, 1);
     interlace = fisrz & 0x40;
     /* Ignore Sort Flag. */
     /* Local Color table_t? */
     if (fisrz & 0x80) {
         /* Read LCT */
         gif->lct.size = 1 << ((fisrz & 0x07) + 1);
-        read(gif->fd, gif->lct.colors, 3 * gif->lct.size);
+        gif_read(gif->fd, gif->lct.colors, 3 * gif->lct.size);
         gif->palette = &gif->lct;
     } else
         gif->palette = &gif->gct;
@@ -429,12 +458,12 @@ static void read_graphic_control_ext(twin_gif_t *gif)
 
     /* Discard block size (always 0x04). */
     lseek(gif->fd, 1, SEEK_CUR);
-    read(gif->fd, &rdit, 1);
+    gif_read(gif->fd, &rdit, 1);
     gif->gce.disposal = (rdit >> 2) & 3;
     gif->gce.input = rdit & 2;
     gif->gce.transparency = rdit & 1;
     gif->gce.delay = read_num(gif->fd);
-    read(gif->fd, &gif->gce.tindex, 1);
+    gif_read(gif->fd, &gif->gce.tindex, 1);
     /* Skip block terminator. */
     lseek(gif->fd, 1, SEEK_CUR);
 }
@@ -453,9 +482,9 @@ static void read_application_ext(twin_gif_t *gif)
     /* Discard block size (always 0x0B). */
     lseek(gif->fd, 1, SEEK_CUR);
     /* Application Identifier. */
-    read(gif->fd, app_id, 8);
+    gif_read(gif->fd, app_id, 8);
     /* Application Authentication Code. */
-    read(gif->fd, app_auth_code, 3);
+    gif_read(gif->fd, app_auth_code, 3);
     if (!strncmp(app_id, "NETSCAPE", sizeof(app_id))) {
         /* Discard block size (0x03) and constant byte (0x01). */
         lseek(gif->fd, 2, SEEK_CUR);
@@ -471,7 +500,7 @@ static void read_ext(twin_gif_t *gif)
 {
     uint8_t label;
 
-    if (read(gif->fd, &label, 1) < 1)
+    if (!gif_read(gif->fd, &label, 1))
         return;
     switch (label) {
     case 0x01:
@@ -497,14 +526,15 @@ static int gif_get_frame(twin_gif_t *gif)
     char sep;
 
     dispose(gif);
-    read(gif->fd, &sep, 1);
+    if (!gif_read(gif->fd, &sep, 1))
+        return -1; /* truncated: no trailer */
     while (sep != ',') {
         if (sep == ';')
             return 0;
         if (sep != '!')
             return -1;
         read_ext(gif);
-        if (read(gif->fd, &sep, 1) < 1)
+        if (!gif_read(gif->fd, &sep, 1))
             return -1;
     }
     if (read_image(gif) == -1)
@@ -514,7 +544,7 @@ static int gif_get_frame(twin_gif_t *gif)
 
 static void gif_render_frame(twin_gif_t *gif, uint8_t *buffer)
 {
-    memcpy(buffer, gif->canvas, gif->width * gif->height * 3);
+    memcpy(buffer, gif->canvas, (size_t) gif->width * gif->height * 3);
     render_frame_rect(gif, buffer);
 }
 
@@ -554,9 +584,16 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
     anim->width = gif->width;
     anim->height = gif->height;
 
+    /* Count the frames; a file truncated or corrupt after some frames
+     * keeps those, one with none is rejected */
     int frame_count = 0;
-    while (gif_get_frame(gif))
+    while (gif_get_frame(gif) > 0)
         frame_count++;
+    if (!frame_count) {
+        twin_free(anim);
+        gif_close(gif);
+        return NULL;
+    }
 
     anim->n_frames = frame_count;
     anim->frames = twin_malloc(sizeof(twin_pixmap_t *) * frame_count);
@@ -575,7 +612,7 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
 
     gif_rewind(gif);
     uint8_t *color, *frame;
-    frame = twin_malloc(gif->width * gif->height * 3);
+    frame = twin_malloc((size_t) gif->width * gif->height * 3);
     if (!frame) {
         twin_free(anim->frame_delays);
         twin_free(anim->frames);

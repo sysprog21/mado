@@ -514,14 +514,13 @@ static void _background_span(twin_screen_t *screen,
     }
 }
 
-/* Is @p, on row @y, opaque across [l, r)?  Returns the opaque span. */
-static bool _layer_opaque_span(const twin_pixmap_t *p,
-                               twin_coord_t y,
-                               twin_coord_t *ol,
-                               twin_coord_t * or)
+/* The columns where @p's own pixels are opaque on row @y, whatever its
+ * opacity */
+static bool _layer_solid_span(const twin_pixmap_t *p,
+                              twin_coord_t y,
+                              twin_coord_t *ol,
+                              twin_coord_t * or)
 {
-    if (p->opacity != 0xff || (_twin_debug & TWIN_DEBUG_NO_OCCLUSION))
-        return false;
     const twin_rect_t *o = &p->opaque_rect;
     if (o->left >= o->right)
         return false;
@@ -530,6 +529,17 @@ static bool _layer_opaque_span(const twin_pixmap_t *p,
     *ol = p->x + o->left;
     *or = p->x + o->right;
     return true;
+}
+
+/* Is @p, on row @y, opaque on screen?  Returns the opaque span. */
+static bool _layer_opaque_span(const twin_pixmap_t *p,
+                               twin_coord_t y,
+                               twin_coord_t *ol,
+                               twin_coord_t * or)
+{
+    if (p->opacity != 0xff || (_twin_debug & TWIN_DEBUG_NO_OCCLUSION))
+        return false;
+    return _layer_solid_span(p, y, ol, or);
 }
 
 static void _composite_row(twin_screen_t *screen,
@@ -652,6 +662,32 @@ static void _composite_row(twin_screen_t *screen,
         return;
     }
 
+    /* A piece of a translucent layer whose own pixels are opaque, with no
+     * layer below it, lands on the solid background: blend it against the
+     * color directly and skip filling the background there.  This is the
+     * window a phone transition dims, every frame. */
+    uint64_t onto = 0;
+    if (!screen->background && !(_twin_debug & TWIN_DEBUG_NO_OCCLUSION)) {
+        for (int i = 0; i < n_layers; i++) {
+            twin_row_layer_t *ly = &layers[i];
+            twin_coord_t ol, or ;
+            if (ly->shadow || ly->p->opacity == 0xff ||
+                ly->p->format == TWIN_A8 ||
+                !_layer_solid_span(ly->p, y, &ol, &or))
+                continue;
+            for (int k = 0; k < ly->count; k++) {
+                twin_span_t *pc = &pieces[ly->first + k];
+                bool below = false;
+                for (int j = i + 1; j < n_layers && !below; j++)
+                    below = layers[j].l < pc->r && pc->l < layers[j].r;
+                if (below || pc->l < ol || pc->r > or)
+                    continue;
+                onto |= (uint64_t) 1 << (ly->first + k);
+                _span_set_add(&covered, pc->l, pc->r);
+            }
+        }
+    }
+
     /* Background where nothing opaque lands */
     {
         twin_span_t bg[TWIN_SPAN_SET_MAX + 1];
@@ -671,6 +707,19 @@ static void _composite_row(twin_screen_t *screen,
             if (ly->shadow) {
                 _shadow_span(span, left, ly->p, y, pc->l, pc->r);
                 screen->stats.shadow_pixels += pc->r - pc->l;
+            } else if (onto & ((uint64_t) 1 << (ly->first + k))) {
+                twin_pixmap_t *p = ly->p;
+                twin_pointer_t src =
+                    twin_pixmap_pointer(p, pc->l - p->x, y - p->y);
+                twin_argb32_t *dst = span + (pc->l - left);
+                if (p->format == TWIN_RGB16)
+                    _twin_screen_blend_onto_rgb16(dst, src.rgb16, p->opacity,
+                                                  screen->background_color,
+                                                  pc->r - pc->l);
+                else
+                    _twin_screen_blend_onto_argb32(dst, src.argb32, p->opacity,
+                                                   screen->background_color,
+                                                   pc->r - pc->l);
             } else {
                 _composite_layer(span, left, ly, y, pc->l, pc->r);
             }

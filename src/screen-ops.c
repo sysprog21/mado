@@ -117,3 +117,69 @@ void _twin_screen_fill(twin_argb32_t *dst, twin_argb32_t color, int width)
     while (width--)
         *dst++ = color;
 }
+
+/* over(under, in_alpha(src, alpha)) for opaque src: the source's alpha
+ * after scaling is exactly alpha, so each channel is
+ * mul(c, alpha) + mul(under_c, 255 - alpha).  Both terms are bounded by
+ * their factors, so the sum never exceeds 255 and the under term packs
+ * into one constant add.  Alpha holds for a whole frame of a transition,
+ * so the products come from a table built once per alpha. */
+static struct {
+    bool valid;
+    twin_a8_t alpha;
+    uint8_t mul[256];
+} _onto_table;
+
+static const uint8_t *_onto_mul(twin_a8_t alpha)
+{
+    if (!_onto_table.valid || _onto_table.alpha != alpha) {
+        for (uint32_t c = 0; c < 256; c++)
+            _onto_table.mul[c] = (uint8_t) _twin_mul_lanes(c, alpha);
+        _onto_table.alpha = alpha;
+        _onto_table.valid = true;
+    }
+    return _onto_table.mul;
+}
+
+static inline uint32_t _onto_under(twin_a8_t alpha, twin_argb32_t under)
+{
+    uint32_t k = 0xff - alpha;
+    return _twin_mul_lanes(under & TWIN_LANES, k) |
+           _twin_mul_lanes((under >> 8) & TWIN_LANES, k) << 8;
+}
+
+static inline twin_argb32_t _onto(twin_argb32_t s,
+                                  const uint8_t *mul,
+                                  uint32_t under)
+{
+    return ((uint32_t) mul[s >> 24] << 24 |
+            (uint32_t) mul[(s >> 16) & 0xff] << 16 |
+            (uint32_t) mul[(s >> 8) & 0xff] << 8 | mul[s & 0xff]) +
+           under;
+}
+
+void _twin_screen_blend_onto_argb32(twin_argb32_t *dst,
+                                    const twin_argb32_t *src,
+                                    twin_a8_t alpha,
+                                    twin_argb32_t under,
+                                    int width)
+{
+    const uint8_t *mul = _onto_mul(alpha);
+    uint32_t u = _onto_under(alpha, under);
+    while (width--)
+        *dst++ = _onto(*src++, mul, u);
+}
+
+void _twin_screen_blend_onto_rgb16(twin_argb32_t *dst,
+                                   const twin_rgb16_t *src,
+                                   twin_a8_t alpha,
+                                   twin_argb32_t under,
+                                   int width)
+{
+    const uint8_t *mul = _onto_mul(alpha);
+    uint32_t u = _onto_under(alpha, under);
+    while (width--) {
+        twin_rgb16_t v = *src++;
+        *dst++ = _onto(twin_rgb16_to_argb32(v), mul, u);
+    }
+}

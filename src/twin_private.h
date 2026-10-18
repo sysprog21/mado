@@ -1321,6 +1321,19 @@ void _twin_screen_blend_rgb16(twin_argb32_t *dst,
                               twin_a8_t alpha,
                               int width);
 void _twin_screen_fill(twin_argb32_t *dst, twin_argb32_t color, int width);
+/* Opaque @src at constant @alpha over the solid color @under, written to
+ * @dst: the result of filling with @under and then blending, with half
+ * the multiplies (@src must be opaque, @alpha below 255) */
+void _twin_screen_blend_onto_argb32(twin_argb32_t *dst,
+                                    const twin_argb32_t *src,
+                                    twin_a8_t alpha,
+                                    twin_argb32_t under,
+                                    int width);
+void _twin_screen_blend_onto_rgb16(twin_argb32_t *dst,
+                                   const twin_rgb16_t *src,
+                                   twin_a8_t alpha,
+                                   twin_argb32_t under,
+                                   int width);
 
 /*
  * Coverage cache (cache.c)

@@ -152,7 +152,7 @@ static void test_display(void)
     if (open_sub("Display")) {
         CHECK_EQ(app_settings_pref("brightness") < 700, 1,
                  "brightness kept across visits");
-        tap_item("Olive");
+        tap_item("Sage");
         CHECK_EQ(phone_theme_index(), 0, "theme restored");
     }
     back_to_root();

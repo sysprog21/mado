@@ -375,7 +375,7 @@ static void grid_paint(ui_view_t *v, twin_pixmap_t *px)
 
     ui_fill(px, ui_view_bounds(v), th->bg);
     if (ui_intersects(clip, head))
-        ui_header(px, head, "Photos", "6 items");
+        ui_header(px, head, NULL, "Photos", "6 items");
     if (ui_intersects(clip, sect))
         ui_section(px, sect, "Recents");
 

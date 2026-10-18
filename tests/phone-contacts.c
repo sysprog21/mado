@@ -103,7 +103,7 @@ static void test_list_scroll(void)
 
 static void open_form(void)
 {
-    ph_tap(PHONE_W - 20, PHONE_HEADER_H / 2);
+    ph_tap(20, PHONE_HEADER_H / 2); /* add, at the header start */
     CHECK(app_contacts_test_form_error() != NULL, "form opened");
 }
 

@@ -22,7 +22,9 @@
 #define PER_PAGE (COLS * ROWS)
 #define CELL_W (PHONE_W / COLS)
 #define CELL_H 74
-#define PLATE 44
+#define PLATE 40
+#define TILE_INSET 3 /* gap between tiles is twice this */
+#define TILE_R 8
 #define GRID_TOP 6
 #define DOTS_Y (GRID_TOP + ROWS * CELL_H + 12)
 
@@ -55,9 +57,15 @@ static ui_rect_t cell_rect(int i)
                    CELL_H);
 }
 
+/* Warm-white tile holding an app's icon and label: the touch target */
+static ui_rect_t tile_rect(ui_rect_t cell)
+{
+    return ui_inset(cell, TILE_INSET);
+}
+
 static ui_rect_t plate_rect(ui_rect_t cell)
 {
-    return ui_rect(cell.left + (CELL_W - PLATE) / 2, cell.top + 6, PLATE,
+    return ui_rect(cell.left + (CELL_W - PLATE) / 2, cell.top + 9, PLATE,
                    PLATE);
 }
 
@@ -65,8 +73,8 @@ static void home_paint(ui_view_t *v, twin_pixmap_t *px)
 {
     home_t *h = (home_t *) v;
     ui_rect_t clip = ui_view_clip(v);
-    twin_argb32_t label =
-        phone_paint_wallpaper(px, ui_view_bounds(v), phone_wallpaper());
+    const phone_theme_t *th = phone_theme();
+    phone_paint_wallpaper(px, ui_view_bounds(v), phone_wallpaper());
 
     for (int i = 0; i < phone_app_count(); i++) {
         ui_rect_t cell = cell_rect(i);
@@ -75,11 +83,26 @@ static void home_paint(ui_view_t *v, twin_pixmap_t *px)
         cell.right += shift;
         if (!ui_intersects(cell, clip))
             continue;
-        ui_rect_t plate = plate_rect(cell);
-        phone_app_icon(px, i, plate, i == h->pressed);
+        ui_rect_t tile = tile_rect(cell), plate = plate_rect(cell);
+        bool pressed = i == h->pressed;
+        /* The ledge shows only along the rounded ends: rasterize those
+         * bands, not the rows the tile covers */
+        ui_rect_t ledge =
+            ui_rect(tile.left, tile.top + 1, ui_w(tile), ui_h(tile));
+        for (int band = 0; band < 2; band++) {
+            twin_coord_t top = band ? tile.bottom - TILE_R : tile.top;
+            twin_rect_t saved = ui_clip_push(
+                px, ui_rect(tile.left, top, ui_w(tile), TILE_R + 1));
+            ui_rrect(px, ledge, TILE_R, 0x1c000000);
+            twin_pixmap_restore_clip(px, saved);
+        }
+        ui_rrect(px, tile, TILE_R,
+                 pressed ? ui_mix(th->card, th->primary, 60) : th->card);
+        phone_app_icon(px, i, plate, pressed);
         ui_text_fit(px, FONT_SM,
-                    ui_rect(cell.left, plate.bottom + 2, CELL_W, 16), UI_CENTER,
-                    label, phone_app_at(i)->name);
+                    ui_rect(tile.left + 2, plate.bottom + 2, ui_w(tile) - 4,
+                            tile.bottom - plate.bottom - 4),
+                    UI_CENTER, th->text, phone_app_at(i)->name);
     }
 
     int current = (h->pan + PHONE_W / 2) / PHONE_W;
@@ -90,7 +113,7 @@ static int app_at(home_t *h, twin_coord_t x, twin_coord_t y)
 {
     for (int i = h->page * PER_PAGE;
          i < phone_app_count() && i < (h->page + 1) * PER_PAGE; i++) {
-        if (ui_hit(plate_rect(cell_rect(i)), x, y))
+        if (ui_hit(tile_rect(cell_rect(i)), x, y))
             return i;
     }
     return -1;
@@ -115,17 +138,17 @@ static bool settle_step(ui_view_t *v, twin_fixed_t value)
     return true;
 }
 
-/* Plate of @app; empty when the app's page is not shown */
-static ui_rect_t shown_plate(ui_view_t *v, int app)
+/* Tile of @app; empty when the app's page is not shown */
+static ui_rect_t shown_tile(ui_view_t *v, int app)
 {
     if (app / PER_PAGE != ((home_t *) v)->page)
         return (ui_rect_t) {0, 0, 0, 0};
-    return plate_rect(cell_rect(app));
+    return tile_rect(cell_rect(app));
 }
 
 static void set_pressed(home_t *h, int app)
 {
-    ui_view_set_pressed(&h->view, &h->pressed, app, shown_plate);
+    ui_view_set_pressed(&h->view, &h->pressed, app, shown_tile);
 }
 
 static bool home_event(ui_view_t *v, const ui_event_t *e)
@@ -194,13 +217,13 @@ ui_view_t *home_create(void)
     return &h->view;
 }
 
-/* Test hook: @app's icon in home-screen content coordinates; false unless
- * home is on top with that icon's page shown */
+/* Test hook: @app's tile in home-screen content coordinates; false unless
+ * home is on top with that tile's page shown */
 bool app_home_icon_rect(int app, ui_rect_t *out)
 {
     ui_view_t *v = phone_top();
     if (!v || v->paint != home_paint || app < 0 || app >= phone_app_count())
         return false;
-    *out = shown_plate(v, app);
+    *out = shown_tile(v, app);
     return out->right > out->left;
 }

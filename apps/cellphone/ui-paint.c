@@ -240,13 +240,33 @@ void ui_icon(twin_pixmap_t *px,
 static twin_path_t *shape_path;
 static twin_path_t *user_path;
 
+/* Dot texture: 1 px dots on a 3 px pitch, inset so no dot touches the
+ * edge, drawn through one mask in a single composite */
+#define DOT_MASK 32
+static twin_pixmap_t *dot_mask;
+
+static twin_pixmap_t *_dot_mask_create(void)
+{
+    twin_pixmap_t *m = twin_pixmap_create(TWIN_A8, DOT_MASK, DOT_MASK);
+    if (!m)
+        return NULL;
+    twin_coord_t stride;
+    uint8_t *p = twin_pixmap_pixels(m, &stride);
+    for (twin_coord_t y = 0; y < DOT_MASK; y++)
+        for (twin_coord_t x = 0; x < DOT_MASK; x++)
+            p[y * stride + x] = (x % 3 == 2 && y % 3 == 2) ? 0xff : 0;
+    return m;
+}
+
 bool ui_init(void)
 {
     if (!shape_path)
         shape_path = twin_path_create();
     if (!user_path)
         user_path = twin_path_create();
-    if (shape_path && user_path)
+    if (!dot_mask)
+        dot_mask = _dot_mask_create();
+    if (shape_path && user_path && dot_mask)
         return true;
     ui_fini();
     return false;
@@ -258,7 +278,10 @@ void ui_fini(void)
         twin_path_destroy(shape_path);
     if (user_path)
         twin_path_destroy(user_path);
+    if (dot_mask)
+        twin_pixmap_destroy(dot_mask);
     shape_path = user_path = NULL;
+    dot_mask = NULL;
 }
 
 /* Both paths exist from ui_init() on, so these never fail */
@@ -423,34 +446,70 @@ void ui_vgrad(twin_pixmap_t *px,
 /*
  * Widgets
  */
-void ui_header(twin_pixmap_t *px,
-               ui_rect_t r,
-               const char *title,
-               const char *trailing)
+static void _dotgrid(twin_pixmap_t *px, ui_rect_t r, twin_argb32_t color)
+{
+    /* Dots stop one pixel short of the right and bottom edges */
+    twin_coord_t w = ui_w(r) - 1, h = ui_h(r) - 1;
+    if (w <= 0 || h <= 0 || !dot_mask)
+        return;
+    twin_operand_t src = {.source_kind = TWIN_SOLID, .u.argb = color};
+    twin_operand_t msk = {.source_kind = TWIN_PIXMAP, .u.pixmap = dot_mask};
+    twin_composite(px, r.left, r.top, &src, 0, 0, &msk, 0, 0, TWIN_OVER,
+                   w < DOT_MASK ? w : DOT_MASK, h < DOT_MASK ? h : DOT_MASK);
+}
+
+ui_rect_t ui_header(twin_pixmap_t *px,
+                    ui_rect_t r,
+                    const char *lead,
+                    const char *title,
+                    const char *trailing)
 {
     const phone_theme_t *th = phone_theme();
-    ui_vgrad(px, r, th->card, ui_mix(th->card, th->bg, 96));
-    ui_text_in(px, FONT_HEADING,
-               ui_rect(r.left + 6, r.top, ui_w(r) - 40, ui_h(r)), UI_LEFT,
-               th->text, title);
+    const twin_coord_t slot = UI_HEADER_SLOT;
+    twin_argb32_t dots = ui_alpha(th->on_bar, 0x38);
+    twin_coord_t cy = (r.top + r.bottom) / 2;
+    /* Texture patch for an empty action slot, narrower than the slot so
+     * the title may use the rest */
+    twin_coord_t tex_w = UI_HEADER_TEXTURE - 8, tex_top = r.top + 7,
+                 tex_h = ui_h(r) - 14;
+
+    ui_vgrad(px, r, th->header, th->header_grad);
+    ui_fill(px, ui_rect(r.left, r.bottom - 1, ui_w(r), 1),
+            ui_darken(th->header_grad, 25));
+
+    twin_coord_t start = r.left + (lead ? slot : UI_HEADER_TEXTURE);
+    twin_coord_t end = r.right - UI_HEADER_TEXTURE;
+    if (lead)
+        ui_icon(px, lead, FONT_HEADING, r.left + slot / 2, cy, th->on_bar);
+    else
+        _dotgrid(px, ui_rect(r.left + 6, tex_top, tex_w, tex_h), dots);
+
     if (trailing) {
-        ui_rect_t t = ui_rect(r.right - 40, r.top, 40, ui_h(r));
-        if (_is_symbol(trailing))
-            ui_icon(px, trailing, FONT_HEADING, (t.left + t.right) / 2,
-                    (t.top + t.bottom) / 2, th->primary);
-        else
-            ui_text_in(px, FONT_SM,
-                       ui_rect(r.left, r.top, ui_w(r) - 4, ui_h(r)), UI_RIGHT,
-                       th->primary, trailing);
+        twin_coord_t tw = ui_text_width(FONT_SM, trailing);
+        ui_text_in(px, FONT_SM, ui_rect(r.left, r.top, ui_w(r) - 8, ui_h(r)),
+                   UI_RIGHT, ui_mix(th->on_bar, th->header, 70), trailing);
+        end = r.right - 8 - tw - 8;
+    } else {
+        _dotgrid(px, ui_rect(r.right - 6 - tex_w, tex_top, tex_w, tex_h), dots);
     }
-    ui_separator(px, r);
+
+    ui_rect_t room = {start, end, r.top, r.bottom};
+    if (!title || !title[0])
+        return room;
+    twin_coord_t w = ui_text_width(FONT_HEADING, title);
+    twin_coord_t mid = (r.left + r.right) / 2;
+    if (mid - w / 2 >= start && mid + (w + 1) / 2 <= end)
+        ui_text_in(px, FONT_HEADING, r, UI_CENTER, th->on_bar, title);
+    else
+        ui_text_fit(px, FONT_HEADING, room, UI_LEFT, th->on_bar, title);
+    return room;
 }
 
 void ui_section(twin_pixmap_t *px, ui_rect_t r, const char *label)
 {
     const phone_theme_t *th = phone_theme();
-    ui_fill(px, r, ui_mix(th->bg, th->text_sec, 40));
-    ui_text_in(px, FONT_SM, ui_rect(r.left + 6, r.top, ui_w(r) - 6, ui_h(r)),
+    ui_fill(px, r, th->group);
+    ui_text_in(px, FONT_SM, ui_rect(r.left + 10, r.top, ui_w(r) - 10, ui_h(r)),
                UI_LEFT, th->text_sec, label);
 }
 
@@ -497,8 +556,16 @@ void ui_button(twin_pixmap_t *px,
 {
     twin_argb32_t bg, fg;
     _button_colors(style, pressed, &bg, &fg);
-    if (bg)
+    if (bg && style == UI_BTN_FLAT) {
         ui_rrect(px, r, radius, bg);
+    } else if (bg) {
+        /* Soft fill: a faint ledge below, lit slightly from the top */
+        if (!pressed)
+            ui_rrect(px, ui_rect(r.left, r.top + 1, ui_w(r), ui_h(r)), radius,
+                     0x18000000);
+        ui_rrect_grad(px, r, radius, ui_mix(bg, UI_WHITE, pressed ? 0 : 28),
+                      bg);
+    }
     if (!label)
         return;
     if (_is_symbol(label))
@@ -508,9 +575,10 @@ void ui_button(twin_pixmap_t *px,
         ui_text_in(px, size, r, UI_CENTER, fg, label);
 }
 
+/* Muted, earthy tones in the launcher's family, white initials legible */
 static const twin_argb32_t avatar_palette[] = {
-    0xff3b82f6, 0xff10b981, 0xfff59e0b, 0xffec4899,
-    0xff8b5cf6, 0xff14b8a6, 0xffef4444, 0xff6366f1,
+    0xff5a7896, 0xff5b8c45, 0xffb5843a, 0xffa95c72,
+    0xff7a6a96, 0xff4f8c7c, 0xffad6a48, 0xff646c9a,
 };
 
 twin_argb32_t ui_avatar_color(const char *name)

@@ -179,8 +179,8 @@ static void game_paint(ui_view_t *v, twin_pixmap_t *px)
         char buf[40];
         snprintf(buf, sizeof(buf), "Score %d \xc2\xb7 Best %d", g->score,
                  g->best);
-        ui_header(px, ui_rect(0, 0, PHONE_W, HEADER_H), ops[g->kind]->name,
-                  buf);
+        ui_header(px, ui_rect(0, 0, PHONE_W, HEADER_H), NULL,
+                  ops[g->kind]->name, buf);
     }
     /* Ticks damage cells inside the panel: fill just the clip there */
     if (ui_rect_contains(in, clip)) {

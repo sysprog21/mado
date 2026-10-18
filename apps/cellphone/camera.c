@@ -333,9 +333,9 @@ static void paint_controls(camera_t *c, twin_pixmap_t *px, ui_rect_t clip)
     ui_rect_t pr = control_rect(&c->view, CTL_PHOTO),
               vr = control_rect(&c->view, CTL_VIDEO);
     ui_text_in(px, FONT_SM, pr, UI_RIGHT, c->video ? MODE_OFF : MODE_ON,
-               "PHOTO");
+               "Photo");
     ui_text_in(px, FONT_SM, vr, UI_LEFT, c->video ? MODE_ON : MODE_OFF,
-               "VIDEO");
+               "Video");
 
     /* Last shot: a miniature of the scene, with the shot count */
     ui_rect_t t = thumb_rect(&c->view);

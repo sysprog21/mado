@@ -772,7 +772,7 @@ static void list_paint(ui_view_t *v, twin_pixmap_t *px)
     if (ui_intersects(clip, hdr)) {
         char count[16];
         snprintf(count, sizeof(count), "%d songs", PHONE_TRACK_COUNT);
-        ui_header(px, hdr, "Music", count);
+        ui_header(px, hdr, NULL, "Music", count);
     }
     if (ui_intersects(clip, mini_rect(l)))
         paint_mini(px, l, clip);

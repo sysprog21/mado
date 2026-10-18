@@ -31,6 +31,7 @@
 #define INFO_H 30
 #define CLOCK_H 86
 #define PLATE 26
+#define ICON_COL 40 /* icon column on the grouped surface */
 #define TILE_GAP 12
 #define TILE_LABEL_H 20
 #define TILE_R 8
@@ -90,7 +91,6 @@ typedef struct {
     item_kind_t kind;
     int id, arg;
     const char *sym;
-    twin_argb32_t accent;
     const char *label;
     const char *sub;
 } item_t;
@@ -224,23 +224,22 @@ static void add(page_t *s,
                 int id,
                 int arg,
                 const char *sym,
-                twin_argb32_t accent,
                 const char *label,
                 const char *sub)
 {
     if (s->n >= MAX_ITEMS)
         return;
-    s->items[s->n++] = (item_t) {kind, id, arg, sym, accent, label, sub};
+    s->items[s->n++] = (item_t) {kind, id, arg, sym, label, sub};
 }
 
 static void section(page_t *s, const char *label)
 {
-    add(s, IT_SECTION, 0, 0, NULL, 0, label, NULL);
+    add(s, IT_SECTION, 0, 0, NULL, label, NULL);
 }
 
 static void info(page_t *s, const char *label, int id)
 {
-    add(s, IT_INFO, id, 0, NULL, 0, label, NULL);
+    add(s, IT_INFO, id, 0, NULL, label, NULL);
 }
 
 static void build(page_t *s)
@@ -248,45 +247,37 @@ static void build(page_t *s)
     switch (s->page) {
     case PAGE_ROOT:
         section(s, "Device");
-        add(s, IT_LINK, PAGE_DISPLAY, 0, TWIN_SYM_SUN, UI_RGB(0x3b82f6),
-            "Display", NULL);
-        add(s, IT_LINK, PAGE_SOUND, 0, TWIN_SYM_VOLUME, UI_RGB(0xec4899),
-            "Sound", NULL);
-        add(s, IT_LINK, PAGE_WALLPAPER, 0, TWIN_SYM_IMAGE, UI_RGB(0xf97316),
-            "Wallpaper", NULL);
+        add(s, IT_LINK, PAGE_DISPLAY, 0, TWIN_SYM_SUN, "Display", NULL);
+        add(s, IT_LINK, PAGE_SOUND, 0, TWIN_SYM_VOLUME, "Sound", NULL);
+        add(s, IT_LINK, PAGE_WALLPAPER, 0, TWIN_SYM_IMAGE, "Wallpaper", NULL);
         section(s, "System");
-        add(s, IT_LINK, PAGE_TIME, 0, TWIN_SYM_CLOCK, UI_RGB(0x10b981),
-            "Date & time", NULL);
-        add(s, IT_LINK, PAGE_ABOUT, 0, TWIN_SYM_LIST, UI_RGB(0x64748b), "About",
-            NULL);
+        add(s, IT_LINK, PAGE_TIME, 0, TWIN_SYM_CLOCK, "Date & time", NULL);
+        add(s, IT_LINK, PAGE_ABOUT, 0, TWIN_SYM_LIST, "About", NULL);
         break;
     case PAGE_DISPLAY:
         section(s, "Theme");
         for (int i = 0; i < phone_theme_count(); i++)
-            add(s, IT_RADIO, 0, i, NULL, 0, phone_theme_at(i)->name, NULL);
+            add(s, IT_RADIO, 0, i, NULL, phone_theme_at(i)->name, NULL);
         section(s, "Screen");
-        add(s, IT_SLIDER, PREF_BRIGHTNESS, 0, NULL, 0, "Brightness", NULL);
+        add(s, IT_SLIDER, PREF_BRIGHTNESS, 0, NULL, "Brightness", NULL);
         break;
     case PAGE_SOUND:
         section(s, "Audio");
-        add(s, IT_SLIDER, PREF_VOLUME, 0, NULL, 0, "Volume", NULL);
+        add(s, IT_SLIDER, PREF_VOLUME, 0, NULL, "Volume", NULL);
         section(s, "Feedback");
-        add(s, IT_SWITCH, PREF_VIBRATE, 0, TWIN_SYM_BELL, UI_RGB(0xef4444),
-            "Vibrate", NULL);
-        add(s, IT_SWITCH, PREF_KEYPAD, 0, TWIN_SYM_KEYBOARD, UI_RGB(0x6366f1),
-            "Keypad tones", NULL);
+        add(s, IT_SWITCH, PREF_VIBRATE, 0, TWIN_SYM_BELL, "Vibrate", NULL);
+        add(s, IT_SWITCH, PREF_KEYPAD, 0, TWIN_SYM_KEYBOARD, "Keypad tones",
+            NULL);
         break;
     case PAGE_WALLPAPER:
-        add(s, IT_WALLPAPERS, 0, 0, NULL, 0, "Wallpapers", NULL);
+        add(s, IT_WALLPAPERS, 0, 0, NULL, "Wallpapers", NULL);
         break;
     case PAGE_TIME:
-        add(s, IT_CLOCK, 0, 0, NULL, 0, "Clock", NULL);
+        add(s, IT_CLOCK, 0, 0, NULL, "Clock", NULL);
         section(s, "Format");
-        add(s, IT_SWITCH, PREF_24H, 0, TWIN_SYM_CLOCK, UI_RGB(0x10b981),
-            "24-hour time", NULL);
+        add(s, IT_SWITCH, PREF_24H, 0, TWIN_SYM_CLOCK, "24-hour time", NULL);
         section(s, "Region");
-        add(s, IT_INFO, VAL_TZ, 0, TWIN_SYM_GLOBE, UI_RGB(0x3b82f6),
-            "Time zone", NULL);
+        add(s, IT_INFO, VAL_TZ, 0, TWIN_SYM_GLOBE, "Time zone", NULL);
         break;
     case PAGE_ABOUT:
         section(s, "Device");
@@ -417,21 +408,22 @@ static ui_rect_t value_rect(ui_rect_t row)
  * Painting
  */
 
-static void paint_plate(twin_pixmap_t *px,
-                        twin_coord_t cy,
-                        const char *sym,
-                        twin_argb32_t accent)
+/* Symbolic icon in the row's icon column, on the grouped surface */
+static void paint_icon_column(twin_pixmap_t *px, ui_rect_t r, const char *sym)
 {
-    ui_rect_t plate = ui_rect(10, cy - PLATE / 2, PLATE, PLATE);
-    ui_rrect_grad(px, plate, 7, accent, ui_darken(accent, 14));
-    ui_icon(px, sym, FONT_SM, plate.left + PLATE / 2, cy, UI_RGB(0xffffff));
+    const phone_theme_t *th = phone_theme();
+    twin_coord_t cy = (r.top + r.bottom) / 2;
+    ui_fill(px, ui_rect(r.left, r.top, ICON_COL, ui_h(r)), th->group);
+    if (sym)
+        ui_icon(px, sym, FONT_NORMAL, r.left + ICON_COL / 2, cy, th->text);
 }
 
 /* Theme preview: the theme's background with its primary color on it */
 static void paint_swatch(twin_pixmap_t *px, twin_coord_t cy, int theme)
 {
     const phone_theme_t *t = phone_theme_at(theme);
-    ui_rect_t plate = ui_rect(10, cy - PLATE / 2, PLATE, PLATE);
+    ui_rect_t plate =
+        ui_rect((ICON_COL - PLATE) / 2, cy - PLATE / 2, PLATE, PLATE);
     ui_rrect(px, plate, 7, phone_theme()->separator);
     ui_rrect_grad(px, ui_inset(plate, 1), 6, t->bg, t->bg_grad);
     ui_rrect(px, ui_rect(plate.left + 5, cy - 5, PLATE - 10, 10), 3, t->card);
@@ -469,14 +461,18 @@ static void paint_row(page_t *s, twin_pixmap_t *px, int i, ui_rect_t r)
     twin_coord_t x = 14, right = r.right - 10;
     char buf[24];
 
-    ui_fill(px, r,
+    /* Rows with an icon column fill the rest of the row only */
+    bool column = it->sym || it->kind == IT_RADIO;
+    ui_rect_t body = r;
+    if (column)
+        body.left += ICON_COL;
+    ui_fill(px, body,
             i == s->pressed ? ui_mix(th->card, th->primary, 70) : th->card);
-    if (it->sym) {
-        paint_plate(px, cy, it->sym, it->accent);
-        x = 10 + PLATE + 10;
-    } else if (it->kind == IT_RADIO) {
-        paint_swatch(px, cy, it->arg);
-        x = 10 + PLATE + 10;
+    if (column) {
+        paint_icon_column(px, r, it->sym);
+        if (it->kind == IT_RADIO)
+            paint_swatch(px, cy, it->arg);
+        x = ICON_COL + 10;
     }
 
     switch (it->kind) {
@@ -666,7 +662,7 @@ static void settings_paint(ui_view_t *v, twin_pixmap_t *px)
     }
     /* Last, so rows scrolled under the header never show through */
     if (clip.top < HEADER_H)
-        ui_header(px, ui_rect(0, 0, ui_view_width(&s->view), HEADER_H),
+        ui_header(px, ui_rect(0, 0, ui_view_width(&s->view), HEADER_H), NULL,
                   s->view.title, NULL);
 }
 

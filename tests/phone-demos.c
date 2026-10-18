@@ -52,6 +52,24 @@ void test_demos(void)
         ph_drag(200, 120, 20, 120);
         pages++;
     }
+    /* Pressing tints the whole tile, so the whole tile is repainted: what
+     * the press drew matches a repaint of the entire view.  Press a corner
+     * outside the icon, then drag straight down to cancel. */
+    if (app_home_icon_rect(first, &r)) {
+        /* A margin past the tile catches damage that stops short of it */
+        twin_rect_t tile = {r.left - 6, r.right + 6, CY(r.top - 6),
+                            CY(r.bottom + 6)};
+        th_press(phone_th, r.left + 3, CY(r.bottom - 3));
+        ph_wait(50);
+        uint32_t pressed = th_crc_rect(phone_th, tile);
+        ui_view_invalidate_all(phone_top());
+        ph_wait(50);
+        CHECK_EQ(th_crc_rect(phone_th, tile), pressed,
+                 "pressed tile repainted whole");
+        th_move(phone_th, r.left + 3, CY(r.bottom + 40));
+        th_release(phone_th, r.left + 3, CY(r.bottom + 40));
+        ph_wait(300);
+    }
     /* The page lists whichever apps are built: the golden frame holds the
      * default set */
 #if defined(CONFIG_DEMO_CLOCK) && defined(CONFIG_DEMO_CALCULATOR) && \

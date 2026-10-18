@@ -22,7 +22,6 @@
  * List
  */
 #define LIST_TOP PHONE_HEADER_H
-#define PLUS_W 40
 #define FRESH_MS 1200 /* how long a newly added row stays highlighted */
 
 typedef struct {
@@ -36,7 +35,8 @@ typedef struct {
 
 static ui_rect_t plus_rect(void)
 {
-    return ui_rect(PHONE_W - PLUS_W, 0, PLUS_W, PHONE_HEADER_H);
+    /* Add sits at the start of the header, as the HIG places it */
+    return ui_rect(0, 0, UI_HEADER_SLOT, PHONE_HEADER_H);
 }
 
 /* Content y of contact @idx's row (sections included) */
@@ -145,12 +145,13 @@ static void list_paint(ui_view_t *v, twin_pixmap_t *px)
 
     ui_rect_t hdr = ui_rect(0, 0, PHONE_W, PHONE_HEADER_H);
     if (ui_intersects(clip, hdr)) {
-        ui_header(px, hdr, "Contacts", TWIN_SYM_PLUS);
+        ui_header(px, hdr, TWIN_SYM_PLUS, "Contacts", NULL);
         if (l->plus_down) {
+            /* Header buttons have no fill until pressed */
             ui_rect_t p = plus_rect();
-            ui_rrect(px, ui_inset(p, 4), 6, ui_alpha(th->primary, 0x40));
+            ui_rrect(px, ui_inset(p, 4), 6, ui_alpha(th->on_bar, 0x30));
             ui_icon(px, TWIN_SYM_PLUS, FONT_HEADING, (p.left + p.right) / 2,
-                    (p.top + p.bottom) / 2, th->primary_dk);
+                    (p.top + p.bottom) / 2, th->on_bar);
         }
     }
 }
@@ -585,7 +586,7 @@ static void form_paint(ui_view_t *v, twin_pixmap_t *px)
 
     ui_rect_t hdr = ui_rect(0, 0, PHONE_W, PHONE_HEADER_H);
     if (ui_intersects(clip, hdr))
-        ui_header(px, hdr, "New Contact", NULL);
+        ui_header(px, hdr, NULL, "New Contact", NULL);
 }
 
 /* Keyboard mode suited to the field: digits for the phone number, and a

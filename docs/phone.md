@@ -287,13 +287,51 @@ is plain fields in the view struct, which is why a covered screen can be
 evicted and repainted at any time.  Timers and tweens created through the
 view die with it.
 
-`shell.c` owns the themes (Olive, Dark, Ocean), wallpapers, clock, app
+`shell.c` owns the themes (Sage, Dark, Ocean), wallpapers, clock, app
 registry with squircle icon plates, the status and navigation bars, and
 navigation (`phone_open()`, `phone_back()`, `phone_home()`), which is
 nothing more than showing and closing views: the window manager owns the
 stack, the transitions and the memory.  Navigation acts on the topmost
 application window whether or not it is a view, so a registry app opened
 from the launcher goes back and home like any phone app.
+
+### Visual language: Sage
+
+The default theme, Sage, is a soft information-appliance style written
+along the lines of the GNOME HIG: warm white pages, sage green grouping
+and deep olive bars give a quiet reading surface, and rounded controls
+with a few tactile launcher icons keep it friendly.  It is a custom design
+language, not Adwaita.
+
+- Three surfaces carry the structure, named in `phone_theme_t`: the page
+  and its content (`bg`, `card`), grouped areas a step darker (`group`:
+  section labels, the settings icon column, the navigation tray and the
+  launcher behind its tiles), and the deep bars (`statusbar`, `header`)
+  with `on_bar` text.  Spacing, tone and thin separators divide content;
+  shadows only mark a control as raised.
+- Colors keep one meaning: `primary` (olive) marks the selection and the
+  main action, `call_red` a destructive one.  A state is never shown by
+  color alone: the current navigation tab is also the filled key, a
+  switch also moves its knob, a radio also fills its dot.
+- Header bars place one start action (Contacts puts Add there), the title
+  centered, and an end action or short status text; header buttons have
+  no fill until pressed.  The title moves to the start only when the end
+  text would collide with it.
+- Buttons are soft rounded fills lit slightly from the top, with labels
+  that name the action.  The navigation bar reaches the top-level pages
+  (Dialer, Home, Contacts), so its keys pair an icon with a label;
+  ordinary buttons carry one or the other.  Above home, its center key
+  turns into Back.
+- Settings apply immediately; there is no OK or Apply step.  Rows use one
+  set of single-color symbols, while the launcher keeps small tactile
+  icons, so decoration and operation stay apart.
+- Dot texture appears only in empty header slots, never behind text, and
+  typography stays a few sans-serif sizes, with capitals kept to
+  acronyms such as the camera's HDR and REC.
+
+Dark and Ocean fill the same roles, so the shell and every themed control
+follow a theme switch without special cases.  The camera and the game
+panels keep fixed palettes of their own.
 
 The default build uses the desktop policy, so build the phone with the
 mobile one, then run it with SDL (2x scaled by default; `MADO_SCALE=n`

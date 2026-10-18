@@ -26,67 +26,80 @@
  */
 static const phone_theme_t themes[] = {
     {
-        .name = "Olive",
-        .primary = UI_RGB(0x7a9b5e),
-        .primary_dk = UI_RGB(0x5d7a45),
-        .statusbar = UI_RGB(0xc5cdb5),
-        .statusbar_grad = UI_RGB(0xa8b09c),
-        .navbar = UI_RGB(0xa8b09c),
-        .navbar_grad = UI_RGB(0xc5cdb5),
-        .bg = UI_RGB(0xcfd7ba),
-        .bg_grad = UI_RGB(0xc5cdb0),
-        .card = UI_RGB(0xeff1e8),
-        .text = UI_RGB(0x222222),
-        .text_sec = UI_RGB(0x5d6253),
-        .separator = UI_RGB(0xc9cdbf),
-        .call_green = UI_RGB(0x7a9b5e),
-        .call_red = UI_RGB(0xbd4b4b),
-        .missed_red = UI_RGB(0xb84040),
-        .sms_sent = UI_RGB(0xdce8c0),
-        .sms_recv = UI_RGB(0xeff1e8),
-        .indicator = UI_RGB(0xa8b09c),
+        /* Sage: warm white pages, sage green groups, deep olive bars */
+        .name = "Sage",
+        .primary = UI_RGB(0x667a3e),
+        .primary_dk = UI_RGB(0x4f5f30),
+        .statusbar = UI_RGB(0x4e5540),
+        .statusbar_grad = UI_RGB(0x646b54),
+        .header = UI_RGB(0x7d8568),
+        .header_grad = UI_RGB(0x6a7257),
+        .on_bar = UI_RGB(0xf7f5ec),
+        .navbar = UI_RGB(0xd3d9c4),
+        .navbar_grad = UI_RGB(0xe0e5d3),
+        .bg = UI_RGB(0xf4f2e9),
+        .bg_grad = UI_RGB(0xedeadf),
+        .card = UI_RGB(0xfbfaf4),
+        .group = UI_RGB(0xe2e6d6),
+        .text = UI_RGB(0x26301f),
+        .text_sec = UI_RGB(0x5c6652),
+        .separator = UI_RGB(0xdadccc),
+        .call_green = UI_RGB(0x55873a),
+        .call_red = UI_RGB(0xb0473e),
+        .missed_red = UI_RGB(0xa63c34),
+        .sms_sent = UI_RGB(0xdde5c6),
+        .sms_recv = UI_RGB(0xfbfaf4),
+        .indicator = UI_RGB(0xbcc2ab),
         .on_primary = UI_RGB(0xffffff),
     },
     {
         .name = "Dark",
-        .primary = UI_RGB(0x42a2ff),
-        .primary_dk = UI_RGB(0x2080e0),
+        .primary = UI_RGB(0x8fb06a),
+        .primary_dk = UI_RGB(0x6f8f4c),
         .statusbar = UI_RGB(0x000000),
-        .statusbar_grad = UI_RGB(0x000000),
-        .navbar = UI_RGB(0x1a1a1a),
-        .navbar_grad = UI_RGB(0x1a1a1a),
-        .bg = UI_RGB(0x121212),
-        .bg_grad = UI_RGB(0x121212),
-        .card = UI_RGB(0x2c2c2c),
-        .text = UI_RGB(0xe0e0e0),
-        .text_sec = UI_RGB(0x9e9e9e),
-        .separator = UI_RGB(0x3a3a3a),
-        .call_green = UI_RGB(0x66d06d),
-        .call_red = UI_RGB(0xef534d),
-        .missed_red = UI_RGB(0xd3392f),
-        .sms_sent = UI_RGB(0x2a5e40),
-        .sms_recv = UI_RGB(0x383838),
-        .indicator = UI_RGB(0x555555),
-        .on_primary = UI_RGB(0xffffff),
+        .statusbar_grad = UI_RGB(0x0c0c0c),
+        .header = UI_RGB(0x262923),
+        .header_grad = UI_RGB(0x1e201c),
+        .on_bar = UI_RGB(0xe4e6df),
+        .navbar = UI_RGB(0x1a1b18),
+        .navbar_grad = UI_RGB(0x22241f),
+        .bg = UI_RGB(0x121311),
+        .bg_grad = UI_RGB(0x121311),
+        .card = UI_RGB(0x1c1d1a),
+        .group = UI_RGB(0x2a2c27),
+        .text = UI_RGB(0xe4e6df),
+        .text_sec = UI_RGB(0xa0a498),
+        .separator = UI_RGB(0x34372f),
+        .call_green = UI_RGB(0x6fbf5a),
+        .call_red = UI_RGB(0xe0574d),
+        .missed_red = UI_RGB(0xe0574d),
+        .sms_sent = UI_RGB(0x34452a),
+        .sms_recv = UI_RGB(0x2a2c27),
+        .indicator = UI_RGB(0x50544a),
+        .on_primary = UI_RGB(0x10140c),
     },
     {
         .name = "Ocean",
-        .primary = UI_RGB(0x1e88c8),
-        .primary_dk = UI_RGB(0x166a9c),
-        .statusbar = UI_RGB(0xdcecf6),
-        .statusbar_grad = UI_RGB(0xbcd6e8),
-        .navbar = UI_RGB(0xbcd6e8),
-        .navbar_grad = UI_RGB(0xdcecf6),
-        .bg = UI_RGB(0xe6f1f8),
-        .bg_grad = UI_RGB(0xd2e4f0),
+        .primary = UI_RGB(0x1e78b4),
+        .primary_dk = UI_RGB(0x165e8e),
+        .statusbar = UI_RGB(0x14496e),
+        .statusbar_grad = UI_RGB(0x1d5f8c),
+        .header = UI_RGB(0x2b78a8),
+        .header_grad = UI_RGB(0x226690),
+        .on_bar = UI_RGB(0xffffff),
+        .navbar = UI_RGB(0xcfe0ec),
+        .navbar_grad = UI_RGB(0xdeeaf3),
+        .bg = UI_RGB(0xf2f7fa),
+        .bg_grad = UI_RGB(0xe8f0f6),
         .card = UI_RGB(0xffffff),
+        .group = UI_RGB(0xdde9f2),
         .text = UI_RGB(0x1c2833),
-        .text_sec = UI_RGB(0x5b6b78),
+        .text_sec = UI_RGB(0x55687a),
         .separator = UI_RGB(0xd5dee5),
-        .call_green = UI_RGB(0x2eae5f),
-        .call_red = UI_RGB(0xd64545),
-        .missed_red = UI_RGB(0xc53030),
-        .sms_sent = UI_RGB(0xc8e4f8),
+        .call_green = UI_RGB(0x2e9a58),
+        .call_red = UI_RGB(0xc8403f),
+        .missed_red = UI_RGB(0xc03030),
+        .sms_sent = UI_RGB(0xcfe5f6),
         .sms_recv = UI_RGB(0xffffff),
         .indicator = UI_RGB(0xa9c3d6),
         .on_primary = UI_RGB(0xffffff),
@@ -208,7 +221,8 @@ twin_argb32_t phone_paint_wallpaper(twin_pixmap_t *px, ui_rect_t r, int idx)
 {
     const phone_theme_t *th = phone_theme();
     if (idx <= 0 || idx >= N_WALLPAPERS) {
-        ui_vgrad(px, r, th->bg, th->bg_grad);
+        /* The grouped surface: the launcher's tiles stand out on it */
+        ui_vgrad(px, r, th->group, ui_darken(th->group, 6));
         return th->text;
     }
     ui_vgrad(px, r, wallpapers[idx].top, wallpapers[idx].bottom);
@@ -270,22 +284,22 @@ static void glyph_pong(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
 static void glyph_tetris(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
 
 static const phone_app_t apps[] = {
-    {"Phone", TWIN_SYM_PHONE, NULL, UI_RGB(0x22c55e), app_dialer_open, NULL},
-    {"Contacts", TWIN_SYM_CONTACTS, NULL, UI_RGB(0x3b82f6), app_contacts_open,
+    {"Phone", TWIN_SYM_PHONE, NULL, UI_RGB(0x5b8c45), app_dialer_open, NULL},
+    {"Contacts", TWIN_SYM_CONTACTS, NULL, UI_RGB(0x5a7896), app_contacts_open,
      NULL},
-    {"Messages", TWIN_SYM_MESSAGE, NULL, UI_RGB(0x10b981), app_sms_open, NULL},
-    {"Calculator", TWIN_SYM_CALCULATOR, NULL, UI_RGB(0xf59e0b), app_calc_open,
+    {"Messages", TWIN_SYM_MESSAGE, NULL, UI_RGB(0x4f8c7c), app_sms_open, NULL},
+    {"Calculator", TWIN_SYM_CALCULATOR, NULL, UI_RGB(0xc08a3e), app_calc_open,
      NULL},
-    {"Music", TWIN_SYM_MUSIC, NULL, UI_RGB(0xec4899), app_music_open, NULL},
-    {"Photos", TWIN_SYM_IMAGE, NULL, UI_RGB(0xf97316), app_photos_open, NULL},
-    {"Camera", TWIN_SYM_CAMERA, NULL, UI_RGB(0x6b7280), app_camera_open, NULL},
-    {"Settings", TWIN_SYM_SETTINGS, NULL, UI_RGB(0x64748b), app_settings_open,
+    {"Music", TWIN_SYM_MUSIC, NULL, UI_RGB(0xa95c72), app_music_open, NULL},
+    {"Photos", TWIN_SYM_IMAGE, NULL, UI_RGB(0xbb6e3e), app_photos_open, NULL},
+    {"Camera", TWIN_SYM_CAMERA, NULL, UI_RGB(0x6c7064), app_camera_open, NULL},
+    {"Settings", TWIN_SYM_SETTINGS, NULL, UI_RGB(0x767b6c), app_settings_open,
      NULL},
-    {"Call Log", TWIN_SYM_HISTORY, NULL, UI_RGB(0x8b5cf6), app_calllog_open,
+    {"Call Log", TWIN_SYM_HISTORY, NULL, UI_RGB(0x7a6a96), app_calllog_open,
      NULL},
-    {"Snake", NULL, glyph_snake, UI_RGB(0x14b8a6), app_snake_open, NULL},
-    {"Pong", NULL, glyph_pong, UI_RGB(0x6366f1), app_pong_open, NULL},
-    {"Tetris", NULL, glyph_tetris, UI_RGB(0xef4444), app_tetris_open, NULL},
+    {"Snake", NULL, glyph_snake, UI_RGB(0x4d8f86), app_snake_open, NULL},
+    {"Pong", NULL, glyph_pong, UI_RGB(0x646c9a), app_pong_open, NULL},
+    {"Tetris", NULL, glyph_tetris, UI_RGB(0xad5348), app_tetris_open, NULL},
 };
 
 #define N_APPS ((int) (sizeof(apps) / sizeof(apps[0])))
@@ -298,8 +312,8 @@ static int n_demos;
 static void _list_demos(void)
 {
     static const twin_argb32_t accents[] = {
-        UI_RGB(0x0f766e), UI_RGB(0x78716c), UI_RGB(0xa855f7),
-        UI_RGB(0xd946ef), UI_RGB(0x84cc16), UI_RGB(0x0ea5e9),
+        UI_RGB(0x3f7f78), UI_RGB(0x7c7468), UI_RGB(0x82689a),
+        UI_RGB(0x9a5f86), UI_RGB(0x7a8f3e), UI_RGB(0x4a7fa0),
     };
     n_demos = 0;
     for (int i = 0; i < apps_count(); i++) {
@@ -398,6 +412,12 @@ void phone_app_icon(twin_pixmap_t *px, int app, ui_rect_t plate, bool pressed)
     ui_rrect(px, ui_rect(plate.left, plate.top + 2, ui_w(plate), ui_h(plate)),
              radius, 0x28000000);
     ui_rrect_grad(px, plate, radius, top, bottom);
+    /* A soft sheen over the upper half: the small tactile touch the
+     * launcher keeps, never repeated in toolbars or lists */
+    ui_rrect_grad(px,
+                  ui_rect(plate.left + 2, plate.top + 2, ui_w(plate) - 4,
+                          ui_h(plate) * 2 / 5),
+                  radius - 2, 0x2c2c2c2c, 0x04040404);
     if (a->sym)
         ui_icon(px, a->sym, ui_w(plate) / 2, (plate.left + plate.right) / 2,
                 (plate.top + plate.bottom) / 2, 0xffffffff);
@@ -414,15 +434,13 @@ static void status_draw(twin_window_t *w)
     twin_pixmap_t *px = twin_window_pixmap(w);
     ui_rect_t r = ui_rect(0, 0, PHONE_W, PHONE_STATUS_H);
     ui_vgrad(px, r, th->statusbar_grad, th->statusbar);
-    ui_icon(px, TWIN_SYM_SIGNAL, FONT_SM, 14, PHONE_STATUS_H / 2, th->text);
-    ui_icon(px, TWIN_SYM_WIFI, FONT_SM, 34, PHONE_STATUS_H / 2, th->text);
+    ui_icon(px, TWIN_SYM_SIGNAL, FONT_SM, 14, PHONE_STATUS_H / 2, th->on_bar);
+    ui_icon(px, TWIN_SYM_WIFI, FONT_SM, 34, PHONE_STATUS_H / 2, th->on_bar);
     char t[8];
     phone_format_time(t, sizeof(t));
-    ui_text_in(px, FONT_SM, r, UI_CENTER, th->text, t);
+    ui_text_in(px, FONT_SM, r, UI_CENTER, th->on_bar, t);
     ui_icon(px, TWIN_SYM_BATTERY, FONT_NORMAL, PHONE_W - 16, PHONE_STATUS_H / 2,
-            th->text);
-    ui_fill(px, ui_rect(0, PHONE_STATUS_H - 1, PHONE_W, 1),
-            ui_alpha(th->text, 0x20));
+            th->on_bar);
 }
 
 static twin_time_t status_tick(twin_time_t now, void *closure)
@@ -478,7 +496,7 @@ static void nav_draw(twin_window_t *w)
     g_nav_drawn = full ? nav_state() : NAV_STALE;
     ui_vgrad(px, ui_rect(0, 0, PHONE_W, PHONE_NAV_H), th->navbar_grad,
              th->navbar);
-    ui_fill(px, ui_rect(0, 0, PHONE_W, 1), ui_alpha(th->text, 0x20));
+    ui_fill(px, ui_rect(0, 0, PHONE_W, 1), th->separator);
     bool back = phone_depth() > 0;
     int active = nav_active();
     static const char *labels[NAV_TABS] = {"Dialer", "Home", "Contacts"};
@@ -486,15 +504,17 @@ static void nav_draw(twin_window_t *w)
                                          TWIN_SYM_CONTACTS};
     for (int i = 0; i < NAV_TABS; i++) {
         ui_rect_t r = nav_tab_rect(i);
-        if (i == active || i == g_nav_pressed)
-            ui_rrect(px, r, 6,
-                     ui_mix(th->navbar, th->primary,
-                            i == g_nav_pressed ? 150 : 100));
+        /* The current page is filled with the accent; the rest are soft
+         * keys on the tray, so the selection never relies on color alone */
+        bool on = i == active;
+        ui_button(px, r, 7, on ? UI_BTN_PRIMARY : UI_BTN_CARD,
+                  i == g_nav_pressed, 0, NULL);
+        twin_argb32_t fg = on ? th->on_primary : th->text;
         const char *sym = (i == 1 && back) ? TWIN_SYM_LEFT : syms[i];
         const char *label = (i == 1 && back) ? "Back" : labels[i];
         twin_coord_t cx = (r.left + r.right) / 2;
-        ui_icon(px, sym, FONT_NORMAL, cx, r.top + 12, th->text);
-        ui_text(px, FONT_SM, cx, r.bottom - 5, UI_CENTER, th->text, label);
+        ui_icon(px, sym, FONT_NORMAL, cx, r.top + 12, fg);
+        ui_text(px, FONT_SM, cx, r.bottom - 5, UI_CENTER, fg, label);
     }
 }
 

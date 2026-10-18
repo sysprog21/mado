@@ -81,13 +81,23 @@
 /*
  * Theme
  */
+/*
+ * Three surfaces carry the structure: the page and its content (bg, card),
+ * grouped areas a step darker (group: section labels, icon columns, the
+ * navigation tray), and the deep bars (status bar, headers) with on_bar
+ * text.  Colors keep one meaning each: primary marks the selection and the
+ * main action, call_red a destructive one.
+ */
 typedef struct {
     const char *name;
     twin_argb32_t primary, primary_dk;
-    twin_argb32_t statusbar, statusbar_grad;
-    twin_argb32_t navbar, navbar_grad;
+    twin_argb32_t statusbar, statusbar_grad; /* bottom, top */
+    twin_argb32_t header, header_grad;       /* top, bottom */
+    twin_argb32_t on_bar;                    /* text/icons on the deep bars */
+    twin_argb32_t navbar, navbar_grad;       /* navigation tray */
     twin_argb32_t bg, bg_grad;
     twin_argb32_t card;
+    twin_argb32_t group; /* grouped surface */
     twin_argb32_t text, text_sec;
     twin_argb32_t separator;
     twin_argb32_t call_green, call_red, missed_red;
@@ -464,11 +474,21 @@ bool ui_view_tween(ui_view_t *view,
  * keeps state (pressed, value, ...) in its view struct.
  */
 
-/* Screen header: title, optional trailing text or symbol */
-void ui_header(twin_pixmap_t *px,
-               ui_rect_t r,
-               const char *title,
-               const char *trailing);
+/*
+ * Header bar on the deep surface: an optional symbol action at the start
+ * (UI_HEADER_SLOT px), the title centered, and optional short status text
+ * at the end.  The title moves to the start only when centering it would
+ * collide with the end text.  An edge without an action carries a dot
+ * texture, which never sits behind text.  Returns the room the title may
+ * use, for a caller that draws its own title.
+ */
+#define UI_HEADER_SLOT 36
+#define UI_HEADER_TEXTURE 28 /* room kept clear of the title at a bare edge */
+ui_rect_t ui_header(twin_pixmap_t *px,
+                    ui_rect_t r,
+                    const char *lead,
+                    const char *title,
+                    const char *trailing);
 
 /* Section header (list group label) */
 void ui_section(twin_pixmap_t *px, ui_rect_t r, const char *label);

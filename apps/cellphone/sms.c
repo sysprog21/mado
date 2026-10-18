@@ -248,10 +248,17 @@ static void paint_header(sms_chat_t *c, twin_pixmap_t *px)
     const phone_theme_t *th = phone_theme();
     const char *name = c->thread->contact_name;
     ui_rect_t r = ui_rect(0, 0, PHONE_W, PHONE_HEADER_H);
-    ui_header(px, r, "", NULL);
-    ui_avatar(px, 20, PHONE_HEADER_H / 2, 10, name[0], ui_avatar_color(name));
-    ui_text_fit(px, FONT_HEADING, ui_rect(32, 0, PHONE_W - 40, PHONE_HEADER_H),
-                UI_LEFT, th->text, name);
+    ui_rect_t room = ui_header(px, r, NULL, NULL, NULL);
+    /* Avatar and name centered together in the title's room */
+    twin_coord_t w = ui_text_width(FONT_HEADING, name);
+    if (w > ui_w(room) - 24)
+        w = ui_w(room) - 24;
+    twin_coord_t x = (room.left + room.right - w - 24) / 2;
+    ui_avatar(px, x + 10, PHONE_HEADER_H / 2, 10, name[0],
+              ui_avatar_color(name));
+    /* ui_text_fit() keeps 4 px of padding on each side */
+    ui_text_fit(px, FONT_HEADING, ui_rect(x + 20, 0, w + 8, PHONE_HEADER_H),
+                UI_LEFT, th->on_bar, name);
 }
 
 /*
@@ -545,7 +552,8 @@ static void list_paint(ui_view_t *v, twin_pixmap_t *px)
         twin_pixmap_restore_clip(px, saved);
     }
     if (ui_intersects(clip, ui_rect(0, 0, PHONE_W, PHONE_HEADER_H)))
-        ui_header(px, ui_rect(0, 0, PHONE_W, PHONE_HEADER_H), "Messages", NULL);
+        ui_header(px, ui_rect(0, 0, PHONE_W, PHONE_HEADER_H), NULL, "Messages",
+                  NULL);
 }
 
 static int row_at(const sms_list_t *l, twin_coord_t x, twin_coord_t y)

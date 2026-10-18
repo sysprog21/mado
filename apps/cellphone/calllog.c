@@ -135,7 +135,7 @@ static void calllog_paint(ui_view_t *v, twin_pixmap_t *px)
 
     ui_rect_t head = ui_rect(0, 0, PHONE_W, LIST_TOP);
     if (ui_intersects(head, clip))
-        ui_header(px, head, v->title, l->missed[0] ? l->missed : NULL);
+        ui_header(px, head, NULL, v->title, l->missed[0] ? l->missed : NULL);
 }
 
 static int row_at(calllog_t *l, twin_coord_t x, twin_coord_t y)

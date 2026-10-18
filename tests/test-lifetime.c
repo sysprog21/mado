@@ -361,8 +361,9 @@ static void test_screen_teardown(void)
     th_settle(t, 500);
     twin_window_t *b = probe_window(t, &pb, TwinWindowApplication, 20, 20);
     twin_window_show(b);
+    /* Left unmapped: shown, it would end the push on a phone and take the
+     * press on a desktop.  It is still destroyed as a sibling. */
     twin_window_t *c = probe_window(t, &pc, TwinWindowPlain, 5, 5);
-    twin_window_show(c);
     /* Mid push on a phone; press and move on b's top edge (its title bar on
      * a desktop) to be mid drag there */
     th_advance(t, 48);

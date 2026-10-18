@@ -66,15 +66,17 @@ static twin_time_t _twin_tween_tick(twin_time_t now, void *closure)
     twin_tween_t *tween = closure;
     twin_time_t elapsed =
         (twin_time_t) ((uint32_t) now - (uint32_t) tween->start);
-    bool last = elapsed >= tween->duration;
+    /* A tween of no duration ends at once, even on a tick stamped early */
+    bool last = elapsed >= tween->duration || tween->duration <= 0;
     twin_fixed_t value;
 
     if (last)
         value = TWIN_FIXED_ONE;
     else
-        value = twin_ease(
-            tween->ease,
-            (twin_fixed_t) (((int64_t) elapsed << 16) / tween->duration));
+        /* elapsed / duration in 16.16; under 32 s it needs no 64-bit
+         * division */
+        value =
+            twin_ease(tween->ease, twin_fixed_div(elapsed, tween->duration));
 
     tween->running = true;
     bool keep = (*tween->proc)(value, tween->closure);

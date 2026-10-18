@@ -31,6 +31,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 
 #include "twin_private.h"
 
@@ -294,7 +295,7 @@ static const uint16_t *_shadow_ramp(int blur)
         int n = 2 * blur;
         for (int i = 0; i <= n; i++) {
             /* t in 16.16, smoothstep 3t^2 - 2t^3 */
-            int64_t t = ((int64_t) i << 16) / (n ? n : 1);
+            int64_t t = twin_fixed_div(i, n ? n : 1);
             int64_t t2 = (t * t) >> 16;
             int64_t t3 = (t2 * t) >> 16;
             int64_t v = 3 * t2 - 2 * t3;
@@ -460,13 +461,15 @@ static void _composite_layer(twin_argb32_t *span,
         if (p->opacity != 0xff)
             _twin_screen_blend_argb32(dst, src.argb32, p->opacity, w);
         else if (layer->opaque_full)
-            _twin_argb32_source_argb32((twin_pointer_t) {.argb32 = dst}, s, w);
+            memcpy(dst, src.argb32, (size_t) w * sizeof(*dst));
         else
             _twin_argb32_over_argb32((twin_pointer_t) {.argb32 = dst}, s, w);
     } else {
         /* A8 pixmaps on screen draw as black coverage */
         for (int i = 0; i < w; i++) {
-            uint32_t a = (uint32_t) src.a8[i] * p->opacity / 255;
+            /* v / 255 for v <= 255 * 255, without a divide */
+            uint32_t cov = (uint32_t) src.a8[i] * p->opacity;
+            uint32_t a = (cov + 1 + (cov >> 8)) >> 8;
             uint32_t k = 255 - a;
             uint16_t t0, t1, t2, t3;
             twin_argb32_t v = dst[i];

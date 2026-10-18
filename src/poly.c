@@ -6,6 +6,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 
 #include "twin_private.h"
 
@@ -17,6 +18,10 @@ typedef struct _twin_edge {
     twin_sfixed_t dx, dy;
     twin_sfixed_t inc_x;
     twin_sfixed_t step_x;
+    /* One sample row (TWIN_POLY_STEP) in Bresenham terms: x moves by
+     * row_x, e by row_e, plus inc_x once e reaches dy */
+    twin_sfixed_t row_x;
+    twin_sfixed_t row_e;
     int winding;
 } twin_edge_t;
 
@@ -44,6 +49,19 @@ static void _edge_step_by(twin_edge_t *edge, twin_sfixed_t dy)
     e = edge->e + (twin_dfixed_t) dy * edge->dx;
     edge->x += edge->step_x * dy + edge->inc_x * (e / edge->dy);
     edge->e = e % edge->dy;
+}
+
+/* _edge_step_by(edge, TWIN_POLY_STEP) without dividing: e < dy and
+ * row_e < dy, so a single correction keeps e in range */
+static inline void _edge_step_row(twin_edge_t *edge)
+{
+    twin_dfixed_t e = edge->e + edge->row_e;
+    edge->x += edge->row_x;
+    if (e >= edge->dy) {
+        e -= edge->dy;
+        edge->x += edge->inc_x;
+    }
+    edge->e = e;
 }
 
 /*
@@ -108,6 +126,10 @@ static int _twin_edge_build(twin_spoint_t *vertices,
         }
         edges[e].step_x = edges[e].inc_x * (edges[e].dx / edges[e].dy);
         edges[e].dx = edges[e].dx % edges[e].dy;
+        twin_dfixed_t row = (twin_dfixed_t) TWIN_POLY_STEP * edges[e].dx;
+        edges[e].row_x = edges[e].step_x * TWIN_POLY_STEP +
+                         edges[e].inc_x * (row / edges[e].dy);
+        edges[e].row_e = row % edges[e].dy;
 
         edges[e].top = vertices[tv].y + dy;
         edges[e].bot = vertices[bv].y + dy;
@@ -122,6 +144,28 @@ static int _twin_edge_build(twin_spoint_t *vertices,
         e++;
     }
     return e;
+}
+
+/* Add coverage @w (at most 0x40) to @n bytes, saturating at 0xff: four
+ * bytes per load and store on the aligned middle part */
+static void _span_add(twin_a8_t *s, int n, uint32_t w)
+{
+    for (; n && ((uintptr_t) s & 3); n--, s++) {
+        twin_a16_t a = *s + w;
+        *s = twin_sat(a);
+    }
+    uint32_t ww = w | w << 16;
+    for (; n >= 4; n -= 4, s += 4) {
+        uint32_t v;
+        memcpy(&v, s, sizeof(v));
+        v = _twin_sat_lanes((v & TWIN_LANES) + ww) |
+            _twin_sat_lanes(((v >> 8) & TWIN_LANES) + ww) << 8;
+        memcpy(s, &v, sizeof(v));
+    }
+    for (; n; n--, s++) {
+        twin_a16_t a = *s + w;
+        *s = twin_sat(a);
+    }
 }
 
 static void _span_fill(twin_pixmap_t *pixmap,
@@ -207,10 +251,11 @@ static void _span_fill(twin_pixmap_t *pixmap,
         w += cover[col];
 
     /* middle pixels */
-    while (x + TWIN_POLY_MASK < right) {
-        a = *s + w;
-        *s++ = twin_sat(a);
-        x += TWIN_POLY_SAMPLE;
+    if (x + TWIN_POLY_MASK < right) {
+        int n = (right - x) >> TWIN_POLY_SHIFT;
+        _span_add(s, n, w);
+        s += n;
+        x += n * TWIN_POLY_SAMPLE;
     }
 
     /* last pixel */
@@ -279,7 +324,7 @@ static void _twin_edge_fill(twin_pixmap_t *pixmap,
 
         /* step all edges */
         for (a = active; a; a = a->next)
-            _edge_step_by(a, TWIN_POLY_STEP);
+            _edge_step_row(a);
 
         /* fix x sorting */
         for (prev = &active; (a = *prev) && (n = a->next);) {

@@ -788,13 +788,59 @@ static twin_argb32_t _twin_lerp_argb(twin_argb32_t c0,
         return c0;
     if (t >= TWIN_FIXED_ONE)
         return c1;
+    /* |b - a| * t < 2^24: 32-bit products suffice */
     twin_argb32_t out = 0;
     for (int shift = 0; shift < 32; shift += 8) {
         int32_t a = (c0 >> shift) & 0xff, b = (c1 >> shift) & 0xff;
-        int32_t v = a + (int32_t) (((int64_t) (b - a) * t + 0x8000) >> 16);
+        int32_t v = a + (((b - a) * t + 0x8000) >> 16);
         out |= (twin_argb32_t) (v & 0xff) << shift;
     }
     return out;
+}
+
+/* Floor division stepped by a constant: q + r / d advances by dq + dr / d
+ * per step, with 0 <= r, dr < d */
+typedef struct {
+    int64_t q, r, dq, dr, d;
+} _twin_step_t;
+
+static void _twin_floor_divmod(int64_t n, int64_t d, int64_t *q, int64_t *r)
+{
+    *q = n / d;
+    *r = n % d;
+    if (*r < 0) {
+        *r += d;
+        (*q)--;
+    }
+}
+
+/* Start at @n / @d, stepping by @step / @d; @d > 0 */
+static _twin_step_t _twin_step_init(int64_t n, int64_t step, int64_t d)
+{
+    _twin_step_t t = {.d = d};
+    _twin_floor_divmod(n, d, &t.q, &t.r);
+    _twin_floor_divmod(step, d, &t.dq, &t.dr);
+    return t;
+}
+
+static inline void _twin_step(_twin_step_t *t)
+{
+    t->q += t->dq;
+    t->r += t->dr;
+    if (t->r >= t->d) {
+        t->r -= t->d;
+        t->q++;
+    }
+}
+
+/* Gradient color at 16.16 position @q, clamped to the ends */
+static inline twin_argb32_t _twin_lerp_q(twin_argb32_t c0,
+                                         twin_argb32_t c1,
+                                         int64_t q)
+{
+    return q <= 0                ? c0
+           : q >= TWIN_FIXED_ONE ? c1
+                                 : _twin_lerp_argb(c0, c1, (twin_fixed_t) q);
 }
 
 void twin_paint_path_linear(twin_pixmap_t *dst,
@@ -821,17 +867,24 @@ void twin_paint_path_linear(twin_pixmap_t *dst,
     int64_t len2 = (gx * gx + gy * gy) >> 16; /* 16.16 */
 
     if (gx == 0 || len2 == 0) {
-        /* Vertical (or degenerate): one solid color per scanline */
+        /* Vertical (or degenerate): one solid color per scanline.  t is
+         * (cy - y0) / gy; a row down adds one pixel to cy, so t steps by a
+         * fixed quotient and remainder.  With the signs folded into a
+         * positive divisor, floor and truncation agree wherever t > 0. */
+        int64_t d = gy < 0 ? -gy : gy;
+        int64_t sign = gy < 0 ? -1 : 1;
+        _twin_step_t t = {0, 0, 0, 0, d ? d : 1};
+        if (gy) {
+            twin_fixed_t cy = twin_int_to_fixed(vis.top) + TWIN_FIXED_HALF;
+            t = _twin_step_init(sign * ((int64_t) cy - y0) * 65536,
+                                sign * ((int64_t) TWIN_FIXED_ONE << 16), d);
+        }
         for (twin_coord_t y = vis.top; y < vis.bottom; y++) {
-            twin_fixed_t t = 0;
-            if (gy) {
-                twin_fixed_t cy = twin_int_to_fixed(y) + TWIN_FIXED_HALF;
-                t = (twin_fixed_t) ((((int64_t) cy - y0) * 65536) / gy);
-            }
             twin_operand_t src = {.source_kind = TWIN_SOLID,
-                                  .u.argb = _twin_lerp_argb(c0, c1, t)};
+                                  .u.argb = _twin_lerp_q(c0, c1, t.q)};
             twin_composite(dst, vis.left, y, &src, 0, 0, &msk, vis.left - mx,
                            y - my, TWIN_OVER, w, 1);
+            _twin_step(&t); /* steps by nothing when gy is 0 */
         }
         _twin_mask_release(&m, sp);
         return;
@@ -847,17 +900,26 @@ void twin_paint_path_linear(twin_pixmap_t *dst,
     _twin_pixmap_init(&span, TWIN_ARGB32, w, 1, (twin_coord_t) (w * 4), row);
     twin_operand_t src = {.source_kind = TWIN_PIXMAP, .u.pixmap = &span};
 
+    /* t = dot * 65536 / len2, floored.  One pixel to the right adds
+     * exactly gx to dot and one row down adds exactly gy, so t is stepped
+     * as a quotient and remainder both ways: no 64-bit division per row or
+     * pixel on 32-bit targets.  Floor and truncating division differ only
+     * for t <= 0, which selects c0 either way. */
+    twin_fixed_t cx = twin_int_to_fixed(vis.left) + TWIN_FIXED_HALF;
+    twin_fixed_t cy = twin_int_to_fixed(vis.top) + TWIN_FIXED_HALF;
+    int64_t dot = (((int64_t) cx - x0) * gx + ((int64_t) cy - y0) * gy) >> 16;
+    _twin_step_t row_t = _twin_step_init(dot * 65536, gy * 65536, len2);
+    _twin_step_t px_t = _twin_step_init(0, gx * 65536, len2);
     for (twin_coord_t y = vis.top; y < vis.bottom; y++) {
         if (y == vis.top || gy) {
-            twin_fixed_t cy = twin_int_to_fixed(y) + TWIN_FIXED_HALF;
+            _twin_step_t t = row_t;
+            t.dq = px_t.dq;
+            t.dr = px_t.dr;
             for (twin_coord_t i = 0; i < w; i++) {
-                twin_fixed_t cx =
-                    twin_int_to_fixed(vis.left + i) + TWIN_FIXED_HALF;
-                int64_t dot =
-                    (((int64_t) cx - x0) * gx + ((int64_t) cy - y0) * gy) >> 16;
-                twin_fixed_t t = (twin_fixed_t) ((dot * 65536) / len2);
-                row[i] = _twin_lerp_argb(c0, c1, t);
+                row[i] = _twin_lerp_q(c0, c1, t.q);
+                _twin_step(&t);
             }
+            _twin_step(&row_t);
         }
         twin_composite(dst, vis.left, y, &src, 0, 0, &msk, vis.left - mx,
                        y - my, TWIN_OVER, w, 1);

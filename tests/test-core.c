@@ -467,6 +467,67 @@ static void test_gradient(void)
     twin_pixmap_destroy(p);
 }
 
+/* The per-pixel formula the stepped gradient must reproduce exactly */
+static twin_argb32_t ref_gradient(twin_coord_t x,
+                                  twin_coord_t y,
+                                  twin_fixed_t x0,
+                                  twin_fixed_t y0,
+                                  twin_argb32_t c0,
+                                  twin_fixed_t x1,
+                                  twin_fixed_t y1,
+                                  twin_argb32_t c1)
+{
+    int64_t gx = (int64_t) x1 - x0, gy = (int64_t) y1 - y0;
+    int64_t len2 = (gx * gx + gy * gy) >> 16;
+    twin_fixed_t cx = twin_int_to_fixed(x) + TWIN_FIXED_HALF;
+    twin_fixed_t cy = twin_int_to_fixed(y) + TWIN_FIXED_HALF;
+    int64_t dot = (((int64_t) cx - x0) * gx + ((int64_t) cy - y0) * gy) >> 16;
+    int64_t t = (dot * 65536) / len2;
+    if (t <= 0)
+        return c0;
+    if (t >= TWIN_FIXED_ONE)
+        return c1;
+    twin_argb32_t out = 0;
+    for (int shift = 0; shift < 32; shift += 8) {
+        int32_t a = (c0 >> shift) & 0xff, b = (c1 >> shift) & 0xff;
+        int32_t v = a + (int32_t) (((int64_t) (b - a) * t + 0x8000) >> 16);
+        out |= (twin_argb32_t) (v & 0xff) << shift;
+    }
+    return out;
+}
+
+/* Diagonal, reversed, steep and off-canvas gradients match the formula at
+ * every pixel */
+static void test_gradient_exact(void)
+{
+    static const struct {
+        int x0, y0, x1, y1;
+    } dirs[] = {
+        {0, 0, 63, 63},   {63, 0, 0, 63}, {50, 60, 3, 2},  {10, 0, 13, 64},
+        {-40, 7, 90, 30}, {5, 5, 6, 5},   {32, 32, 31, 0}, {0, 70, 1, -20},
+    };
+    twin_pixmap_t *p = twin_pixmap_create(TWIN_ARGB32, 64, 64);
+    twin_path_t *path = twin_path_create();
+    twin_path_rectangle(path, 0, 0, twin_int_to_fixed(64),
+                        twin_int_to_fixed(64));
+    const twin_argb32_t c0 = 0xff10a0f0, c1 = 0xfff02010;
+    for (size_t d = 0; d < sizeof(dirs) / sizeof(dirs[0]); d++) {
+        twin_fixed_t x0 = twin_int_to_fixed(dirs[d].x0) + 0x1234;
+        twin_fixed_t y0 = twin_int_to_fixed(dirs[d].y0) - 0x0567;
+        twin_fixed_t x1 = twin_int_to_fixed(dirs[d].x1);
+        twin_fixed_t y1 = twin_int_to_fixed(dirs[d].y1) + 0x89ab;
+        twin_paint_path_linear(p, path, x0, y0, c0, x1, y1, c1);
+        int bad = 0;
+        for (twin_coord_t y = 0; y < 64; y++)
+            for (twin_coord_t x = 0; x < 64; x++)
+                bad += *twin_pixmap_pointer(p, x, y).argb32 !=
+                       ref_gradient(x, y, x0, y0, c0, x1, y1, c1);
+        CHECK(!bad, "gradient %zu: %d pixels off the formula", d, bad);
+    }
+    twin_path_destroy(path);
+    twin_pixmap_destroy(p);
+}
+
 typedef struct {
     int calls;
     twin_fixed_t last;
@@ -1133,6 +1194,7 @@ int main(void)
     test_cache_equivalence();
     test_text();
     test_gradient();
+    test_gradient_exact();
     test_tween();
     test_closure_churn();
     test_scroll();

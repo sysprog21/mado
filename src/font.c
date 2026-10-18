@@ -25,6 +25,14 @@ typedef struct _twin_text_info {
     twin_fixed_t snap_y[TWIN_GLYPH_MAX_SNAP_Y];
 } twin_text_info_t;
 
+/* 1 / m in 16.16; unscaled text (m = 1) needs no division */
+static twin_fixed_t _twin_reciprocal(twin_fixed_t m)
+{
+    if (m == TWIN_FIXED_ONE || m == -TWIN_FIXED_ONE)
+        return m;
+    return twin_fixed_div(TWIN_FIXED_ONE, m);
+}
+
 static void _twin_text_compute_info(twin_path_t *path,
                                     const twin_font_t *font,
                                     twin_text_info_t *info)
@@ -61,8 +69,7 @@ static void _twin_text_compute_info(twin_path_t *path,
         }
         info->scale.x =
             twin_fixed_mul(path->state.font_size, path->state.matrix.m[0][xi]);
-        info->reverse_scale.x =
-            twin_fixed_div(TWIN_FIXED_ONE, path->state.matrix.m[0][xi]);
+        info->reverse_scale.x = _twin_reciprocal(path->state.matrix.m[0][xi]);
         if (info->scale.x < 0) {
             info->scale.x = -info->scale.x;
             info->reverse_scale.x = -info->reverse_scale.x;
@@ -71,8 +78,7 @@ static void _twin_text_compute_info(twin_path_t *path,
         }
         info->scale.y =
             twin_fixed_mul(path->state.font_size, path->state.matrix.m[1][yi]);
-        info->reverse_scale.y =
-            twin_fixed_div(TWIN_FIXED_ONE, path->state.matrix.m[1][yi]);
+        info->reverse_scale.y = _twin_reciprocal(path->state.matrix.m[1][yi]);
         if (info->scale.y < 0) {
             info->scale.y = -info->scale.y;
             info->reverse_scale.y = -info->reverse_scale.y;

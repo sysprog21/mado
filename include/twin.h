@@ -525,7 +525,20 @@ void twin_fill(twin_pixmap_t *dst,
                twin_coord_t bottom);
 
 #define twin_fixed_mul(a, b) ((twin_fixed_t) (((int64_t) (a) * (b)) >> 16))
-#define twin_fixed_div(a, b) ((twin_fixed_t) (((int64_t) (a) * 65536) / (b)))
+/* a / b in 16.16.  When |a| * 65536 fits in 31 bits a 32-bit divide gives
+ * the same quotient (no INT32_MIN / -1 either), which spares 32-bit targets
+ * a 64-bit division */
+static inline twin_fixed_t twin_fixed_div(twin_fixed_t a, twin_fixed_t b)
+{
+    /* Two 32-bit cases give the 64-bit quotient exactly: a small dividend
+     * shifts without overflow, and a whole-number divisor cancels the
+     * shift (except -1, whose quotient of INT32_MIN overflows) */
+    if ((uint32_t) a + 0x7fffu < 0xffffu)
+        return (twin_fixed_t) ((int32_t) ((uint32_t) a << 16) / b);
+    if (!(b & 0xffff) && b != -TWIN_FIXED_ONE)
+        return a / (b >> 16);
+    return (twin_fixed_t) (((int64_t) a * 65536) / b);
+}
 #define twin_fixed_abs(f) ((f) < 0 ? -(f) : (f))
 
 /**

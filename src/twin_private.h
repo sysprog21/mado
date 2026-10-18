@@ -1573,6 +1573,30 @@ static inline int twin_clzll(uint64_t v)
         return 63 - leading_zero;
     return 64; /* undefined behavior */
 }
+#elif defined(__riscv) && !defined(__riscv_zbb)
+/* Without Zbb there is no count-leading-zeros instruction and
+ * __builtin_clz becomes a libgcc call; a binary search of shifts is
+ * cheaper.  Like the builtin, @v must be nonzero. */
+static inline int twin_clz(uint32_t v)
+{
+    int n = 0;
+    if (!(v & 0xffff0000u))
+        n += 16, v <<= 16;
+    if (!(v & 0xff000000u))
+        n += 8, v <<= 8;
+    if (!(v & 0xf0000000u))
+        n += 4, v <<= 4;
+    if (!(v & 0xc0000000u))
+        n += 2, v <<= 2;
+    if (!(v & 0x80000000u))
+        n += 1;
+    return n;
+}
+static inline int twin_clzll(uint64_t v)
+{
+    uint32_t hi = (uint32_t) (v >> 32);
+    return hi ? twin_clz(hi) : 32 + twin_clz((uint32_t) v);
+}
 #elif defined(__GNUC__) || defined(__clang__)
 static inline int twin_clz(uint32_t v)
 {

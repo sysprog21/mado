@@ -48,70 +48,39 @@
  * combinations of source/mask/destination format operations.
  */
 
-static inline twin_argb32_t in_over(twin_argb32_t dst,
-                                    twin_argb32_t src,
-                                    twin_a8_t msk)
-{
-    uint16_t t1, t2, t3, t4;
-    twin_a8_t a;
-
-    switch (msk) {
-    case 0:
-        return dst;
-    case 0xff:
-        break;
-    default:
-        src = (twin_in(src, 0, msk, t1) | twin_in(src, 8, msk, t2) |
-               twin_in(src, 16, msk, t3) | twin_in(src, 24, msk, t4));
-        break;
-    }
-    if (!src)
-        return dst;
-    a = ~(src >> 24);
-    switch (a) {
-    case 0:
-        return src;
-    case 0xff:
-        dst = (twin_add(src, dst, 0, t1) | twin_add(src, dst, 8, t2) |
-               twin_add(src, dst, 16, t3) | twin_add(src, dst, 24, t4));
-        break;
-    default:
-        dst = (twin_over(src, dst, 0, a, t1) | twin_over(src, dst, 8, a, t2) |
-               twin_over(src, dst, 16, a, t3) | twin_over(src, dst, 24, a, t4));
-        break;
-    }
-    return dst;
-}
-
+/* Two channels per 32-bit multiply (see _twin_mul_lanes); every result is
+ * bit-identical to the per-channel twin_in/twin_over/twin_add forms */
 static inline twin_argb32_t in(twin_argb32_t src, twin_a8_t msk)
 {
-    uint16_t t1, t2, t3, t4;
-
-    return (twin_in(src, 0, msk, t1) | twin_in(src, 8, msk, t2) |
-            twin_in(src, 16, msk, t3) | twin_in(src, 24, msk, t4));
+    return _twin_mul_lanes(src & TWIN_LANES, msk) |
+           _twin_mul_lanes((src >> 8) & TWIN_LANES, msk) << 8;
 }
 
 static inline twin_argb32_t over(twin_argb32_t dst, twin_argb32_t src)
 {
-    uint16_t t1, t2, t3, t4;
-    twin_a8_t a;
-
     if (!src)
         return dst;
-    a = ~(src >> 24);
-    switch (a) {
-    case 0:
+    uint32_t a = (uint8_t) ~(src >> 24);
+    if (!a)
         return src;
-    case 0xff:
-        dst = (twin_add(src, dst, 0, t1) | twin_add(src, dst, 8, t2) |
-               twin_add(src, dst, 16, t3) | twin_add(src, dst, 24, t4));
-        break;
-    default:
-        dst = (twin_over(src, dst, 0, a, t1) | twin_over(src, dst, 8, a, t2) |
-               twin_over(src, dst, 16, a, t3) | twin_over(src, dst, 24, a, t4));
-        break;
+    uint32_t rb = dst & TWIN_LANES, ag = (dst >> 8) & TWIN_LANES;
+    if (a != 0xff) {
+        rb = _twin_mul_lanes(rb, a);
+        ag = _twin_mul_lanes(ag, a);
     }
-    return dst;
+    return _twin_sat_lanes(rb + (src & TWIN_LANES)) |
+           _twin_sat_lanes(ag + ((src >> 8) & TWIN_LANES)) << 8;
+}
+
+static inline twin_argb32_t in_over(twin_argb32_t dst,
+                                    twin_argb32_t src,
+                                    twin_a8_t msk)
+{
+    if (!msk)
+        return dst;
+    if (msk != 0xff)
+        src = in(src, msk);
+    return over(dst, src);
 }
 
 static inline twin_argb32_t rgb16_to_argb32(twin_rgb16_t v)
@@ -741,11 +710,16 @@ static void twin_pixmap_free_xform(twin_xform_t *xform)
         *((twin_argb32_t *) (char *) (d)) = p;                               \
     } while (0)
 
-#define _pix_saucemix(tl, tr, bl, br, wx, wy)                     \
-    ((((((br * wx) + (bl * (TWIN_FIXED_ONE - wx))) >> 16) * wy) + \
-      ((((tr * wx) + (tl * (TWIN_FIXED_ONE - wx))) >> 16) *       \
-       (TWIN_FIXED_ONE - wy))) >>                                 \
+/* Linear blend of a and b at w (16.16): a * (1 - w) + b * w rounded down,
+ * written with one multiply */
+#define _pix_lerp(a, b, w)                                \
+    ((((int32_t) (a) << 16) +                             \
+      ((int32_t) (b) - (int32_t) (a)) * (int32_t) (w)) >> \
      16)
+
+/* Bilinear blend of four samples */
+#define _pix_saucemix(tl, tr, bl, br, wx, wy) \
+    _pix_lerp(_pix_lerp(tl, tr, wx), _pix_lerp(bl, br, wx), wy)
 
 static void twin_pixmap_read_xform_8(twin_xform_t *xform, twin_coord_t line)
 {
@@ -758,11 +732,15 @@ static void twin_pixmap_read_xform_8(twin_xform_t *xform, twin_coord_t line)
 
     /* for each row in the dest line */
     dy = twin_int_to_fixed(line + xform->off_y);
-    for (dx = twin_int_to_fixed(xform->off_x);
-         dx < twin_int_to_fixed(xform->off_x + xform->width);
-         dx += TWIN_FIXED_ONE) {
-        sx = _twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x);
-        sy = _twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y);
+    dx = twin_int_to_fixed(xform->off_x);
+    /* dx moves by whole pixels, so the source moves by exactly the first
+     * matrix column per pixel: no multiplies after the first */
+    uint32_t ux = (uint32_t) (_twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x));
+    uint32_t uy = (uint32_t) (_twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y));
+    for (twin_coord_t i = 0; i < xform->width;
+         i++, ux += (uint32_t) tfm->m[0][0], uy += (uint32_t) tfm->m[0][1]) {
+        sx = (twin_fixed_t) ux;
+        sy = (twin_fixed_t) uy;
         _get_pix_8(pts[0], pix, sx, sy);
         _get_pix_8(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
         _get_pix_8(pts[2], pix, sx, sy + TWIN_FIXED_ONE);
@@ -784,11 +762,15 @@ static void twin_pixmap_read_xform_16(twin_xform_t *xform, twin_coord_t line)
 
     /* for each row in the dest line */
     dy = twin_int_to_fixed(line + xform->off_y);
-    for (dx = twin_int_to_fixed(xform->off_x);
-         dx < twin_int_to_fixed(xform->off_x + xform->width);
-         dx += TWIN_FIXED_ONE) {
-        sx = _twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x);
-        sy = _twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y);
+    dx = twin_int_to_fixed(xform->off_x);
+    /* dx moves by whole pixels, so the source moves by exactly the first
+     * matrix column per pixel: no multiplies after the first */
+    uint32_t ux = (uint32_t) (_twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x));
+    uint32_t uy = (uint32_t) (_twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y));
+    for (twin_coord_t i = 0; i < xform->width;
+         i++, ux += (uint32_t) tfm->m[0][0], uy += (uint32_t) tfm->m[0][1]) {
+        sx = (twin_fixed_t) ux;
+        sy = (twin_fixed_t) uy;
         _get_pix_16(pts[0], pix, sx, sy);
         _get_pix_16(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
         _get_pix_16(pts[2], pix, sx, sy + TWIN_FIXED_ONE);
@@ -817,11 +799,15 @@ static void twin_pixmap_read_xform_32(twin_xform_t *xform, twin_coord_t line)
 
     /* for each row in the dest line */
     dy = twin_int_to_fixed(line + xform->off_y);
-    for (dx = twin_int_to_fixed(xform->off_x);
-         dx < twin_int_to_fixed(xform->off_x + xform->width);
-         dx += TWIN_FIXED_ONE) {
-        sx = _twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x);
-        sy = _twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y);
+    dx = twin_int_to_fixed(xform->off_x);
+    /* dx moves by whole pixels, so the source moves by exactly the first
+     * matrix column per pixel: no multiplies after the first */
+    uint32_t ux = (uint32_t) (_twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x));
+    uint32_t uy = (uint32_t) (_twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y));
+    for (twin_coord_t i = 0; i < xform->width;
+         i++, ux += (uint32_t) tfm->m[0][0], uy += (uint32_t) tfm->m[0][1]) {
+        sx = (twin_fixed_t) ux;
+        sy = (twin_fixed_t) uy;
         _get_pix_32(pts[0], pix, sx, sy);
         _get_pix_32(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
         _get_pix_32(pts[2], pix, sx, sy + TWIN_FIXED_ONE);

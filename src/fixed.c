@@ -82,8 +82,7 @@ twin_xfixed_t _twin_xfixed_sqrt(twin_xfixed_t a)
 
     /* Digit-by-digit square root calculation */
     twin_xfixed_t z = 0;
-    for (twin_xfixed_t m = 1ULL << ((63 - __builtin_clzll(a)) & ~1ULL); m;
-         m >>= 2) {
+    for (twin_xfixed_t m = 1ULL << ((63 - twin_clzll(a)) & ~1ULL); m; m >>= 2) {
         twin_xfixed_t b = z + m;
         z >>= 1;
         if (a >= b)

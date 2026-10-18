@@ -719,6 +719,8 @@ static void twin_pixmap_read_xform_16(twin_xform_t *xform, twin_coord_t line)
     twin_a8_t *dst = xform->span.a8;
     twin_pixmap_t *pix = xform->pixmap;
     twin_matrix_t *tfm = &xform->pixmap->transform;
+    twin_coord_t last_x = 0, last_y = 0;
+    bool fetched = false;
 
     /* for each row in the dest line */
     dy = twin_int_to_fixed(line + xform->off_y);
@@ -731,10 +733,17 @@ static void twin_pixmap_read_xform_16(twin_xform_t *xform, twin_coord_t line)
          i++, ux += (uint32_t) tfm->m[0][0], uy += (uint32_t) tfm->m[0][1]) {
         sx = (twin_fixed_t) ux;
         sy = (twin_fixed_t) uy;
-        _get_pix_16(pts[0], pix, sx, sy);
-        _get_pix_16(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
-        _get_pix_16(pts[2], pix, sx, sy + TWIN_FIXED_ONE);
-        _get_pix_16(pts[3], pix, sx + TWIN_FIXED_ONE, sy + TWIN_FIXED_ONE);
+        /* The four texels depend on the integer position only: scaling up
+         * revisits them, so fetch (and convert) them once per texel */
+        if (!fetched || XF(sx) != last_x || XF(sy) != last_y) {
+            fetched = true;
+            last_x = XF(sx);
+            last_y = XF(sy);
+            _get_pix_16(pts[0], pix, sx, sy);
+            _get_pix_16(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
+            _get_pix_16(pts[2], pix, sx, sy + TWIN_FIXED_ONE);
+            _get_pix_16(pts[3], pix, sx + TWIN_FIXED_ONE, sy + TWIN_FIXED_ONE);
+        }
         wx = sx & 0xffff;
         wy = sy & 0xffff;
         *(dst++) =
@@ -756,6 +765,8 @@ static void twin_pixmap_read_xform_32(twin_xform_t *xform, twin_coord_t line)
     twin_a8_t *dst = xform->span.a8;
     twin_pixmap_t *pix = xform->pixmap;
     twin_matrix_t *tfm = &xform->pixmap->transform;
+    twin_coord_t last_x = 0, last_y = 0;
+    bool fetched = false;
 
     /* for each row in the dest line */
     dy = twin_int_to_fixed(line + xform->off_y);
@@ -768,10 +779,17 @@ static void twin_pixmap_read_xform_32(twin_xform_t *xform, twin_coord_t line)
          i++, ux += (uint32_t) tfm->m[0][0], uy += (uint32_t) tfm->m[0][1]) {
         sx = (twin_fixed_t) ux;
         sy = (twin_fixed_t) uy;
-        _get_pix_32(pts[0], pix, sx, sy);
-        _get_pix_32(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
-        _get_pix_32(pts[2], pix, sx, sy + TWIN_FIXED_ONE);
-        _get_pix_32(pts[3], pix, sx + TWIN_FIXED_ONE, sy + TWIN_FIXED_ONE);
+        /* The four texels depend on the integer position only: scaling up
+         * revisits them, so fetch (and convert) them once per texel */
+        if (!fetched || XF(sx) != last_x || XF(sy) != last_y) {
+            fetched = true;
+            last_x = XF(sx);
+            last_y = XF(sy);
+            _get_pix_32(pts[0], pix, sx, sy);
+            _get_pix_32(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
+            _get_pix_32(pts[2], pix, sx, sy + TWIN_FIXED_ONE);
+            _get_pix_32(pts[3], pix, sx + TWIN_FIXED_ONE, sy + TWIN_FIXED_ONE);
+        }
         wx = sx & 0xffff;
         wy = sy & 0xffff;
         *(dst++) =

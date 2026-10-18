@@ -288,11 +288,7 @@ static void _ui_destroy(twin_window_t *window)
     if (v->alive)
         *v->alive = false;
     ui_view_stop_timers(v);
-    for (int i = 0; i < UI_VIEW_TIMERS; i++) {
-        if (v->tweens[i].handle)
-            twin_tween_cancel(v->tweens[i].handle);
-        v->tweens[i].handle = NULL;
-    }
+    ui_view_stop_tweens(v);
     if (fling_view == v) {
         fling_view = NULL;
         fling_scroll = NULL;
@@ -357,7 +353,9 @@ static bool _tween(twin_fixed_t value, void *closure)
         return false;
     if (slot->handle != self)
         return false; /* cancelled from the callback, slot maybe reused */
-    if (!keep || value >= TWIN_FIXED_ONE) {
+    /* Only the final frame is exactly one: overshooting easings (OutBack)
+     * pass above it on the way and must still reach the end */
+    if (!keep || value == TWIN_FIXED_ONE) {
         slot->handle = NULL;
         return false;
     }
@@ -399,6 +397,15 @@ void ui_view_stop_timers(ui_view_t *view)
         if (view->timers[i].handle)
             twin_clear_timeout(view->timers[i].handle);
         view->timers[i].handle = NULL;
+    }
+}
+
+void ui_view_stop_tweens(ui_view_t *view)
+{
+    for (int i = 0; i < UI_VIEW_TIMERS; i++) {
+        if (view->tweens[i].handle)
+            twin_tween_cancel(view->tweens[i].handle);
+        view->tweens[i].handle = NULL;
     }
 }
 
@@ -479,11 +486,20 @@ bool ui_scroll_event(ui_view_t *view, ui_scroll_t *s, const ui_event_t *e)
     switch (e->kind) {
     case UI_PRESS:
         s->grab = s->offset;
+        s->caught = false;
         if (s->flinging) {
             s->flinging = false;
-            return true; /* a press that stops a fling is not a tap */
+            /* A press over the list that stops a fling is not a tap: swallow
+             * it and the tap it may end in */
+            s->caught = ui_hit(s->area, e->x, e->y);
+            return s->caught;
         }
         return false;
+    case UI_TAP:
+        if (!s->caught)
+            return false;
+        s->caught = false;
+        return true;
     case UI_DRAG:
         if (!ui_hit(s->area, e->x0, e->y0) || abs(e->dy) < abs(e->dx))
             return false;
@@ -500,7 +516,11 @@ bool ui_scroll_event(ui_view_t *view, ui_scroll_t *s, const ui_event_t *e)
                 fling_scroll->flinging = false;
             fling_scroll = s;
             fling_view = view;
-            ui_view_every(view, 16, _fling_step);
+            if (!ui_view_every(view, 16, _fling_step)) {
+                s->flinging = false;
+                fling_scroll = NULL;
+                fling_view = NULL;
+            }
         }
         return true;
     default:

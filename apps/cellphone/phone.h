@@ -453,6 +453,7 @@ bool ui_view_every(ui_view_t *view, twin_time_t delay, ui_timer_t fn);
 /* A timer running @fn is set on the view */
 bool ui_view_has_timer(ui_view_t *view, ui_timer_t fn);
 void ui_view_stop_timers(ui_view_t *view);
+void ui_view_stop_tweens(ui_view_t *view);
 bool ui_view_tween(ui_view_t *view,
                    twin_time_t duration,
                    twin_ease_t ease,
@@ -545,6 +546,7 @@ typedef struct {
     int velocity;           /* px/s during a fling */
     twin_time_t last;       /* fling clock */
     bool flinging;
+    bool caught; /* this press stopped a fling: its tap is swallowed */
 } ui_scroll_t;
 
 void ui_scroll_setup(ui_scroll_t *s, ui_rect_t area, twin_coord_t content_h);

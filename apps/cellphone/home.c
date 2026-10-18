@@ -32,7 +32,9 @@ typedef struct {
     twin_coord_t pan;  /* horizontal pan in px: page * PHONE_W - drag */
     twin_coord_t from; /* pan when an animation started */
     twin_coord_t to;
-    int pressed; /* app index under the finger, -1 when none */
+    twin_coord_t grab; /* pan a drag starts from */
+    bool settling;     /* the settle tween is running */
+    int pressed;       /* app index under the finger, -1 when none */
 } home_t;
 
 static int pages(void)
@@ -108,6 +110,8 @@ static bool settle_step(ui_view_t *v, twin_fixed_t value)
 {
     home_t *h = (home_t *) v;
     pan_to(h, ui_lerp(h->from, h->to, value));
+    if (value == TWIN_FIXED_ONE)
+        h->settling = false;
     return true;
 }
 
@@ -130,10 +134,17 @@ static bool home_event(ui_view_t *v, const ui_event_t *e)
     switch (e->kind) {
     case UI_PRESS:
         set_pressed(h, app_at(h, e->x, e->y));
+        h->grab = h->pan;
         return true;
     case UI_DRAG: {
         set_pressed(h, -1);
-        twin_coord_t pan = h->page * PHONE_W - e->dx;
+        if (h->settling) {
+            /* Catch the page mid-settle: continue from where it is */
+            ui_view_stop_tweens(v);
+            h->settling = false;
+            h->grab = h->pan + e->dx;
+        }
+        twin_coord_t pan = h->grab - e->dx;
         twin_coord_t max = (pages() - 1) * PHONE_W;
         /* Rubber band past the first and last page */
         if (pan < 0)
@@ -152,8 +163,11 @@ static bool home_event(ui_view_t *v, const ui_event_t *e)
         h->page = page;
         h->from = h->pan;
         h->to = page * PHONE_W;
-        if (h->from != h->to)
-            ui_view_tween(v, 220, TwinEaseOutCubic, settle_step);
+        if (h->from != h->to) {
+            h->settling = ui_view_tween(v, 220, TwinEaseOutCubic, settle_step);
+            if (!h->settling)
+                pan_to(h, h->to); /* no animation: settle at once */
+        }
         return true;
     }
     case UI_TAP: {

@@ -248,7 +248,11 @@ static void list_added(contacts_list_t *l, int idx)
     l->scroll.offset = off < 0 ? 0 : off;
     l->scroll.flinging = false;
     l->fresh = idx;
-    ui_view_every(&l->view, FRESH_MS, fresh_done);
+    /* Restart the highlight: an earlier timer would end this one early.
+     * The fling timer is the only other one, and the fling just stopped. */
+    ui_view_stop_timers(&l->view);
+    if (!ui_view_every(&l->view, FRESH_MS, fresh_done))
+        l->fresh = -1;
     ui_view_invalidate_all(&l->view);
 }
 

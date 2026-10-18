@@ -211,8 +211,10 @@ static twin_time_t game_tick(ui_view_t *v)
 {
     game_t *g = (game_t *) v;
     const game_ops_t *o = ops[g->kind];
-    /* Freeze while another view covers this one */
-    if (g->paused || phone_top() != v)
+    /* Freeze while another view covers this one.  Only the mobile scene
+     * stacks views exclusively: desktop windows may sit side by side. */
+    if (g->paused || (phone_top() != v &&
+                      twin_screen_get_wm(phone_screen()) != TwinWmDesktop))
         return o->period;
     o->tick(g);
     g->steps++;

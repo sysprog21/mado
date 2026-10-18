@@ -22,7 +22,8 @@
 /* Font Awesome code points live in U+F000..U+F8FF: UTF-8 0xEF 0x80.. */
 static inline bool _is_symbol(const char *s)
 {
-    return s && (uint8_t) s[0] == 0xef;
+    return s && (uint8_t) s[0] == 0xef && (uint8_t) s[1] >= 0x80 &&
+           (uint8_t) s[1] <= 0xa3;
 }
 
 #endif /* _UI_INTERNAL_H_ */

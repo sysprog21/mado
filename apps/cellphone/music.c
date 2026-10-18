@@ -44,9 +44,20 @@ static int32_t track_ms(int i)
     return (int32_t) phone_tracks()[i].duration_sec * 1000;
 }
 
+/* twin_now() wraps: do clock arithmetic in unsigned and convert back */
+static int32_t player_elapsed(void)
+{
+    return (int32_t) ((uint32_t) twin_now() - (uint32_t) player.start);
+}
+
+static twin_time_t time_add(twin_time_t t, int32_t ms)
+{
+    return (twin_time_t) ((uint32_t) t + (uint32_t) ms);
+}
+
 static int32_t player_pos(void)
 {
-    return player.playing ? (int32_t) (twin_now() - player.start) : player.pos;
+    return player.playing ? player_elapsed() : player.pos;
 }
 
 static int shuffle_pick(void)
@@ -72,8 +83,8 @@ static void player_sync(void)
 {
     if (!player.playing)
         return;
-    while ((int32_t) (twin_now() - player.start) >= track_ms(player.track)) {
-        player.start += track_ms(player.track);
+    while (player_elapsed() >= track_ms(player.track)) {
+        player.start = time_add(player.start, track_ms(player.track));
         if (!player.repeat)
             player.track = next_track();
     }
@@ -87,7 +98,7 @@ static void player_seek(int32_t ms)
     if (ms > dur - 1)
         ms = dur - 1;
     if (player.playing)
-        player.start = twin_now() - ms;
+        player.start = time_add(twin_now(), -ms);
     else
         player.pos = ms;
 }

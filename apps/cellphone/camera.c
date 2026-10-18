@@ -475,7 +475,8 @@ static bool camera_event(ui_view_t *v, const ui_event_t *e)
     case UI_RELEASE:
         set_pressed(c, CTL_NONE);
         /* Horizontal swipes over the viewfinder switch modes */
-        if (e->dx < -40 || e->dx > 40)
+        if (ui_hit(viewfinder(v), e->x0, e->y0) &&
+            (e->dx < -40 || e->dx > 40) && e->dx * e->dx > e->dy * e->dy)
             set_mode(c, e->dx < 0);
         return true;
     case UI_KEY:

@@ -673,8 +673,11 @@ bool phone_boot(twin_screen_t *screen)
     if (!ui_init())
         return false;
     g_screen = screen;
-    if (twin_screen_get_wm(screen) != TwinWmMobile)
-        twin_screen_set_wm(screen, TwinWmMobile);
+    if (twin_screen_get_wm(screen) != TwinWmMobile &&
+        !twin_screen_set_wm(screen, TwinWmMobile)) {
+        phone_shutdown();
+        return false;
+    }
 
     g_status = bar_create(0, PHONE_STATUS_H, status_draw, NULL);
     g_nav = bar_create(PHONE_H - PHONE_NAV_H, PHONE_NAV_H, nav_draw, nav_event);
@@ -683,10 +686,13 @@ bool phone_boot(twin_screen_t *screen)
         g_tick = twin_set_timeout(status_tick, 1000, g_status);
 
     g_home = home_create();
-    if (g_home) {
-        g_home->destroy = home_destroyed;
-        ui_view_show(g_home);
+    if (!g_status || !g_nav || !g_home) {
+        /* No shell without its bars and home: let the caller fall back */
+        phone_shutdown();
+        return false;
     }
+    g_home->destroy = home_destroyed;
+    ui_view_show(g_home);
     phone_lock();
     return true;
 }

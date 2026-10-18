@@ -138,6 +138,17 @@ int ui_text_wrap(twin_pixmap_t *px,
             fit = n ? n : 1;
         memcpy(line, s, fit);
         line[fit] = 0;
+        /* A single word wider than the line: break inside it, at a
+         * character boundary, keeping at least one character */
+        while (ui_text_width(size, line) > width) {
+            size_t cut = fit - 1;
+            while (cut && ((uint8_t) s[cut] & 0xc0) == 0x80)
+                cut--;
+            if (!cut)
+                break;
+            fit = cut;
+            line[fit] = 0;
+        }
         twin_coord_t w = ui_text_width(size, line);
         if (w > wmax)
             wmax = w;
@@ -184,7 +195,7 @@ void ui_text_fit(twin_pixmap_t *px,
         ui_text_in(px, size, r, align, color, s);
         return;
     }
-    char buf[96];
+    char buf[96] = "...";
     size_t n = strlen(s);
     if (n > sizeof(buf) - 4)
         n = sizeof(buf) - 4;
@@ -635,7 +646,8 @@ void ui_dots(twin_pixmap_t *px,
              int current)
 {
     const phone_theme_t *th = phone_theme();
-    int total = count * 10 + 8;
+    int total =
+        count * 10 + 4; /* dots, the wider current one, no trailing gap */
     twin_coord_t x = cx - total / 2;
     for (int i = 0; i < count; i++) {
         if (i == current) {

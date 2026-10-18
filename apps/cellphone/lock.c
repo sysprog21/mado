@@ -130,6 +130,9 @@ static bool lock_event(ui_view_t *v, const ui_event_t *e)
     switch (e->kind) {
     case UI_PRESS:
         l->grabbed = ui_hit(t, e->x, e->y);
+        /* A new slide takes the knob from a running spring-back */
+        if (l->grabbed)
+            ui_view_stop_tweens(v);
         return true;
     case UI_MOVE:
     case UI_DRAG:
@@ -147,8 +150,8 @@ static bool lock_event(ui_view_t *v, const ui_event_t *e)
             return true;
         }
         l->from = l->knob;
-        if (l->from)
-            ui_view_tween(v, 180, TwinEaseOutCubic, spring_back);
+        if (l->from && !ui_view_tween(v, 180, TwinEaseOutCubic, spring_back))
+            set_knob(l, 0);
         return true;
     default:
         return false;

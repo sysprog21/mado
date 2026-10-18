@@ -2,7 +2,7 @@
 # Regenerate with: make check-update
 # config 2336132b
 lock 052098fa
-home 1a3dc03b
+home 5ede29ca
 calculator 749994d4
 dialer-empty 7e87b318
 dialer-number 13143cec
@@ -48,7 +48,7 @@ settings-sound 6b5df6cf
 settings-wallpaper 7a91c018
 settings-time 5b4ffa59
 settings-display-dark 85a1f340
-settings-home-dark e14d1f87
+settings-home-dark e8e63c74
 settings-sound-changed 54b18173
 settings-wallpaper-dusk d9c420f3
 settings-wm 9ed9fd7e

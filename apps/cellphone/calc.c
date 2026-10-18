@@ -50,6 +50,7 @@ typedef struct {
     bool new_input;      /* next digit starts a new number */
     int32_t frac_div;    /* 0: integer part; 10, 100, ...: after the dot */
     bool negative;
+    bool fresh; /* an operator was just pressed: no operand typed yet */
     bool error;
     int pressed; /* key index, -1 when none */
 } calc_t;
@@ -107,6 +108,44 @@ static bool scaled_mul(int64_t a, int64_t b, int64_t *res)
     return true;
 }
 
+/*
+ * (a * SCALE) / b, truncated toward zero, without forming the product:
+ * integer quotient first, then the six fractional digits by long division
+ * of the remainder.  Fails only when the result itself does not fit.
+ */
+static bool scaled_div(int64_t a, int64_t b, int64_t *res)
+{
+    if (!b)
+        return false;
+    bool neg = (a < 0) != (b < 0);
+    uint64_t ua = a < 0 ? -(uint64_t) a : (uint64_t) a;
+    uint64_t ub = b < 0 ? -(uint64_t) b : (uint64_t) b;
+    uint64_t q = ua / ub, r = ua % ub;
+    if (q > (uint64_t) INT64_MAX / SCALE)
+        return false;
+    q *= SCALE;
+    uint64_t frac = 0;
+    for (int64_t div = SCALE / 10; div; div /= 10) {
+        /* Next digit of r / ub: 10 r = d ub + r', with r, r' < ub, so the
+         * running sum stays below 2 ub and never wraps */
+        uint64_t t = 0;
+        int d = 0;
+        for (int k = 0; k < 10; k++) {
+            t += r;
+            if (t >= ub) {
+                t -= ub;
+                d++;
+            }
+        }
+        r = t;
+        frac += (uint64_t) d * (uint64_t) div;
+    }
+    if (q + frac > (uint64_t) INT64_MAX)
+        return false;
+    *res = neg ? -(int64_t) (q + frac) : (int64_t) (q + frac);
+    return true;
+}
+
 static bool execute(calc_t *c)
 {
     switch (c->pending) {
@@ -123,10 +162,8 @@ static bool execute(calc_t *c)
             goto fail;
         break;
     case '/':
-        if (!c->operand || c->accumulator > INT64_MAX / SCALE ||
-            c->accumulator < INT64_MIN / SCALE)
+        if (!scaled_div(c->accumulator, c->operand, &c->accumulator))
             goto fail;
-        c->accumulator = c->accumulator * SCALE / c->operand;
         break;
     default:
         c->accumulator = c->operand;
@@ -147,7 +184,7 @@ static void reset(calc_t *c)
     c->pending = 0;
     c->new_input = true;
     c->frac_div = 0;
-    c->negative = c->error = false;
+    c->negative = c->fresh = c->error = false;
     strcpy(c->display, "0");
 }
 
@@ -164,7 +201,11 @@ static void append_digit(calc_t *c, char digit)
         if (c->frac_div > SCALE)
             return;
         size_t len = strlen(c->display);
-        if (len >= BUF_LEN - 2 || (!c->frac_div && len >= 12))
+        /* A lone "0" or "-0" is replaced, not extended */
+        if (!c->frac_div && !c->operand && c->display[len - 1] == '0')
+            len--;
+        size_t digits = len - (c->display[0] == '-');
+        if (len >= BUF_LEN - 2 || (!c->frac_div && digits >= 12))
             return;
         c->display[len] = digit;
         c->display[len + 1] = 0;
@@ -204,6 +245,15 @@ static void press_key(calc_t *c, int i)
     if (c->error)
         return;
     if (!strcmp(t, "+/-")) {
+        if (c->new_input && (c->fresh || !c->operand)) {
+            /* Nothing typed yet: sign the number about to be entered */
+            c->new_input = c->fresh = false;
+            c->frac_div = 0;
+            c->operand = 0;
+            c->negative = true;
+            strcpy(c->display, "-0");
+            return;
+        }
         if (c->operand == INT64_MIN) {
             c->error = true;
             return;
@@ -215,6 +265,7 @@ static void press_key(calc_t *c, int i)
         c->operand /= 100;
         format_scaled(c, c->operand);
         c->new_input = true;
+        c->fresh = false;
         c->frac_div = 0;
     } else if (keys[i].kind == 'd') {
         if (t[0] == '.')
@@ -229,6 +280,7 @@ static void press_key(calc_t *c, int i)
             c->pending = 0;
             format_scaled(c, c->operand);
             c->new_input = true;
+            c->fresh = false;
             c->frac_div = 0;
         }
     } else {
@@ -242,7 +294,7 @@ static void press_key(calc_t *c, int i)
             c->accumulator = c->operand;
         }
         c->pending = op;
-        c->new_input = true;
+        c->new_input = c->fresh = true;
         c->frac_div = 0;
     }
 }

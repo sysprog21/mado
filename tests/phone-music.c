@@ -145,7 +145,6 @@ void test_music(void)
     phone_back();
     ph_wait(2000);
     CHECK_EQ(phone_depth(), 1, "back to the list");
-    int track = app_music_test_track();
     ph_shot("music-list-playing");
 
     /* Mini player toggles playback without leaving the list */
@@ -166,7 +165,7 @@ void test_music(void)
     ph_tap(120, y);
     CHECK_EQ(phone_depth(), 2, "row tap after scrolling opens now playing");
     CHECK_EQ(app_music_test_track(), last, "tapped the last song");
-    CHECK(track != last || app_music_test_playing(), "playing");
+    CHECK(app_music_test_playing(), "tapped song is playing");
 
     /* The player outlives the app: playback continues while closed */
     ph_home();

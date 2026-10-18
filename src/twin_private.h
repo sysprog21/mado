@@ -593,7 +593,7 @@ typedef int64_t twin_xfixed_t;
 
 #define twin_int_to_sfixed(i) ((twin_sfixed_t) ((i) * 16))
 
-#define twin_sfixed_to_fixed(s) (((twin_fixed_t) (s)) << 12)
+#define twin_sfixed_to_fixed(s) (((twin_fixed_t) (s)) * 4096)
 #define twin_fixed_to_sfixed(f) ((twin_sfixed_t) ((f) >> 12))
 
 

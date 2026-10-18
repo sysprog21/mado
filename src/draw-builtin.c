@@ -56,22 +56,6 @@ static inline twin_argb32_t in(twin_argb32_t src, twin_a8_t msk)
            _twin_mul_lanes((src >> 8) & TWIN_LANES, msk) << 8;
 }
 
-static inline twin_argb32_t over(twin_argb32_t dst, twin_argb32_t src)
-{
-    if (!src)
-        return dst;
-    uint32_t a = (uint8_t) ~(src >> 24);
-    if (!a)
-        return src;
-    uint32_t rb = dst & TWIN_LANES, ag = (dst >> 8) & TWIN_LANES;
-    if (a != 0xff) {
-        rb = _twin_mul_lanes(rb, a);
-        ag = _twin_mul_lanes(ag, a);
-    }
-    return _twin_sat_lanes(rb + (src & TWIN_LANES)) |
-           _twin_sat_lanes(ag + ((src >> 8) & TWIN_LANES)) << 8;
-}
-
 static inline twin_argb32_t in_over(twin_argb32_t dst,
                                     twin_argb32_t src,
                                     twin_a8_t msk)
@@ -80,7 +64,7 @@ static inline twin_argb32_t in_over(twin_argb32_t dst,
         return dst;
     if (msk != 0xff)
         src = in(src, msk);
-    return over(dst, src);
+    return _twin_over(dst, src);
 }
 
 static inline twin_argb32_t rgb16_to_argb32(twin_rgb16_t v)
@@ -193,7 +177,7 @@ MAKE_TWIN_in_op_dsts_srcs_msks(over) MAKE_TWIN_in_op_dsts_srcs_msks(source)
         while (width--) {                                                  \
             dst32 = CAT3(dst_, __dst, _get);                               \
             src32 = CAT2(src_, __src);                                     \
-            dst32 = over(dst32, src32);                                    \
+            dst32 = _twin_over(dst32, src32);                              \
             CAT3(dst_, __dst, _set)(dst32);                                \
         }                                                                  \
     }

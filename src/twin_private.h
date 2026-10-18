@@ -754,6 +754,23 @@ static inline uint32_t _twin_sat_lanes(uint32_t x)
     return (x | (carry * 0xff)) & TWIN_LANES;
 }
 
+/* Porter-Duff over on premultiplied pixels: src + dst * (1 - src alpha) */
+static inline twin_argb32_t _twin_over(twin_argb32_t dst, twin_argb32_t src)
+{
+    if (!src)
+        return dst;
+    uint32_t a = (uint8_t) ~(src >> 24);
+    if (!a)
+        return src;
+    uint32_t rb = dst & TWIN_LANES, ag = (dst >> 8) & TWIN_LANES;
+    if (a != 0xff) {
+        rb = _twin_mul_lanes(rb, a);
+        ag = _twin_mul_lanes(ag, a);
+    }
+    return _twin_sat_lanes(rb + (src & TWIN_LANES)) |
+           _twin_sat_lanes(ag + ((src >> 8) & TWIN_LANES)) << 8;
+}
+
 #define twin_in(s, i, m, t) \
     ((twin_argb32_t) twin_int_mult(twin_get_8(s, i), (m), (t)) << (i))
 

@@ -11,25 +11,6 @@
 #include "twin_private.h"
 
 /*
- * Porter-Duff "over" operator for ARGB32 pixels
- * dst = src + dst * (1 - alpha_src)
- */
-static inline twin_argb32_t over(twin_argb32_t dst, twin_argb32_t src)
-{
-    uint32_t a = 0xff - (src >> 24);
-
-    if (a == 0)
-        return src;
-    if (!src)
-        return dst;
-    return _twin_sat_lanes(_twin_mul_lanes(dst & TWIN_LANES, a) +
-                           (src & TWIN_LANES)) |
-           _twin_sat_lanes(_twin_mul_lanes((dst >> 8) & TWIN_LANES, a) +
-                           ((src >> 8) & TWIN_LANES))
-               << 8;
-}
-
-/*
  * The built-in renderer generates these three span operations along with the
  * rest of its compositing table; other renderers (Pixman) get them here.
  */
@@ -60,7 +41,7 @@ void _twin_argb32_over_argb32(twin_pointer_t dst, twin_source_u src, int width)
     while (width--) {
         dst32 = *dst.argb32;
         src32 = *src.p.argb32++;
-        dst32 = over(dst32, src32);
+        dst32 = _twin_over(dst32, src32);
         *dst.argb32++ = dst32;
     }
 }
@@ -94,7 +75,7 @@ void _twin_screen_blend_argb32(twin_argb32_t *dst,
                                int width)
 {
     while (width--) {
-        *dst = over(*dst, in_alpha(*src++, alpha));
+        *dst = _twin_over(*dst, in_alpha(*src++, alpha));
         dst++;
     }
 }
@@ -107,7 +88,7 @@ void _twin_screen_blend_rgb16(twin_argb32_t *dst,
     while (width--) {
         twin_rgb16_t v = *src++;
         twin_argb32_t s = twin_rgb16_to_argb32(v);
-        *dst = over(*dst, in_alpha(s, alpha));
+        *dst = _twin_over(*dst, in_alpha(s, alpha));
         dst++;
     }
 }

@@ -27,13 +27,10 @@ static void _apps_animation_paint(twin_custom_widget_t *custom)
         (apps_animation_data_t *) twin_custom_widget_data(custom);
     twin_pixmap_t *current_frame = NULL;
 
+    /* Paint the current frame; only the timer advances it, so repainting
+     * (exposure, a restore after eviction) does not skip frames */
     twin_animation_t *a = twin_pixmap_animation(anim->pix);
-    if (a) {
-        current_frame = twin_animation_get_current_frame(a);
-        twin_animation_advance_frame(a);
-    } else {
-        current_frame = anim->pix;
-    }
+    current_frame = a ? twin_animation_get_current_frame(a) : anim->pix;
 
     /* A policy may give the window more room than the image (a phone's
      * work area, the whole screen without a window manager): center it */
@@ -60,8 +57,10 @@ static twin_time_t _apps_animation_timeout(twin_time_t now, void *closure)
     twin_custom_widget_t *custom = closure;
     apps_animation_data_t *anim =
         (apps_animation_data_t *) twin_custom_widget_data(custom);
+    twin_animation_t *a = twin_pixmap_animation(anim->pix);
+    twin_animation_advance_frame(a);
     twin_custom_widget_queue_paint(custom);
-    return twin_animation_get_current_delay(twin_pixmap_animation(anim->pix));
+    return twin_animation_get_current_delay(a);
 }
 
 static twin_dispatch_result_t _apps_animation_dispatch(twin_widget_t *widget,

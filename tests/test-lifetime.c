@@ -323,6 +323,70 @@ static void test_cache_collision(void)
     twin_cache_flush();
 }
 
+/*
+ * Destroying a screen in the middle of whatever its window manager is doing
+ * (a push transition on a phone, a drag on a desktop) returns every byte,
+ * and destroy callbacks that act on a sibling during the teardown (show,
+ * hide, reconfigure, activate) reach nothing that is gone.
+ */
+static twin_window_t *teardown_sibling;
+static int teardown_pokes;
+
+static void poke_sibling(twin_window_t *w)
+{
+    teardown_pokes++;
+    twin_window_t *s = teardown_sibling;
+    if (!s || s == w)
+        return;
+    twin_window_show(s);
+    twin_window_hide(s);
+    twin_window_configure(s, TwinWindowApplication, 0, 0, 50, 50);
+    twin_window_activate(s);
+    twin_window_show(s);
+}
+
+static void forget_sibling(twin_window_t *w)
+{
+    if (teardown_sibling == w)
+        teardown_sibling = NULL;
+}
+
+static void test_screen_teardown(void)
+{
+    twin_cache_flush();
+    size_t before = th_heap_raw();
+    th_t *t = th_create(W, H);
+    probe_t pa = {0}, pb = {0}, pc = {0};
+    twin_window_t *a = probe_window(t, &pa, TwinWindowApplication, 0, 0);
+    twin_window_show(a);
+    th_settle(t, 500);
+    twin_window_t *b = probe_window(t, &pb, TwinWindowApplication, 20, 20);
+    twin_window_show(b);
+    twin_window_t *c = probe_window(t, &pc, TwinWindowPlain, 5, 5);
+    twin_window_show(c);
+    /* Mid push on a phone; press and move on b's top edge (its title bar on
+     * a desktop) to be mid drag there */
+    th_advance(t, 48);
+    th_press(t, b->pixmap->x + 30, b->pixmap->y + 4);
+    th_move(t, b->pixmap->x + 50, b->pixmap->y + 14);
+
+    a->destroy = poke_sibling;
+    b->destroy = poke_sibling;
+    c->destroy = forget_sibling;
+    teardown_sibling = c;
+    teardown_pokes = 0;
+    th_destroy(t);
+    twin_cache_flush();
+    CHECK_EQ(teardown_pokes, 2, "destroy callbacks ran once each");
+    CHECK(!teardown_sibling, "the sibling went too");
+#if defined(CONFIG_MEMORY_STATS)
+    CHECK(th_heap_raw() <= before, "teardown returns every byte (%zu > %zu)",
+          th_heap_raw(), before);
+#else
+    (void) before;
+#endif
+}
+
 int main(void)
 {
     test_window_destroy_schedules();
@@ -336,6 +400,7 @@ int main(void)
     test_relayout_from_destroy();
 #endif
     test_tween_finish_from_proc();
+    test_screen_teardown();
     test_cache_collision();
     twin_cache_flush();
     return th_report("lifetime");

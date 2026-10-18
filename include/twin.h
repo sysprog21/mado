@@ -1034,6 +1034,7 @@ void twin_window_configure(twin_window_t *window,
                            twin_coord_t width,
                            twin_coord_t height);
 
+/** Title shown in the title bar; only the desktop manager keeps it */
 void twin_window_set_name(twin_window_t *window, const char *name);
 
 /** The pixmap a window draws into; it includes any decorations */
@@ -1150,7 +1151,8 @@ void twin_window_scroll(twin_window_t *window,
  * @bottom : Plain window pinned below the work area, or NULL
  *
  * The mobile manager shows the bars and shrinks the work area between
- * them by the height of each mapped bar; other managers hide them.  The
+ * them by the height of each mapped bar; the others have no system bars
+ * and just hide the windows.  The
  * screen does not own the bars: a bar that is replaced is unmapped, and a
  * destroyed bar unregisters itself.  Resizing a bar with
  * twin_window_configure() re-lays out the applications.
@@ -1166,6 +1168,7 @@ void twin_screen_set_bars(twin_screen_t *screen,
  * @bottom : Rows to reserve above the bottom bar (0 releases them)
  *
  * Application windows are re-laid out (they receive TwinEventConfigure).
+ * Only the mobile manager has a work area to shrink; the others ignore it.
  */
 void twin_screen_set_inset(twin_screen_t *screen, twin_coord_t bottom);
 

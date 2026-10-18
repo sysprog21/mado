@@ -44,7 +44,9 @@ twin_screen_t *twin_screen_create(twin_coord_t width,
                                   twin_put_span_t put_span,
                                   void *closure)
 {
-    twin_screen_t *screen = twin_calloc(1, sizeof(twin_screen_t));
+    /* The window manager's state lives right after the screen */
+    twin_screen_t *screen =
+        twin_calloc(1, sizeof(twin_screen_t) + _twin_wm_state_size);
     if (!screen)
         return NULL;
 
@@ -61,13 +63,7 @@ twin_screen_t *twin_screen_create(twin_coord_t width,
     screen->scratch_buf = twin_malloc(TWIN_SCRATCH_SIZE);
     screen->scratch_size = screen->scratch_buf ? TWIN_SCRATCH_SIZE : 0;
 
-    /* The window manager the library was built with, for good */
-    screen->wm = &_twin_wm_built;
-    if (screen->wm->enter && !screen->wm->enter(screen)) {
-        twin_free(screen->scratch_buf);
-        twin_free(screen);
-        return NULL;
-    }
+    _twin_wm_init(screen);
     /* Nothing has been shown yet: the first update paints everything */
     twin_screen_damage(screen, 0, 0, width, height);
     return screen;
@@ -75,11 +71,10 @@ twin_screen_t *twin_screen_create(twin_coord_t width,
 
 void twin_screen_destroy(twin_screen_t *screen)
 {
-    /* Let the policy finish animations and drop pixmaps it owns, then tear
-     * the windows down under 'none', which keeps no state */
-    if (screen->wm->leave)
-        screen->wm->leave(screen);
-    screen->wm = &_twin_wm_none;
+    /* Let the policy finish animations and drop pixmaps it owns; the
+     * windows then go without it */
+    screen->closing = true;
+    _twin_wm_fini(screen);
 
     while (screen->windows)
         twin_window_destroy(screen->windows);
@@ -285,6 +280,7 @@ static int _span_set_subtract(const twin_span_set_t *set,
     return n;
 }
 
+#if defined(CONFIG_DROP_SHADOW)
 /*
  * Shadow profile: smoothstep ramp across 2 * blur + 1 pixels, in 1/256
  * units.  One entry is cached; radii rarely change between rows.
@@ -336,9 +332,12 @@ static inline twin_rect_t _shadow_rect(const twin_pixmap_t *p)
     return r;
 }
 
+#endif /* CONFIG_DROP_SHADOW */
+
 twin_rect_t _twin_pixmap_extents(const twin_pixmap_t *p)
 {
     twin_rect_t r = {p->x, p->x + p->width, p->y, p->y + p->scan_height};
+#if defined(CONFIG_DROP_SHADOW)
     if (p->shadow.blur) {
         int b = min((int) p->shadow.blur, TWIN_SHADOW_MAX_BLUR);
         twin_rect_t s = _shadow_rect(p);
@@ -348,9 +347,11 @@ twin_rect_t _twin_pixmap_extents(const twin_pixmap_t *p)
         s.bottom += b;
         r = _rect_union(&r, &s);
     }
+#endif
     return r;
 }
 
+#if defined(CONFIG_DROP_SHADOW)
 /* Premultiplied black at coverage @a (0..255) over dst: color scales,
  * coverage adds.  Two channels per multiply, rounding as twin_int_mult. */
 static inline twin_argb32_t _shadow_over(twin_argb32_t v, uint32_t a)
@@ -403,6 +404,17 @@ static void _shadow_span(twin_argb32_t *span,
         d++;
     }
 }
+#else
+static inline void _shadow_span(twin_argb32_t *span,
+                                twin_coord_t span_left,
+                                const twin_pixmap_t *p,
+                                twin_coord_t y,
+                                twin_coord_t l,
+                                twin_coord_t r)
+{
+    (void) span, (void) span_left, (void) p, (void) y, (void) l, (void) r;
+}
+#endif
 
 /*
  * One layer as seen by a single scanline.  Shadows appear as their own
@@ -548,7 +560,7 @@ static void _composite_row(twin_screen_t *screen,
                 l = p->x;
                 r = p->x + p->width;
             } else {
-                if (!p->shadow.blur || !p->shadow.alpha)
+                if (!_twin_pixmap_shadowed(p))
                     break;
                 twin_rect_t e = _twin_pixmap_extents(p);
                 if (y < e.top || y >= e.bottom)
@@ -605,7 +617,7 @@ static void _composite_row(twin_screen_t *screen,
         for (twin_pixmap_t *p = screen->bottom; p; p = p->up) {
             if (_layer_hidden(p))
                 continue;
-            if (p->shadow.blur && p->shadow.alpha) {
+            if (_twin_pixmap_shadowed(p)) {
                 twin_rect_t e = _twin_pixmap_extents(p);
                 if (y >= e.top && y < e.bottom)
                     _shadow_span(span, left, p, y, max(e.left, left),
@@ -904,7 +916,7 @@ static bool _twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
                                   event->u.pointer.screen_y);
 #endif
         /* Window manager gestures see pointer events first */
-        if (screen->wm->filter && screen->wm->filter(screen, event))
+        if (_twin_wm_filter(screen, event))
             return true;
         return _twin_screen_route(screen, event);
     case TwinEventKeyDown:

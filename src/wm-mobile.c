@@ -77,16 +77,18 @@ typedef struct {
     bool swallow; /* a press was dropped: drop until its release */
 } twin_mobile_t;
 
-#define MOBILE(screen) ((twin_mobile_t *) (screen)->wm_data)
+#define MOBILE(screen) ((twin_mobile_t *) _twin_wm_state(screen))
+
+const size_t _twin_wm_state_size = sizeof(twin_mobile_t);
 
 static bool _animate(void)
 {
     return !(_twin_debug & TWIN_DEBUG_NO_ANIMATION);
 }
 
-static void mobile_layout(twin_window_t *window,
-                          twin_rect_t *geom,
-                          twin_rect_t *border)
+void _twin_wm_layout(twin_window_t *window,
+                     twin_rect_t *geom,
+                     twin_rect_t *border)
 {
     twin_screen_t *screen = window->screen;
     twin_coord_t h = window->request.bottom - window->request.top;
@@ -145,7 +147,7 @@ static bool _fullscreen_mapped(twin_screen_t *screen)
 static void _home_position(twin_window_t *window)
 {
     twin_rect_t geom, border;
-    mobile_layout(window, &geom, &border);
+    _twin_wm_layout(window, &geom, &border);
     twin_pixmap_move(window->pixmap, geom.left, geom.top);
 }
 
@@ -335,7 +337,7 @@ static void _shadow_on(twin_pixmap_t *p)
 #endif
 }
 
-static void mobile_map(twin_window_t *window)
+void _twin_wm_map(twin_window_t *window)
 {
     twin_screen_t *screen = window->screen;
     twin_mobile_t *m = MOBILE(screen);
@@ -376,7 +378,7 @@ static void mobile_map(twin_window_t *window)
     _start(screen, MOBILE_PUSH, 0, PUSH_MS);
 }
 
-static void mobile_unmap(twin_window_t *window, bool destroying)
+void _twin_wm_unmap(twin_window_t *window, bool destroying)
 {
     twin_screen_t *screen = window->screen;
     twin_mobile_t *m = MOBILE(screen);
@@ -480,7 +482,7 @@ static twin_time_t _edge_hold_done(twin_time_t now, void *closure)
 }
 
 /* Edge swipe: drag from the left edge to go back */
-static bool mobile_filter(twin_screen_t *screen, twin_event_t *event)
+bool _twin_wm_filter(twin_screen_t *screen, twin_event_t *event)
 {
     twin_mobile_t *m = MOBILE(screen);
     twin_coord_t x = event->u.pointer.screen_x;
@@ -520,7 +522,7 @@ static bool mobile_filter(twin_screen_t *screen, twin_event_t *event)
             if (dx > EDGE_SLOP && dx > abs(dy)) {
                 _edge_end(screen, false);
                 if (_swipe_begin(screen, m->edge.u.pointer.screen_x))
-                    return mobile_filter(screen, event);
+                    return _twin_wm_filter(screen, event);
                 _edge_end(screen, true);
                 return false;
             }
@@ -553,7 +555,7 @@ static bool mobile_filter(twin_screen_t *screen, twin_event_t *event)
 }
 
 /* Escape the application leaves alone goes back, like the edge swipe */
-static bool mobile_dispatch(twin_window_t *window, twin_event_t *event)
+bool _twin_wm_dispatch(twin_window_t *window, twin_event_t *event)
 {
     if (_twin_window_deliver(window, event) || window->dead)
         return true;
@@ -565,24 +567,19 @@ static bool mobile_dispatch(twin_window_t *window, twin_event_t *event)
     return false;
 }
 
-static bool mobile_enter(twin_screen_t *screen)
+void _twin_wm_init(twin_screen_t *screen)
 {
-    twin_mobile_t *m = twin_calloc(1, sizeof(*m));
-    if (!m)
-        return false;
-    screen->wm_data = m;
     screen->background_color = 0xff000000;
-    return true;
 }
 
 /* A mapped window changed style or opacity: rebuild the arrangement */
-static void mobile_refresh(twin_screen_t *screen)
+void _twin_wm_refresh(twin_screen_t *screen)
 {
     _finish(screen);
     mobile_settle(screen);
 }
 
-static void mobile_leave(twin_screen_t *screen)
+void _twin_wm_fini(twin_screen_t *screen)
 {
     twin_mobile_t *m = MOBILE(screen);
     if (m->edge_timer)
@@ -591,8 +588,8 @@ static void mobile_leave(twin_screen_t *screen)
         twin_tween_cancel(m->tween);
     if (m->orphan)
         twin_pixmap_destroy(m->orphan);
-    twin_free(m);
-    screen->wm_data = NULL;
+    /* The windows go next, without the policy */
+    *m = (twin_mobile_t) {0};
 }
 
 static twin_coord_t _bar_height(const twin_window_t *bar)
@@ -605,20 +602,8 @@ static twin_coord_t _bar_height(const twin_window_t *bar)
 
 /* Mapped system bars take their requested heights off the top and bottom
  * (twin_screen_work_area() keeps the result from inverting) */
-static void mobile_work_area(const twin_screen_t *screen, twin_rect_t *area)
+void _twin_wm_work_area(const twin_screen_t *screen, twin_rect_t *area)
 {
     area->top = _bar_height(screen->bar_top);
     area->bottom -= _bar_height(screen->bar_bottom);
 }
-
-const twin_wm_ops_t _twin_wm_mobile = {
-    .enter = mobile_enter,
-    .leave = mobile_leave,
-    .layout = mobile_layout,
-    .map = mobile_map,
-    .unmap = mobile_unmap,
-    .dispatch = mobile_dispatch,
-    .filter = mobile_filter,
-    .refresh = mobile_refresh,
-    .work_area = mobile_work_area,
-};

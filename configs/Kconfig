@@ -235,27 +235,27 @@ choice
       runs it for its whole life: there is no switching at run time.
 
 config WM_DESKTOP
-    bool "Desktop window manager"
+    bool "Desktop (classic)"
     help
-      Overlapping windows with title bars, click-to-raise, drag-to-move,
+      Classic desktop: overlapping windows with title bars, click-to-raise, drag-to-move,
       double-click maximize, edge snapping, corner resizing,
       iconify/restore, close, and a drop shadow under the active window.
 
-      Costs ~3-4 KB .text on ARM Cortex-M class targets.
+      Costs ~8 KB .text on RV32IM (title bars add src/icon.c).
 
 config WM_MOBILE
-    bool "Mobile window manager"
+    bool "Mobile (embedded)"
     help
-      Phone-style shell: application windows stack over the work area
+      Embedded, phone-style shell: application windows stack over the work area
       between optional system bars (status bar, navigation bar), only the
       top application is visible, and push/pop/dismiss transitions plus
       an edge-swipe back gesture animate retained pixels without
       repainting applications.  Escape also goes back.
 
 config WM_NONE
-    bool "None"
+    bool "None (minimal)"
     help
-      No window manager: no decorations, every application window covers
+      Minimal, no window manager: no decorations, every application window covers
       the screen, and the keyboard goes to the newest or the last pressed
       window.  The demo launcher starts only the first demo.
 
@@ -272,14 +272,14 @@ config WM_MOBILE_EVICT
 
 config DROP_SHADOW
     bool "Window drop shadows"
-    default y
-    depends on !WM_NONE
+    default y if !WM_NONE
     help
       Cast a soft shadow under the active desktop window and under the
       sliding window of mobile transitions.  The compositor synthesizes
       it while scanning out, so it needs no extra pixmap memory and no
       blur pass, but every shadowed span costs blending on scan-out;
-      small targets can turn it off and keep plain slides.
+      small targets can turn it off and keep plain slides.  Without it the
+      compositor carries no shadow code at all.
 
 config HORIZONTAL_OFFSET
     int "Horizontal offset"

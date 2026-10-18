@@ -286,7 +286,9 @@ static void test_restore_handoff(void)
     CHECK(t->screen->active == p, "focus follows the restored surface");
     CHECK(t->screen->target == p, "pointer target follows");
     CHECK_EQ(p->opacity, 0x80, "opacity carried");
+#if defined(CONFIG_DROP_SHADOW)
     CHECK_EQ(p->shadow.blur, 6, "shadow carried");
+#endif
     CHECK_EQ(p->scan_height, 50, "shown rows carried");
     CHECK_EQ(p->disable, 1, "update disable carried");
     twin_pixmap_enable_update(p);

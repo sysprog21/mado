@@ -70,7 +70,8 @@ libtwin.a_files-y = \
 	src/closure.c \
 	src/api.c
 
-# Window manager policies ('none' is part of wm.c)
+# Window manager policy: exactly one is built
+libtwin.a_files-$(CONFIG_WM_NONE) += src/wm-none.c
 libtwin.a_files-$(CONFIG_WM_DESKTOP) += src/wm-desktop.c src/icon.c
 libtwin.a_files-$(CONFIG_WM_MOBILE) += src/wm-mobile.c
 

@@ -263,6 +263,10 @@ void twin_pixmap_set_shadow(twin_pixmap_t *pixmap,
                             twin_coord_t blur,
                             twin_a8_t alpha)
 {
+#if !defined(CONFIG_DROP_SHADOW)
+    /* Built without shadow support */
+    (void) pixmap, (void) dx, (void) dy, (void) blur, (void) alpha;
+#else
     twin_shadow_t s = {0};
     if (blur > 0 && alpha) {
         s.dx = (int8_t) (dx > 127 ? 127 : dx < -127 ? -127 : dx);
@@ -275,6 +279,7 @@ void twin_pixmap_set_shadow(twin_pixmap_t *pixmap,
     _twin_pixmap_damage_extents(pixmap);
     pixmap->shadow = s;
     _twin_pixmap_damage_extents(pixmap);
+#endif
 }
 
 twin_pointer_t twin_pixmap_pointer(twin_pixmap_t *pixmap,

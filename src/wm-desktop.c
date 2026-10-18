@@ -54,11 +54,13 @@ typedef struct {
     twin_time_t click_time;
 } twin_desktop_t;
 
-#define DESKTOP(screen) ((twin_desktop_t *) (screen)->wm_data)
+#define DESKTOP(screen) ((twin_desktop_t *) _twin_wm_state(screen))
 
-static void desktop_layout(twin_window_t *window,
-                           twin_rect_t *geom,
-                           twin_rect_t *border)
+const size_t _twin_wm_state_size = sizeof(twin_desktop_t);
+
+void _twin_wm_layout(twin_window_t *window,
+                     twin_rect_t *geom,
+                     twin_rect_t *border)
 {
     twin_screen_t *screen = window->screen;
     const twin_rect_t *r = &window->request;
@@ -148,7 +150,7 @@ static void _draw_icon(twin_pixmap_t *pixmap,
     twin_icon_draw(pixmap, icon, m);
 }
 
-static void desktop_decorate(twin_window_t *window)
+void _twin_wm_decorate(twin_window_t *window)
 {
     twin_pixmap_t *pixmap = window->pixmap;
     twin_title_t t;
@@ -303,7 +305,7 @@ static void _place_new(twin_window_t *w)
     _clamp_to_screen(w);
 }
 
-static void desktop_map(twin_window_t *window)
+void _twin_wm_map(twin_window_t *window)
 {
     twin_screen_t *screen = window->screen;
 
@@ -322,13 +324,13 @@ static void desktop_map(twin_window_t *window)
 }
 
 /* twin_window_activate(): an explicit request also restores */
-static void desktop_activate(twin_window_t *window)
+void _twin_wm_activate(twin_window_t *window)
 {
     _twin_pixmap_set_scan_height(window->pixmap, window->pixmap->height);
-    desktop_map(window);
+    _twin_wm_map(window);
 }
 
-static void desktop_unmap(twin_window_t *window, bool destroying)
+void _twin_wm_unmap(twin_window_t *window, bool destroying)
 {
     twin_screen_t *screen = window->screen;
     twin_desktop_t *d = DESKTOP(screen);
@@ -368,7 +370,7 @@ static bool _frame_transparent(twin_pixmap_t *p, twin_coord_t x, twin_coord_t y)
     }
 }
 
-static bool desktop_hit(twin_window_t *window, twin_coord_t x, twin_coord_t y)
+bool _twin_wm_hit(twin_window_t *window, twin_coord_t x, twin_coord_t y)
 {
     twin_pixmap_t *p = window->pixmap;
     if (x < p->x || x >= p->x + p->width || y < p->y || y >= p->y + p->height)
@@ -485,7 +487,7 @@ static bool _title_press(twin_window_t *window, twin_event_t *event)
             _toggle_maximize(window);
             /* Configure handlers may have destroyed it */
             if (!window->dead)
-                desktop_map(window);
+                _twin_wm_map(window);
             return true;
         }
         d->click = window;
@@ -517,7 +519,7 @@ static bool _resize_work(void *closure)
     return false;
 }
 
-static bool desktop_dispatch(twin_window_t *window, twin_event_t *event)
+bool _twin_wm_dispatch(twin_window_t *window, twin_event_t *event)
 {
     twin_screen_t *screen = window->screen;
     twin_desktop_t *d = DESKTOP(screen);
@@ -544,7 +546,7 @@ static bool desktop_dispatch(twin_window_t *window, twin_event_t *event)
         } else {
             d->click = NULL;
         }
-        desktop_map(window); /* raise and activate */
+        _twin_wm_map(window); /* raise and activate */
         if (window->dead)
             return true;
         if (in_client && !_iconified(window)) {
@@ -636,7 +638,7 @@ static void _clamp_to_screen(twin_window_t *w)
 {
     twin_screen_t *screen = w->screen;
     twin_rect_t geom, border;
-    desktop_layout(w, &geom, &border);
+    _twin_wm_layout(w, &geom, &border);
     twin_coord_t dx = 0, dy = 0;
     if (geom.right > screen->width)
         dx = max((twin_coord_t) (screen->width - geom.right),
@@ -652,18 +654,14 @@ static void _clamp_to_screen(twin_window_t *w)
     _offset(&w->request, dx, dy);
 }
 
-static bool desktop_enter(twin_screen_t *screen)
+void _twin_wm_init(twin_screen_t *screen)
 {
-    twin_desktop_t *d = twin_calloc(1, sizeof(*d));
-    if (!d)
-        return false;
-    screen->wm_data = d;
-    return true;
+    (void) screen; /* the zeroed state is the start state */
 }
 
 /* The screen or the work area changed size: refit maximized windows and
  * bring everything else back on screen */
-static void desktop_refresh(twin_screen_t *screen)
+void _twin_wm_refresh(twin_screen_t *screen)
 {
     twin_rect_t area = twin_screen_work_area(screen);
     for (twin_window_t *w = screen->windows; w; w = w->wm_next) {
@@ -688,24 +686,11 @@ static void desktop_refresh(twin_screen_t *screen)
     }
 }
 
-static void desktop_leave(twin_screen_t *screen)
+void _twin_wm_fini(twin_screen_t *screen)
 {
     twin_desktop_t *d = DESKTOP(screen);
     if (d->resize_work)
         twin_clear_work(d->resize_work);
-    twin_free(screen->wm_data);
-    screen->wm_data = NULL;
+    d->resize_work = NULL;
+    d->drag = d->resize = d->click = NULL;
 }
-
-const twin_wm_ops_t _twin_wm_desktop = {
-    .enter = desktop_enter,
-    .leave = desktop_leave,
-    .layout = desktop_layout,
-    .map = desktop_map,
-    .unmap = desktop_unmap,
-    .decorate = desktop_decorate,
-    .dispatch = desktop_dispatch,
-    .hit = desktop_hit,
-    .refresh = desktop_refresh,
-    .activate = desktop_activate,
-};

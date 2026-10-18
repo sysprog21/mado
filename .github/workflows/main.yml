@@ -115,6 +115,8 @@ jobs:
             options: WM_MOBILE=y CACHE_SIZE=0
           - name: no mobile eviction
             options: WM_MOBILE=y WM_MOBILE_EVICT=n
+          - name: no shadows
+            options: DROP_SHADOW=n
           - name: no allocator stats
             options: MEMORY_STATS=n
           - name: no widget toolkit

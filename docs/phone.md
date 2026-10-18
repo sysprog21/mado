@@ -16,15 +16,19 @@ when the library is built:
 
 | Policy | Behavior | Kconfig |
 |--------|----------|---------|
-| none | No decorations; application windows cover the screen; the newest window, or the one last pressed, has the keyboard, and hiding it hands the keyboard to the window below. | `WM_NONE` |
-| desktop | Overlapping decorated windows, click-to-raise, drag-to-move (the title bar always stays reachable), double-click the title to maximize, drop on a screen edge to snap, drag the bottom-right client corner to resize, iconify, close, shadow under the active window. New windows cascade off occupied spots. | `WM_DESKTOP` |
-| mobile | Application windows stack over the work area between optional system bars; only the top one is visible; animated push/pop/dismiss, an edge-swipe back gesture and Escape for back. | `WM_MOBILE` |
+| none (minimal) | No decorations; application windows cover the screen; the newest window, or the one last pressed, has the keyboard, and hiding it hands the keyboard to the window below. | `WM_NONE` |
+| desktop (classic) | Overlapping decorated windows, click-to-raise, drag-to-move (the title bar always stays reachable), double-click the title to maximize, drop on a screen edge to snap, drag the bottom-right client corner to resize, iconify, close, shadow under the active window. New windows cascade off occupied spots. | `WM_DESKTOP` |
+| mobile (embedded) | Application windows stack over the work area between optional system bars; only the top one is visible; animated push/pop/dismiss, an edge-swipe back gesture and Escape for back. | `WM_MOBILE` |
 
 The Kconfig "Window manager" choice builds exactly one of them, and every
 screen runs it for its whole life: there is no switching and no run-time
 check of which policy is active.  Keeping one policy per build keeps the
 others' code and state out of targets that never use them, and a product
-ships as a phone, a desktop or a kiosk, not as all three.
+ships as a phone, a desktop or a kiosk, not as all three.  Code and
+fields only one policy needs are compiled out of the others: system bars
+and the keyboard inset exist only in mobile builds, title bars and the
+window title only in desktop builds, and drop shadows only with
+`DROP_SHADOW`.
 
 ```c
 twin_screen_set_bars(screen, status, nav);  /* mobile system bars */
@@ -51,13 +55,17 @@ windows, and a `WM_NONE` build shows the first one full screen.
 `screen->windows` lists every window bottom to top and is the stacking
 order for all policies.
 
-The policy interface (`twin_wm_ops_t` in `src/twin_private.h`) has twelve
-hooks: enter/leave, layout, map/unmap, decorate, dispatch, hit test, a
-pointer filter for gestures, refresh (re-place the stack after a style,
-opacity, system-bar, inset or screen-size change), activate (an explicit
-`twin_window_activate()`) and work area (what application windows may
-cover; a policy without it shows no system bars).  The work area counts
-only mapped bars, minus the inset set with `twin_screen_set_inset()`.
+The policy interface (`src/twin_private.h`) is a set of `_twin_wm_*`
+functions that the built policy defines and generic code calls directly,
+with no function-pointer table: init/fini, layout, map/unmap, dispatch,
+refresh (re-place the stack after a style, opacity, system-bar, inset or
+screen-size change), and, for the policies that need them, decorate, hit
+test and activate (desktop) or a pointer filter for gestures and the work
+area (mobile).  A hook a policy has no use for is an inline no-op, so the
+call compiles away; outside the desktop, activation is the policy's map.
+Policy state is allocated with the screen, so starting a policy cannot
+fail.  The work area counts only mapped bars, minus the inset set with
+`twin_screen_set_inset()`.
 `twin_screen_resize()` (a rotated panel, a resized host window) re-lays out
 every window: phone apps and bars refit, desktop windows come back on
 screen and maximized ones refit.
@@ -78,9 +86,11 @@ Pointer grabs are explicit: the release goes to the window that took the
 press, even when the pointer ends up over another one, and hover updates
 re-check their targets after each Leave/Enter handler, so a window may
 destroy itself from any of its own handlers.  Generic code never asks
-which policy is running.  `src/wm.c` holds the screen-wide services and
-the `none` policy, which a screen also falls back to while it is torn
-down; `src/wm-desktop.c` and `src/wm-mobile.c` are the other two.
+which policy is running.  `src/wm.c` holds the screen-wide services;
+`src/wm-none.c`, `src/wm-desktop.c` and `src/wm-mobile.c` are the
+policies.  A screen being destroyed first lets its policy go (`fini`) and
+then tears the windows down without it, so the policy never sees half a
+teardown.
 
 Policy state stays out of the compositor.  Iconifying, for instance, is the
 desktop policy limiting how many rows of the window's pixmap are shown

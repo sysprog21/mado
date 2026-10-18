@@ -94,6 +94,13 @@ typedef struct _twin_shadow {
     twin_a8_t alpha; /**< Peak shadow opacity */
 } twin_shadow_t;
 
+/* The pixmap casts a shadow (only with CONFIG_DROP_SHADOW) */
+#if defined(CONFIG_DROP_SHADOW)
+#define _twin_pixmap_shadowed(p) ((p)->shadow.blur && (p)->shadow.alpha)
+#else
+#define _twin_pixmap_shadowed(p) ((void) (p), false)
+#endif
+
 /**
  * Pixmap structure representing a rectangular array of pixels
  *
@@ -124,9 +131,11 @@ struct _twin_pixmap {
     twin_pointer_t p;            /**< Pixel data pointer (NULL if evicted) */
 
     /* Compositing attributes, applied by the screen compositor */
-    twin_a8_t opacity;        /**< Constant alpha applied on scan-out */
-    twin_rect_t opaque_rect;  /**< Region (pixmap coords) known to be opaque */
-    twin_shadow_t shadow;     /**< Procedural drop shadow */
+    twin_a8_t opacity;       /**< Constant alpha applied on scan-out */
+    twin_rect_t opaque_rect; /**< Region (pixmap coords) known to be opaque */
+#if defined(CONFIG_DROP_SHADOW)
+    twin_shadow_t shadow; /**< Procedural drop shadow */
+#endif
     twin_coord_t scan_height; /**< Rows shown from the top on scan-out and
                                    hit by the pointer (normally height) */
 
@@ -212,14 +221,15 @@ struct _twin_screen {
     void *closure;              /**< Backend user data */
 
     /* Window manager policy */
-    const struct _twin_wm_ops *wm; /**< Active policy */
-    void *wm_data;                 /**< Policy private state */
-    twin_window_t *windows;        /**< Every window, bottom to top */
-    twin_window_t *bar_top;        /**< System bar above the work area */
-    twin_window_t *bar_bottom;     /**< System bar below the work area */
-    int dispatching;               /**< Busy depth: dispatch, relayout */
-    twin_coord_t inset_bottom;     /**< Reserved above the bottom bar (IME) */
-    twin_window_t *zombies;        /**< Destroyed while busy, freed when idle */
+    bool closing;           /**< Being destroyed: no policy */
+    twin_window_t *windows; /**< Every window, bottom to top */
+    twin_window_t *zombies; /**< Destroyed while busy, freed when idle */
+    int dispatching;        /**< Busy depth: dispatch, relayout */
+#if defined(CONFIG_WM_MOBILE)
+    twin_window_t *bar_top;    /**< System bar above the work area */
+    twin_window_t *bar_bottom; /**< System bar below the work area */
+    twin_coord_t inset_bottom; /**< Reserved above the bottom bar (IME) */
+#endif
 
     twin_screen_stats_t stats; /**< Compositor work counters */
 
@@ -287,25 +297,28 @@ struct _twin_window {
     twin_pixmap_t *pixmap; /**< Window pixmap */
 
     /* Window properties */
-    twin_window_style_t style; /**< Window style */
-    twin_format_t format;      /**< Pixel format of the window pixmap */
-    twin_rect_t request;       /**< Requested client geometry (screen) */
-    twin_rect_t client;        /**< Client area rectangle (pixmap) */
+    uint8_t style;       /**< twin_window_style_t */
+    uint8_t format;      /**< twin_format_t of the window pixmap */
+    twin_rect_t request; /**< Requested client geometry (screen) */
+    twin_rect_t client;  /**< Client area rectangle (pixmap) */
 #define TWIN_WINDOW_DAMAGE_RECTS 4
     twin_rect_t damage[TWIN_WINDOW_DAMAGE_RECTS]; /**< Pending repaint */
     int n_damage;                                 /**< Valid damage[] */
 
     /* Window state */
-    bool active;          /**< Active window flag */
-    bool client_grab;     /**< Mouse grab state */
-    bool draw_queued;     /**< Draw pending flag */
-    bool opaque;          /**< Client area is fully painted by draw() */
-    bool mapped;          /**< Shown by the application */
-    bool frame_dirty;     /**< Decorations need repainting */
-    bool dead;            /**< Destroyed; the struct outlives a busy screen */
-    bool wm_placed;       /**< Policy already chose a position (desktop) */
-    bool wm_maximized;    /**< Covers the work area; wm_saved is the request */
-    twin_rect_t wm_saved; /**< Request to restore after maximize */
+    bool active : 1;      /**< Active window flag */
+    bool client_grab : 1; /**< Mouse grab state */
+    bool draw_queued : 1; /**< Draw pending flag */
+    bool opaque : 1;      /**< Client area is fully painted by draw() */
+    bool mapped : 1;      /**< Shown by the application */
+    bool frame_dirty : 1; /**< Decorations need repainting */
+    bool dead : 1;        /**< Destroyed; the struct outlives a busy screen */
+#if defined(CONFIG_WM_DESKTOP)
+    bool wm_placed : 1;    /**< Policy already chose a position */
+    bool wm_maximized : 1; /**< Covers the work area; wm_saved is the request */
+    twin_rect_t wm_saved;  /**< Request to restore after maximize */
+    char *name;            /**< Title shown in the title bar */
+#endif
 
     struct _twin_work *paint_work; /**< Queued repaint, if any */
 
@@ -315,7 +328,6 @@ struct _twin_window {
 
     /* Window data */
     void *client_data; /**< User data pointer */
-    char *name;        /**< Window title */
 
     /* Window callbacks */
     twin_draw_func_t draw;       /**< Draw callback */
@@ -1142,71 +1154,102 @@ extern const twin_backend_t g_twin_backend;
  * Window manager policy interface
  *
  * A policy decides window geometry, decorations, stacking, and how pointer
- * events reach clients.  window.c owns the window objects and calls into the
- * active policy at a handful of well-defined points; policies never free a
- * window.  The build selects one policy (_twin_wm_built); the 'none'
- * policy (wm.c) is always present.
+ * events reach clients.  Exactly one is built: wm-none.c (WM_NONE, the
+ * minimal one), wm-desktop.c (WM_DESKTOP, classic) or wm-mobile.c
+ * (WM_MOBILE, embedded).  It defines the hooks below and window.c,
+ * screen.c and wm.c call them directly; a hook a policy has no use for is
+ * an inline no-op here, so the call compiles away.  Policies never free a
+ * window.
  */
-typedef struct _twin_wm_ops {
-    /* Policy becomes active when the screen is created, and inactive when
-     * it is destroyed.  enter() returns false when it cannot start (out of
-     * memory for its state); the screen is then not created. */
-    bool (*enter)(twin_screen_t *screen);
-    void (*leave)(twin_screen_t *screen);
-
-    /* Compute pixmap geometry (screen coordinates) and decoration border */
-    void (*layout)(twin_window_t *window,
-                   twin_rect_t *geom,
-                   twin_rect_t *border);
-
-    /* Application mapped / unmapped a window.  On destroy, the policy may
-     * take ownership of window->pixmap (setting it to NULL) to animate the
-     * departure after the window object is gone. */
-    void (*map)(twin_window_t *window);
-    void (*unmap)(twin_window_t *window, bool destroying);
-
-    /* Paint decorations into window->pixmap (NULL: none) */
-    void (*decorate)(twin_window_t *window);
-
-    /* Deliver an event targeted at a window (NULL: forward to client) */
-    bool (*dispatch)(twin_window_t *window, twin_event_t *event);
-
-    /* Pointer hit test in screen coordinates (NULL: pixmap rectangle) */
-    bool (*hit)(twin_window_t *window, twin_coord_t x, twin_coord_t y);
-
-    /* Gesture hook: sees every pointer event (motion, button down/up) before
-     * it is routed to a window; true consumes it.  Other kinds bypass it. */
-    bool (*filter)(twin_screen_t *screen, twin_event_t *event);
-
-    /* Re-place the stack after a mapped window changed style or opacity, or
-     * the system bars, the inset or the screen size changed (NULL: nothing
-     * to do).  Every window has been re-laid out already. */
-    void (*refresh)(twin_screen_t *screen);
-
-    /* Explicit activation request (twin_window_activate); NULL: map() */
-    void (*activate)(twin_window_t *window);
-
-    /* Shrink @area (preset to the whole screen) to what application windows
-     * may cover, e.g. minus the system bars.  NULL: the whole screen, and
-     * the policy does not show system bars, so twin_screen_set_bars() hides
-     * them. */
-    void (*work_area)(const twin_screen_t *screen, twin_rect_t *area);
-} twin_wm_ops_t;
-
-#if defined(CONFIG_WM_DESKTOP) && defined(CONFIG_WM_MOBILE)
-#error "CONFIG_WM_DESKTOP and CONFIG_WM_MOBILE are mutually exclusive"
+#if defined(CONFIG_WM_DESKTOP) + defined(CONFIG_WM_MOBILE) + \
+        defined(CONFIG_WM_NONE) !=                           \
+    1
+#error \
+    "Select exactly one of CONFIG_WM_DESKTOP, CONFIG_WM_MOBILE, CONFIG_WM_NONE"
 #endif
 
-/* 'none' is also what a screen falls back to while it is torn down */
-extern const twin_wm_ops_t _twin_wm_none;
 #if defined(CONFIG_WM_DESKTOP)
-extern const twin_wm_ops_t _twin_wm_desktop;
-#define _twin_wm_built _twin_wm_desktop
-#elif defined(CONFIG_WM_MOBILE)
-extern const twin_wm_ops_t _twin_wm_mobile;
-#define _twin_wm_built _twin_wm_mobile
+#define TWIN_WM_DECORATES 1 /* title bars: decorate(), hit(), activate() */
 #else
-#define _twin_wm_built _twin_wm_none
+#define TWIN_WM_DECORATES 0
+#endif
+#if defined(CONFIG_WM_MOBILE)
+#define TWIN_WM_BARS 1 /* system bars and a work area: filter(), work_area() \
+                        */
+#else
+#define TWIN_WM_BARS 0
+#endif
+
+/* Bytes of policy state that follow the screen in its allocation, zeroed;
+ * _twin_wm_state() finds them */
+extern const size_t _twin_wm_state_size;
+#define _twin_wm_state(screen) ((void *) ((twin_screen_t *) (screen) + 1))
+
+/* The screen was created / is going away.  fini() runs before the windows
+ * are destroyed and must let go of them: from then on (screen->closing)
+ * window.c bypasses the policy. */
+void _twin_wm_init(twin_screen_t *screen);
+void _twin_wm_fini(twin_screen_t *screen);
+
+/* Compute pixmap geometry (screen coordinates) and decoration border */
+void _twin_wm_layout(twin_window_t *window,
+                     twin_rect_t *geom,
+                     twin_rect_t *border);
+
+/* Application mapped / unmapped a window.  On destroy, the policy may take
+ * ownership of window->pixmap (setting it to NULL) to animate the departure
+ * after the window object is gone. */
+void _twin_wm_map(twin_window_t *window);
+void _twin_wm_unmap(twin_window_t *window, bool destroying);
+
+/* Deliver an event targeted at a window */
+bool _twin_wm_dispatch(twin_window_t *window, twin_event_t *event);
+
+/* Re-place the stack after a mapped window changed style or opacity, or the
+ * system bars, the inset or the screen size changed.  Every window has been
+ * re-laid out already. */
+#if defined(CONFIG_WM_NONE)
+static inline void _twin_wm_refresh(twin_screen_t *screen)
+{
+    (void) screen;
+}
+#else
+void _twin_wm_refresh(twin_screen_t *screen);
+#endif
+
+#if TWIN_WM_DECORATES
+/* Paint decorations into window->pixmap */
+void _twin_wm_decorate(twin_window_t *window);
+/* Pointer hit test in screen coordinates (others: the pixmap's shown
+ * rows, see _twin_window_hit) */
+bool _twin_wm_hit(twin_window_t *window, twin_coord_t x, twin_coord_t y);
+/* Explicit activation request (twin_window_activate) */
+void _twin_wm_activate(twin_window_t *window);
+#else
+static inline void _twin_wm_decorate(twin_window_t *window)
+{
+    (void) window;
+}
+static inline void _twin_wm_activate(twin_window_t *window)
+{
+    _twin_wm_map(window);
+}
+#endif
+
+#if TWIN_WM_BARS
+/* Gesture hook: sees every pointer event (motion, button down/up) before it
+ * is routed to a window; true consumes it.  Other kinds bypass it. */
+bool _twin_wm_filter(twin_screen_t *screen, twin_event_t *event);
+/* Shrink @area (preset to the whole screen) to what application windows may
+ * cover, e.g. minus the system bars */
+void _twin_wm_work_area(const twin_screen_t *screen, twin_rect_t *area);
+#else
+static inline bool _twin_wm_filter(twin_screen_t *screen, twin_event_t *event)
+{
+    (void) screen;
+    (void) event;
+    return false;
+}
 #endif
 
 /* window.c services used by policies */
@@ -1214,7 +1257,16 @@ void _twin_window_relayout(twin_window_t *window);
 bool _twin_window_deliver(twin_window_t *window, twin_event_t *event);
 void _twin_window_evict(twin_window_t *window);
 bool _twin_window_restore(twin_window_t *window);
+#if defined(CONFIG_WM_MOBILE)
 bool _twin_window_is_bar(const twin_window_t *window);
+#else
+/* Only the mobile window manager has system bars */
+static inline bool _twin_window_is_bar(const twin_window_t *window)
+{
+    (void) window;
+    return false;
+}
+#endif
 /* On screen with its pixels (not hidden, not evicted) */
 bool _twin_window_shown(const twin_window_t *window);
 /* Mapped window the policy stacks and focuses (not Plain, not a bar) */

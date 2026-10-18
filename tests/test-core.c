@@ -200,6 +200,7 @@ static void test_row_fallback(void)
     th_destroy(t);
 }
 
+#if defined(CONFIG_DROP_SHADOW)
 static void test_shadow(void)
 {
     th_t *t = th_create(W, H);
@@ -232,6 +233,7 @@ static void test_shadow(void)
     twin_pixmap_destroy(p);
     th_destroy(t);
 }
+#endif
 
 static void test_rgb16_and_opacity(void)
 {
@@ -1127,7 +1129,9 @@ int main(void)
     test_damage_merge();
     test_occlusion_differential();
     test_row_fallback();
+#if defined(CONFIG_DROP_SHADOW)
     test_shadow();
+#endif
     test_rgb16_and_opacity();
     test_stub();
     test_cache_equivalence();

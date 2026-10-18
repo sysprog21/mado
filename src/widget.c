@@ -235,12 +235,12 @@ void twin_widget_match_size(twin_widget_t *widget, twin_widget_t *source)
     _twin_widget_queue_layout(widget);
 }
 
-static twin_fixed_t twin_widget_width(twin_widget_t *widget)
+static twin_coord_t twin_widget_width(twin_widget_t *widget)
 {
     return _twin_widget_width(widget);
 }
 
-static twin_fixed_t twin_widget_height(twin_widget_t *widget)
+static twin_coord_t twin_widget_height(twin_widget_t *widget)
 {
     return _twin_widget_height(widget);
 }
@@ -432,12 +432,12 @@ void *twin_custom_widget_data(twin_custom_widget_t *custom)
     return custom ? custom->data : NULL;
 }
 
-twin_fixed_t twin_custom_widget_width(twin_custom_widget_t *custom)
+twin_coord_t twin_custom_widget_width(twin_custom_widget_t *custom)
 {
     return custom ? twin_widget_width(custom->widget) : 0;
 }
 
-twin_fixed_t twin_custom_widget_height(twin_custom_widget_t *custom)
+twin_coord_t twin_custom_widget_height(twin_custom_widget_t *custom)
 {
     return custom ? twin_widget_height(custom->widget) : 0;
 }

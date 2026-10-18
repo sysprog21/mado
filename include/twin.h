@@ -994,11 +994,11 @@ void *twin_custom_widget_data(twin_custom_widget_t *custom);
  * without requiring direct manipulation of the base widget.
  */
 
-/** Get the current width of a custom widget */
-twin_fixed_t twin_custom_widget_width(twin_custom_widget_t *custom);
+/** Get the current width of a custom widget, in pixels */
+twin_coord_t twin_custom_widget_width(twin_custom_widget_t *custom);
 
-/** Get the current height of a custom widget */
-twin_fixed_t twin_custom_widget_height(twin_custom_widget_t *custom);
+/** Get the current height of a custom widget, in pixels */
+twin_coord_t twin_custom_widget_height(twin_custom_widget_t *custom);
 
 /** Request that a custom widget be repainted */
 void twin_custom_widget_queue_paint(twin_custom_widget_t *custom);

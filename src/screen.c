@@ -229,30 +229,27 @@ static void _span_set_add(twin_span_set_t *set, twin_coord_t l, twin_coord_t r)
 {
     if (l >= r)
         return;
-    /* Merge with every interval that touches [l, r). */
-    int i = 0, o = 0;
-    twin_span_t out[TWIN_SPAN_SET_MAX + 1];
-    bool placed = false;
-    for (; i < set->n; i++) {
-        twin_span_t s = set->s[i];
-        if (s.r < l) {
-            out[o++] = s;
-        } else if (r < s.l) {
-            if (!placed) {
-                out[o++] = (twin_span_t) {l, r};
-                placed = true;
-            }
-            out[o++] = s;
-        } else {
-            l = min(l, s.l);
-            r = max(r, s.r);
-        }
+    /* Intervals [i, j) touch [l, r): they merge into one at i */
+    int i = 0, n = set->n;
+    while (i < n && set->s[i].r < l)
+        i++;
+    int j = i;
+    for (; j < n && set->s[j].l <= r; j++) {
+        l = min(l, set->s[j].l);
+        r = max(r, set->s[j].r);
     }
-    if (!placed)
-        out[o++] = (twin_span_t) {l, r};
+    int o = n - (j - i) + 1;
     if (o > TWIN_SPAN_SET_MAX)
         return; /* keep the old (smaller) set: conservative */
-    memcpy(set->s, out, sizeof(out[0]) * o);
+    if (j != i + 1) {
+        if (j > i + 1)
+            for (int k = j; k < n; k++)
+                set->s[k - (j - i - 1)] = set->s[k];
+        else
+            for (int k = n; k > i; k--)
+                set->s[k] = set->s[k - 1];
+    }
+    set->s[i] = (twin_span_t) {l, r};
     set->n = o;
 }
 

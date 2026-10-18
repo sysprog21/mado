@@ -170,15 +170,24 @@ int main(void)
         /* Shells own the screen and have suites of their own */
         if (d->shell)
             continue;
+        /* Each policy the app is marked for that this build has */
+        const twin_wm_mode_t modes[] = {
 #if defined(BUILT_WM)
-        if (apps_runs_under(d, BUILT_WM))
-            run(d, BUILT_WM, BUILT_WM == TwinWmMobile ? "mobile" : "desktop");
+            BUILT_WM,
 #endif
-        if (apps_runs_under(d, TwinWmNone))
-            run(d, TwinWmNone, "none");
+            TwinWmNone,
+        };
+        for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); m++) {
+            if (!apps_runs_under(d, modes[m]))
+                continue;
+            run(d, modes[m],
+                modes[m] == TwinWmMobile    ? "mobile"
+                : modes[m] == TwinWmDesktop ? "desktop"
+                                            : "none");
 #if defined(CONFIG_MEMORY_STATS)
-        run_out_of_memory(d, TwinWmNone);
+            run_out_of_memory(d, modes[m]);
 #endif
+        }
     }
     twin_cache_flush();
     return th_report("demos");

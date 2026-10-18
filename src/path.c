@@ -173,10 +173,20 @@ void twin_path_ellipse(twin_path_t *path,
     twin_path_close(path);
 }
 
+/* pi sqrt(8) in 16.16: sides per square root of the radius in pixels */
+#define ARC_SIDES_PER_ROOT ((twin_fixed_t) 582338)
+
+/* An upper bound on how far @m moves a unit vector: the largest
+ * singular value never exceeds the largest absolute row or column sum
+ * (it is at most the geometric mean of the two norms).  Exact for an
+ * axis-aligned scale, so an uneven ellipse gets its long radius. */
 static twin_fixed_t _twin_matrix_max_radius(twin_matrix_t *m)
 {
-    return (twin_fixed_abs(m->m[0][0]) + twin_fixed_abs(m->m[0][1]) +
-            twin_fixed_abs(m->m[1][0]) + twin_fixed_abs(m->m[1][1]));
+    twin_fixed_t a = twin_fixed_abs(m->m[0][0]), b = twin_fixed_abs(m->m[0][1]);
+    twin_fixed_t c = twin_fixed_abs(m->m[1][0]), d = twin_fixed_abs(m->m[1][1]);
+    twin_fixed_t r = max(a + b, c + d);
+    r = max(r, a + c);
+    return max(r, b + d);
 }
 
 void twin_path_arc(twin_path_t *path,
@@ -192,8 +202,13 @@ void twin_path_arc(twin_path_t *path,
     twin_path_translate(path, x, y);
     twin_path_scale(path, x_radius, y_radius);
 
+    /* A chord of an n-gon strays r (1 - cos(pi / n)) ~ r pi^2 / (2 n^2)
+     * from the circle, so a deviation of at most 1/16 pixel (a quarter of
+     * the rasterizer's sample spacing) needs n = pi sqrt(8 r) sides. */
     twin_fixed_t max_radius = _twin_matrix_max_radius(&path->state.matrix);
-    int32_t sides = max_radius / twin_sfixed_to_fixed(TWIN_SFIXED_TOLERANCE);
+    twin_fixed_t root = twin_fixed_sqrt(max_radius);
+    int32_t sides =
+        twin_fixed_to_int(twin_fixed_mul(root, ARC_SIDES_PER_ROOT)) + 1;
     if (sides > 1024)
         sides = 1024;
 

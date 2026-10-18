@@ -453,15 +453,16 @@ twin_pixmap_t *twin_custom_widget_pixmap(twin_custom_widget_t *custom)
     return custom ? twin_widget_pixmap(custom->widget) : NULL;
 }
 
-void twin_widget_set_callback(twin_widget_t *widget,
+bool twin_widget_set_callback(twin_widget_t *widget,
                               twin_widget_proc_t callback,
                               void *data)
 {
     if (!widget)
-        return;
+        return false;
     twin_widget_ext_t *ext = _twin_widget_ensure_ext(widget);
     if (!ext)
-        return;
+        return false;
     ext->callback = callback;
     ext->callback_data = data;
+    return true;
 }

@@ -152,23 +152,25 @@ static bool apps_multiline_start(twin_screen_t *screen,
     twin_custom_widget_t *custom = twin_custom_widget_create(
         twin_toplevel_box(toplevel), 0xffffffff, 0, 0, 1, 1,
         _multiline_dispatch, sizeof(multiline_data_t));
+    if (!custom) {
+        twin_toplevel_destroy(toplevel);
+        return false;
+    }
 
-    if (custom) {
-        multiline_data_t *data =
-            (multiline_data_t *) twin_custom_widget_data(custom);
-        data->num_lines = 3;
-        data->active_line = -1;
-        data->line_width = D(30);
+    multiline_data_t *data =
+        (multiline_data_t *) twin_custom_widget_data(custom);
+    data->num_lines = 3;
+    data->active_line = -1;
+    data->line_width = D(30);
 
-        /* Initialize 3 lines */
-        twin_fixed_t fy;
-        int i = 0;
-        for (fy = 0; i < 3; fy += 50, i++) {
-            data->lines[i].p1.x = D(30);
-            data->lines[i].p1.y = D(100 - fy);
-            data->lines[i].p2.x = D(220);
-            data->lines[i].p2.y = D(100 + fy);
-        }
+    /* Initialize 3 lines */
+    twin_fixed_t fy;
+    int i = 0;
+    for (fy = 0; i < 3; fy += 50, i++) {
+        data->lines[i].p1.x = D(30);
+        data->lines[i].p1.y = D(100 - fy);
+        data->lines[i].p2.x = D(220);
+        data->lines[i].p2.y = D(100 + fy);
     }
 
     twin_toplevel_show(toplevel);

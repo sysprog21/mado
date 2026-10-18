@@ -184,6 +184,13 @@ void twin_toplevel_show(twin_toplevel_t *toplevel)
     twin_window_show(toplevel->box.widget.window);
 }
 
+void twin_toplevel_destroy(twin_toplevel_t *toplevel)
+{
+    /* The window's destroy callback tears down the widgets and frees the
+     * toplevel */
+    twin_window_destroy(toplevel->box.widget.window);
+}
+
 twin_box_t *twin_toplevel_box(twin_toplevel_t *toplevel)
 {
     return &toplevel->box;

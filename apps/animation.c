@@ -141,8 +141,11 @@ bool apps_animation_start(twin_screen_t *screen,
         return false;
     }
     /* The widget owns the image from here on */
-    if (!apps_animation_create(twin_toplevel_box(toplevel), pix))
+    if (!apps_animation_create(twin_toplevel_box(toplevel), pix)) {
+        twin_toplevel_destroy(toplevel);
         twin_pixmap_destroy(pix);
+        return false;
+    }
     twin_toplevel_show(toplevel);
     return true;
 }

@@ -482,8 +482,9 @@ twin_button_t *twin_button_create(twin_box_t *parent,
  *
  * Allows applications to respond to widget events (e.g., button clicks).
  * The callback receives events after the widget's core handler processes them.
+ * Returns false when it could not be installed (out of memory).
  */
-void twin_widget_set_callback(twin_widget_t *widget,
+bool twin_widget_set_callback(twin_widget_t *widget,
                               twin_widget_proc_t callback,
                               void *data);
 
@@ -904,6 +905,9 @@ twin_toplevel_t *twin_toplevel_create(twin_screen_t *screen,
                                       const char *name);
 
 void twin_toplevel_show(twin_toplevel_t *toplevel);
+
+/** Destroy a toplevel with its window and every widget in it */
+void twin_toplevel_destroy(twin_toplevel_t *toplevel);
 
 /** The box that holds a toplevel's widgets */
 twin_box_t *twin_toplevel_box(twin_toplevel_t *toplevel);

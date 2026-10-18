@@ -225,25 +225,38 @@ bool apps_calc_start(twin_screen_t *screen,
         return false;
     }
     twin_box_t *top = twin_toplevel_box(calc->toplevel);
+    /* The display frees the calculator when the window goes away */
+    bool owned = false;
     calc->display =
         twin_label_create(top, "0", APPS_CALC_VALUE_FG, APPS_CALC_VALUE_SIZE,
                           APPS_CALC_VALUE_STYLE);
+    if (!calc->display)
+        goto fail;
     twin_widget_t *display = twin_label_widget(calc->display);
+    owned = twin_widget_set_callback(display, _apps_calc_display_event, calc);
+    if (!owned)
+        goto fail;
     twin_widget_set(display, APPS_CALC_VALUE_BG);
-    twin_widget_set_callback(display, _apps_calc_display_event, calc);
     twin_label_set_align(calc->display, TwinAlignRight);
     twin_widget_set_shape(display, TwinShapeLozenge);
     calc->keys = twin_box_create(top, TwinBoxHorz);
+    if (!calc->keys)
+        goto fail;
     for (int i = 0; i < APPS_CALC_COLS; i++) {
         calc->cols[i] = twin_box_create(calc->keys, TwinBoxVert);
+        if (!calc->cols[i])
+            goto fail;
         for (int j = 0; j < APPS_CALC_ROWS; j++) {
             int b = calc_layout[j][i];
             calc->buttons[b] = twin_button_create(
                 calc->cols[i], apps_calc_labels[b], APPS_CALC_BUTTON_FG,
                 APPS_CALC_BUTTON_SIZE, APPS_CALC_BUTTON_STYLE);
+            if (!calc->buttons[b])
+                goto fail;
             twin_widget_t *key = twin_button_widget(calc->buttons[b]);
             twin_widget_set(key, APPS_CALC_BUTTON_BG);
-            twin_widget_set_callback(key, _apps_calc_button_clicked, calc);
+            if (!twin_widget_set_callback(key, _apps_calc_button_clicked, calc))
+                goto fail;
             twin_widget_set_shape(key, TwinShapeEllipse);
             if (i || j)
                 twin_widget_match_size(
@@ -257,4 +270,10 @@ bool apps_calc_start(twin_screen_t *screen,
     calc->pending_op = 0;
     twin_toplevel_show(calc->toplevel);
     return true;
+
+fail:
+    twin_toplevel_destroy(calc->toplevel);
+    if (!owned)
+        free(calc);
+    return false;
 }

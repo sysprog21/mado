@@ -263,9 +263,11 @@ bool apps_spline_start(twin_screen_t *screen,
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
     if (!toplevel)
         return false;
-    twin_custom_widget_t *spline = apps_spline_create(
-        twin_toplevel_box(toplevel), 4, twin_screen_height(screen) * 2 / 3);
-    (void) spline;
+    if (!apps_spline_create(twin_toplevel_box(toplevel), 4,
+                            twin_screen_height(screen) * 2 / 3)) {
+        twin_toplevel_destroy(toplevel);
+        return false;
+    }
     twin_toplevel_show(toplevel);
     return true;
 }

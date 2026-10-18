@@ -63,8 +63,10 @@ static void check_placement(th_t *t, const char *what)
                   "%s: window covers the work area (%d,%d %dx%d)", what, p->x,
                   p->y, p->width, p->height);
         } else {
-            CHECK(p->x >= 0 && p->y >= 0 && p->x < t->width && p->y < t->height,
-                  "%s: window on screen (%d,%d)", what, p->x, p->y);
+            CHECK(p->x >= 0 && p->y >= 0 && p->x + p->width <= t->width &&
+                      p->y + p->height <= t->height,
+                  "%s: window on screen (%d,%d %dx%d)", what, p->x, p->y,
+                  p->width, p->height);
         }
     }
 }
@@ -135,6 +137,32 @@ static void run(const apps_entry_t *d, twin_wm_mode_t mode, const char *scene)
     th_destroy(t);
 }
 
+#if defined(CONFIG_MEMORY_STATS)
+/* Out of memory from the first allocation: the start reports failure and
+ * leaves neither a window nor a byte behind.  (Failures deeper in, while
+ * text and paths are painted, are not handled by the core yet.) */
+static void run_out_of_memory(const apps_entry_t *d, twin_wm_mode_t mode)
+{
+    th_t *t = th_create(W, H, mode);
+    th_settle(t, 500);
+    size_t base = th_heap_net(t);
+    _twin_alloc_fail_next = 1;
+    bool ok = d->start(t->screen, d->x, d->y, d->w, d->h);
+    _twin_alloc_fail_next = 0;
+    int n;
+    top_app(t->screen, &n);
+    /* An app of several windows may still open the others */
+    CHECK(ok || !n, "%s: failed start left %d windows", d->name, n);
+    th_settle(t, 500);
+    for (twin_window_t *w; (w = top_app(t->screen, NULL));)
+        twin_window_destroy(w);
+    th_settle(t, 500);
+    CHECK(th_heap_net(t) <= base, "%s: failed start leaks (%zu > %zu)", d->name,
+          th_heap_net(t), base);
+    th_destroy(t);
+}
+#endif
+
 int main(void)
 {
     for (int i = 0; i < apps_count(); i++) {
@@ -148,6 +176,9 @@ int main(void)
 #endif
         if (apps_runs_under(d, TwinWmNone))
             run(d, TwinWmNone, "none");
+#if defined(CONFIG_MEMORY_STATS)
+        run_out_of_memory(d, TwinWmNone);
+#endif
     }
     twin_cache_flush();
     return th_report("demos");

@@ -139,6 +139,8 @@ static twin_custom_widget_t *_apps_image_init(twin_box_t *parent,
     twin_button_t *button =
         twin_button_create(parent, "Next Image", 0xFF482722, D(10),
                            TwinStyleBold | TwinStyleOblique);
+    if (!button)
+        return NULL; /* the toplevel's teardown frees the image widget */
     twin_widget_t *bw = twin_button_widget(button);
     twin_widget_set(bw, 0xFFFEE4CE);
     twin_widget_set_callback(bw, _apps_image_button_clicked, custom);
@@ -160,9 +162,11 @@ bool apps_image_start(twin_screen_t *screen, const char *name, int x, int y)
                              APP_WIDTH, APP_HEIGHT, name);
     if (!toplevel)
         return false;
-    twin_custom_widget_t *img = apps_image_create(
-        twin_toplevel_box(toplevel), twin_screen_height(screen) * 3 / 4);
-    (void) img;
+    if (!apps_image_create(twin_toplevel_box(toplevel),
+                           twin_screen_height(screen) * 3 / 4)) {
+        twin_toplevel_destroy(toplevel);
+        return false;
+    }
     twin_toplevel_show(toplevel);
     return true;
 }

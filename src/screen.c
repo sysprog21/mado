@@ -291,6 +291,8 @@ static int _span_set_subtract(const twin_span_set_t *set,
  * units.  One entry is cached; radii rarely change between rows.
  */
 static uint16_t shadow_ramp[2 * TWIN_SHADOW_MAX_BLUR + 1];
+/* Widest shadow piece whose alphas are kept between rows */
+#define SHADOW_ROW_CACHE 64
 static int shadow_ramp_blur = -1;
 
 static const uint16_t *_shadow_ramp(int blur)
@@ -364,8 +366,8 @@ static inline twin_argb32_t _shadow_over(twin_argb32_t v, uint32_t a)
     uint32_t k = 255 - a;
     uint32_t rb = _twin_mul_lanes(v & TWIN_LANES, k);
     uint32_t ag = _twin_mul_lanes((v >> 8) & TWIN_LANES, k);
-    uint32_t alpha = a + (ag >> 16);
-    return rb | (ag & 0xff) << 8 | (alpha > 255 ? 255 : alpha) << 24;
+    /* The scaled alpha is at most k, so adding a never carries out */
+    return (rb | ag << 8) + (a << 24);
 }
 
 static void _shadow_span(twin_argb32_t *span,
@@ -382,13 +384,42 @@ static void _shadow_span(twin_argb32_t *span,
     if (!fy)
         return;
     uint32_t row_alpha = (uint32_t) p->shadow.alpha * (uint32_t) fy;
+    twin_argb32_t *d = span + (l - span_left);
+
+    /* A narrow piece (the fringe beside a sliding window) recurs with the
+     * same geometry on every row whose vertical coverage saturates: keep
+     * its alphas and skip the ramp lookups on those rows */
+    static struct {
+        uint32_t row_alpha;
+        int blur;
+        twin_coord_t sl, sr, l, r;
+        uint8_t a[SHADOW_ROW_CACHE];
+    } row;
+    if (r - l <= SHADOW_ROW_CACHE) {
+        if (row.r <= row.l || row.row_alpha != row_alpha || row.blur != blur ||
+            row.sl != s.left || row.sr != s.right || row.l != l || row.r != r) {
+            for (twin_coord_t x = l; x < r; x++) {
+                int fx = _shadow_cover(ramp, blur, x, s.left, s.right);
+                row.a[x - l] = (uint8_t) ((row_alpha * (uint32_t) fx) >> 16);
+            }
+            row.row_alpha = row_alpha;
+            row.blur = blur;
+            row.sl = s.left;
+            row.sr = s.right;
+            row.l = l;
+            row.r = r;
+        }
+        for (twin_coord_t i = 0; i < r - l; i++)
+            if (row.a[i])
+                d[i] = _shadow_over(d[i], row.a[i]);
+        return;
+    }
 
     /* Between the two edge ramps both saturate and the horizontal coverage
      * is exactly 256 (see _shadow_cover), so the alpha is constant there */
     twin_coord_t flat_l = s.left + blur + 1, flat_r = s.right - blur - 1;
     uint32_t flat_a = (row_alpha * 256) >> 16;
 
-    twin_argb32_t *d = span + (l - span_left);
     for (twin_coord_t x = l; x < r;) {
         if (x >= flat_l && x < flat_r) {
             twin_coord_t end = min(r, flat_r);

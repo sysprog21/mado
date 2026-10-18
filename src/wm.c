@@ -89,6 +89,14 @@ void _twin_screen_relayout(twin_screen_t *screen)
     for (twin_window_t *w = screen->windows; w; w = w->wm_next)
         if (w->pixmap)
             _twin_window_relayout(w);
+    /* Bars belong to policies that carve a work area out for them; a bar
+     * shown some other way (its pixmap shown directly) goes again here */
+    if (!screen->wm->work_area) {
+        if (screen->bar_top && screen->bar_top->pixmap)
+            twin_pixmap_hide(screen->bar_top->pixmap);
+        if (screen->bar_bottom && screen->bar_bottom->pixmap)
+            twin_pixmap_hide(screen->bar_bottom->pixmap);
+    }
     if (screen->wm->refresh)
         screen->wm->refresh(screen);
     twin_screen_enable_update(screen);
@@ -117,14 +125,6 @@ void twin_screen_set_bars(twin_screen_t *screen,
     for (int i = 0; i < 2; i++) {
         if (old[i] && old[i] != top && old[i] != bottom)
             twin_window_hide(old[i]);
-    }
-    /* Bars belong to policies that carve a work area out for them; the
-     * others never map a registered bar, so hiding it once is enough */
-    if (!screen->wm->work_area) {
-        if (top && top->pixmap)
-            twin_pixmap_hide(top->pixmap);
-        if (bottom && bottom->pixmap)
-            twin_pixmap_hide(bottom->pixmap);
     }
     _twin_screen_relayout(screen);
 }

@@ -42,6 +42,8 @@ typedef struct {
 typedef struct {
     uint32_t magic;
     uint32_t version;
+    /* Backend process: tells a live object from one a crash left behind */
+    int32_t owner_pid;
 
     /* Screen info */
     twin_coord_t width, height;

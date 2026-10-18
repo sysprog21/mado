@@ -166,8 +166,10 @@ bail_dumb:
 
 static void destroy_fb(twin_drm_t *tx)
 {
-    /* Unmap framebuffer */
-    munmap(tx->fb_base, tx->fb_len);
+    /* Unmap framebuffer; MAP_FAILED tells the work loop there is no mapping */
+    if (tx->fb_base != MAP_FAILED)
+        munmap(tx->fb_base, tx->fb_len);
+    tx->fb_base = MAP_FAILED;
 
     /* Delete framebuffer */
     drmModeRmFB(tx->drm_dri_fd, tx->fb_id);

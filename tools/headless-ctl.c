@@ -432,29 +432,47 @@ static int utf8_decode(const unsigned char *p, twin_ucs4_t *c)
     return len;
 }
 
-/* Queue each UTF-8 character of @text as a UCS-4 key event */
+/*
+ * Queue each UTF-8 character of @text as a UCS-4 key event.  The whole
+ * string is validated first so malformed input delivers nothing; text
+ * longer than the queue waits for the backend to drain it.
+ */
 static int inject_text(twin_headless_shm_t *shm, const char *text)
 {
     const unsigned char *p = (const unsigned char *) text;
+    size_t total = 0, sent = 0;
+    twin_ucs4_t c;
+
     while (*p) {
-        twin_ucs4_t c;
         int len = utf8_decode(p, &c);
         if (!len) {
             fprintf(stderr, "Invalid UTF-8 sequence at byte %td\n",
                     (const char *) p - text);
             return -1;
         }
-        if (shm->event_write_idx - shm->event_read_idx >=
-            TWIN_HEADLESS_MAX_EVENTS) {
-            fprintf(stderr, "Event queue full - backend may be stalled\n");
+        total++;
+        p += len;
+    }
+
+    for (p = (const unsigned char *) text; *p; sent++) {
+        int timeout = 30; /* 3 seconds, as for commands */
+        while (shm->event_write_idx - shm->event_read_idx >=
+                   TWIN_HEADLESS_MAX_EVENTS &&
+               timeout-- > 0)
+            usleep(100000);
+        if (timeout < 0) {
+            fprintf(stderr,
+                    "Event queue full after %zu of %zu characters - backend "
+                    "may be stalled\n",
+                    sent, total);
             return -1;
         }
+        p += utf8_decode(p, &c);
         twin_headless_event_t *evt =
             &shm->events[shm->event_write_idx % TWIN_HEADLESS_MAX_EVENTS];
         evt->kind = TwinEventUcs4;
         evt->u.ucs4.ucs4 = c;
         shm->event_write_idx++;
-        p += len;
     }
     return 0;
 }

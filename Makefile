@@ -312,12 +312,13 @@ endif
 endif
 
 # Headless tests: built only for 'make check' / 'make check-update'
+# (and listed for 'make clean' so their binaries are removed)
 TESTS := test-core test-wm test-lifetime
 ifeq ($(CONFIG_DEMO_CELLPHONE), y)
 TESTS += test-cellphone
 endif
 
-ifneq ($(filter check check-update,$(MAKECMDGOALS)),)
+ifneq ($(filter check check-update clean distclean,$(MAKECMDGOALS)),)
 ifneq ($(CC_IS_EMCC), 1)
 define test-target
 target-y += $(1)
@@ -335,13 +336,19 @@ endif
 extra-build-goals := check check-update
 
 .PHONY: check check-update
+ifeq ($(CC_IS_EMCC), 1)
+check check-update:
+	@echo "The headless tests run natively; rebuild without Emscripten" >&2
+	@exit 1
+else
 check: $(TESTS)
 	@mkdir -p tests/golden
 	@status=0; for t in $(TESTS); do ./$$t || status=1; done; exit $$status
 
 check-update: $(TESTS)
 	@mkdir -p tests/golden
-	@for t in $(TESTS); do MADO_UPDATE_GOLDEN=1 ./$$t; done
+	@status=0; for t in $(TESTS); do MADO_UPDATE_GOLDEN=1 ./$$t || status=1; done; exit $$status
+endif
 
 # Build system integration
 

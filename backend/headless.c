@@ -319,6 +319,30 @@ static void twin_headless_exit(twin_context_t *ctx)
     free(ctx);
 }
 
+/* Whether the existing shared memory object names a backend still running */
+static bool _twin_headless_shm_live(void)
+{
+    bool live = false;
+    struct stat st;
+    int fd = shm_open(TWIN_HEADLESS_SHM_NAME, O_RDONLY, 0);
+    if (fd < 0)
+        return false;
+    if (fstat(fd, &st) == 0 &&
+        (size_t) st.st_size >= sizeof(twin_headless_shm_t)) {
+        twin_headless_shm_t *shm =
+            mmap(NULL, sizeof(*shm), PROT_READ, MAP_SHARED, fd, 0);
+        if (shm != MAP_FAILED) {
+            pid_t pid = shm->owner_pid;
+            live = shm->magic == TWIN_HEADLESS_MAGIC &&
+                   shm->version == TWIN_HEADLESS_VERSION && pid > 0 &&
+                   (kill(pid, 0) == 0 || errno == EPERM);
+            munmap(shm, sizeof(*shm));
+        }
+    }
+    close(fd);
+    return live;
+}
+
 twin_context_t *twin_headless_init(int width, int height)
 {
     twin_context_t *ctx = calloc(1, sizeof(twin_context_t));
@@ -340,12 +364,23 @@ twin_context_t *twin_headless_init(int width, int height)
     if (!tx->shm_size)
         goto error;
 
-    /* Create shared memory, readable and writable by this user only.  A
-     * stale object from a crashed run is removed first; O_EXCL then makes
-     * sure the backend never adopts one somebody else created. */
-    shm_unlink(TWIN_HEADLESS_SHM_NAME);
+    /* Create shared memory, readable and writable by this user only.
+     * O_EXCL makes sure the backend never adopts an object somebody else
+     * created; one left by a crashed run is removed and created afresh,
+     * but a running backend's is left alone. */
     tx->shm_fd =
         shm_open(TWIN_HEADLESS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0600);
+    if (tx->shm_fd < 0 && errno == EEXIST) {
+        if (_twin_headless_shm_live()) {
+            fprintf(stderr,
+                    "Shared memory %s belongs to a running headless backend\n",
+                    TWIN_HEADLESS_SHM_NAME);
+            goto error;
+        }
+        shm_unlink(TWIN_HEADLESS_SHM_NAME);
+        tx->shm_fd =
+            shm_open(TWIN_HEADLESS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0600);
+    }
     if (tx->shm_fd < 0) {
         fprintf(stderr, "Failed to create shared memory: %s\n",
                 strerror(errno));
@@ -374,6 +409,7 @@ twin_context_t *twin_headless_init(int width, int height)
     memset(tx->shm, 0, tx->shm_size);
     tx->shm->magic = TWIN_HEADLESS_MAGIC;
     tx->shm->version = TWIN_HEADLESS_VERSION;
+    tx->shm->owner_pid = getpid();
     tx->shm->width = width;
     tx->shm->height = height;
 

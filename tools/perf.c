@@ -309,9 +309,6 @@ static void run_large_tests(void)
  * off and on, and a phone-like screen scan-out with occlusion culling off
  * and on.
  */
-extern unsigned _twin_debug; /* internal switch, see TWIN_DEBUG_NO_OCCLUSION */
-#define DEBUG_NO_OCCLUSION 0x1
-
 static twin_path_t *vec_rrect;
 static twin_screen_t *vec_screen;
 static twin_pixmap_t *vec_layers[3];
@@ -354,6 +351,7 @@ static void run_vector_tests(void)
 {
     twin_cache_stats_t stats;
     twin_cache_get_stats(&stats);
+    /* Measure the cached case even when built with CACHE_SIZE=0 */
     size_t budget = stats.budget ? stats.budget : 24 * 1024;
 
     vec_rrect = twin_path_create();
@@ -370,6 +368,7 @@ static void run_vector_tests(void)
     test_rrect_44();
     run_test_series("text 20 glyphs 14px, cached", test_text_14, 1, 1);
     run_test_series("rounded rect 44x44, cached", test_rrect_44, 1, 1);
+    twin_cache_set_budget(stats.budget);
 
     /* App over a covered app, plus a status bar: a phone's steady state */
     vec_screen = twin_screen_create(240, 320, NULL, discard_span, NULL);
@@ -384,11 +383,12 @@ static void run_vector_tests(void)
         twin_pixmap_move(p, 0, i == 2 ? 0 : 20);
         twin_pixmap_show(p, vec_screen, vec_screen->top);
     }
-    _twin_debug |= DEBUG_NO_OCCLUSION;
-    run_test_series("scan-out 240x320, 3 layers, no culling", test_scanout, 1,
-                    1);
-    _twin_debug &= ~DEBUG_NO_OCCLUSION;
-    run_test_series("scan-out 240x320, 3 layers, culled", test_scanout, 1, 1);
+    _twin_debug |= TWIN_DEBUG_NO_OCCLUSION;
+    run_test_series("scan-out 240x320, 3 layers, no culling", test_scanout, 240,
+                    320);
+    _twin_debug &= ~TWIN_DEBUG_NO_OCCLUSION;
+    run_test_series("scan-out 240x320, 3 layers, culled", test_scanout, 240,
+                    320);
     for (int i = 0; i < 3; i++)
         twin_pixmap_destroy(vec_layers[i]);
     twin_screen_destroy(vec_screen);

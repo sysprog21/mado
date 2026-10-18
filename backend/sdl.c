@@ -229,7 +229,7 @@ static bool twin_sdl_poll(twin_context_t *ctx)
     twin_sdl_t *tx = PRIV(ctx);
 
     /* Sleep until input arrives or the next timeout is due instead of
-     * spinning: an idle screen should cost no CPU. */
+     * spinning, waking at least every 100 ms */
     if (!twin_screen_damaged(screen)) {
         twin_time_t wait = _twin_timeout_delay();
         if (wait < 0 || wait > 100)

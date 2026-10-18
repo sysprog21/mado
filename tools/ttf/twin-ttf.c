@@ -178,18 +178,47 @@ static int wanted(FT_ULong ucs4)
     return 0;
 }
 
+/* Parse one code point; it must span the whole of [s, end) */
+static int parse_ucs4(const char *s, const char *end, FT_ULong *out)
+{
+    char *stop;
+
+    if (s == end || *s < '0' || *s > '9')
+        return 0;
+    *out = strtoul(s, &stop, 0);
+    return stop == end && *out < MAX_UCS4;
+}
+
 /* "0x20-0x7e", "0xf095", or comma separated lists of either */
 static int parse_ranges(char *spec)
 {
     for (char *tok = strtok(spec, ","); tok; tok = strtok(NULL, ",")) {
-        char *dash = strchr(tok + 1, '-');
+        char *end = tok + strlen(tok);
+        char *dash = strchr(tok, '-');
         if (n_ranges == MAX_RANGES)
             return 0;
-        range_lo[n_ranges] = strtoul(tok, NULL, 0);
-        range_hi[n_ranges] =
-            dash ? strtoul(dash + 1, NULL, 0) : range_lo[n_ranges];
+        if (!parse_ucs4(tok, dash ? dash : end, &range_lo[n_ranges]))
+            return 0;
+        if (!dash)
+            range_hi[n_ranges] = range_lo[n_ranges];
+        else if (!parse_ucs4(dash + 1, end, &range_hi[n_ranges]) ||
+                 range_hi[n_ranges] < range_lo[n_ranges])
+            return 0;
         n_ranges++;
     }
+    /* An empty list would silently mean the whole font */
+    return n_ranges > 0;
+}
+
+/* The symbol becomes part of a C identifier */
+static int valid_symbol(const char *s)
+{
+    if (!*s)
+        return 0;
+    for (; *s; s++)
+        if (!(*s == '_' || (*s >= '0' && *s <= '9') ||
+              (*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z')))
+            return 0;
     return 1;
 }
 
@@ -254,6 +283,12 @@ static int convert_font(const char *in_name, const char *symbol)
     }
     printf("};\n");
     printf("/* clang-format on */\n\n");
+    /* The runtime falls back to charmap[0], so it must exist */
+    if (closure.offset == 1) {
+        fprintf(stderr, "error: no glyphs in the requested ranges\n");
+        free(offsets);
+        return 0;
+    }
     printf("static const twin_charmap_t charmap[] = {\n");
     ncharmap = 0;
     for (ucs4 = FT_Get_First_Char(face, &gindex);
@@ -319,6 +354,10 @@ int main(int argc, char **argv)
     for (i = 1; i < argc && argv[i][0] == '-'; i++) {
         if (!strcmp(argv[i], "-n") && i + 1 < argc) {
             symbol = argv[++i];
+            if (!valid_symbol(symbol)) {
+                fprintf(stderr, "invalid symbol name: %s\n", symbol);
+                return 1;
+            }
         } else if (!strcmp(argv[i], "-r") && i + 1 < argc) {
             if (!parse_ranges(argv[++i])) {
                 usage(argv[0]);

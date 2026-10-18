@@ -1208,17 +1208,65 @@ static void test_accessors(void)
     th_destroy(t);
 }
 
+#if defined(CONFIG_LOADER_GIF) || defined(CONFIG_LOADER_TVG)
+/* Write @len bytes to a temporary file named in @path ("...XXXXXX"); a
+ * fixture that cannot be written fails the run rather than passing as a
+ * loader's rejection */
+static bool write_fixture(char *path, const uint8_t *bytes, size_t len)
+{
+    int fd = mkstemp(path);
+    CHECK(fd >= 0, "temporary file created");
+    if (fd < 0)
+        return false;
+    bool ok = write(fd, bytes, len) == (ssize_t) len;
+    close(fd);
+    CHECK(ok, "temporary file written");
+    if (!ok)
+        unlink(path);
+    return ok;
+}
+#endif
+
+#if defined(CONFIG_LOADER_TVG)
+/* A line of width zero is drawn with a hairline pen, not dropped: 0.01
+ * units, one pixel here at 100x */
+static void test_tvg_hairline(void)
+{
+    const uint8_t doc[] = {
+        0x72, 0x56, 1,           /* magic, version 1 */
+        0x44,                    /* scale 4 (1/16 unit), RGBA8888, u8 coords */
+        2,    2,                 /* 2 x 2 units */
+        1,    0,    0,  0,  255, /* one color: opaque black */
+        0x04, 0,    0,  0,       /* draw 1 line, color 0, width 0 */
+        2,    16,   30, 16,      /* (0.125, 1) to (1.875, 1) */
+        0x00,                    /* end */
+    };
+    char path[] = "/tmp/mado-tvg-XXXXXX";
+    if (!write_fixture(path, doc, sizeof(doc)))
+        return;
+    twin_pixmap_t *p = twin_tvg_to_pixmap(path, 200, 200);
+    unlink(path);
+    CHECK(p != NULL, "TVG with a zero-width line loads");
+    if (!p)
+        return;
+    int inked = 0;
+    for (int y = 0; y < twin_pixmap_height(p); y++)
+        for (int x = 0; x < twin_pixmap_width(p); x++)
+            inked += (*twin_pixmap_pointer(p, x, y).argb32 >> 24) != 0;
+    CHECK(inked > 100, "zero-width line drawn as a hairline (%d pixels)",
+          inked);
+    twin_pixmap_destroy(p);
+}
+#endif
+
 #if defined(CONFIG_LOADER_GIF)
 /* Load @len bytes as a file; NULL is the only acceptable answer here */
 static twin_pixmap_t *load_bytes(const uint8_t *bytes, size_t len)
 {
     char path[] = "/tmp/mado-gif-XXXXXX";
-    int fd = mkstemp(path);
-    if (fd < 0)
+    if (!write_fixture(path, bytes, len))
         return NULL;
-    bool ok = write(fd, bytes, len) == (ssize_t) len;
-    close(fd);
-    twin_pixmap_t *p = ok ? twin_pixmap_from_file(path) : NULL;
+    twin_pixmap_t *p = twin_pixmap_from_file(path);
     unlink(path);
     return p;
 }
@@ -1250,14 +1298,12 @@ static void test_gif_malformed(void)
                             0,    0x80, 0,   0,   0,    0,    0, 0xff, 0xff,
                             0xff, ',',  0,   0,   0,    0,    2, 0,    2,
                             0,    0,    2,   2,   0x44, 0x01, 0, ';'};
-    int returned = 0;
     for (size_t cut = 0; cut <= sizeof(good); cut++) {
         twin_pixmap_t *p = load_bytes(good, cut);
         if (p)
             twin_pixmap_destroy(p);
-        returned++;
     }
-    CHECK_EQ(returned, (int) sizeof(good) + 1, "every truncated GIF returns");
+    /* Reaching here is the check: every truncated GIF returned */
 }
 #endif
 
@@ -1292,6 +1338,9 @@ int main(void)
 #endif
 #if defined(CONFIG_LOADER_GIF)
     test_gif_malformed();
+#endif
+#if defined(CONFIG_LOADER_TVG)
+    test_tvg_hairline();
 #endif
     test_leaks();
     twin_cache_flush();

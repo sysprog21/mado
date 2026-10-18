@@ -43,6 +43,10 @@ static void _twin_toplevel_draw(twin_window_t *window)
     twin_toplevel_t *toplevel = window->client_data;
     twin_event_t event;
 
+    /* The window asks for its damaged pixels, which may be all of them (a
+     * window manager restoring an evicted window): repaint every widget,
+     * not only those queued since the last paint */
+    _twin_box_mark_paint(&toplevel->box);
     twin_screen_disable_update(window->screen);
     event.kind = TwinEventPaint;
     (*(&toplevel->box.widget)->handler)(&toplevel->box.widget, &event, NULL);

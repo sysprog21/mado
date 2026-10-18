@@ -146,6 +146,16 @@ static twin_widget_t *_twin_box_xy_to_widget(twin_box_t *box,
     return NULL;
 }
 
+void _twin_box_mark_paint(twin_box_t *box)
+{
+    box->widget.paint = true;
+    for (twin_widget_t *child = box->children; child; child = child->next) {
+        child->paint = true;
+        if (child->handler == _twin_box_dispatch)
+            _twin_box_mark_paint((twin_box_t *) child);
+    }
+}
+
 twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
                                           twin_event_t *event,
                                           void *closure)

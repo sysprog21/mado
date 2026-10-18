@@ -46,6 +46,8 @@ void _twin_wm_map(twin_window_t *window)
     if (_twin_window_is_bar(window))
         return;
     _twin_window_restore(window);
+    /* The window list follows the stacking order: focus moves use it */
+    _twin_window_raise(window);
     if (window->pixmap != screen->top)
         twin_pixmap_show(window->pixmap, screen, screen->top);
     /* The newest window covers the screen, so it takes the keyboard */

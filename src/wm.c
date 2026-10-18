@@ -30,18 +30,18 @@ void twin_screen_set_bars(twin_screen_t *screen,
                           twin_window_t *top,
                           twin_window_t *bottom)
 {
+    /* Bars live on this screen */
+    if ((top && top->screen != screen) || (bottom && bottom->screen != screen))
+        return;
 #if !TWIN_WM_BARS
     /* Only the mobile window manager has system bars: elsewhere the
      * windows are simply hidden */
-    (void) screen;
     if (top)
         twin_window_hide(top);
     if (bottom)
         twin_window_hide(bottom);
 #else
-    /* One window cannot be both bars, and bars live on this screen */
-    if ((top && top->screen != screen) || (bottom && bottom->screen != screen))
-        return;
+    /* One window cannot be both bars */
     if (top && top == bottom)
         bottom = NULL;
     if (top == screen->bar_top && bottom == screen->bar_bottom)

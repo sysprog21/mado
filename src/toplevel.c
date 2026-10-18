@@ -117,6 +117,9 @@ twin_toplevel_t *twin_toplevel_create(twin_screen_t *screen,
         return NULL;
     }
     _twin_toplevel_init(toplevel, _twin_toplevel_dispatch, window, name);
+    /* An opaque root: every client pixel is painted (see the box's paint),
+     * so nothing behind shows through */
+    twin_widget_set(&toplevel->box.widget, 0xffffffff);
     return toplevel;
 }
 

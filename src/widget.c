@@ -11,17 +11,34 @@
 
 #include "twin_private.h"
 
-/* Fill the widget with its background, in its shape */
-static void _twin_widget_paint(twin_widget_t *widget)
+/* What the ancestors' rectangular backgrounds leave under @widget */
+static twin_argb32_t _twin_widget_under(const twin_widget_t *widget)
+{
+    if (!widget->parent)
+        return 0;
+    const twin_widget_t *parent = &widget->parent->widget;
+    twin_argb32_t under = _twin_widget_under(parent);
+    if (parent->shape != TwinShapeRectangle)
+        return under;
+    return _twin_over(under, parent->background);
+}
+
+/* Fill the widget with its background, in its shape, over what its
+ * ancestors painted there: a repaint erases the old content without
+ * punching a hole through the ancestors' backgrounds */
+void _twin_widget_paint(twin_widget_t *widget)
 {
     twin_pixmap_t *pixmap = widget->window->pixmap;
     twin_coord_t w = _twin_widget_width(widget);
     twin_coord_t h = _twin_widget_height(widget);
+    twin_argb32_t under = _twin_widget_under(widget);
 
     if (widget->shape == TwinShapeRectangle) {
-        twin_fill(pixmap, widget->background, TWIN_SOURCE, 0, 0, w, h);
+        twin_fill(pixmap, _twin_over(under, widget->background), TWIN_SOURCE, 0,
+                  0, w, h);
         return;
     }
+    twin_fill(pixmap, under, TWIN_SOURCE, 0, 0, w, h);
     twin_path_t *path = twin_path_create();
     if (!path)
         return;
@@ -174,16 +191,41 @@ void _twin_widget_bevel(twin_widget_t *widget, twin_fixed_t b, bool down)
     }
 }
 
+/* The root widget fills the whole client area, so its background decides
+ * whether the window is opaque: then the compositor skips what lies
+ * underneath and the window manager may release covered windows. */
+static void _twin_widget_update_opaque(twin_widget_t *widget)
+{
+    if (widget->parent)
+        return;
+    bool opaque = (widget->background >> 24) == 0xff &&
+                  widget->shape == TwinShapeRectangle;
+    if (widget->window->opaque != opaque)
+        twin_window_set_opaque(widget->window, opaque);
+}
+
+/* The background or shape of @widget changed */
+static void _twin_widget_restyle(twin_widget_t *widget)
+{
+    _twin_widget_update_opaque(widget);
+    _twin_widget_queue_paint(widget);
+    /* Every descendant fills over the box's background: repaint them all
+     * (after queueing, which stops at a widget already marked) */
+    if (widget->handler == _twin_box_dispatch ||
+        widget->handler == _twin_toplevel_dispatch)
+        _twin_box_mark_paint((twin_box_t *) widget);
+}
+
 void twin_widget_set(twin_widget_t *widget, twin_argb32_t background)
 {
     widget->background = background;
-    _twin_widget_queue_paint(widget);
+    _twin_widget_restyle(widget);
 }
 
 void twin_widget_set_shape(twin_widget_t *widget, twin_shape_t shape)
 {
     widget->shape = shape;
-    _twin_widget_queue_paint(widget);
+    _twin_widget_restyle(widget);
 }
 
 void twin_widget_match_size(twin_widget_t *widget, twin_widget_t *source)

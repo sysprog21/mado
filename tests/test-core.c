@@ -1208,6 +1208,131 @@ static void test_accessors(void)
     th_destroy(t);
 }
 
+#if defined(CONFIG_WIDGETS)
+static twin_argb32_t client_pixel(twin_window_t *w,
+                                  twin_coord_t x,
+                                  twin_coord_t y)
+{
+    twin_rect_t c = twin_window_client(w);
+    return *twin_pixmap_pointer(w->pixmap, c.left + x, c.top + y).argb32;
+}
+
+/* A toplevel paints every client pixel, so the compositor can treat it as
+ * opaque; children repaint over their ancestors' background instead of
+ * punching through it */
+static void test_toplevel_background(void)
+{
+    th_t *t = th_create(W, H);
+    twin_toplevel_t *top = twin_toplevel_create(t->screen, 0, 0, W, H, "t");
+    twin_window_t *w = top->box.widget.window;
+    twin_label_t *label =
+        twin_label_create(twin_toplevel_box(top), " ", 0xff000000,
+                          twin_int_to_fixed(12), TwinStyleRoman);
+    twin_label_t *oval =
+        twin_label_create(twin_toplevel_box(top), " ", 0xff000000,
+                          twin_int_to_fixed(12), TwinStyleRoman);
+    twin_widget_t *ow = twin_label_widget(oval);
+    twin_widget_set(ow, 0x80000000);
+    twin_widget_set_shape(ow, TwinShapeEllipse);
+    twin_toplevel_show(top);
+    th_frame(t);
+    CHECK(w->opaque, "a toplevel is opaque");
+
+    twin_rect_t e = label->widget.extents;
+    CHECK_EQ(client_pixel(w, e.left + 1, e.top + 1), 0xffffffff,
+             "the root's background under a transparent child");
+    twin_label_set(label, "  ");
+    th_frame(t);
+    CHECK_EQ(client_pixel(w, e.left + 1, e.top + 1), 0xffffffff,
+             "a repainted child keeps it");
+
+    /* A translucent shape repaints to the same pixels, not darker */
+    twin_rect_t o = ow->extents;
+    twin_coord_t cx = (o.left + o.right) / 2, cy = (o.top + o.bottom) / 2;
+    twin_argb32_t center = client_pixel(w, cx, cy);
+    CHECK(center != 0xffffffff, "the oval is painted");
+    for (int i = 0; i < 3; i++) {
+        twin_label_set(oval, i & 1 ? " " : "  ");
+        th_frame(t);
+    }
+    CHECK_EQ(client_pixel(w, cx, cy), center, "oval repainted");
+    CHECK_EQ(client_pixel(w, o.left, o.top), 0xffffffff,
+             "the root's background outside the oval");
+
+    twin_widget_set(twin_box_widget(twin_toplevel_box(top)), 0x80000000);
+    CHECK(!w->opaque, "a translucent background makes it translucent");
+    twin_widget_set(twin_box_widget(twin_toplevel_box(top)), 0xff102030);
+    CHECK(w->opaque, "and an opaque one opaque again");
+    th_frame(t);
+    CHECK_EQ(client_pixel(w, e.left + 1, e.top + 1), 0xff102030,
+             "children repaint over the new background");
+    CHECK_EQ(th_damage_check(t), 0, "toplevel background");
+    twin_toplevel_destroy(top);
+    th_destroy(t);
+}
+
+/* Boxes paint their own background in the gaps their children leave, a
+ * background or shape change repaints everything over it, and a shaped
+ * root leaves the rest of the window transparent */
+static void test_box_background(void)
+{
+    th_t *t = th_create(W, H);
+    twin_toplevel_t *top = twin_toplevel_create(t->screen, 0, 0, W, H, "t");
+    twin_window_t *w = top->box.widget.window;
+    twin_widget_t *root = twin_box_widget(twin_toplevel_box(top));
+    twin_toplevel_show(top);
+    th_frame(t);
+    CHECK_EQ(client_pixel(w, 5, 5), 0xffffffff, "an empty toplevel is white");
+    twin_widget_set(root, 0xff336699);
+    th_frame(t);
+    CHECK_EQ(client_pixel(w, 5, 5), 0xff336699,
+             "a new background reaches pixels no child covers");
+    twin_widget_set_shape(root, TwinShapeEllipse);
+    th_frame(t);
+    CHECK(!w->opaque, "a shaped root is translucent");
+    CHECK_EQ(client_pixel(w, 0, 0), 0, "outside the root's shape is clear");
+    CHECK_EQ(th_damage_check(t), 0, "shaped root");
+    twin_toplevel_destroy(top);
+
+    /* A child fills over its box's background, and a shape change on the
+     * box repaints the child */
+    top = twin_toplevel_create(t->screen, 0, 0, W, H, "t");
+    w = top->box.widget.window;
+    /* root > outer > (box > label, sibling) */
+    twin_box_t *outer = twin_box_create(twin_toplevel_box(top), TwinBoxVert);
+    twin_box_t *box = twin_box_create(outer, TwinBoxVert);
+    twin_label_t *label = twin_label_create(
+        box, " ", 0xff000000, twin_int_to_fixed(12), TwinStyleRoman);
+    twin_label_t *sibling = twin_label_create(
+        outer, " ", 0xff000000, twin_int_to_fixed(12), TwinStyleRoman);
+    twin_widget_set(twin_box_widget(box), 0xff00ff00);
+    twin_widget_set(twin_label_widget(sibling), 0xffff0000);
+    twin_toplevel_show(top);
+    th_frame(t);
+    /* Repainting deep in the tree leaves the siblings alone */
+    twin_rect_t o = twin_box_widget(outer)->extents;
+    twin_rect_t s = twin_label_widget(sibling)->extents;
+    s.left += o.left, s.top += o.top;
+    twin_label_set(label, "  ");
+    th_frame(t);
+    CHECK_EQ(client_pixel(w, s.left + 1, s.top + 1), 0xffff0000,
+             "a nested repaint keeps the siblings");
+    twin_rect_t b = twin_box_widget(box)->extents;
+    b.left += o.left, b.top += o.top;
+    twin_rect_t l = twin_label_widget(label)->extents;
+    CHECK(l.right > l.left + 2 && l.bottom > l.top + 2, "label laid out");
+    CHECK_EQ(client_pixel(w, b.left + l.left + 1, b.top + l.top + 1),
+             0xff00ff00, "a child fills over its box's background");
+    twin_widget_set_shape(twin_box_widget(box), TwinShapeEllipse);
+    th_frame(t);
+    CHECK_EQ(client_pixel(w, b.left + l.left + 1, b.top + l.top + 1),
+             0xffffffff, "a shape change repaints the children");
+    CHECK_EQ(th_damage_check(t), 0, "box background");
+    twin_toplevel_destroy(top);
+    th_destroy(t);
+}
+#endif
+
 #if defined(CONFIG_LOADER_GIF) || defined(CONFIG_LOADER_TVG)
 /* Write @len bytes to a temporary file named in @path ("...XXXXXX"); a
  * fixture that cannot be written fails the run rather than passing as a
@@ -1335,6 +1460,8 @@ int main(void)
     test_accessors();
 #if defined(CONFIG_WIDGETS)
     test_widget_teardown();
+    test_toplevel_background();
+    test_box_background();
 #endif
 #if defined(CONFIG_LOADER_GIF)
     test_gif_malformed();

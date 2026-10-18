@@ -1048,6 +1048,8 @@ void _twin_box_init(twin_box_t *box,
 /* Flag @box and every widget inside it for repainting, e.g. when the
  * window's pixels were released and have to be drawn again in full */
 void _twin_box_mark_paint(twin_box_t *box);
+/* Fill @widget with its background, in its shape, over its ancestors' */
+void _twin_widget_paint(twin_widget_t *widget);
 
 twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
                                           twin_event_t *event,

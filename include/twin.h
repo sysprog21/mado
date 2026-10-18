@@ -592,7 +592,9 @@ void twin_label_set(twin_label_t *label, const char *value);
 
 void twin_label_set_align(twin_label_t *label, twin_align_t align);
 
-/** The widget a label or button is built on, for the twin_widget_* calls */
+/** The widget a box, label or button is built on, for the twin_widget_*
+ * calls */
+twin_widget_t *twin_box_widget(twin_box_t *box);
 twin_widget_t *twin_label_widget(twin_label_t *label);
 twin_widget_t *twin_button_widget(twin_button_t *button);
 
@@ -801,6 +803,11 @@ void twin_clear_timeout(twin_timeout_t *timeout);
  * toplevel.c
  */
 
+/**
+ * A toplevel's box starts with an opaque white background, so the window
+ * is opaque.  A translucent background on the box (twin_box_widget with
+ * twin_widget_set) or a non-rectangular shape makes it translucent again.
+ */
 twin_toplevel_t *twin_toplevel_create(twin_screen_t *screen,
                                       twin_coord_t x,
                                       twin_coord_t y,

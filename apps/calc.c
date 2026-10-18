@@ -75,6 +75,9 @@ static const char *apps_calc_labels[] = {
 #define APPS_CALC_VALUE_SIZE twin_int_to_fixed(29)
 #define APPS_CALC_VALUE_STYLE TwinStyleRoman
 #define APPS_CALC_VALUE_FG 0xff000000
+/* The display and keys are translucent white: keep a black panel under
+ * them */
+#define APPS_CALC_BG 0xff000000
 #define APPS_CALC_VALUE_BG 0x80808080
 #define APPS_CALC_BUTTON_SIZE twin_int_to_fixed(15)
 #define APPS_CALC_BUTTON_STYLE TwinStyleBold
@@ -223,6 +226,7 @@ bool apps_calc_start(twin_screen_t *screen,
         return false;
     }
     twin_box_t *top = twin_toplevel_box(calc->toplevel);
+    twin_widget_set(twin_box_widget(top), APPS_CALC_BG);
     calc->display =
         twin_label_create(top, "0", APPS_CALC_VALUE_FG, APPS_CALC_VALUE_SIZE,
                           APPS_CALC_VALUE_STYLE);

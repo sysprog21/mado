@@ -29,7 +29,7 @@ static void th_put_span(twin_coord_t left,
            sizeof(twin_argb32_t) * (size_t) (right - left));
 }
 
-th_t *th_create(twin_coord_t width, twin_coord_t height, twin_wm_mode_t wm)
+th_t *th_create(twin_coord_t width, twin_coord_t height)
 {
     th_t *t = calloc(1, sizeof(*t));
     if (!t)
@@ -46,7 +46,6 @@ th_t *th_create(twin_coord_t width, twin_coord_t height, twin_wm_mode_t wm)
         free(t);
         return NULL;
     }
-    twin_screen_set_wm(t->screen, wm);
     th_frame(t);
     return t;
 }

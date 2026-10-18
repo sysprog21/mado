@@ -74,36 +74,31 @@ static bool start_multi(twin_screen_t *screen, int x, int y, int w, int h)
 }
 #endif
 
+/* Every app below the phone runs under all three window managers */
 static const apps_entry_t apps[] = {
-#if defined(CONFIG_DEMO_CELLPHONE)
-    /* The phone shell targets the mobile policy only; it lists the other
-     * apps that run there on its home screen */
-    {"Phone", TWIN_SYM_MOBILE, APPS_WM(TwinWmMobile), true, 0, 0, PHONE_W,
-     PHONE_H, start_phone, phone_shutdown},
+#if defined(CONFIG_DEMO_CELLPHONE) && defined(CONFIG_WM_MOBILE)
+    /* Mobile only: the phone shell lists the other apps on its home
+     * screen */
+    {"Phone", TWIN_SYM_MOBILE, true, 0, 0, PHONE_W, PHONE_H, start_phone,
+     phone_shutdown},
 #endif
 #if defined(CONFIG_DEMO_MULTI)
-    {"Demo", TWIN_SYM_LIST, APPS_WM_ALL, false, 100, 100, 400, 400, start_multi,
-     NULL},
+    {"Demo", TWIN_SYM_LIST, false, 100, 100, 400, 400, start_multi, NULL},
 #endif
 #if defined(CONFIG_DEMO_CLOCK)
-    {"Clock", TWIN_SYM_CLOCK, APPS_WM_ALL, false, 10, 10, 200, 200, start_clock,
-     NULL},
+    {"Clock", TWIN_SYM_CLOCK, false, 10, 10, 200, 200, start_clock, NULL},
 #endif
 #if defined(CONFIG_DEMO_CALCULATOR)
-    {"Calc", TWIN_SYM_CALCULATOR, APPS_WM_ALL, false, 100, 100, 200, 200,
-     start_calc, NULL},
+    {"Calc", TWIN_SYM_CALCULATOR, false, 100, 100, 200, 200, start_calc, NULL},
 #endif
 #if defined(CONFIG_DEMO_SPLINE)
-    {"Spline", TWIN_SYM_SHUFFLE, APPS_WM_ALL, false, 20, 20, 400, 400,
-     start_spline, NULL},
+    {"Spline", TWIN_SYM_SHUFFLE, false, 20, 20, 400, 400, start_spline, NULL},
 #endif
 #if defined(CONFIG_DEMO_ANIMATION)
-    {"Animation", TWIN_SYM_PLAY, APPS_WM_ALL, false, 20, 20, 0, 0,
-     start_animation, NULL},
+    {"Animation", TWIN_SYM_PLAY, false, 20, 20, 0, 0, start_animation, NULL},
 #endif
 #if defined(CONFIG_DEMO_IMAGE)
-    {"Vectors", TWIN_SYM_GLOBE, APPS_WM_ALL, false, 20, 20, 0, 0, start_image,
-     NULL},
+    {"Vectors", TWIN_SYM_GLOBE, false, 20, 20, 0, 0, start_image, NULL},
 #endif
     {0}, /* keeps the table valid when nothing is built */
 };

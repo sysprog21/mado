@@ -572,9 +572,6 @@ static bool mobile_enter(twin_screen_t *screen)
         return false;
     screen->wm_data = m;
     screen->background_color = 0xff000000;
-    for (twin_window_t *w = screen->windows; w; w = w->wm_next)
-        _twin_window_relayout(w);
-    mobile_settle(screen);
     return true;
 }
 
@@ -615,7 +612,6 @@ static void mobile_work_area(const twin_screen_t *screen, twin_rect_t *area)
 }
 
 const twin_wm_ops_t _twin_wm_mobile = {
-    .mode = TwinWmMobile,
     .enter = mobile_enter,
     .leave = mobile_leave,
     .layout = mobile_layout,

@@ -68,8 +68,7 @@ static twin_pixmap_t *load_background(twin_screen_t *screen, const char *path)
 
 static twin_context_t *tx = NULL;
 
-static twin_wm_mode_t scene;
-static const apps_entry_t *shell; /* the shell the scene runs, if any */
+static const apps_entry_t *shell; /* the running shell, if any */
 
 static void cleanup(void)
 {
@@ -87,66 +86,25 @@ static void sigint_handler(int sig)
     exit(1);
 }
 
-/*
- * Scene: which window manager the demo starts under.  Kconfig picks the
- * default; MADO_SCENE=mobile|desktop|none overrides it at run time when
- * that window manager is built.
- */
-
-static twin_wm_mode_t default_scene(void)
+/* A shell that owns the screen (the phone, in a mobile build) */
+static const apps_entry_t *find_shell(void)
 {
-#if defined(CONFIG_DEMO_SCENE_MOBILE)
-    return TwinWmMobile;
-#elif defined(CONFIG_DEMO_SCENE_DESKTOP)
-    return TwinWmDesktop;
-#else
-    return TwinWmNone;
-#endif
-}
-
-static twin_wm_mode_t pick_scene(void)
-{
-    const char *env = getenv("MADO_SCENE");
-    if (!env)
-        return default_scene();
-#if defined(CONFIG_WM_MOBILE)
-    if (!strcmp(env, "mobile"))
-        return TwinWmMobile;
-#endif
-#if defined(CONFIG_WM_DESKTOP)
-    if (!strcmp(env, "desktop"))
-        return TwinWmDesktop;
-#endif
-    if (!strcmp(env, "none"))
-        return TwinWmNone;
-    fprintf(stderr, "MADO_SCENE=%s is not built, using the default scene\n",
-            env);
-    return default_scene();
-}
-
-/* A shell that runs the whole scene (the phone under the mobile policy) */
-static const apps_entry_t *scene_shell(twin_wm_mode_t mode)
-{
-    for (int i = 0; i < apps_count(); i++) {
-        const apps_entry_t *app = apps_at(i);
-        if (app->shell && apps_runs_under(app, mode))
-            return app;
-    }
+    for (int i = 0; i < apps_count(); i++)
+        if (apps_at(i)->shell)
+            return apps_at(i);
     return NULL;
 }
 
-/* Start the shell of the scene, or else every app that runs under it in
- * registry order.  Without a window manager every window covers the screen,
- * so overlapping apps would hide each other: start only the first one.
+/* Start the shell, or else every app in registry order.  Without a window
+ * manager every window covers the screen, so overlapping apps would hide
+ * each other: start only the first one.
  * Shared by both native and WebAssembly builds.
  */
 static void init_demo_apps(twin_context_t *ctx)
 {
     twin_screen_t *screen = twin_context_screen(ctx);
 
-    if (!twin_screen_set_wm(screen, scene))
-        scene = twin_screen_get_wm(screen);
-    const apps_entry_t *sh = scene_shell(scene);
+    const apps_entry_t *sh = find_shell();
     if (sh) {
         if (sh->start(screen, 0, 0, sh->w, sh->h)) {
             shell = sh;
@@ -156,23 +114,20 @@ static void init_demo_apps(twin_context_t *ctx)
                 sh->name);
     }
 #if defined(CONFIG_WM_DESKTOP)
-    if (scene == TwinWmDesktop)
-        twin_screen_set_background(
-            screen, load_background(screen, ASSET_PATH "/tux.png"));
+    twin_screen_set_background(screen,
+                               load_background(screen, ASSET_PATH "/tux.png"));
 #endif
-    if (scene == TwinWmNone) {
-        for (int i = 0; i < apps_count(); i++) {
-            const apps_entry_t *app = apps_at(i);
-            if (!app->shell && apps_runs_under(app, scene) &&
-                app->start(screen, app->x, app->y, app->w, app->h))
-                break;
-        }
-        return;
-    }
     for (int i = 0; i < apps_count(); i++) {
         const apps_entry_t *app = apps_at(i);
-        if (!app->shell && apps_runs_under(app, scene))
-            app->start(screen, app->x, app->y, app->w, app->h);
+        if (app->shell)
+            continue;
+        bool started = app->start(screen, app->x, app->y, app->w, app->h);
+#if defined(CONFIG_WM_NONE)
+        if (started)
+            break;
+#else
+        (void) started;
+#endif
     }
 }
 
@@ -180,8 +135,7 @@ int main(void)
 {
     int width = WIDTH, height = HEIGHT;
 
-    scene = pick_scene();
-    const apps_entry_t *sh = scene_shell(scene);
+    const apps_entry_t *sh = find_shell();
     if (sh) {
         width = sh->w;
         height = sh->h;

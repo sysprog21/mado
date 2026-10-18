@@ -658,33 +658,6 @@ static bool desktop_enter(twin_screen_t *screen)
     if (!d)
         return false;
     screen->wm_data = d;
-
-    /* Place every application window afresh, bottom to top (leave cleared
-     * wm_placed) */
-    for (twin_window_t *w = screen->windows; w; w = w->wm_next) {
-        _place_new(w);
-        _twin_window_relayout(w);
-    }
-    /* Map in stacking order; desktop_map raises, so iterate a snapshot. */
-    twin_window_t *top = NULL;
-    int n = 0;
-    for (twin_window_t *w = screen->windows; w; w = w->wm_next)
-        n++;
-    for (int i = 0; i < n; i++) {
-        twin_window_t *w = screen->windows;
-        /* Activation handlers may have destroyed windows meanwhile */
-        if (!w)
-            break;
-        if (w->mapped && !_twin_window_is_bar(w)) {
-            desktop_map(w);
-            if (w->style != TwinWindowPlain)
-                top = w;
-        } else {
-            _twin_window_raise(w);
-        }
-    }
-    if (top)
-        _activate(top);
     return true;
 }
 
@@ -720,21 +693,11 @@ static void desktop_leave(twin_screen_t *screen)
     twin_desktop_t *d = DESKTOP(screen);
     if (d->resize_work)
         twin_clear_work(d->resize_work);
-    for (twin_window_t *w = screen->windows; w; w = w->wm_next) {
-        w->active = false;
-        w->client_grab = false;
-        /* Placement is redone on the next entry; maximized stays as is */
-        w->wm_placed = false;
-        /* A window being destroyed may already have lost its pixmap */
-        if (w->pixmap)
-            twin_pixmap_set_shadow(w->pixmap, 0, 0, 0, 0);
-    }
     twin_free(screen->wm_data);
     screen->wm_data = NULL;
 }
 
 const twin_wm_ops_t _twin_wm_desktop = {
-    .mode = TwinWmDesktop,
     .enter = desktop_enter,
     .leave = desktop_leave,
     .layout = desktop_layout,

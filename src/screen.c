@@ -54,7 +54,6 @@ twin_screen_t *twin_screen_create(twin_coord_t width,
     screen->put_begin = put_begin;
     screen->put_span = put_span;
     screen->closure = closure;
-    screen->wm = &_twin_wm_none;
 
 #ifndef TWIN_SCRATCH_SIZE
 #define TWIN_SCRATCH_SIZE (16 * 1024)
@@ -62,11 +61,13 @@ twin_screen_t *twin_screen_create(twin_coord_t width,
     screen->scratch_buf = twin_malloc(TWIN_SCRATCH_SIZE);
     screen->scratch_size = screen->scratch_buf ? TWIN_SCRATCH_SIZE : 0;
 
-#if defined(CONFIG_WM_DESKTOP)
-    twin_screen_set_wm(screen, TwinWmDesktop);
-#elif defined(CONFIG_WM_MOBILE)
-    twin_screen_set_wm(screen, TwinWmMobile);
-#endif
+    /* The window manager the library was built with, for good */
+    screen->wm = &_twin_wm_built;
+    if (screen->wm->enter && !screen->wm->enter(screen)) {
+        twin_free(screen->scratch_buf);
+        twin_free(screen);
+        return NULL;
+    }
     /* Nothing has been shown yet: the first update paints everything */
     twin_screen_damage(screen, 0, 0, width, height);
     return screen;
@@ -74,9 +75,8 @@ twin_screen_t *twin_screen_create(twin_coord_t width,
 
 void twin_screen_destroy(twin_screen_t *screen)
 {
-    _twin_screen_drop_pending_wm(screen);
-
-    /* Let the policy finish animations and drop pixmaps it owns. */
+    /* Let the policy finish animations and drop pixmaps it owns, then tear
+     * the windows down under 'none', which keeps no state */
     if (screen->wm->leave)
         screen->wm->leave(screen);
     screen->wm = &_twin_wm_none;
@@ -716,7 +716,7 @@ void twin_screen_set_active(twin_screen_t *screen, twin_pixmap_t *pixmap)
     if (old == pixmap)
         return;
     screen->active = pixmap;
-    /* Handlers run under the busy guard (a policy switch waits) */
+    /* Handlers run under the busy guard */
     _twin_screen_busy(screen);
     if (old) {
         ev.kind = TwinEventDeactivate;
@@ -883,7 +883,7 @@ static bool _twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event);
 
 bool twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event)
 {
-    /* Handlers may ask for a policy switch; it waits until we are out */
+    /* Handlers may destroy windows; they are freed once we are out */
     _twin_screen_busy(screen);
     bool handled = _twin_screen_dispatch(screen, event);
     _twin_screen_idle(screen);

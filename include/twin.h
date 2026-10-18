@@ -168,22 +168,6 @@ typedef struct _twin_event {
 } twin_event_t;
 
 /**
- * Window manager policy
- *
- * The window manager is a runtime-switchable policy layered over the
- * compositor.  At most one of the desktop and mobile policies is built
- * (CONFIG_WM_DESKTOP or CONFIG_WM_MOBILE); twin_screen_set_wm() refuses the
- * other.  TwinWmNone is always available: it adds no decorations, covers
- * the screen with application windows, and gives the keyboard to the
- * newest or the last pressed window.
- */
-typedef enum _twin_wm_mode {
-    TwinWmNone /**< No window management: windows map as requested */,
-    TwinWmDesktop /**< Overlapping, decorated, draggable windows */,
-    TwinWmMobile /**< Full-screen app stack with transitions */,
-} twin_wm_mode_t;
-
-/**
  * Compositor counters
  *
  * Monotonic counters describing how much work the compositor performed.
@@ -1149,27 +1133,15 @@ void twin_window_scroll(twin_window_t *window,
  * Window manager
  */
 
-/**
- * Select the window manager policy
- * @screen : Screen to manage
- * @mode   : Policy to activate
- *
- * Existing windows are re-placed under the new policy: decorations are
- * added or removed, app windows are stacked or cascaded, and the pixels
- * of windows the policy keeps hidden are released.
- *
- * Safe to call from an event handler: the switch is then applied once the
- * event has been delivered (twin_screen_get_wm() already reports it), and
- * a later request replaces it.
- *
- * Return false if @mode was compiled out, or if the switch could not be
- * queued (out of memory); the current policy then stays.  If the new
- * policy cannot start (out of memory), the screen falls back to TwinWmNone
- * and false is returned.
+/*
+ * The window manager is chosen when the library is built: the Kconfig
+ * "Window manager" choice selects the desktop policy (CONFIG_WM_DESKTOP:
+ * overlapping, decorated, draggable windows), the mobile one
+ * (CONFIG_WM_MOBILE: a full-screen app stack between system bars, with
+ * transitions) or none (CONFIG_WM_NONE: no decorations, application
+ * windows cover the screen, the newest or last pressed window has the
+ * keyboard).  Every screen runs that policy for its whole life.
  */
-bool twin_screen_set_wm(twin_screen_t *screen, twin_wm_mode_t mode);
-
-twin_wm_mode_t twin_screen_get_wm(const twin_screen_t *screen);
 
 /**
  * Register system bars (status bar, navigation bar)

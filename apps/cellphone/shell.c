@@ -291,8 +291,8 @@ static const phone_app_t apps[] = {
 
 #define N_APPS ((int) (sizeof(apps) / sizeof(apps[0])))
 
-/* Then every app from the shared registry that runs under the mobile
- * policy (apps.c), in registry order */
+/* Then every other app of the shared registry (apps.c), in registry order:
+ * a mobile build compiles in only apps that run under it */
 static phone_app_t demos[16];
 static int n_demos = -1;
 
@@ -307,7 +307,7 @@ static void _list_demos(void)
     n_demos = 0;
     for (int i = 0; i < apps_count(); i++) {
         const apps_entry_t *e = apps_at(i);
-        if (e->shell || !apps_runs_under(e, TwinWmMobile))
+        if (e->shell)
             continue;
         if (n_demos == (int) (sizeof(demos) / sizeof(demos[0])))
             break;
@@ -713,11 +713,6 @@ bool phone_boot(twin_screen_t *screen)
     if (!ui_init())
         return false;
     g_screen = screen;
-    if (twin_screen_get_wm(screen) != TwinWmMobile &&
-        !twin_screen_set_wm(screen, TwinWmMobile)) {
-        phone_shutdown();
-        return false;
-    }
 
     g_status = bar_create(0, PHONE_STATUS_H, status_draw, NULL);
     g_nav = bar_create(PHONE_H - PHONE_NAV_H, PHONE_NAV_H, nav_draw, nav_event);

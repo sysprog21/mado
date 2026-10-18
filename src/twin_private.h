@@ -217,11 +217,9 @@ struct _twin_screen {
     twin_window_t *windows;        /**< Every window, bottom to top */
     twin_window_t *bar_top;        /**< System bar above the work area */
     twin_window_t *bar_bottom;     /**< System bar below the work area */
-    const struct _twin_wm_ops *wm_pending; /**< Switch requested mid-event */
-    struct _twin_work *wm_work;            /**< Work item applying it */
-    int dispatching;           /**< Busy depth: dispatch, relayout, switch */
-    twin_coord_t inset_bottom; /**< Reserved above the bottom bar (IME) */
-    twin_window_t *zombies;    /**< Destroyed while busy, freed when idle */
+    int dispatching;               /**< Busy depth: dispatch, relayout */
+    twin_coord_t inset_bottom;     /**< Reserved above the bottom bar (IME) */
+    twin_window_t *zombies;        /**< Destroyed while busy, freed when idle */
 
     twin_screen_stats_t stats; /**< Compositor work counters */
 
@@ -1138,14 +1136,13 @@ typedef struct twin_backend {
  * A policy decides window geometry, decorations, stacking, and how pointer
  * events reach clients.  window.c owns the window objects and calls into the
  * active policy at a handful of well-defined points; policies never free a
- * window.  The 'none' policy (wm.c) is always present.
+ * window.  The build selects one policy (_twin_wm_built); the 'none'
+ * policy (wm.c) is always present.
  */
 typedef struct _twin_wm_ops {
-    twin_wm_mode_t mode;
-
-    /* Policy becomes active / inactive.  enter() re-lays out and maps every
-     * window; returning false (e.g. out of memory for its state) makes the
-     * screen fall back to the 'none' policy. */
+    /* Policy becomes active when the screen is created, and inactive when
+     * it is destroyed.  enter() returns false when it cannot start (out of
+     * memory for its state); the screen is then not created. */
     bool (*enter)(twin_screen_t *screen);
     void (*leave)(twin_screen_t *screen);
 
@@ -1192,12 +1189,16 @@ typedef struct _twin_wm_ops {
 #error "CONFIG_WM_DESKTOP and CONFIG_WM_MOBILE are mutually exclusive"
 #endif
 
+/* 'none' is also what a screen falls back to while it is torn down */
 extern const twin_wm_ops_t _twin_wm_none;
 #if defined(CONFIG_WM_DESKTOP)
 extern const twin_wm_ops_t _twin_wm_desktop;
-#endif
-#if defined(CONFIG_WM_MOBILE)
+#define _twin_wm_built _twin_wm_desktop
+#elif defined(CONFIG_WM_MOBILE)
 extern const twin_wm_ops_t _twin_wm_mobile;
+#define _twin_wm_built _twin_wm_mobile
+#else
+#define _twin_wm_built _twin_wm_none
 #endif
 
 /* window.c services used by policies */
@@ -1212,10 +1213,10 @@ bool _twin_window_shown(const twin_window_t *window);
 bool _twin_window_managed(const twin_window_t *window);
 void _twin_window_raise(twin_window_t *window);
 /*
- * Client callbacks run while the screen is busy (an event, a relayout, a
- * policy switch).  A window destroyed then is torn down and unlinked at
- * once, but its struct stays readable (window->dead) until the outermost
- * busy section ends, so code holding the pointer can check it.
+ * Client callbacks run while the screen is busy (an event, a relayout).  A
+ * window destroyed then is torn down and unlinked at once, but its struct stays
+ * readable (window->dead) until the outermost busy section ends, so code
+ * holding the pointer can check it.
  */
 void _twin_screen_busy(twin_screen_t *screen);
 void _twin_screen_idle(twin_screen_t *screen);
@@ -1223,9 +1224,6 @@ void _twin_screen_idle(twin_screen_t *screen);
 /* screen.c: route a pointer event to windows (grab, hover, delivery),
  * skipping the policy's gesture filter */
 bool _twin_screen_route(twin_screen_t *screen, twin_event_t *event);
-
-/* wm.c: forget a policy switch queued from an event handler */
-void _twin_screen_drop_pending_wm(twin_screen_t *screen);
 
 /* wm.c: re-lay out every window after the screen, the bars or the inset
  * changed, then let the policy re-place the stack */

@@ -11,24 +11,22 @@ without graphics acceleration.
 
 A window is a pixmap plus client callbacks.  Everything else (where the
 window goes, whether it has a title bar, which window gets the pointer,
-what happens when it closes) belongs to a *window manager policy* selected
-at run time:
+what happens when it closes) belongs to a *window manager policy* chosen
+when the library is built:
 
-| Policy | `twin_wm_mode_t` | Behavior | Kconfig |
-|--------|------------------|----------|---------|
-| none | `TwinWmNone` | No decorations; application windows cover the screen; the newest window, or the one last pressed, has the keyboard, and hiding it hands the keyboard to the window below. | always built |
-| desktop | `TwinWmDesktop` | Overlapping decorated windows, click-to-raise, drag-to-move (the title bar always stays reachable), double-click the title to maximize, drop on a screen edge to snap, drag the bottom-right client corner to resize, iconify, close, shadow under the active window. New windows cascade off occupied spots. | `WM_DESKTOP` |
-| mobile | `TwinWmMobile` | Application windows stack over the work area between optional system bars; only the top one is visible; animated push/pop/dismiss, an edge-swipe back gesture and Escape for back. | `WM_MOBILE` |
+| Policy | Behavior | Kconfig |
+|--------|----------|---------|
+| none | No decorations; application windows cover the screen; the newest window, or the one last pressed, has the keyboard, and hiding it hands the keyboard to the window below. | `WM_NONE` |
+| desktop | Overlapping decorated windows, click-to-raise, drag-to-move (the title bar always stays reachable), double-click the title to maximize, drop on a screen edge to snap, drag the bottom-right client corner to resize, iconify, close, shadow under the active window. New windows cascade off occupied spots. | `WM_DESKTOP` |
+| mobile | Application windows stack over the work area between optional system bars; only the top one is visible; animated push/pop/dismiss, an edge-swipe back gesture and Escape for back. | `WM_MOBILE` |
 
-The desktop and mobile policies are mutually exclusive: the Kconfig
-"Window manager" choice builds one of them, or neither (`WM_NONE`), and
-`twin_screen_set_wm()` switches between that one and none at run time.
-Keeping one interactive policy per build keeps its code and state out of
-targets that never use it, and a product ships as a phone or a desktop,
-not both.
+The Kconfig "Window manager" choice builds exactly one of them, and every
+screen runs it for its whole life: there is no switching and no run-time
+check of which policy is active.  Keeping one policy per build keeps the
+others' code and state out of targets that never use them, and a product
+ships as a phone, a desktop or a kiosk, not as all three.
 
 ```c
-twin_screen_set_wm(screen, TwinWmNone);     /* switch at run time */
 twin_screen_set_bars(screen, status, nav);  /* mobile system bars */
 twin_window_close(window);                  /* WM-aware close */
 twin_window_back(window);                   /* in-app back, else close */
@@ -43,23 +41,15 @@ geometry: `TwinWindowPlain` (placed exactly as requested, never decorated),
 (above everything, e.g. a lock screen).  The same app code therefore runs
 decorated on a desktop, stacked on a phone, or full screen with no window
 manager at all.  The demo apps are the proof.  `apps/apps.c` registers
-every app that is built together with the policies it runs under:
-ordinary apps are marked for all three, and the phone shell, which owns the
-screen, for the mobile policy only.  The desktop scene opens the apps as
-overlapping windows, the phone launcher lists every app marked for mobile
-and the policy stacks its windows, and the 'none' scene shows one full
-screen.  `test-demos` runs each app under every policy it is marked for
-that the build has.
-
-Switching policies re-lays out every existing window: decorations are added
-or removed, application windows are cascaded or stacked, and, with
-`WM_MOBILE_EVICT`, pixels of windows the new policy keeps hidden are
-released.  A switch requested from
-an event handler is applied once that event has been delivered; a later
-request replaces it, and if it cannot be queued (out of memory) the call
-fails and the current policy stays.  `screen->windows` lists
-every window bottom to top and is the stacking order for all policies, so a
-switch preserves which window is on top.
+every app that is built, and which policies an app runs under is settled
+at build time too: ordinary apps run under all three, while the phone
+shell, which owns the screen, depends on `WM_MOBILE` in Kconfig and is
+compiled in only there.  A desktop build opens the apps as overlapping
+windows, the phone launcher lists them and the mobile policy stacks their
+windows, and a `WM_NONE` build shows the first one full screen.
+`test-demos` runs each app under the policy of the build.
+`screen->windows` lists every window bottom to top and is the stacking
+order for all policies.
 
 The policy interface (`twin_wm_ops_t` in `src/twin_private.h`) has twelve
 hooks: enter/leave, layout, map/unmap, decorate, dispatch, hit test, a
@@ -88,9 +78,9 @@ Pointer grabs are explicit: the release goes to the window that took the
 press, even when the pointer ends up over another one, and hover updates
 re-check their targets after each Leave/Enter handler, so a window may
 destroy itself from any of its own handlers.  Generic code never asks
-which policy is running.  `src/wm.c` holds the always present `none` policy
-and the switching logic; `src/wm-desktop.c` and `src/wm-mobile.c` are the
-two optional policies.
+which policy is running.  `src/wm.c` holds the screen-wide services and
+the `none` policy, which a screen also falls back to while it is torn
+down; `src/wm-desktop.c` and `src/wm-mobile.c` are the other two.
 
 Policy state stays out of the compositor.  Iconifying, for instance, is the
 desktop policy limiting how many rows of the window's pixmap are shown
@@ -110,7 +100,7 @@ is freed immediately and never touched by the animation.
 
 Every arrangement ends in `mobile_settle()`, which derives the visible set
 from the window list alone.  Transitions only perturb positions and opacity
-in between, so interrupting one (a tap, a second push, a policy switch) is
+in between, so interrupting one (a tap, a second push, a resize) is
 always safe: finish, settle, start the next.
 
 ### Memory: one surface regardless of stack depth
@@ -295,11 +285,11 @@ $ make defconfig
 $ python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig WM_MOBILE=y
 $ python3 tools/kconfig/genconfig.py configs/Kconfig
 $ make
-$ ./demo-sdl                      # phone (default scene of this build)
-$ MADO_SCENE=none ./demo-sdl      # single app, no window manager
+$ ./demo-sdl                      # the phone
 ```
 
-The desktop demos are the default build's scene.
+The default build runs the desktop demos; a `WM_NONE=y` build shows a
+single app with no window manager.
 
 Drag the lock screen knob to unlock.  Drag from the left edge of an app, or
 press Escape, to go back.  A hardware keyboard types into the focused
@@ -315,17 +305,17 @@ built-in renderer every frame is bit-exact across hosts.
 - `test-core`: damage merging, compositor paths, shadows, opacity, stub
   pixmaps, text, gradients, tweens, closure lifetime, scroll blitting,
   multi-rectangle window damage, public accessors, leaks.
-- `test-wm`: placement and input under each policy, desktop activation,
+- `test-wm`: placement and input under the built policy, desktop activation,
   focus after iconify/close, cycling, drag clamping, maximize, snap,
   resize and releases outside the grab, windows destroying themselves from
   their handlers, mobile push/pop/swipe/dismiss with mid-transition checks,
   edge taps, back handling, bars hidden/replaced/destroyed/resized, the
-  keyboard inset, screen rotation, eviction memory, and run-time switching
-  including mid-swipe, superseded and out-of-memory requests.
+  keyboard inset, screen rotation and, with `WM_MOBILE_EVICT`, the memory
+  of covered windows.
 - `test-lifetime`: callbacks that run while an object is torn down, or
   that act on the object calling them.
 - `test-demos`: every registry app except the phone shell (covered by
-  `test-cellphone`) under the built policy and 'none': placement,
+  `test-cellphone`) under the built policy: placement,
   consistency while it runs, repainting revealed windows, closing window
   by window, a start that runs out of memory, leaks.
 - `test-cellphone` (mobile builds): boots the phone with a fixed clock and
@@ -347,7 +337,7 @@ The checks are layered:
   skipped when those differ.  `make check-update` records new ones;
   `MADO_SCREENSHOTS=dir` writes PPM screenshots of every golden frame.
 - **Work and memory gates.**  Heap returns to its baseline after app
-  cycles and policy switches; covered screens cost no pixels; per-tick
+  cycles; covered screens cost no pixels; per-tick
   repaint area of animated screens is bounded through `twin_screen_stats()`.
 
 CI runs the suites under the default configuration, Valgrind,

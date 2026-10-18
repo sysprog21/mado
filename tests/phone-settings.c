@@ -242,6 +242,4 @@ void test_settings(void)
     ph_home();
     CHECK_EQ(phone_theme_index(), 0, "theme 0 at exit");
     CHECK_EQ(phone_wallpaper(), 0, "wallpaper 0 at exit");
-    CHECK_EQ(twin_screen_get_wm(phone_screen()), TwinWmMobile,
-             "mobile scene at exit");
 }

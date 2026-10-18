@@ -30,7 +30,7 @@ static twin_pixmap_t *solid(twin_format_t fmt,
 
 static void test_damage_merge(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     twin_screen_t *s = t->screen;
 
     twin_screen_damage(s, 0, 0, 10, 10);
@@ -96,7 +96,7 @@ static void build_scene(th_t *t, twin_pixmap_t **out, int *n)
 
 static void test_occlusion_differential(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     twin_pixmap_t *p[8];
     int n;
     build_scene(t, p, &n);
@@ -158,7 +158,7 @@ static uint32_t full_frame(th_t *t, unsigned debug)
  */
 static void test_row_fallback(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     twin_pixmap_t *p[8];
     int n;
     build_scene(t, p, &n);
@@ -201,8 +201,10 @@ static void test_row_fallback(void)
 
 static void test_shadow(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
+    /* White whatever the window manager paints behind everything */
     t->screen->background_color = 0xffffffff;
+    twin_screen_damage(t->screen, 0, 0, W, H);
     twin_pixmap_t *p = solid(TWIN_ARGB32, 40, 40, 0xff000080);
     twin_pixmap_move(p, 40, 40);
     twin_pixmap_set_shadow(p, 4, 4, 6, 0xc0);
@@ -232,7 +234,7 @@ static void test_shadow(void)
 
 static void test_rgb16_and_opacity(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     t->screen->background_color = 0xff000000;
     twin_pixmap_t *p = solid(TWIN_RGB16, 20, 20, 0xffff0000);
     twin_pixmap_show(p, t->screen, NULL);
@@ -498,7 +500,7 @@ static bool finish_and_stop(twin_fixed_t v, void *closure)
 
 static void test_tween(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     tween_probe_t a = {.monotonic = true};
     twin_tween_start(200, TwinEaseOutCubic, tween_probe, &a);
     th_advance(t, 400);
@@ -562,7 +564,7 @@ static twin_time_t once(twin_time_t now, void *closure)
 
 static void test_closure_churn(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     /* Far more distinct closures than the tracker holds at once */
     for (int i = 0; i < 4 * TWIN_MAX_CLOSURES; i++) {
         void *owner = malloc(16);
@@ -619,7 +621,7 @@ static void scroll_draw(twin_window_t *w)
 
 static void test_scroll(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     scroll_state_t st = {0, -1};
     twin_window_t *w = twin_window_create(t->screen, TWIN_ARGB32,
                                           TwinWindowPlain, 10, 10, 80, 96);
@@ -676,7 +678,7 @@ static void probe_draw(twin_window_t *w)
 
 static void test_window_damage_rects(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     damage_probe_t probe = {0};
     twin_window_t *w =
         twin_window_create(t->screen, TWIN_ARGB32, TwinWindowPlain, 0, 0, W, H);
@@ -766,7 +768,7 @@ static void test_translated_source(void)
 
 static void test_leaks(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     th_frame(t);
     size_t base = th_heap_net(t);
     for (int i = 0; i < 20; i++) {
@@ -830,7 +832,7 @@ static twin_dispatch_result_t custom_handler(twin_widget_t *widget,
 /* Destroying a toplevel releases every widget the toolkit created for it */
 static void test_widget_teardown(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     th_frame(t);
     size_t base = th_heap_net(t);
     for (int round = 0; round < 3; round++) {
@@ -888,7 +890,7 @@ static twin_time_t cancel_victim_tween(twin_time_t now, void *closure)
 
 static void test_cleared_in_pass(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     int a, b;
     victim_runs = 0;
     twin_set_timeout(clear_victim, 0, &a);
@@ -964,7 +966,7 @@ static void stale_draw(twin_window_t *w)
 
 static void test_destroyed_paint(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     twin_window_t *w = twin_window_create(t->screen, TWIN_ARGB32,
                                           TwinWindowPlain, 0, 0, 50, 50);
     w->draw = stale_draw;
@@ -989,7 +991,7 @@ static void on_draw(twin_window_t *window)
 
 static void test_accessors(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     CHECK(
         twin_screen_width(t->screen) == W && twin_screen_height(t->screen) == H,
         "screen size");

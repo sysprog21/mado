@@ -7,7 +7,7 @@
 /*
  * Cellphone scenario test: boots the phone headless with a fixed clock and
  * drives the user journey (unlock, every app, navigation, swipe-back,
- * paging, keyboard input, theme switch, window-manager scene switch).
+ * paging, keyboard input, theme switch, apps opened from the launcher).
  *
  * Gates:
  *  - structure: stack depth, top view, focus after each step
@@ -249,7 +249,7 @@ static void test_budgets(void)
 int main(void)
 {
     phone_set_clock_source(fixed_clock);
-    t = phone_th = th_create(PHONE_W, PHONE_H, TwinWmMobile);
+    t = phone_th = th_create(PHONE_W, PHONE_H);
     phone_boot(t->screen);
     th_settle(t, 2000);
 

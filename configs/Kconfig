@@ -231,10 +231,8 @@ choice
     prompt "Window manager"
     default WM_DESKTOP
     help
-      Select the window manager policy built into the library.  Only one
-      can be built at a time; the 'none' policy (no decorations, no
-      placement) is always available besides it, and
-      twin_screen_set_wm() switches between the two at run time.
+      Select the window manager built into the library.  Every screen
+      runs it for its whole life: there is no switching at run time.
 
 config WM_DESKTOP
     bool "Desktop window manager"
@@ -242,7 +240,6 @@ config WM_DESKTOP
       Overlapping windows with title bars, click-to-raise, drag-to-move,
       double-click maximize, edge snapping, corner resizing,
       iconify/restore, close, and a drop shadow under the active window.
-      Selected at run time with twin_screen_set_wm(screen, TwinWmDesktop).
 
       Costs ~3-4 KB .text on ARM Cortex-M class targets.
 
@@ -254,14 +251,13 @@ config WM_MOBILE
       top application is visible, and push/pop/dismiss transitions plus
       an edge-swipe back gesture animate retained pixels without
       repainting applications.  Escape also goes back.
-      Selected at run time with twin_screen_set_wm(screen, TwinWmMobile).
 
 config WM_NONE
     bool "None"
     help
-      Build only the 'none' policy: no decorations, every application
-      window covers the screen, and the keyboard goes to the newest or the
-      last pressed window.
+      No window manager: no decorations, every application window covers
+      the screen, and the keyboard goes to the newest or the last pressed
+      window.  The demo launcher starts only the first demo.
 
 endchoice
 
@@ -428,10 +424,9 @@ config DEMO_CELLPHONE
     help
       Phone user interface: lock screen, home screen, dialer, contacts,
       messages, calculator, music, photos, camera, settings, call log and
-      games, drawn with vector graphics on the mobile window manager.
-      Every other app in apps/apps.c marked for the mobile policy (the
-      demos selected below) gets a launcher icon too and runs as a
-      stacked app; Back closes its windows one at a time.
+      games on the mobile window manager, which it needs.  The other demos
+      selected below get launcher icons too and run as stacked apps; Back
+      closes their windows one at a time.
 
 config DEMO_CELLPHONE_RGB16
     bool "Use RGB565 surfaces for phone screens"
@@ -441,32 +436,6 @@ config DEMO_CELLPHONE_RGB16
       Halve the memory of every phone screen by rendering into 16-bit
       surfaces.  RGB565 has no alpha channel, so screens are always
       opaque, at the cost of some banding in gradients.
-
-choice
-    prompt "Demo scene at startup"
-    depends on DEMO_APPLICATIONS
-    default DEMO_SCENE_MOBILE if WM_MOBILE
-    default DEMO_SCENE_DESKTOP
-    help
-      The window manager the demo launcher starts under.  Each app in
-      apps/apps.c is marked with the window managers it runs under; the
-      launcher starts those marked for the scene, or the shell that owns
-      it (the phone under the mobile policy).  'No window manager' shows
-      the first app full screen.  MADO_SCENE=mobile|desktop|none overrides
-      the choice at run time.
-
-config DEMO_SCENE_MOBILE
-    bool "Mobile"
-    depends on WM_MOBILE
-
-config DEMO_SCENE_DESKTOP
-    bool "Desktop"
-    depends on WM_DESKTOP
-
-config DEMO_SCENE_NONE
-    bool "No window manager"
-
-endchoice
 
 config DEMO_MULTI
     bool "Build multi demo"

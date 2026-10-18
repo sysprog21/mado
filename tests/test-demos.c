@@ -5,9 +5,9 @@
  */
 
 /*
- * Every app in the registry (apps.h) under each window manager it is marked
- * for that this build has: the built policy (desktop or mobile) and 'none'.
- * Each app is started on a fresh screen, run for a while, poked, and then
+ * Every app in the registry (apps.h) under the window manager this build
+ * has, which is one the app runs under: the registry lists no other.  Each
+ * app is started on a fresh screen, run for a while, poked, and then
  * closed window by window the way a user would (Back under the mobile
  * policy, close otherwise).  Its windows must stay where the policy can
  * reach them, frames must match a full recomposite, and closing must return
@@ -18,14 +18,15 @@
 #include "harness.h"
 
 #if defined(CONFIG_WM_MOBILE)
-#define BUILT_WM TwinWmMobile
+#define SCENE "mobile"
 #define W 240
 #define H 320
 #elif defined(CONFIG_WM_DESKTOP)
-#define BUILT_WM TwinWmDesktop
+#define SCENE "desktop"
 #define W 640
 #define H 480
 #else
+#define SCENE "none"
 #define W 640
 #define H 480
 #endif
@@ -50,7 +51,11 @@ static twin_window_t *top_app(twin_screen_t *screen, int *count)
 static void check_placement(th_t *t, const char *what)
 {
     twin_rect_t area = twin_screen_work_area(t->screen);
-    bool fills = t->screen->wm->mode != TwinWmDesktop;
+#if defined(CONFIG_WM_DESKTOP)
+    const bool fills = false;
+#else
+    const bool fills = true;
+#endif
     for (twin_window_t *w = t->screen->windows; w; w = w->wm_next) {
         /* Windows a policy keeps hidden (covered on a phone) do not count */
         if (w->style != TwinWindowApplication || !_twin_window_shown(w))
@@ -84,12 +89,12 @@ static bool painted(th_t *t, const twin_window_t *w)
     return false;
 }
 
-static void run(const apps_entry_t *d, twin_wm_mode_t mode, const char *scene)
+static void run(const apps_entry_t *d)
 {
     char what[96];
-    snprintf(what, sizeof(what), "%s under %s", d->name, scene);
+    snprintf(what, sizeof(what), "%s under %s", d->name, SCENE);
 
-    th_t *t = th_create(W, H, mode);
+    th_t *t = th_create(W, H);
     th_settle(t, 500);
     /* First pass warms the glyph and coverage caches; the second measures */
     size_t base = 0;
@@ -115,10 +120,11 @@ static void run(const apps_entry_t *d, twin_wm_mode_t mode, const char *scene)
             twin_window_t *top = top_app(t->screen, NULL);
             if (!top)
                 break;
-            if (mode == TwinWmMobile)
-                twin_window_back(top);
-            else
-                twin_window_close(top);
+#if defined(CONFIG_WM_MOBILE)
+            twin_window_back(top);
+#else
+            twin_window_close(top);
+#endif
             th_settle(t, 2000);
             twin_window_t *next = top_app(t->screen, NULL);
             if (next && next->pixmap && _twin_window_shown(next))
@@ -141,9 +147,9 @@ static void run(const apps_entry_t *d, twin_wm_mode_t mode, const char *scene)
 /* Out of memory from the first allocation: the start reports failure and
  * leaves neither a window nor a byte behind.  (Failures deeper in, while
  * text and paths are painted, are not handled by the core yet.) */
-static void run_out_of_memory(const apps_entry_t *d, twin_wm_mode_t mode)
+static void run_out_of_memory(const apps_entry_t *d)
 {
-    th_t *t = th_create(W, H, mode);
+    th_t *t = th_create(W, H);
     th_settle(t, 500);
     size_t base = th_heap_net(t);
     _twin_alloc_fail_next = 1;
@@ -170,24 +176,10 @@ int main(void)
         /* Shells own the screen and have suites of their own */
         if (d->shell)
             continue;
-        /* Each policy the app is marked for that this build has */
-        const twin_wm_mode_t modes[] = {
-#if defined(BUILT_WM)
-            BUILT_WM,
-#endif
-            TwinWmNone,
-        };
-        for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); m++) {
-            if (!apps_runs_under(d, modes[m]))
-                continue;
-            run(d, modes[m],
-                modes[m] == TwinWmMobile    ? "mobile"
-                : modes[m] == TwinWmDesktop ? "desktop"
-                                            : "none");
+        run(d);
 #if defined(CONFIG_MEMORY_STATS)
-            run_out_of_memory(d, modes[m]);
+        run_out_of_memory(d);
 #endif
-        }
     }
     twin_cache_flush();
     return th_report("demos");

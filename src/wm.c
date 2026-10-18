@@ -5,9 +5,10 @@
  */
 
 /*
- * Window manager selection and the 'none' policy
+ * Screen-wide window management services and the 'none' policy
  *
- * The 'none' policy is the floor every build has: Plain windows map where
+ * The 'none' policy is what a WM_NONE build runs, and what every screen
+ * falls back to while it is torn down: Plain windows map where
  * the application asked, Application and Fullscreen windows cover the
  * screen, nothing is decorated, and a button press focuses the window under
  * the pointer.  It costs a few hundred bytes of code and no state, which is
@@ -73,128 +74,12 @@ static bool none_dispatch(twin_window_t *window, twin_event_t *event)
     return _twin_window_deliver(window, event);
 }
 
-static bool none_enter(twin_screen_t *screen)
-{
-    for (twin_window_t *w = screen->windows; w; w = w->wm_next) {
-        _twin_window_relayout(w);
-        if (w->mapped)
-            none_map(w);
-    }
-    return true;
-}
-
 const twin_wm_ops_t _twin_wm_none = {
-    .mode = TwinWmNone,
-    .enter = none_enter,
     .layout = none_layout,
     .map = none_map,
     .unmap = none_unmap,
     .dispatch = none_dispatch,
 };
-
-static const twin_wm_ops_t *_twin_wm_lookup(twin_wm_mode_t mode)
-{
-    switch (mode) {
-    case TwinWmNone:
-        return &_twin_wm_none;
-#if defined(CONFIG_WM_DESKTOP)
-    case TwinWmDesktop:
-        return &_twin_wm_desktop;
-#endif
-#if defined(CONFIG_WM_MOBILE)
-    case TwinWmMobile:
-        return &_twin_wm_mobile;
-#endif
-    default:
-        return NULL;
-    }
-}
-
-static void _twin_screen_switch_wm(twin_screen_t *screen,
-                                   const twin_wm_ops_t *ops)
-{
-    if (screen->wm == ops)
-        return;
-
-    _twin_screen_busy(screen);
-    twin_screen_disable_update(screen);
-    if (screen->wm->leave)
-        screen->wm->leave(screen);
-
-    /* Neutral state: nothing shown, no policy-specific attributes. */
-    for (twin_window_t *w = screen->windows; w; w = w->wm_next) {
-        /* A window being destroyed may already have lost its pixmap */
-        if (!w->pixmap)
-            continue;
-        twin_pixmap_hide(w->pixmap);
-        w->pixmap->scan_height = w->pixmap->height; /* not iconified */
-        w->active = false;
-        w->pixmap->opacity = 0xff;
-        w->pixmap->shadow = (twin_shadow_t) {0};
-    }
-    screen->background_color = 0xffffffff;
-    screen->active = NULL;
-    screen->target = NULL;
-    screen->clicklock = false;
-
-    screen->wm = ops;
-    if (!ops->enter || !ops->enter(screen)) {
-        screen->wm = &_twin_wm_none;
-        none_enter(screen);
-    }
-    twin_screen_damage(screen, 0, 0, screen->width, screen->height);
-    twin_screen_enable_update(screen);
-    _twin_screen_idle(screen);
-}
-
-void _twin_screen_drop_pending_wm(twin_screen_t *screen)
-{
-    if (screen->wm_work)
-        twin_clear_work(screen->wm_work);
-    screen->wm_work = NULL;
-    screen->wm_pending = NULL;
-}
-
-static bool _twin_screen_apply_pending_wm(void *closure)
-{
-    twin_screen_t *screen = closure;
-    const twin_wm_ops_t *ops = screen->wm_pending;
-    screen->wm_pending = NULL;
-    screen->wm_work = NULL;
-    if (ops)
-        _twin_screen_switch_wm(screen, ops);
-    return false;
-}
-
-bool twin_screen_set_wm(twin_screen_t *screen, twin_wm_mode_t mode)
-{
-    const twin_wm_ops_t *ops = _twin_wm_lookup(mode);
-    if (!ops)
-        return false;
-
-    /* Switching re-lays out every window, including the one whose event
-     * is being delivered, and frees the old policy's state: never do that
-     * underneath a running dispatch. */
-    if (screen->dispatching) {
-        if (!screen->wm_work)
-            screen->wm_work = twin_set_work(_twin_screen_apply_pending_wm,
-                                            TWIN_WORK_LAYOUT, screen);
-        /* Out of memory: refuse rather than switch under the dispatch */
-        if (!screen->wm_work)
-            return false;
-        screen->wm_pending = ops == screen->wm ? NULL : ops;
-        return true;
-    }
-    /* A newer request replaces whatever a handler queued */
-    _twin_screen_drop_pending_wm(screen);
-    _twin_screen_switch_wm(screen, ops);
-    return screen->wm == ops;
-}
-
-twin_wm_mode_t twin_screen_get_wm(const twin_screen_t *screen)
-{
-    return screen->wm_pending ? screen->wm_pending->mode : screen->wm->mode;
-}
 
 void _twin_screen_relayout(twin_screen_t *screen)
 {

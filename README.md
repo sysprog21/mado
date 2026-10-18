@@ -140,16 +140,10 @@ $ make
 $ ./demo-sdl                      # phone; drag from the left edge to go back
 ```
 
-Either build also runs with no window manager at all:
-
-```shell
-$ MADO_SCENE=none ./demo-sdl
-```
-
-`twin_screen_set_wm()` switches between the built policy and the 'none'
-policy at run time.  Each demo app is registered in `apps/apps.c` with the
-window managers it runs under: all three by default, the mobile one only
-for the phone shell.  See [docs/phone.md](docs/phone.md) for the design of
+`WM_NONE=y` builds with no window manager at all, showing a single app.
+The window manager is fixed for the life of the build: nothing switches
+or checks it at run time.  The demo apps in `apps/apps.c` run under all
+three; the phone shell depends on `WM_MOBILE` and is built only there.  See [docs/phone.md](docs/phone.md) for the design of
 the window manager, compositor and caches.
 
 ### Verification

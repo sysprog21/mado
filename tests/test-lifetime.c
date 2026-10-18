@@ -85,7 +85,7 @@ static void schedule_on_destroy(twin_window_t *w)
 
 static void test_window_destroy_schedules(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     probe_t p = {0};
     twin_window_t *w = probe_window(t, &p, TwinWindowApplication, 0, 0);
     w->destroy = schedule_on_destroy;
@@ -124,7 +124,7 @@ static twin_dispatch_result_t repaint_on_destroy(twin_widget_t *widget,
 
 static void test_toplevel_destroy_repaint(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     twin_toplevel_t *top = twin_toplevel_create(
         t->screen, TWIN_ARGB32, TwinWindowApplication, 0, 0, W, H, "t");
     twin_label_t *label = twin_label_create(
@@ -151,7 +151,7 @@ static void test_toplevel_destroy_repaint(void)
  */
 static void test_desktop_destroy_unshown(void)
 {
-    th_t *t = th_create(W, H, TwinWmDesktop);
+    th_t *t = th_create(W, H);
     probe_t pa = {0}, pp = {0}, pb = {0};
     twin_window_t *a = probe_window(t, &pa, TwinWindowApplication, 10, 10);
     twin_window_show(a);
@@ -180,17 +180,18 @@ static void test_desktop_destroy_unshown(void)
 /*
  * Under the mobile policy a destroyed app's pixels are adopted to animate
  * the pop, leaving window->pixmap NULL while the destroy callback runs.
- * Switching policy from that callback must skip the window, not crash.
+ * Re-laying out every window from that callback must skip the window, not
+ * crash.
  */
-static void switch_wm_on_destroy(twin_window_t *w)
+static void relayout_on_destroy(twin_window_t *w)
 {
     CHECK(!w->pixmap, "pixels adopted for the pop animation");
-    CHECK(twin_screen_set_wm(w->screen, TwinWmNone), "switch to 'none'");
+    twin_screen_set_inset(w->screen, 30);
 }
 
-static void test_wm_switch_from_destroy(void)
+static void test_relayout_from_destroy(void)
 {
-    th_t *t = th_create(W, H, TwinWmMobile);
+    th_t *t = th_create(W, H);
     probe_t pa = {0}, pb = {0};
     twin_window_t *a = probe_window(t, &pa, TwinWindowApplication, 0, 0);
     twin_window_show(a);
@@ -200,12 +201,12 @@ static void test_wm_switch_from_destroy(void)
     th_settle(t, 1000);
     CHECK(b->pixmap->screen && b->pixmap->x == 0, "second app on top");
 
-    b->destroy = switch_wm_on_destroy;
+    b->destroy = relayout_on_destroy;
     twin_window_destroy(b);
     th_settle(t, 1000);
-    CHECK_EQ(twin_screen_get_wm(t->screen), TwinWmNone, "policy switched");
-    CHECK(a->pixmap && a->pixmap->screen, "remaining app shown");
-    CHECK_EQ(th_damage_check(t), 0, "screen consistent after the switch");
+    CHECK(a->pixmap && a->pixmap->screen && a->pixmap->height == H - 30,
+          "remaining app shown above the inset");
+    CHECK_EQ(th_damage_check(t), 0, "screen consistent after the relayout");
 
     twin_window_destroy(a);
     th_destroy(t);
@@ -236,7 +237,7 @@ static bool self_finish(twin_fixed_t value, void *closure)
 
 static void test_tween_finish_from_proc(void)
 {
-    th_t *t = th_create(W, H, TwinWmNone);
+    th_t *t = th_create(W, H);
     self_finish_t s = {0};
     s.self = twin_tween_start(1000, TwinEaseLinear, self_finish, &s);
     th_advance(t, 100);
@@ -332,7 +333,7 @@ int main(void)
     test_desktop_destroy_unshown();
 #endif
 #if defined(CONFIG_WM_MOBILE)
-    test_wm_switch_from_destroy();
+    test_relayout_from_destroy();
 #endif
     test_tween_finish_from_proc();
     test_cache_collision();

@@ -30,8 +30,8 @@ typedef struct {
     twin_coord_t width, height;
 } th_t;
 
-/* Create a screen of the given size under the given window manager */
-th_t *th_create(twin_coord_t width, twin_coord_t height, twin_wm_mode_t wm);
+/* Create a screen of the given size (under the window manager built in) */
+th_t *th_create(twin_coord_t width, twin_coord_t height);
 void th_destroy(th_t *t);
 
 /* Resize the screen (rotation, host window resize) and its framebuffer */

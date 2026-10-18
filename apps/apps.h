@@ -5,10 +5,14 @@
  */
 
 /*
- * Registry of the demo applications that are built, and of the window
- * managers each one runs under.  The demo launcher (main.c), the phone's
- * home screen and the tests all read it, so a new app is listed everywhere
- * by adding one entry.
+ * Registry of the demo applications that are built.  The demo launcher
+ * (main.c), the phone's home screen and the tests all read it, so a new app
+ * is listed everywhere by adding one entry.
+ *
+ * Which window managers an app runs under is settled at build time, like
+ * the window manager itself: an app runs under all of them unless its
+ * Kconfig option depends on one (DEMO_CELLPHONE depends on WM_MOBILE), and
+ * its entry is compiled in only when it can run.
  */
 
 #ifndef _APPS_H_
@@ -17,16 +21,9 @@
 #include <stdbool.h>
 #include <twin.h>
 
-/* Window managers an app runs under: one bit per twin_wm_mode_t.  Apps
- * that create ordinary windows run under every policy (APPS_WM_ALL). */
-#define APPS_WM(mode) (1u << (mode))
-#define APPS_WM_ALL \
-    (APPS_WM(TwinWmNone) | APPS_WM(TwinWmDesktop) | APPS_WM(TwinWmMobile))
-
 typedef struct apps_entry {
     const char *name; /* window title and launcher label */
     const char *icon; /* TWIN_SYM_* shown by launchers */
-    unsigned wm;      /* APPS_WM() bits of the policies it runs under */
     /* Takes over the screen and launches the other apps itself (the phone
      * shell): started alone, on a screen of its own w x h */
     bool shell;
@@ -39,10 +36,5 @@ typedef struct apps_entry {
 
 int apps_count(void);
 const apps_entry_t *apps_at(int idx);
-
-static inline bool apps_runs_under(const apps_entry_t *app, twin_wm_mode_t mode)
-{
-    return app->wm & APPS_WM(mode);
-}
 
 #endif /* _APPS_H_ */

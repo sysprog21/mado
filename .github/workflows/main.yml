@@ -90,7 +90,7 @@ jobs:
             sudo apt-get install -y libsdl2-dev libjpeg-dev libpng-dev
     - name: AddressSanitizer + UndefinedBehaviorSanitizer
       run: |
-            for wm in WM_DESKTOP WM_MOBILE; do
+            for wm in WM_DESKTOP WM_MOBILE WM_NONE; do
               make defconfig
               python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig $wm=y
               python3 tools/kconfig/genconfig.py configs/Kconfig

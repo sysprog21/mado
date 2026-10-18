@@ -1163,15 +1163,15 @@ extern const twin_backend_t g_twin_backend;
     "Select exactly one of CONFIG_WM_DESKTOP, CONFIG_WM_MOBILE, CONFIG_WM_NONE"
 #endif
 
+/* Title bars: decorate(), hit() and activate() (desktop) */
 #if defined(CONFIG_WM_DESKTOP)
-#define TWIN_WM_DECORATES 1 /* title bars: decorate(), hit(), activate() */
+#define TWIN_WM_DECORATES 1
 #else
 #define TWIN_WM_DECORATES 0
 #endif
+/* System bars and a work area: filter() and work_area() (mobile) */
 #if defined(CONFIG_WM_MOBILE)
-#define TWIN_WM_BARS                                        \
-    1 /* system bars and a work area: filter(), work_area() \
-       */
+#define TWIN_WM_BARS 1
 #else
 #define TWIN_WM_BARS 0
 #endif

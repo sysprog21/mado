@@ -292,14 +292,12 @@ static const phone_app_t apps[] = {
 #define N_APPS ((int) (sizeof(apps) / sizeof(apps[0])))
 
 /* Then every other app of the shared registry (apps.c), in registry order:
- * a mobile build compiles in only apps that run under it */
+ * a mobile build compiles in only apps that run under it.  Listed at boot. */
 static phone_app_t demos[16];
-static int n_demos = -1;
+static int n_demos;
 
 static void _list_demos(void)
 {
-    if (n_demos >= 0)
-        return;
     static const twin_argb32_t accents[] = {
         UI_RGB(0x0f766e), UI_RGB(0x78716c), UI_RGB(0xa855f7),
         UI_RGB(0xd946ef), UI_RGB(0x84cc16), UI_RGB(0x0ea5e9),
@@ -323,7 +321,6 @@ static void _list_demos(void)
 
 int phone_app_count(void)
 {
-    _list_demos();
     return N_APPS + n_demos;
 }
 
@@ -331,7 +328,6 @@ const phone_app_t *phone_app_at(int idx)
 {
     if (idx >= 0 && idx < N_APPS)
         return &apps[idx];
-    _list_demos();
     return idx >= N_APPS && idx < N_APPS + n_demos ? &demos[idx - N_APPS]
                                                    : NULL;
 }
@@ -512,14 +508,24 @@ static int nav_hit(twin_coord_t x, twin_coord_t y)
     return -1;
 }
 
-static bool is_app_window(twin_window_t *w);
+/* The stack holds phone views and the windows of registry apps alike */
+static bool is_app_window(twin_window_t *w)
+{
+    return twin_window_is_mapped(w) &&
+           twin_window_style(w) == TwinWindowApplication;
+}
+
+static bool is_home(twin_window_t *w)
+{
+    return g_home && w == g_home->window;
+}
 
 /* Destroy every app window except home and @keep, without animation */
 static void _drop_apps(twin_window_t *keep)
 {
     for (twin_window_t *w = twin_screen_first_window(g_screen); w;) {
         twin_window_t *next = twin_window_next(w);
-        if (w != keep && is_app_window(w) && (!g_home || w != g_home->window))
+        if (w != keep && is_app_window(w) && !is_home(w))
             twin_window_destroy(w);
         w = next;
     }
@@ -568,13 +574,6 @@ static bool nav_event(twin_window_t *w, twin_event_t *ev)
 /*
  * Navigation
  */
-/* The stack holds phone views and the windows of registry apps alike */
-static bool is_app_window(twin_window_t *w)
-{
-    return twin_window_is_mapped(w) &&
-           twin_window_style(w) == TwinWindowApplication;
-}
-
 static twin_window_t *_top_app(void)
 {
     twin_window_t *top = NULL;
@@ -600,7 +599,7 @@ int phone_depth(void)
         return 0;
     for (twin_window_t *w = twin_screen_first_window(g_screen); w;
          w = twin_window_next(w))
-        if (is_app_window(w) && (!g_home || w != g_home->window))
+        if (is_app_window(w) && !is_home(w))
             n++;
     return n;
 }
@@ -629,14 +628,14 @@ void phone_open(int app)
 void phone_back(void)
 {
     twin_window_t *top = _top_app();
-    if (top && (!g_home || top != g_home->window))
+    if (top && !is_home(top))
         twin_window_back(top);
 }
 
 void phone_home(void)
 {
     twin_window_t *top = _top_app();
-    if (!top || (g_home && top == g_home->window))
+    if (!top || is_home(top))
         return;
     /* Hidden screens go first (no animation), then the visible one pops */
     _drop_apps(top);
@@ -713,6 +712,7 @@ bool phone_boot(twin_screen_t *screen)
     if (!ui_init())
         return false;
     g_screen = screen;
+    _list_demos();
 
     g_status = bar_create(0, PHONE_STATUS_H, status_draw, NULL);
     g_nav = bar_create(PHONE_H - PHONE_NAV_H, PHONE_NAV_H, nav_draw, nav_event);

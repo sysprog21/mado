@@ -31,21 +31,6 @@
 #define H 480
 #endif
 
-/* Topmost shown application window, and how many there are */
-static twin_window_t *top_app(twin_screen_t *screen, int *count)
-{
-    twin_window_t *top = NULL;
-    int n = 0;
-    for (twin_window_t *w = screen->windows; w; w = w->wm_next)
-        if (w->mapped && w->style == TwinWindowApplication) {
-            top = w;
-            n++;
-        }
-    if (count)
-        *count = n;
-    return top;
-}
-
 /* Where the policy must keep each window: inside the screen, and covering
  * the work area exactly under the policies that do not place windows */
 static void check_placement(th_t *t, const char *what)
@@ -76,19 +61,6 @@ static void check_placement(th_t *t, const char *what)
     }
 }
 
-/* A window the policy just revealed was painted again: a released
- * (evicted) window that nobody repainted comes back as one flat colour */
-static bool painted(th_t *t, const twin_window_t *w)
-{
-    twin_pixmap_t *p = w->pixmap;
-    twin_argb32_t first = th_pixel(t, p->x, p->y);
-    for (twin_coord_t y = p->y; y < p->y + p->height && y < t->height; y++)
-        for (twin_coord_t x = p->x; x < p->x + p->width && x < t->width; x++)
-            if (th_pixel(t, x, y) != first)
-                return true;
-    return false;
-}
-
 static void run(const apps_entry_t *d)
 {
     char what[96];
@@ -104,7 +76,7 @@ static void run(const apps_entry_t *d)
         CHECK(d->start(t->screen, d->x, d->y, d->w, d->h), "%s: started", what);
         th_settle(t, 2000);
         int n;
-        CHECK(top_app(t->screen, &n) && n > 0, "%s: opened a window", what);
+        CHECK(th_top_app(t->screen, &n) && n > 0, "%s: opened a window", what);
         check_placement(t, what);
         CHECK_EQ(th_damage_check(t), 0, what);
 
@@ -117,7 +89,7 @@ static void run(const apps_entry_t *d)
 
         /* Close what the demo opened, one window at a time */
         for (int guard = 0; guard < 16; guard++) {
-            twin_window_t *top = top_app(t->screen, NULL);
+            twin_window_t *top = th_top_app(t->screen, NULL);
             if (!top)
                 break;
 #if defined(CONFIG_WM_MOBILE)
@@ -126,11 +98,12 @@ static void run(const apps_entry_t *d)
             twin_window_close(top);
 #endif
             th_settle(t, 2000);
-            twin_window_t *next = top_app(t->screen, NULL);
+            twin_window_t *next = th_top_app(t->screen, NULL);
             if (next && next->pixmap && _twin_window_shown(next))
-                CHECK(painted(t, next), "%s: revealed window painted", what);
+                CHECK(th_painted(t, next->pixmap),
+                      "%s: revealed window painted", what);
         }
-        CHECK(!top_app(t->screen, &n), "%s: every window closed (%d left)",
+        CHECK(!th_top_app(t->screen, &n), "%s: every window closed (%d left)",
               what, n);
         CHECK_EQ(th_damage_check(t), 0, what);
     }
@@ -156,11 +129,11 @@ static void run_out_of_memory(const apps_entry_t *d)
     bool ok = d->start(t->screen, d->x, d->y, d->w, d->h);
     _twin_alloc_fail_next = 0;
     int n;
-    top_app(t->screen, &n);
+    th_top_app(t->screen, &n);
     /* An app of several windows may still open the others */
     CHECK(ok || !n, "%s: failed start left %d windows", d->name, n);
     th_settle(t, 500);
-    for (twin_window_t *w; (w = top_app(t->screen, NULL));)
+    for (twin_window_t *w; (w = th_top_app(t->screen, NULL));)
         twin_window_destroy(w);
     th_settle(t, 500);
     CHECK(th_heap_net(t) <= base, "%s: failed start leaks (%zu > %zu)", d->name,

@@ -194,7 +194,7 @@ static uint32_t th_crc_bytes(const void *data, size_t len)
     return ~crc_update(~0u, data, len);
 }
 
-static uint32_t th_crc_rect(const th_t *t, twin_rect_t r)
+uint32_t th_crc_rect(const th_t *t, twin_rect_t r)
 {
     uint32_t crc = ~0u;
     for (twin_coord_t y = r.top; y < r.bottom; y++)
@@ -211,6 +211,35 @@ uint32_t th_crc(const th_t *t)
 twin_argb32_t th_pixel(const th_t *t, twin_coord_t x, twin_coord_t y)
 {
     return t->fb[(size_t) y * t->width + x];
+}
+
+bool th_painted(const th_t *t, const twin_pixmap_t *p)
+{
+    twin_coord_t right = p->x + p->width, bottom = p->y + p->height;
+    if (right > t->width)
+        right = t->width;
+    if (bottom > t->height)
+        bottom = t->height;
+    twin_argb32_t first = th_pixel(t, p->x, p->y);
+    for (twin_coord_t y = p->y; y < bottom; y++)
+        for (twin_coord_t x = p->x; x < right; x++)
+            if (th_pixel(t, x, y) != first)
+                return true;
+    return false;
+}
+
+twin_window_t *th_top_app(twin_screen_t *screen, int *count)
+{
+    twin_window_t *top = NULL;
+    int n = 0;
+    for (twin_window_t *w = screen->windows; w; w = w->wm_next)
+        if (w->mapped && w->style == TwinWindowApplication) {
+            top = w;
+            n++;
+        }
+    if (count)
+        *count = n;
+    return top;
 }
 
 int th_damage_check(th_t *t)

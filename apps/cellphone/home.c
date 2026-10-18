@@ -193,3 +193,14 @@ ui_view_t *home_create(void)
     h->pressed = -1;
     return &h->view;
 }
+
+/* Test hook: @app's icon in home-screen content coordinates; false unless
+ * home is on top with that icon's page shown */
+bool app_home_icon_rect(int app, ui_rect_t *out)
+{
+    ui_view_t *v = phone_top();
+    if (!v || v->paint != home_paint || app < 0 || app >= phone_app_count())
+        return false;
+    *out = shown_plate(v, app);
+    return out->right > out->left;
+}

@@ -179,9 +179,14 @@ void _twin_toplevel_queue_layout(twin_widget_t *widget)
 
 void twin_toplevel_show(twin_toplevel_t *toplevel)
 {
+    twin_window_t *window = toplevel->box.widget.window;
     _twin_toplevel_layout(toplevel);
-    _twin_toplevel_paint(toplevel);
-    twin_window_show(toplevel->box.widget.window);
+    /* Paint every widget through the window, which also settles its damage:
+     * the window manager's first draw then has nothing left to repaint */
+    twin_rect_t c = twin_window_client(window);
+    twin_window_damage(window, c.left, c.top, c.right, c.bottom);
+    twin_window_draw(window);
+    twin_window_show(window);
 }
 
 void twin_toplevel_destroy(twin_toplevel_t *toplevel)

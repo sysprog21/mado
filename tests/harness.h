@@ -65,6 +65,16 @@ uint32_t th_crc(const th_t *t);
 /* Pixel at (x, y) */
 twin_argb32_t th_pixel(const th_t *t, twin_coord_t x, twin_coord_t y);
 
+/* CRC-32 of the frame inside @r */
+uint32_t th_crc_rect(const th_t *t, twin_rect_t r);
+
+/* The frame under @p is not one flat colour: something painted it (a
+ * released window that nobody repainted comes back flat) */
+bool th_painted(const th_t *t, const twin_pixmap_t *p);
+
+/* Topmost mapped application window, and how many there are */
+twin_window_t *th_top_app(twin_screen_t *screen, int *count);
+
 /*
  * Damage consistency: recomposite the whole screen from scratch with every
  * optimization off and compare with the incrementally maintained frame.

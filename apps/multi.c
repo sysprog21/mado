@@ -200,39 +200,35 @@ static twin_fixed_t fit_400(int w, int h)
                        : twin_fixed_div(twin_int_to_fixed(side), D(400));
 }
 
+/* Open a window painted by @draw; @data and @destroy belong to it.  A new
+ * window is damaged all over, so the first draw paints everything. */
 static bool start_window(twin_screen_t *screen,
                          int x,
                          int y,
                          int w,
                          int h,
                          const char *name,
-                         twin_draw_func_t draw)
+                         twin_draw_func_t draw,
+                         void *data,
+                         twin_destroy_func_t destroy)
 {
     twin_window_t *window = twin_window_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
     if (!window)
         return false;
     twin_window_set_name(window, name);
-    twin_window_set_callbacks(window, draw, NULL, NULL);
-    twin_rect_t c = twin_window_client(window);
-    twin_window_damage(window, c.left, c.top, c.right, c.bottom);
+    twin_window_set_client_data(window, data);
+    twin_window_set_callbacks(window, draw, NULL, destroy);
     twin_window_draw(window);
     twin_window_show(window);
     return true;
 }
 
-/* Fill @path's coverage into the window in black over white */
+/* Paint @path in black over white */
 static void paint_text(twin_pixmap_t *pixmap, twin_path_t *path, int w, int h)
 {
     twin_fill(pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, w, h);
-    twin_pixmap_t *alpha = twin_pixmap_create(TWIN_A8, w, h);
-    if (!alpha)
-        return;
-    twin_paint_path(alpha, 0xff000000, path);
-    twin_operand_t source = {.source_kind = TWIN_SOLID, .u.argb = 0xff000000};
-    twin_operand_t mask = {.source_kind = TWIN_PIXMAP, .u.pixmap = alpha};
-    twin_composite(pixmap, 0, 0, &source, 0, 0, &mask, 0, 0, TWIN_OVER, w, h);
-    twin_pixmap_destroy(alpha);
+    twin_paint_path(pixmap, 0xff000000, path);
 }
 
 static void circletext_draw(twin_window_t *window)
@@ -483,20 +479,11 @@ static bool apps_blur(twin_screen_t *screen, int x, int y, int w, int h)
 #endif
     if (!raw_background)
         return false;
-    twin_window_t *window = twin_window_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
-    if (!window) {
-        twin_pixmap_destroy(raw_background);
-        return false;
-    }
-    twin_window_set_name(window, "Blur");
-    twin_window_set_client_data(window, raw_background);
-    twin_window_set_callbacks(window, blur_draw, NULL, blur_destroy);
-    twin_rect_t c = twin_window_client(window);
-    twin_window_damage(window, c.left, c.top, c.right, c.bottom);
-    twin_window_draw(window);
-    twin_window_show(window);
-    return true;
+    if (start_window(screen, x, y, w, h, "Blur", blur_draw, raw_background,
+                     blur_destroy))
+        return true;
+    twin_pixmap_destroy(raw_background);
+    return false;
 }
 
 bool apps_multi_start(twin_screen_t *screen,
@@ -508,12 +495,15 @@ bool apps_multi_start(twin_screen_t *screen,
 {
     (void) name;
     /* Started if any of its windows opened */
-    bool any = start_window(screen, x, y, w, h, "circletext", circletext_draw);
+    bool any = start_window(screen, x, y, w, h, "circletext", circletext_draw,
+                            NULL, NULL);
     any |= apps_multiline_start(screen, x += 20, y += 20, w * 2 / 3, h * 2 / 3);
-    any |=
-        start_window(screen, x += 20, y += 20, 200, 200, "Smiley", smiley_draw);
-    any |= start_window(screen, x += 20, y += 20, w, h, "ASCII", ascii_draw);
-    any |= start_window(screen, x += 20, y += 20, w, h, "Flower", flower_draw);
+    any |= start_window(screen, x += 20, y += 20, 200, 200, "Smiley",
+                        smiley_draw, NULL, NULL);
+    any |= start_window(screen, x += 20, y += 20, w, h, "ASCII", ascii_draw,
+                        NULL, NULL);
+    any |= start_window(screen, x += 20, y += 20, w, h, "Flower", flower_draw,
+                        NULL, NULL);
     any |= apps_blur(screen, x += 20, y += 20, w / 2, h / 2);
     return any;
 }

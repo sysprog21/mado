@@ -62,7 +62,7 @@ static const char *const page_titles[] = {
 typedef enum {
     IT_SECTION,
     IT_LINK,       /* id: page */
-    IT_RADIO,      /* id: group, arg: value */
+    IT_RADIO,      /* arg: theme */
     IT_SWITCH,     /* id: pref */
     IT_SLIDER,     /* id: pref */
     IT_INFO,       /* id: value */
@@ -70,8 +70,6 @@ typedef enum {
     IT_WALLPAPERS, /* grid of wallpaper tiles */
     IT_CLOCK,      /* large time and date */
 } item_kind_t;
-
-enum { GROUP_THEME };
 
 /* Info values; those from VAL_HEAP on are refreshed once per second */
 enum {
@@ -173,7 +171,6 @@ static void format_value(int id, char *buf, size_t len)
     case VAL_SCREEN:
         snprintf(buf, len, "%dx%d", PHONE_W, PHONE_H);
         return;
-        return;
     case VAL_TZ:
         snprintf(buf, len, "GMT+8 Taipei");
         return;
@@ -266,8 +263,7 @@ static void build(page_t *s)
     case PAGE_DISPLAY:
         section(s, "Theme");
         for (int i = 0; i < phone_theme_count(); i++)
-            add(s, IT_RADIO, GROUP_THEME, i, NULL, 0, phone_theme_at(i)->name,
-                NULL);
+            add(s, IT_RADIO, 0, i, NULL, 0, phone_theme_at(i)->name, NULL);
         section(s, "Screen");
         add(s, IT_SLIDER, PREF_BRIGHTNESS, 0, NULL, 0, "Brightness", NULL);
         break;
@@ -420,17 +416,6 @@ static ui_rect_t value_rect(ui_rect_t row)
 /*
  * Painting
  */
-static void paint_header(page_t *s, twin_pixmap_t *px)
-{
-    const phone_theme_t *th = phone_theme();
-    twin_coord_t w = ui_view_width(&s->view);
-    ui_rect_t r = ui_rect(0, 0, w, HEADER_H);
-    twin_coord_t x = 6;
-    ui_vgrad(px, r, th->card, ui_mix(th->card, th->bg, 96));
-    ui_text_in(px, FONT_HEADING, ui_rect(x, 0, w - x - 8, HEADER_H), UI_LEFT,
-               th->text, s->view.title);
-    ui_separator(px, r);
-}
 
 static void paint_plate(twin_pixmap_t *px,
                         twin_coord_t cy,
@@ -455,7 +440,7 @@ static void paint_swatch(twin_pixmap_t *px, twin_coord_t cy, int theme)
 
 static bool radio_on(const item_t *it)
 {
-    return it->id == GROUP_THEME && phone_theme_index() == it->arg;
+    return phone_theme_index() == it->arg;
 }
 
 static void link_detail(const item_t *it, char *buf, size_t len)
@@ -489,7 +474,7 @@ static void paint_row(page_t *s, twin_pixmap_t *px, int i, ui_rect_t r)
     if (it->sym) {
         paint_plate(px, cy, it->sym, it->accent);
         x = 10 + PLATE + 10;
-    } else if (it->kind == IT_RADIO && it->id == GROUP_THEME) {
+    } else if (it->kind == IT_RADIO) {
         paint_swatch(px, cy, it->arg);
         x = 10 + PLATE + 10;
     }
@@ -681,7 +666,8 @@ static void settings_paint(ui_view_t *v, twin_pixmap_t *px)
     }
     /* Last, so rows scrolled under the header never show through */
     if (clip.top < HEADER_H)
-        paint_header(s, px);
+        ui_header(px, ui_rect(0, 0, ui_view_width(&s->view), HEADER_H),
+                  s->view.title, NULL);
 }
 
 /*

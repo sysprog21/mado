@@ -225,17 +225,12 @@ bool apps_calc_start(twin_screen_t *screen,
         return false;
     }
     twin_box_t *top = twin_toplevel_box(calc->toplevel);
-    /* The display frees the calculator when the window goes away */
-    bool owned = false;
     calc->display =
         twin_label_create(top, "0", APPS_CALC_VALUE_FG, APPS_CALC_VALUE_SIZE,
                           APPS_CALC_VALUE_STYLE);
     if (!calc->display)
         goto fail;
     twin_widget_t *display = twin_label_widget(calc->display);
-    owned = twin_widget_set_callback(display, _apps_calc_display_event, calc);
-    if (!owned)
-        goto fail;
     twin_widget_set(display, APPS_CALC_VALUE_BG);
     twin_label_set_align(calc->display, TwinAlignRight);
     twin_widget_set_shape(display, TwinShapeLozenge);
@@ -264,6 +259,10 @@ bool apps_calc_start(twin_screen_t *screen,
         }
     }
 
+    /* Last: from here on the display frees the calculator with the window */
+    if (!twin_widget_set_callback(display, _apps_calc_display_event, calc))
+        goto fail;
+
     for (int i = 0; i < APPS_CALC_STACK; i++)
         calc->stack[i] = 0;
     calc->pending_delete = true;
@@ -273,7 +272,6 @@ bool apps_calc_start(twin_screen_t *screen,
 
 fail:
     twin_toplevel_destroy(calc->toplevel);
-    if (!owned)
-        free(calc);
+    free(calc);
     return false;
 }

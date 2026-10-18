@@ -14,59 +14,22 @@
 
 #include "phone-test.h"
 
-/* Home screen grid (home.c): 3x3 icons per page below a 6 px margin */
-#define COLS 3
-#define PER_PAGE 9
-#define CELL_W (PHONE_W / COLS)
-#define CELL_H 74
-#define GRID_TOP 6
+bool app_home_icon_rect(int app, ui_rect_t *out);
 
 static uint32_t nav_crc(void)
 {
-    uint32_t crc = 0;
-    for (twin_coord_t y = PHONE_H - PHONE_NAV_H; y < PHONE_H; y++)
-        for (twin_coord_t x = 0; x < PHONE_W; x++)
-            crc = crc * 31 + th_pixel(phone_th, x, y);
-    return crc;
+    return th_crc_rect(
+        phone_th, (twin_rect_t) {0, PHONE_W, PHONE_H - PHONE_NAV_H, PHONE_H});
 }
 
-static void tap_icon(int app)
+/* Tap @app's icon; false when it is not on the page shown */
+static bool tap_icon(int app)
 {
-    int k = app % PER_PAGE;
-    ph_tap((k % COLS) * CELL_W + CELL_W / 2,
-           GRID_TOP + (k / COLS) * CELL_H + CELL_H / 2 - 8);
-}
-
-/* Not one flat colour: the window was painted at its current size */
-static bool painted(const twin_pixmap_t *p)
-{
-    twin_argb32_t first = th_pixel(phone_th, p->x, p->y);
-    for (twin_coord_t y = p->y; y < p->y + p->height; y++)
-        for (twin_coord_t x = p->x; x < p->x + p->width; x++)
-            if (th_pixel(phone_th, x, y) != first)
-                return true;
-    return false;
-}
-
-static twin_window_t *top_window(void)
-{
-    twin_window_t *top = NULL;
-    for (twin_window_t *w = phone_screen()->windows; w; w = w->wm_next)
-        if (w->mapped && w->style == TwinWindowApplication)
-            top = w;
-    return top;
-}
-
-/* Swipe from the left edge across the screen: the mobile back gesture */
-static void edge_swipe(void)
-{
-    th_press(phone_th, 2, CY(120));
-    for (twin_coord_t x = 30; x <= 210; x += 30) {
-        th_move(phone_th, x, CY(120));
-        th_advance(phone_th, 16);
-    }
-    th_release(phone_th, 210, CY(120));
-    th_settle(phone_th, 2000);
+    ui_rect_t r;
+    if (!app_home_icon_rect(app, &r))
+        return false;
+    ph_tap((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+    return true;
 }
 
 void test_demos(void)
@@ -83,8 +46,12 @@ void test_demos(void)
 
     uint32_t home_nav = nav_crc();
     /* The demos follow the phone apps: page to the first one */
-    for (int p = 0; p < first / PER_PAGE; p++)
+    ui_rect_t r;
+    int pages = 0;
+    while (!app_home_icon_rect(first, &r) && pages < 8) {
         ph_drag(200, 120, 20, 120);
+        pages++;
+    }
     /* The page lists whichever apps are built: the golden frame holds the
      * default set */
 #if defined(CONFIG_DEMO_CLOCK) && defined(CONFIG_DEMO_CALCULATOR) && \
@@ -101,12 +68,11 @@ void test_demos(void)
             base = th_heap_net(phone_th); /* first pass warms the caches */
         for (int i = first; i < phone_app_count(); i++) {
             const char *name = phone_app_at(i)->name;
-            if (i / PER_PAGE != first / PER_PAGE)
+            if (!tap_icon(i))
                 break; /* the icons below are tested on this page only */
-            tap_icon(i);
             CHECK(phone_depth() > 0, "%s opened from the launcher", name);
             CHECK(!phone_top(), "%s: its own window is on top", name);
-            twin_window_t *w = top_window();
+            twin_window_t *w = th_top_app(phone_screen(), NULL);
             twin_pixmap_t *p = w ? w->pixmap : NULL;
             CHECK(p && p->x == 0 && p->y == PHONE_STATUS_H &&
                       p->width == PHONE_W && p->height == PHONE_CONTENT_H,
@@ -123,14 +89,14 @@ void test_demos(void)
                 p = w ? w->pixmap : NULL;
                 CHECK(p && p->height == PHONE_CONTENT_H - inset,
                       "%s: height with inset %d", name, inset);
-                CHECK(p && painted(p), "%s: painted with inset %d", name,
-                      inset);
+                CHECK(p && th_painted(phone_th, p), "%s: painted with inset %d",
+                      name, inset);
                 CHECK_EQ(th_damage_check(phone_th), 0, name);
             }
 
             /* The back gesture closes the window on top ... */
             int depth = phone_depth();
-            edge_swipe();
+            ph_drag(2, 120, 210, 120); /* swipe from the left edge */
             CHECK_EQ(phone_depth(), depth - 1, name);
             /* ... and the nav bar's Back closes the rest */
             for (int guard = 0; phone_depth() > 0 && guard < 16; guard++) {
@@ -154,6 +120,6 @@ void test_demos(void)
     th_settle(phone_th, 2000);
     ph_home();
 
-    for (int p = 0; p < first / PER_PAGE; p++)
+    while (pages-- > 0)
         ph_drag(20, 120, 200, 120);
 }

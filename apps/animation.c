@@ -33,7 +33,8 @@ static void _apps_animation_paint(twin_custom_widget_t *custom)
     current_frame = a ? twin_animation_get_current_frame(a) : anim->pix;
 
     /* A policy may give the window more room than the image (a phone's
-     * work area, the whole screen without a window manager): center it */
+     * work area, the whole screen without a window manager): center it on
+     * the widget's black background */
     twin_pixmap_t *dst = _apps_animation_pixmap(custom);
     twin_coord_t w = twin_custom_widget_width(custom);
     twin_coord_t h = twin_custom_widget_height(custom);
@@ -41,8 +42,6 @@ static void _apps_animation_paint(twin_custom_widget_t *custom)
     twin_coord_t fh = twin_pixmap_height(current_frame);
     twin_coord_t x = w > fw ? (w - fw) / 2 : 0;
     twin_coord_t y = h > fh ? (h - fh) / 2 : 0;
-    if (w > fw || h > fh)
-        twin_fill(dst, 0xff000000, TWIN_SOURCE, 0, 0, w, h);
 
     twin_operand_t srcop = {
         .source_kind = TWIN_PIXMAP,
@@ -97,7 +96,7 @@ static twin_custom_widget_t *_apps_animation_init(twin_box_t *parent,
                                                   twin_pixmap_t *pix)
 {
     twin_custom_widget_t *custom = twin_custom_widget_create(
-        parent, 0, 0, 0, 1, 1, _apps_animation_dispatch,
+        parent, 0xff000000, 0, 0, 1, 1, _apps_animation_dispatch,
         sizeof(apps_animation_data_t));
     if (!custom)
         return NULL;

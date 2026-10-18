@@ -838,8 +838,8 @@ void twin_screen_set_background(twin_screen_t *screen, twin_pixmap_t *pixmap);
 
 void twin_screen_set_cursor(twin_screen_t *screen,
                             twin_pixmap_t *pixmap,
-                            twin_fixed_t hotspot_x,
-                            twin_fixed_t hotspot_y);
+                            twin_coord_t hotspot_x,
+                            twin_coord_t hotspot_y);
 
 twin_coord_t twin_screen_width(const twin_screen_t *screen);
 twin_coord_t twin_screen_height(const twin_screen_t *screen);

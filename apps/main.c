@@ -115,7 +115,7 @@ static void init_demo_apps(twin_context_t *ctx)
     }
 #if defined(CONFIG_WM_DESKTOP)
     twin_screen_set_background(screen,
-                               load_background(screen, ASSET_PATH "/tux.png"));
+                               load_background(screen, ASSET_PATH "tux.png"));
 #endif
     for (int i = 0; i < apps_count(); i++) {
         const apps_entry_t *app = apps_at(i);

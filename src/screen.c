@@ -748,8 +748,8 @@ static void twin_screen_damage_cursor(twin_screen_t *screen)
 
 void twin_screen_set_cursor(twin_screen_t *screen,
                             twin_pixmap_t *pixmap,
-                            twin_fixed_t hotspot_x,
-                            twin_fixed_t hotspot_y)
+                            twin_coord_t hotspot_x,
+                            twin_coord_t hotspot_y)
 {
     twin_screen_disable_update(screen);
 

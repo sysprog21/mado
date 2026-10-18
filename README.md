@@ -140,11 +140,12 @@ for the design of the window manager, compositor and caches.
 
 ### Verification
 
-Headless test suites run in-process with a virtual clock and compare every
-incrementally updated frame against a full recomposite:
+Headless test suites run in-process with a virtual clock.  At checkpoints
+they check the incrementally updated frame against a full recomposite, and
+the core and phone suites also compare golden frame checksums:
 
 ```shell
-$ make check          # core, window manager and phone suites
+$ make check          # core, window manager, lifetime and phone suites
 $ make check-update   # re-record golden frame checksums
 ```
 

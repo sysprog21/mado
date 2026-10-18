@@ -35,9 +35,9 @@ Run:
 Once the window appears, interact with the phone (the default scene) or, with
 `MADO_SCENE=desktop`, move windows and interact with widgets.  Screens up to
 320x480 open at twice their size so a phone display is readable on a desktop
-monitor; `MADO_SCALE=n` picks another integer factor.  The backend sleeps
-until input or the next timeout when nothing is damaged, and presents once
-per screen update.
+monitor; `MADO_SCALE=n` picks another integer factor from 1 through 8.
+When nothing is damaged the backend waits for input or the next timeout,
+waking at least every 100 ms, and presents once per screen update.
 
 Use Cases:
 - Desktop applications
@@ -365,6 +365,7 @@ The `headless-ctl` tool provides command-line access to the headless backend:
   - Supports PNG format with minimal dependencies
   - No external image libraries required
 - `shutdown`: Gracefully shutdown the backend
+- `type TEXT`: Inject TEXT as character (UCS-4) events to the focused window
 - `mouse TYPE X Y [BUTTON]`: Inject mouse events
   - TYPE: move, down, up
   - X, Y: Screen coordinates (validated against screen size)

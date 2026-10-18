@@ -3,8 +3,9 @@
 This document describes how Mado runs a phone user interface and a classic
 desktop from the same core, and why the core is shaped the way it is.  The
 cellphone demo under `apps/cellphone/` is the reference workload: a lock
-screen, a home screen and twelve apps on a 240x320 display, drawn entirely
-with anti-aliased vector graphics on a CPU without graphics acceleration.
+screen, a home screen and twelve apps on a 240x320 display, drawn with
+anti-aliased vector graphics (plus JPEG photo fixtures in Photos) on a CPU
+without graphics acceleration.
 
 ## Window management is a policy
 
@@ -38,8 +39,9 @@ manager at all; the cellphone demo's Settings app switches between the
 three while running.
 
 Switching policies re-lays out every existing window: decorations are added
-or removed, application windows are cascaded or stacked, and pixels of
-windows the new policy keeps hidden are released.  A switch requested from
+or removed, application windows are cascaded or stacked, and, with
+`WM_MOBILE_EVICT`, pixels of windows the new policy keeps hidden are
+released.  A switch requested from
 an event handler is applied once that event has been delivered; a later
 request replaces it, and if it cannot be queued (out of memory) the call
 fails and the current policy stays.  `screen->windows` lists

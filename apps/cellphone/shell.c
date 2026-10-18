@@ -744,12 +744,13 @@ void phone_shutdown(void)
     if (g_tick)
         twin_clear_timeout(g_tick);
     g_tick = NULL;
-    /* Views first (top-down), then the bars */
+    /* Views and the windows of apps opened from home first (top-down),
+     * then the bars */
     for (;;) {
         twin_window_t *last = NULL;
         for (twin_window_t *w = twin_screen_first_window(g_screen); w;
              w = twin_window_next(w))
-            if (ui_view_of(w))
+            if (ui_view_of(w) || twin_window_style(w) == TwinWindowApplication)
                 last = w;
         if (!last)
             break;

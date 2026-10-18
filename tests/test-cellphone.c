@@ -269,7 +269,15 @@ int main(void)
     }
     test_budgets();
 
+    /* Shutdown closes what the phone opened, demo windows included */
+    for (int i = 0; i < phone_app_count(); i++)
+        if (phone_app_at(i)->demo) {
+            phone_open(i);
+            th_settle(t, 2000);
+            break;
+        }
     phone_shutdown();
+    CHECK(!t->screen->windows, "shutdown leaves no window behind");
     th_destroy(t);
     twin_cache_flush();
     return th_report("cellphone");

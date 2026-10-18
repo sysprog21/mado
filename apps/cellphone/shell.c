@@ -318,7 +318,7 @@ static void _list_demos(void)
     n_demos = 0;
     for (int i = 0; i < apps_count(); i++) {
         const apps_entry_t *e = apps_at(i);
-        if (e->shell)
+        if (e->boot)
             continue;
         if (n_demos == (int) (sizeof(demos) / sizeof(demos[0])))
             break;
@@ -629,7 +629,8 @@ void phone_open(int app)
         return;
     if (a->demo) {
         /* Its own windows: the policy stacks them over the work area */
-        a->demo->start(g_screen, 0, PHONE_STATUS_H, PHONE_W, PHONE_CONTENT_H);
+        a->demo->start(g_screen, a->demo->name, 0, PHONE_STATUS_H, PHONE_W,
+                       PHONE_CONTENT_H);
         phone_view_changed();
         return;
     }

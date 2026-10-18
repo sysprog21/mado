@@ -7,10 +7,9 @@
 
 #include <stddef.h>
 #include <stdlib.h>
-#include "apps_multi.h"
+#include "apps.h"
 
 #define D(x) twin_double_to_fixed(x)
-#define ASSET_PATH "assets/"
 
 typedef struct {
     twin_point_t p1, p2;

@@ -8,7 +8,7 @@
 
 #include <twin.h>
 
-#include "apps_animation.h"
+#include "apps.h"
 
 static inline twin_pixmap_t *_apps_animation_pixmap(
     twin_custom_widget_t *animation)
@@ -117,13 +117,16 @@ static twin_custom_widget_t *apps_animation_create(twin_box_t *parent,
     return _apps_animation_init(parent, pix);
 }
 
+/* Sized by the image: @w and @h are ignored */
 bool apps_animation_start(twin_screen_t *screen,
                           const char *name,
-                          const char *path,
                           int x,
-                          int y)
+                          int y,
+                          int w,
+                          int h)
 {
-    twin_pixmap_t *pix = twin_pixmap_from_file(path);
+    (void) w, (void) h;
+    twin_pixmap_t *pix = twin_pixmap_from_file(ASSET_PATH "nyancat.gif");
     if (!pix)
         return false;
     twin_toplevel_t *toplevel = twin_toplevel_create(

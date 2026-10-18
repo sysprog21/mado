@@ -71,20 +71,6 @@ void twin_matrix_scale(twin_matrix_t *m, twin_fixed_t sx, twin_fixed_t sy)
     twin_matrix_multiply(m, &t, m);
 }
 
-twin_fixed_t _twin_matrix_determinant(twin_matrix_t *matrix)
-{
-    twin_fixed_t a, b, c, d;
-
-    a = matrix->m[0][0];
-    b = matrix->m[0][1];
-    c = matrix->m[1][0];
-    d = matrix->m[1][1];
-
-    twin_fixed_t det = twin_fixed_mul(a, d) - twin_fixed_mul(b, c);
-
-    return det;
-}
-
 void twin_matrix_rotate(twin_matrix_t *m, twin_angle_t a)
 {
     twin_fixed_t c, s;

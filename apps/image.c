@@ -8,7 +8,7 @@
 
 #include <twin.h>
 
-#include "apps_image.h"
+#include "apps.h"
 
 static inline twin_pixmap_t *_apps_image_pixmap(twin_custom_widget_t *image)
 {
@@ -16,7 +16,6 @@ static inline twin_pixmap_t *_apps_image_pixmap(twin_custom_widget_t *image)
 }
 
 #define D(x) twin_double_to_fixed(x)
-#define ASSET_PATH "assets/"
 #define APP_WIDTH 400
 #define APP_HEIGHT 400
 
@@ -142,8 +141,15 @@ static twin_custom_widget_t *apps_image_create(twin_box_t *parent,
     return _apps_image_init(parent, height);
 }
 
-bool apps_image_start(twin_screen_t *screen, const char *name, int x, int y)
+/* Fixed size: @w and @h are ignored */
+bool apps_image_start(twin_screen_t *screen,
+                      const char *name,
+                      int x,
+                      int y,
+                      int w,
+                      int h)
 {
+    (void) w, (void) h;
     twin_toplevel_t *toplevel =
         twin_toplevel_create(screen, x, y, APP_WIDTH, APP_HEIGHT, name);
     if (!toplevel)

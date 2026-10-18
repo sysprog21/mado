@@ -11,7 +11,7 @@
 
 #include <twin.h>
 
-#include "apps_clock.h"
+#include "apps.h"
 
 #define D(x) twin_double_to_fixed(x)
 

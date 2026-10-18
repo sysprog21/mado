@@ -611,33 +611,9 @@ typedef int64_t twin_xfixed_t;
 #define twin_xfixed_to_fixed(x) ((twin_fixed_t) ((x) >> 16))
 #define twin_fixed_to_xfixed(f) (((twin_xfixed_t) (f)) * 65536)
 
-/*
- * twin_sfixed_t a = b'10100;
- * twin_sfixed_t b = b'10000;
- * exact a is 1*(2^0) + 1*(2^(-2)) = 1.25
- * exact b is 1*(2^0) = 1
- *
- * The result of twin_sfixed_div(a, b) is of type twin_sfixed_t
- * (a << 4) / (b) = (b'101000000) / (b'10000) = b'10100
- * exact result is 1*(2^0) + 1*(2^(-2)) = 1.25
- *
- * twin_dfixed_t a = b'10100;
- * twin_dfixed_t b = b'10000;
- * exact a is 1*(2^(-4)) + 1*(2^(-6)) = 0.078125
- * exact b is 1*(2^(-4)) = 0.0625
- *
- * The result of twin_dfixed_mul(a, b) is of type twin_dfixed_t
- * (a * b) >> 8 = (b'101000000) >> 8 = b'1
- * exact result is 1*(2^(-8)) = 0.00390625
- */
-
+/* 28.4 product */
 #define twin_sfixed_mul(a, b) \
     (twin_sfixed_t)((((int32_t) (a)) * ((int32_t) (b))) >> 4)
-#define twin_sfixed_div(a, b) \
-    (twin_sfixed_t)((((int32_t) (a)) << 4) / ((int32_t) (b)))
-
-#define twin_dfixed_mul(a, b) \
-    (twin_dfixed_t)((((int64_t) (a)) * ((int64_t) (b))) >> 8)
 
 /* 64-bit fixed-point multiplication and division
  * These require 128-bit intermediate results for full precision.
@@ -924,8 +900,6 @@ twin_sfixed_t _twin_matrix_dx(twin_matrix_t *m,
 twin_sfixed_t _twin_matrix_dy(twin_matrix_t *m,
                               twin_fixed_t dx,
                               twin_fixed_t dy);
-
-twin_fixed_t _twin_matrix_determinant(twin_matrix_t *matrix);
 
 /*
  * Path stuff

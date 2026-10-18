@@ -21,20 +21,33 @@
 #include <stdbool.h>
 #include <twin.h>
 
+/* Open the app's windows on @screen at @x,@y, @w x @h titled @name (the
+ * policy may place them elsewhere); false when it could not start */
+typedef bool apps_start_fn(twin_screen_t *screen,
+                           const char *name,
+                           int x,
+                           int y,
+                           int w,
+                           int h);
+
 typedef struct apps_entry {
     const char *name; /* window title and launcher label */
     const char *icon; /* TWIN_SYM_* shown by launchers */
-    /* Takes over the screen and launches the other apps itself (the phone
-     * shell): started alone, on a screen of its own w x h */
-    bool shell;
-    int x, y, w, h; /* placement requested on a desktop */
-    /* Open the app's windows on @screen at @x,@y, @w x @h (the policy may
-     * place them elsewhere); false when it could not start */
-    bool (*start)(twin_screen_t *screen, int x, int y, int w, int h);
-    void (*stop)(void); /* tear down a shell; NULL for ordinary apps */
+    int x, y, w, h;   /* placement requested on a desktop; a shell's screen */
+    apps_start_fn *start;
+    /* A shell takes over a screen of its own w x h and launches the other
+     * apps itself (the phone): it has boot and stop instead of start */
+    bool (*boot)(twin_screen_t *screen);
+    void (*stop)(void);
 } apps_entry_t;
 
 int apps_count(void);
 const apps_entry_t *apps_at(int idx);
+
+/* Bundled images and vectors, relative to the working directory */
+#define ASSET_PATH "assets/"
+
+apps_start_fn apps_animation_start, apps_calc_start, apps_clock_start,
+    apps_image_start, apps_multi_start, apps_spline_start;
 
 #endif /* _APPS_H_ */

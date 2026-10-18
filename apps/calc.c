@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "apps_calc.h"
+#include "apps.h"
 
 #define APPS_CALC_STACK 5
 

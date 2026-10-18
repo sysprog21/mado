@@ -18,8 +18,6 @@
 #define WIDTH 640
 #define HEIGHT 480
 
-#define ASSET_PATH "assets/"
-
 #if defined(CONFIG_WM_DESKTOP)
 /*
  * Load the background pixmap from storage.
@@ -90,7 +88,7 @@ static void sigint_handler(int sig)
 static const apps_entry_t *find_shell(void)
 {
     for (int i = 0; i < apps_count(); i++)
-        if (apps_at(i)->shell)
+        if (apps_at(i)->boot)
             return apps_at(i);
     return NULL;
 }
@@ -104,7 +102,7 @@ static void init_demo_apps(twin_screen_t *screen)
 {
     const apps_entry_t *sh = find_shell();
     if (sh) {
-        if (sh->start(screen, 0, 0, sh->w, sh->h)) {
+        if (sh->boot(screen)) {
             shell = sh;
             return;
         }
@@ -117,9 +115,10 @@ static void init_demo_apps(twin_screen_t *screen)
 #endif
     for (int i = 0; i < apps_count(); i++) {
         const apps_entry_t *app = apps_at(i);
-        if (app->shell)
+        if (app->boot)
             continue;
-        bool started = app->start(screen, app->x, app->y, app->w, app->h);
+        bool started =
+            app->start(screen, app->name, app->x, app->y, app->w, app->h);
 #if defined(CONFIG_WM_NONE)
         if (started)
             break;

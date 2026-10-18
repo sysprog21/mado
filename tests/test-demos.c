@@ -73,7 +73,8 @@ static void run(const apps_entry_t *d)
     for (int pass = 0; pass < 2; pass++) {
         if (pass)
             base = th_heap_net(t);
-        CHECK(d->start(t->screen, d->x, d->y, d->w, d->h), "%s: started", what);
+        CHECK(d->start(t->screen, d->name, d->x, d->y, d->w, d->h),
+              "%s: started", what);
         th_settle(t, 2000);
         int n;
         CHECK(th_top_app(t->screen, &n) && n > 0, "%s: opened a window", what);
@@ -126,7 +127,7 @@ static void run_out_of_memory(const apps_entry_t *d)
     th_settle(t, 500);
     size_t base = th_heap_net(t);
     _twin_alloc_fail_next = 1;
-    bool ok = d->start(t->screen, d->x, d->y, d->w, d->h);
+    bool ok = d->start(t->screen, d->name, d->x, d->y, d->w, d->h);
     _twin_alloc_fail_next = 0;
     int n;
     th_top_app(t->screen, &n);
@@ -147,7 +148,7 @@ int main(void)
     for (int i = 0; i < apps_count(); i++) {
         const apps_entry_t *d = apps_at(i);
         /* Shells own the screen and have suites of their own */
-        if (d->shell)
+        if (d->boot)
             continue;
         run(d);
 #if defined(CONFIG_MEMORY_STATS)

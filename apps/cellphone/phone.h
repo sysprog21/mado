@@ -630,9 +630,6 @@ ui_view_t *phone_top(void); /* topmost view, NULL if none */
 void phone_lock(void);      /* show the lock screen */
 bool phone_locked(void);
 
-/* Ask the status/nav bars to repaint (after navigation or theme change) */
-void phone_bars_refresh(void);
-
 /* Home screen wallpaper */
 int phone_wallpaper(void);
 int phone_wallpaper_count(void);
@@ -640,9 +637,6 @@ const char *phone_wallpaper_name(int idx);
 void phone_set_wallpaper(int idx);
 /* Paint wallpaper @idx into @r; returns the label color that reads on it */
 twin_argb32_t phone_paint_wallpaper(twin_pixmap_t *px, ui_rect_t r, int idx);
-
-/* Window manager scene (Settings): TwinWmMobile, TwinWmDesktop, TwinWmNone */
-bool phone_set_scene(twin_wm_mode_t mode);
 
 /* Wall clock; tests install a fixed source */
 typedef struct {
@@ -668,6 +662,9 @@ typedef struct {
     phone_glyph_t glyph;  /* procedural icon when sym is NULL */
     twin_argb32_t accent; /* icon plate color */
     void (*open)(void);
+    /* An app from the shared registry (apps.h) that opens its own windows
+     * rather than a view; NULL for the phone's apps */
+    const struct apps_entry *demo;
 } phone_app_t;
 
 int phone_app_count(void);

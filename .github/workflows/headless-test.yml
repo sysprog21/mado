@@ -165,6 +165,13 @@ jobs:
         fi
         echo "No definite memory leaks detected"
 
+    - name: Rebuild with the mobile window manager
+      run: |
+        python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig WM_MOBILE=y
+        python3 tools/kconfig/genconfig.py configs/Kconfig
+        make -j$(nproc)
+        make check
+
     - name: Phone end-to-end
       run: |
         # Boot the phone shell, unlock, open Calculator, type, screenshot

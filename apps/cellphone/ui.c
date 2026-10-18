@@ -243,7 +243,7 @@ static bool _ui_event(twin_window_t *window, twin_event_t *ev)
             e.ucs4 = UI_KEY_BACKSPACE;
         return _deliver(v, &e);
     case TwinEventConfigure:
-        /* Sent only when the client size changed (a scene switch) */
+        /* Sent only when the client size changed (the work area moved) */
         ui_view_invalidate_all(v);
         if (v->layout)
             v->layout(v);
@@ -254,6 +254,9 @@ static bool _ui_event(twin_window_t *window, twin_event_t *ev)
     case TwinEventDeactivate:
         e.kind = ev->kind == TwinEventActivate ? UI_SHOW : UI_HIDE;
         _deliver(v, &e);
+        /* A view revealed by a closing demo window: the stack changed */
+        if (ev->kind == TwinEventActivate)
+            phone_view_changed();
         return true;
     case TwinEventClose:
         return false; /* let the window close */

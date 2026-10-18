@@ -17,6 +17,13 @@
 
 #define W 240
 #define H 320
+
+/* The interactive policy this build has, if any; 'none' is always there */
+#if defined(CONFIG_WM_MOBILE)
+#define BUILT_WM TwinWmMobile
+#elif defined(CONFIG_WM_DESKTOP)
+#define BUILT_WM TwinWmDesktop
+#endif
 #define TOP_BAR 20
 #define BOTTOM_BAR 32
 
@@ -654,7 +661,7 @@ static void test_switching(void)
     app_t extra = {.color = 0xffaaaa00};
     twin_window_t *we = mk(t, &extra, TwinWindowApplication, 0, 0, W, H);
     th_advance(t, 48);
-    twin_screen_set_wm(t->screen, TwinWmDesktop);
+    twin_screen_set_wm(t->screen, TwinWmNone);
     th_settle(t, 1000);
     CONSISTENT(t, "switch: mid transition");
     twin_screen_set_wm(t->screen, TwinWmMobile);
@@ -675,7 +682,7 @@ static void test_switching(void)
     th_destroy(t);
 }
 
-#if defined(CONFIG_WM_DESKTOP) && defined(CONFIG_WM_MOBILE)
+#if defined(BUILT_WM)
 static twin_wm_mode_t switch_to;
 static bool dispatch_result;
 
@@ -692,38 +699,39 @@ static bool switching_event(twin_window_t *w, twin_event_t *ev)
 
 static void test_switch_from_handler(void)
 {
-#if defined(CONFIG_WM_DESKTOP) && defined(CONFIG_WM_MOBILE)
-    th_t *t = th_create(W, H, TwinWmMobile);
+#if defined(BUILT_WM)
+    th_t *t = th_create(W, H, BUILT_WM);
     app_t a = {.color = 0xffaa3333};
     twin_window_t *w = mk(t, &a, TwinWindowApplication, 0, 20, W, 258);
     w->event = switching_event;
     th_settle(t, 1000);
 
-    switch_to = TwinWmDesktop;
+    switch_to = TwinWmNone;
     th_press(t, 100, 100);
-    CHECK(twin_screen_get_wm(t->screen) == TwinWmDesktop,
+    CHECK(twin_screen_get_wm(t->screen) == TwinWmNone,
           "pending switch reported at once");
     th_release(t, 100, 100);
     th_settle(t, 1000);
-    CHECK(t->screen->wm->mode == TwinWmDesktop,
-          "switch applied after the event");
-    CHECK(w->client.top > 0, "window decorated after the switch");
+    CHECK(t->screen->wm->mode == TwinWmNone, "switch applied after the event");
+    CHECK(w->client.top == 0 && w->pixmap->width == W,
+          "window full screen after the switch");
     CONSISTENT(t, "switch from handler");
 
-    switch_to = TwinWmMobile;
+    switch_to = BUILT_WM;
     th_tap(t, 100, 150);
     th_settle(t, 1000);
-    CHECK(t->screen->wm->mode == TwinWmMobile, "switched back from a handler");
+    CHECK(t->screen->wm->mode == BUILT_WM, "switched back from a handler");
     twin_window_destroy(w);
 
-    /* Phone-sized screens built for the work area cascade and stay on screen */
-    twin_screen_set_wm(t->screen, TwinWmDesktop);
+#if defined(CONFIG_WM_DESKTOP)
+    /* Phone-sized screens built for the work area cascade and stay on screen,
+     * also after a round trip through 'none' */
     app_t apps[3] = {
         {.color = 0xff111111}, {.color = 0xff222222}, {.color = 0xff333333}};
     twin_window_t *ws[3];
     for (int i = 0; i < 3; i++)
         ws[i] = mk(t, &apps[i], TwinWindowApplication, 0, 20, W, 258);
-    twin_screen_set_wm(t->screen, TwinWmMobile);
+    twin_screen_set_wm(t->screen, TwinWmNone);
     twin_screen_set_wm(t->screen, TwinWmDesktop);
     th_settle(t, 1000);
     for (int i = 0; i < 3; i++) {
@@ -737,6 +745,7 @@ static void test_switch_from_handler(void)
     CONSISTENT(t, "cascade on a small screen");
     for (int i = 0; i < 3; i++)
         twin_window_destroy(ws[i]);
+#endif
     th_destroy(t);
 #endif
 }
@@ -1216,57 +1225,67 @@ static void test_mobile_bars(void)
 
 static void test_switch_pending(void)
 {
-#if defined(CONFIG_WM_DESKTOP) && defined(CONFIG_WM_MOBILE)
-    th_t *t = th_create(W, H, TwinWmMobile);
+#if defined(BUILT_WM)
+    th_t *t = th_create(W, H, BUILT_WM);
     app_t a = {.color = 0xffaa3333};
     twin_window_t *w = mk(t, &a, TwinWindowApplication, 0, 20, W, 258);
     w->event = switching_event;
     th_settle(t, 1000);
 
     /* A direct request replaces one queued by a handler */
-    switch_to = TwinWmDesktop;
+    switch_to = TwinWmNone;
     twin_event_t ev = {.kind = TwinEventButtonDown};
     ev.u.pointer.screen_x = 100;
     ev.u.pointer.screen_y = 100;
     twin_screen_dispatch(t->screen, &ev);
-    CHECK(twin_screen_get_wm(t->screen) == TwinWmDesktop, "queued");
-    CHECK(twin_screen_set_wm(t->screen, TwinWmNone), "direct switch");
+    CHECK(twin_screen_get_wm(t->screen) == TwinWmNone, "queued");
+    CHECK(twin_screen_set_wm(t->screen, BUILT_WM), "direct switch");
     th_settle(t, 1000);
-    CHECK(t->screen->wm->mode == TwinWmNone, "stale queued switch dropped");
+    CHECK(t->screen->wm->mode == BUILT_WM, "stale queued switch dropped");
     th_release(t, 100, 100);
 
+    /* The policy that is not built is refused, from a handler too */
+    switch_to = BUILT_WM == TwinWmMobile ? TwinWmDesktop : TwinWmMobile;
+    dispatch_result = true;
+    th_tap(t, 100, 100);
+    CHECK(!dispatch_result, "compiled-out policy refused from a handler");
+    th_settle(t, 1000);
+    CHECK(t->screen->wm->mode == BUILT_WM, "current policy kept");
+
+#if defined(CONFIG_WM_MOBILE)
     /* Switching while a swipe is under the finger */
-    twin_screen_set_wm(t->screen, TwinWmMobile);
     w->event = app_event;
     app_t b = {.color = 0xff33aa33};
     twin_window_t *wb = mk(t, &b, TwinWindowApplication, 0, 20, W, 258);
     th_settle(t, 1000);
     th_press(t, 3, 150);
     th_move(t, 60, 150);
-    twin_screen_set_wm(t->screen, TwinWmDesktop);
+    twin_screen_set_wm(t->screen, TwinWmNone);
     th_move(t, 90, 150);
     th_release(t, 90, 150);
     th_settle(t, 1000);
     CONSISTENT(t, "switch mid swipe");
     twin_window_destroy(wb);
+    twin_screen_set_wm(t->screen, BUILT_WM);
+    th_settle(t, 1000);
+#endif
 
 #if defined(CONFIG_MEMORY_STATS)
     /* Out of memory: a handler's switch is refused, not forced */
-    twin_screen_set_wm(t->screen, TwinWmMobile);
-    th_settle(t, 1000);
     w->event = switching_event;
-    switch_to = TwinWmDesktop;
+    switch_to = TwinWmNone;
     _twin_alloc_fail_next = 1;
     dispatch_result = true;
     th_tap(t, 100, 100);
     _twin_alloc_fail_next = 0;
     CHECK(!dispatch_result, "queuing failure reported");
     th_settle(t, 1000);
-    CHECK(t->screen->wm->mode == TwinWmMobile, "current policy kept");
+    CHECK(t->screen->wm->mode == BUILT_WM, "current policy kept");
 
     /* A policy that cannot start falls back to none */
+    twin_screen_set_wm(t->screen, TwinWmNone);
     _twin_alloc_fail_next = 1;
-    CHECK(!twin_screen_set_wm(t->screen, TwinWmDesktop), "failed start");
+    CHECK(!twin_screen_set_wm(t->screen, BUILT_WM), "failed start");
     _twin_alloc_fail_next = 0;
     CHECK(twin_screen_get_wm(t->screen) == TwinWmNone, "fell back to none");
     th_settle(t, 1000);

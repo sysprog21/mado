@@ -171,10 +171,11 @@ typedef struct _twin_event {
  * Window manager policy
  *
  * The window manager is a runtime-switchable policy layered over the
- * compositor.  Each policy can be compiled out (CONFIG_WM_DESKTOP,
- * CONFIG_WM_MOBILE); TwinWmNone is always available: it adds no
- * decorations, covers the screen with application windows, and gives the
- * keyboard to the newest or the last pressed window.
+ * compositor.  At most one of the desktop and mobile policies is built
+ * (CONFIG_WM_DESKTOP or CONFIG_WM_MOBILE); twin_screen_set_wm() refuses the
+ * other.  TwinWmNone is always available: it adds no decorations, covers
+ * the screen with application windows, and gives the keyboard to the
+ * newest or the last pressed window.
  */
 typedef enum _twin_wm_mode {
     TwinWmNone /**< No window management: windows map as requested */,

@@ -178,7 +178,7 @@ static void test_calculator(void)
 
 /*
  * Budgets for the whole phone: memory returns to baseline after visiting
- * every app, the peak stays bounded, transitions cost about one frame of
+ * every phone app, the peak stays bounded, transitions cost about one frame of
  * compositing per animation frame, and a warm pass is served by the cache.
  */
 static void test_budgets(void)
@@ -186,6 +186,8 @@ static void test_budgets(void)
     ph_home();
     /* One warm-up pass so caches and reuse pools reach steady state */
     for (int i = 0; i < phone_app_count(); i++) {
+        if (phone_app_at(i)->demo)
+            continue; /* own windows, covered by test_demos() */
         phone_open(i);
         th_settle(t, 2000);
         ph_home();
@@ -200,6 +202,8 @@ static void test_budgets(void)
 
     uint32_t worst_frame = 0;
     for (int i = 0; i < phone_app_count(); i++) {
+        if (phone_app_at(i)->demo)
+            continue;
         twin_screen_stats_t s0 = t->screen->stats;
         phone_open(i);
         th_settle(t, 2000);
@@ -257,7 +261,7 @@ int main(void)
     void (*suites[])(void) = {test_dialer, test_calllog,  test_contacts,
                               test_sms,    test_music,    test_photos,
                               test_camera, test_settings, test_games,
-                              test_scenes, test_regress};
+                              test_scenes, test_demos,    test_regress};
     for (size_t i = 0; i < sizeof(suites) / sizeof(suites[0]); i++) {
         suites[i]();
         if (phone_depth())

@@ -1,6 +1,6 @@
 # Golden frame checksums for the cellphone suite.
 # Regenerate with: make check-update
-# config 2336132b
+# config 2aae645b
 lock 052098fa
 home 5ede29ca
 calculator 749994d4
@@ -42,7 +42,7 @@ camera d68c4510
 camera-shot 6e9386eb
 camera-video 63db382b
 camera-selfie 946f8ecd
-settings a066cd81
+settings 131f4566
 settings-display 58065c6c
 settings-sound 6b5df6cf
 settings-wallpaper 7a91c018
@@ -51,13 +51,10 @@ settings-display-dark 85a1f340
 settings-home-dark e8e63c74
 settings-sound-changed 54b18173
 settings-wallpaper-dusk d9c420f3
-settings-wm 9ed9fd7e
-settings-desktop 32891299
-settings-wm-mobile 9ed9fd7e
-settings-none f60f298b
 games-paused 01480e92
 games-snake 7d15230d
 games-pong d2b0caba
 games-tetris 31fd1cac
 games-tetris-late 4f253509
 games-tetris-revealed 29ee7bdc
+home-demos d7ac800b

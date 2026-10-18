@@ -153,13 +153,16 @@ static twin_custom_widget_t *apps_image_create(twin_box_t *parent,
     return _apps_image_init(parent, height);
 }
 
-void apps_image_start(twin_screen_t *screen, const char *name, int x, int y)
+bool apps_image_start(twin_screen_t *screen, const char *name, int x, int y)
 {
     twin_toplevel_t *toplevel =
         twin_toplevel_create(screen, TWIN_ARGB32, TwinWindowApplication, x, y,
                              APP_WIDTH, APP_HEIGHT, name);
+    if (!toplevel)
+        return false;
     twin_custom_widget_t *img = apps_image_create(
         twin_toplevel_box(toplevel), twin_screen_height(screen) * 3 / 4);
     (void) img;
     twin_toplevel_show(toplevel);
+    return true;
 }

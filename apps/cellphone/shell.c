@@ -18,6 +18,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "apps.h"
 #include "phone.h"
 
 /*
@@ -142,12 +143,6 @@ static void _repaint_window(twin_window_t *w)
     twin_rect_t c = twin_window_client(w);
     twin_window_damage(w, c.left, c.top, c.right, c.bottom);
     twin_window_queue_paint(w);
-}
-
-void phone_bars_refresh(void)
-{
-    _repaint_window(g_status);
-    _repaint_window(g_nav);
 }
 
 static int nav_state(void);
@@ -276,36 +271,75 @@ static void glyph_pong(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
 static void glyph_tetris(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
 
 static const phone_app_t apps[] = {
-    {"Phone", TWIN_SYM_PHONE, NULL, UI_RGB(0x22c55e), app_dialer_open},
-    {"Contacts", TWIN_SYM_CONTACTS, NULL, UI_RGB(0x3b82f6), app_contacts_open},
-    {"Messages", TWIN_SYM_MESSAGE, NULL, UI_RGB(0x10b981), app_sms_open},
-    {"Calculator", TWIN_SYM_CALCULATOR, NULL, UI_RGB(0xf59e0b), app_calc_open},
-    {"Music", TWIN_SYM_MUSIC, NULL, UI_RGB(0xec4899), app_music_open},
-    {"Photos", TWIN_SYM_IMAGE, NULL, UI_RGB(0xf97316), app_photos_open},
-    {"Camera", TWIN_SYM_CAMERA, NULL, UI_RGB(0x6b7280), app_camera_open},
-    {"Settings", TWIN_SYM_SETTINGS, NULL, UI_RGB(0x64748b), app_settings_open},
-    {"Call Log", TWIN_SYM_HISTORY, NULL, UI_RGB(0x8b5cf6), app_calllog_open},
-    {"Snake", NULL, glyph_snake, UI_RGB(0x14b8a6), app_snake_open},
-    {"Pong", NULL, glyph_pong, UI_RGB(0x6366f1), app_pong_open},
-    {"Tetris", NULL, glyph_tetris, UI_RGB(0xef4444), app_tetris_open},
+    {"Phone", TWIN_SYM_PHONE, NULL, UI_RGB(0x22c55e), app_dialer_open, NULL},
+    {"Contacts", TWIN_SYM_CONTACTS, NULL, UI_RGB(0x3b82f6), app_contacts_open,
+     NULL},
+    {"Messages", TWIN_SYM_MESSAGE, NULL, UI_RGB(0x10b981), app_sms_open, NULL},
+    {"Calculator", TWIN_SYM_CALCULATOR, NULL, UI_RGB(0xf59e0b), app_calc_open,
+     NULL},
+    {"Music", TWIN_SYM_MUSIC, NULL, UI_RGB(0xec4899), app_music_open, NULL},
+    {"Photos", TWIN_SYM_IMAGE, NULL, UI_RGB(0xf97316), app_photos_open, NULL},
+    {"Camera", TWIN_SYM_CAMERA, NULL, UI_RGB(0x6b7280), app_camera_open, NULL},
+    {"Settings", TWIN_SYM_SETTINGS, NULL, UI_RGB(0x64748b), app_settings_open,
+     NULL},
+    {"Call Log", TWIN_SYM_HISTORY, NULL, UI_RGB(0x8b5cf6), app_calllog_open,
+     NULL},
+    {"Snake", NULL, glyph_snake, UI_RGB(0x14b8a6), app_snake_open, NULL},
+    {"Pong", NULL, glyph_pong, UI_RGB(0x6366f1), app_pong_open, NULL},
+    {"Tetris", NULL, glyph_tetris, UI_RGB(0xef4444), app_tetris_open, NULL},
 };
 
 #define N_APPS ((int) (sizeof(apps) / sizeof(apps[0])))
 
+/* Then every app from the shared registry that runs under the mobile
+ * policy (apps.c), in registry order */
+static phone_app_t demos[16];
+static int n_demos = -1;
+
+static void _list_demos(void)
+{
+    if (n_demos >= 0)
+        return;
+    static const twin_argb32_t accents[] = {
+        UI_RGB(0x0f766e), UI_RGB(0x78716c), UI_RGB(0xa855f7),
+        UI_RGB(0xd946ef), UI_RGB(0x84cc16), UI_RGB(0x0ea5e9),
+    };
+    n_demos = 0;
+    for (int i = 0; i < apps_count(); i++) {
+        const apps_entry_t *e = apps_at(i);
+        if (e->shell || !apps_runs_under(e, TwinWmMobile))
+            continue;
+        if (n_demos == (int) (sizeof(demos) / sizeof(demos[0])))
+            break;
+        demos[n_demos] = (phone_app_t) {
+            .name = e->name,
+            .sym = e->icon,
+            .accent = accents[n_demos % (sizeof(accents) / sizeof(accents[0]))],
+            .demo = e,
+        };
+        n_demos++;
+    }
+}
+
 int phone_app_count(void)
 {
-    return N_APPS;
+    _list_demos();
+    return N_APPS + n_demos;
 }
 
 const phone_app_t *phone_app_at(int idx)
 {
-    return (idx >= 0 && idx < N_APPS) ? &apps[idx] : NULL;
+    if (idx >= 0 && idx < N_APPS)
+        return &apps[idx];
+    _list_demos();
+    return idx >= N_APPS && idx < N_APPS + n_demos ? &demos[idx - N_APPS]
+                                                   : NULL;
 }
 
 int phone_app_find(const char *name)
 {
-    for (int i = 0; i < N_APPS; i++)
-        if (!strcmp(apps[i].name, name))
+    for (int i = 0; i < phone_app_count(); i++)
+        if (!strcmp(phone_app_at(i)->name, name))
             return i;
     return -1;
 }
@@ -478,14 +512,14 @@ static int nav_hit(twin_coord_t x, twin_coord_t y)
     return -1;
 }
 
-/* Destroy every app view except home and @keep, without animation */
-static void _drop_views(ui_view_t *keep)
+static bool is_app_window(twin_window_t *w);
+
+/* Destroy every app window except home and @keep, without animation */
+static void _drop_apps(twin_window_t *keep)
 {
     for (twin_window_t *w = twin_screen_first_window(g_screen); w;) {
         twin_window_t *next = twin_window_next(w);
-        ui_view_t *v = ui_view_of(w);
-        if (v && v != g_home && v != keep &&
-            twin_window_style(w) == TwinWindowApplication)
+        if (w != keep && is_app_window(w) && (!g_home || w != g_home->window))
             twin_window_destroy(w);
         w = next;
     }
@@ -498,7 +532,7 @@ static void nav_go_root(const char *name)
     if (top && top->app == app)
         return;
     /* Tabs are destinations, not history: reset to home, then open */
-    _drop_views(NULL);
+    _drop_apps(NULL);
     phone_open(app);
 }
 
@@ -534,23 +568,29 @@ static bool nav_event(twin_window_t *w, twin_event_t *ev)
 /*
  * Navigation
  */
-static bool is_app_view(twin_window_t *w)
+/* The stack holds phone views and the windows of registry apps alike */
+static bool is_app_window(twin_window_t *w)
 {
-    ui_view_t *v = ui_view_of(w);
-    return v && twin_window_is_mapped(w) &&
+    return twin_window_is_mapped(w) &&
            twin_window_style(w) == TwinWindowApplication;
 }
 
-ui_view_t *phone_top(void)
+static twin_window_t *_top_app(void)
 {
-    ui_view_t *top = NULL;
+    twin_window_t *top = NULL;
     if (!g_screen)
         return NULL;
     for (twin_window_t *w = twin_screen_first_window(g_screen); w;
          w = twin_window_next(w))
-        if (is_app_view(w))
-            top = ui_view_of(w);
+        if (is_app_window(w))
+            top = w;
     return top;
+}
+
+ui_view_t *phone_top(void)
+{
+    twin_window_t *w = _top_app();
+    return w ? ui_view_of(w) : NULL;
 }
 
 int phone_depth(void)
@@ -560,7 +600,7 @@ int phone_depth(void)
         return 0;
     for (twin_window_t *w = twin_screen_first_window(g_screen); w;
          w = twin_window_next(w))
-        if (is_app_view(w) && ui_view_of(w) != g_home)
+        if (is_app_window(w) && (!g_home || w != g_home->window))
             n++;
     return n;
 }
@@ -568,7 +608,15 @@ int phone_depth(void)
 void phone_open(int app)
 {
     const phone_app_t *a = phone_app_at(app);
-    if (!a || !a->open)
+    if (!a)
+        return;
+    if (a->demo) {
+        /* Its own windows: the policy stacks them over the work area */
+        a->demo->start(g_screen, 0, PHONE_STATUS_H, PHONE_W, PHONE_CONTENT_H);
+        phone_view_changed();
+        return;
+    }
+    if (!a->open)
         return;
     a->open();
     /* Tag the view the app just pushed */
@@ -580,19 +628,19 @@ void phone_open(int app)
 
 void phone_back(void)
 {
-    ui_view_t *top = phone_top();
-    if (top && top != g_home)
-        ui_view_close(top);
+    twin_window_t *top = _top_app();
+    if (top && (!g_home || top != g_home->window))
+        twin_window_back(top);
 }
 
 void phone_home(void)
 {
-    ui_view_t *top = phone_top();
-    if (!top || top == g_home)
+    twin_window_t *top = _top_app();
+    if (!top || (g_home && top == g_home->window))
         return;
     /* Hidden screens go first (no animation), then the visible one pops */
-    _drop_views(top);
-    ui_view_close(top);
+    _drop_apps(top);
+    twin_window_close(top);
 }
 
 static ui_view_t *lock_view(void)
@@ -619,14 +667,6 @@ void phone_lock(void)
     ui_view_t *lock = lock_create();
     if (lock)
         ui_view_show(lock);
-}
-
-bool phone_set_scene(twin_wm_mode_t mode)
-{
-    if (!g_screen || !twin_screen_set_wm(g_screen, mode))
-        return false;
-    phone_bars_refresh();
-    return true;
 }
 
 /*

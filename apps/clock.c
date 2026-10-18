@@ -252,7 +252,7 @@ static twin_custom_widget_t *apps_clock_create(twin_box_t *parent)
     return _apps_clock_init(parent);
 }
 
-void apps_clock_start(twin_screen_t *screen,
+bool apps_clock_start(twin_screen_t *screen,
                       const char *name,
                       int x,
                       int y,
@@ -261,8 +261,11 @@ void apps_clock_start(twin_screen_t *screen,
 {
     twin_toplevel_t *toplevel = twin_toplevel_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
+    if (!toplevel)
+        return false;
     twin_custom_widget_t *clock =
         apps_clock_create(twin_toplevel_box(toplevel));
     (void) clock;
     twin_toplevel_show(toplevel);
+    return true;
 }

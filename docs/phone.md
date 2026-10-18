@@ -1,6 +1,6 @@
 # Mobile and Desktop Scenes
 
-This document describes how Mado runs a phone user interface and a classic
+This document describes how Mado runs a phone user interface or a classic
 desktop from the same core, and why the core is shaped the way it is.  The
 cellphone demo under `apps/cellphone/` is the reference workload: a lock
 screen, a home screen and twelve apps on a 240x320 display, drawn with
@@ -20,8 +20,15 @@ at run time:
 | desktop | `TwinWmDesktop` | Overlapping decorated windows, click-to-raise, drag-to-move (the title bar always stays reachable), double-click the title to maximize, drop on a screen edge to snap, drag the bottom-right client corner to resize, iconify, close, shadow under the active window. New windows cascade off occupied spots. | `WM_DESKTOP` |
 | mobile | `TwinWmMobile` | Application windows stack over the work area between optional system bars; only the top one is visible; animated push/pop/dismiss, an edge-swipe back gesture and Escape for back. | `WM_MOBILE` |
 
+The desktop and mobile policies are mutually exclusive: the Kconfig
+"Window manager" choice builds one of them, or neither (`WM_NONE`), and
+`twin_screen_set_wm()` switches between that one and none at run time.
+Keeping one interactive policy per build keeps its code and state out of
+targets that never use it, and a product ships as a phone or a desktop,
+not both.
+
 ```c
-twin_screen_set_wm(screen, TwinWmMobile);   /* switch at run time */
+twin_screen_set_wm(screen, TwinWmNone);     /* switch at run time */
 twin_screen_set_bars(screen, status, nav);  /* mobile system bars */
 twin_window_close(window);                  /* WM-aware close */
 twin_window_back(window);                   /* in-app back, else close */
@@ -35,8 +42,14 @@ geometry: `TwinWindowPlain` (placed exactly as requested, never decorated),
 `TwinWindowApplication` (a managed app window) and `TwinWindowFullscreen`
 (above everything, e.g. a lock screen).  The same app code therefore runs
 decorated on a desktop, stacked on a phone, or full screen with no window
-manager at all; the cellphone demo's Settings app switches between the
-three while running.
+manager at all.  The demo apps are the proof.  `apps/apps.c` registers
+every app that is built together with the policies it runs under:
+ordinary apps are marked for all three, and the phone shell, which owns the
+screen, for the mobile policy only.  The desktop scene opens the apps as
+overlapping windows, the phone launcher lists every app marked for mobile
+and the policy stacks its windows, and the 'none' scene shows one full
+screen.  `test-demos` runs each app under every policy it is marked for
+that the build has.
 
 Switching policies re-lays out every existing window: decorations are added
 or removed, application windows are cascaded or stacked, and, with
@@ -269,16 +282,24 @@ view die with it.
 registry with squircle icon plates, the status and navigation bars, and
 navigation (`phone_open()`, `phone_back()`, `phone_home()`), which is
 nothing more than showing and closing views: the window manager owns the
-stack, the transitions and the memory.
+stack, the transitions and the memory.  Navigation acts on the topmost
+application window whether or not it is a view, so a registry app opened
+from the launcher goes back and home like any phone app.
 
-Run it with SDL (2x scaled by default; `MADO_SCALE=n` overrides):
+The default build uses the desktop policy, so build the phone with the
+mobile one, then run it with SDL (2x scaled by default; `MADO_SCALE=n`
+overrides):
 
 ```shell
-$ make defconfig && make
-$ ./demo-sdl                      # phone (default scene)
-$ MADO_SCENE=desktop ./demo-sdl   # desktop demos
+$ make defconfig
+$ python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig WM_MOBILE=y
+$ python3 tools/kconfig/genconfig.py configs/Kconfig
+$ make
+$ ./demo-sdl                      # phone (default scene of this build)
 $ MADO_SCENE=none ./demo-sdl      # single app, no window manager
 ```
+
+The desktop demos are the default build's scene.
 
 Drag the lock screen knob to unlock.  Drag from the left edge of an app, or
 press Escape, to go back.  A hardware keyboard types into the focused
@@ -286,7 +307,7 @@ screen.  In the desktop scene Alt+Tab cycles the windows.
 
 ## Verification
 
-`make check` builds and runs four headless suites in-process: scan-out
+`make check` builds and runs the headless suites in-process: scan-out
 lands in a memory framebuffer, time is a virtual clock, input is injected
 through `twin_screen_dispatch()`.  Mado is integer-only, so with the
 built-in renderer every frame is bit-exact across hosts.
@@ -303,8 +324,11 @@ built-in renderer every frame is bit-exact across hosts.
   including mid-swipe, superseded and out-of-memory requests.
 - `test-lifetime`: callbacks that run while an object is torn down, or
   that act on the object calling them.
-- `test-cellphone`: boots the phone with a fixed clock and drives the whole
-  user journey through every app.
+- `test-demos`: every registry app under the built policy and 'none':
+  placement, consistency while it runs, closing window by window, leaks.
+- `test-cellphone` (mobile builds): boots the phone with a fixed clock and
+  drives the whole user journey through every app, including the registry
+  apps opened from the launcher.
 
 The checks are layered:
 

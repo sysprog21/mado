@@ -7,8 +7,9 @@
 #ifndef _APPS_IMAGE_H_
 #define _APPS_IMAGE_H_
 
+#include <stdbool.h>
 #include <twin.h>
 
-void apps_image_start(twin_screen_t *screen, const char *name, int x, int y);
+bool apps_image_start(twin_screen_t *screen, const char *name, int x, int y);
 
 #endif /* _APPS_ANIMATION_H_ */

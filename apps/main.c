@@ -13,16 +13,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "apps_animation.h"
-#include "apps_calc.h"
-#include "apps_clock.h"
-#include "apps_image.h"
-#include "apps_multi.h"
-#include "apps_spline.h"
-
-#if defined(CONFIG_DEMO_CELLPHONE)
-#include "phone.h"
-#endif
+#include "apps.h"
 
 #define WIDTH 640
 #define HEIGHT 480
@@ -78,13 +69,13 @@ static twin_pixmap_t *load_background(twin_screen_t *screen, const char *path)
 static twin_context_t *tx = NULL;
 
 static twin_wm_mode_t scene;
+static const apps_entry_t *shell; /* the shell the scene runs, if any */
 
 static void cleanup(void)
 {
-#if defined(CONFIG_DEMO_CELLPHONE)
-    if (scene == TwinWmMobile)
-        phone_shutdown();
-#endif
+    if (shell && shell->stop)
+        shell->stop();
+    shell = NULL;
     twin_destroy(tx);
     tx = NULL;
 }
@@ -98,20 +89,12 @@ static void sigint_handler(int sig)
 
 /*
  * Scene: which window manager the demo starts under.  Kconfig picks the
- * default; MADO_SCENE=mobile|desktop|none overrides it at run time.
+ * default; MADO_SCENE=mobile|desktop|none overrides it at run time when
+ * that window manager is built.
  */
 
-static twin_wm_mode_t pick_scene(void)
+static twin_wm_mode_t default_scene(void)
 {
-    const char *env = getenv("MADO_SCENE");
-    if (env) {
-        if (!strcmp(env, "mobile"))
-            return TwinWmMobile;
-        if (!strcmp(env, "desktop"))
-            return TwinWmDesktop;
-        if (!strcmp(env, "none"))
-            return TwinWmNone;
-    }
 #if defined(CONFIG_DEMO_SCENE_MOBILE)
     return TwinWmMobile;
 #elif defined(CONFIG_DEMO_SCENE_DESKTOP)
@@ -121,73 +104,76 @@ static twin_wm_mode_t pick_scene(void)
 #endif
 }
 
-static void init_desktop_apps(twin_screen_t *screen)
+static twin_wm_mode_t pick_scene(void)
 {
-    (void) screen;
-#if defined(CONFIG_DEMO_MULTI)
-    apps_multi_start(screen, "Demo", 100, 100, 400, 400);
+    const char *env = getenv("MADO_SCENE");
+    if (!env)
+        return default_scene();
+#if defined(CONFIG_WM_MOBILE)
+    if (!strcmp(env, "mobile"))
+        return TwinWmMobile;
 #endif
-#if defined(CONFIG_DEMO_CLOCK)
-    apps_clock_start(screen, "Clock", 10, 10, 200, 200);
+#if defined(CONFIG_WM_DESKTOP)
+    if (!strcmp(env, "desktop"))
+        return TwinWmDesktop;
 #endif
-#if defined(CONFIG_DEMO_CALCULATOR)
-    apps_calc_start(screen, "Calculator", 100, 100, 200, 200);
-#endif
-#if defined(CONFIG_DEMO_SPLINE)
-    apps_spline_start(screen, "Spline", 20, 20, 400, 400);
-#endif
-#if defined(CONFIG_DEMO_ANIMATION)
-    apps_animation_start(screen, "Viewer", ASSET_PATH "nyancat.gif", 20, 20);
-#endif
-#if defined(CONFIG_DEMO_IMAGE)
-    apps_image_start(screen, "Viewer", 20, 20);
-#endif
+    if (!strcmp(env, "none"))
+        return TwinWmNone;
+    fprintf(stderr, "MADO_SCENE=%s is not built, using the default scene\n",
+            env);
+    return default_scene();
 }
 
-/* Without a window manager every window covers the screen, so overlapping
- * demos would hide each other: start only the first one.
- */
-static void init_single_app(twin_screen_t *screen)
+/* A shell that runs the whole scene (the phone under the mobile policy) */
+static const apps_entry_t *scene_shell(twin_wm_mode_t mode)
 {
-    (void) screen;
-#if defined(CONFIG_DEMO_CLOCK)
-    apps_clock_start(screen, "Clock", 10, 10, 200, 200);
-#elif defined(CONFIG_DEMO_CALCULATOR)
-    apps_calc_start(screen, "Calculator", 100, 100, 200, 200);
-#elif defined(CONFIG_DEMO_SPLINE)
-    apps_spline_start(screen, "Spline", 20, 20, 400, 400);
-#elif defined(CONFIG_DEMO_ANIMATION)
-    apps_animation_start(screen, "Viewer", ASSET_PATH "nyancat.gif", 20, 20);
-#elif defined(CONFIG_DEMO_IMAGE)
-    apps_image_start(screen, "Viewer", 20, 20);
-#endif
+    for (int i = 0; i < apps_count(); i++) {
+        const apps_entry_t *app = apps_at(i);
+        if (app->shell && apps_runs_under(app, mode))
+            return app;
+    }
+    return NULL;
 }
 
-/* Initialize demo applications based on build configuration.
+/* Start the shell of the scene, or else every app that runs under it,
+ * last to first so that the first registry entries end up on top.
+ * Without a window manager every window covers the screen, so overlapping
+ * apps would hide each other: start only the first one.
  * Shared by both native and WebAssembly builds.
  */
 static void init_demo_apps(twin_context_t *ctx)
 {
     twin_screen_t *screen = twin_context_screen(ctx);
 
-#if defined(CONFIG_DEMO_CELLPHONE)
-    if (scene == TwinWmMobile) {
-        if (phone_boot(screen))
-            return;
-        fprintf(stderr,
-                "cellphone: out of memory, showing the classic demos\n");
-    }
-#endif
     if (!twin_screen_set_wm(screen, scene))
         scene = twin_screen_get_wm(screen);
-    if (scene == TwinWmDesktop) {
+    const apps_entry_t *sh = scene_shell(scene);
+    if (sh) {
+        if (sh->start(screen, 0, 0, sh->w, sh->h)) {
+            shell = sh;
+            return;
+        }
+        fprintf(stderr, "%s: out of memory, starting the apps instead\n",
+                sh->name);
+    }
 #if defined(CONFIG_WM_DESKTOP)
+    if (scene == TwinWmDesktop)
         twin_screen_set_background(
             screen, load_background(screen, ASSET_PATH "/tux.png"));
 #endif
-        init_desktop_apps(screen);
-    } else {
-        init_single_app(screen);
+    if (scene == TwinWmNone) {
+        for (int i = 0; i < apps_count(); i++) {
+            const apps_entry_t *app = apps_at(i);
+            if (!app->shell && apps_runs_under(app, scene) &&
+                app->start(screen, app->x, app->y, app->w, app->h))
+                break;
+        }
+        return;
+    }
+    for (int i = apps_count() - 1; i >= 0; i--) {
+        const apps_entry_t *app = apps_at(i);
+        if (!app->shell && apps_runs_under(app, scene))
+            app->start(screen, app->x, app->y, app->w, app->h);
     }
 }
 
@@ -196,15 +182,11 @@ int main(void)
     int width = WIDTH, height = HEIGHT;
 
     scene = pick_scene();
-#if defined(CONFIG_DEMO_CELLPHONE)
-    if (scene == TwinWmMobile) {
-        width = PHONE_W;
-        height = PHONE_H;
+    const apps_entry_t *sh = scene_shell(scene);
+    if (sh) {
+        width = sh->w;
+        height = sh->h;
     }
-#else
-    if (scene == TwinWmMobile)
-        scene = TwinWmDesktop;
-#endif
 
     tx = twin_create(width, height);
     if (!tx)

@@ -7,9 +7,10 @@
 #ifndef _APPS_SPLINE_H_
 #define _APPS_SPLINE_H_
 
+#include <stdbool.h>
 #include <twin.h>
 
-void apps_spline_start(twin_screen_t *screen,
+bool apps_spline_start(twin_screen_t *screen,
                        const char *name,
                        int x,
                        int y,

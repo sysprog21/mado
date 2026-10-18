@@ -35,13 +35,23 @@ static void _apps_animation_paint(twin_custom_widget_t *custom)
         current_frame = anim->pix;
     }
 
+    /* A policy may give the window more room than the image (a phone's
+     * work area, the whole screen without a window manager): center it */
+    twin_pixmap_t *dst = _apps_animation_pixmap(custom);
+    twin_coord_t w = twin_custom_widget_width(custom);
+    twin_coord_t h = twin_custom_widget_height(custom);
+    twin_coord_t fw = twin_pixmap_width(current_frame);
+    twin_coord_t fh = twin_pixmap_height(current_frame);
+    twin_coord_t x = w > fw ? (w - fw) / 2 : 0;
+    twin_coord_t y = h > fh ? (h - fh) / 2 : 0;
+    if (w > fw || h > fh)
+        twin_fill(dst, 0xff000000, TWIN_SOURCE, 0, 0, w, h);
+
     twin_operand_t srcop = {
         .source_kind = TWIN_PIXMAP,
         .u.pixmap = current_frame,
     };
-    twin_composite(_apps_animation_pixmap(custom), 0, 0, &srcop, 0, 0, NULL, 0,
-                   0, TWIN_SOURCE, twin_pixmap_width(current_frame),
-                   twin_pixmap_height(current_frame));
+    twin_composite(dst, x, y, &srcop, 0, 0, NULL, 0, 0, TWIN_SOURCE, fw, fh);
 }
 
 static twin_time_t _apps_animation_timeout(twin_time_t now, void *closure)
@@ -115,7 +125,7 @@ static twin_custom_widget_t *apps_animation_create(twin_box_t *parent,
     return _apps_animation_init(parent, pix);
 }
 
-void apps_animation_start(twin_screen_t *screen,
+bool apps_animation_start(twin_screen_t *screen,
                           const char *name,
                           const char *path,
                           int x,
@@ -123,12 +133,17 @@ void apps_animation_start(twin_screen_t *screen,
 {
     twin_pixmap_t *pix = twin_pixmap_from_file(path, TWIN_ARGB32);
     if (!pix)
-        return;
+        return false;
     twin_toplevel_t *toplevel = twin_toplevel_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y,
         twin_pixmap_width(pix), twin_pixmap_height(pix), name);
-    twin_custom_widget_t *anim =
-        apps_animation_create(twin_toplevel_box(toplevel), pix);
-    (void) anim;
+    if (!toplevel) {
+        twin_pixmap_destroy(pix);
+        return false;
+    }
+    /* The widget owns the image from here on */
+    if (!apps_animation_create(twin_toplevel_box(toplevel), pix))
+        twin_pixmap_destroy(pix);
     twin_toplevel_show(toplevel);
+    return true;
 }

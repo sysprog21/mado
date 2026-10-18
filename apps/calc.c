@@ -207,7 +207,7 @@ static twin_dispatch_result_t _apps_calc_display_event(twin_widget_t *widget,
     return TwinDispatchContinue;
 }
 
-void apps_calc_start(twin_screen_t *screen,
+bool apps_calc_start(twin_screen_t *screen,
                      const char *name,
                      int x,
                      int y,
@@ -215,9 +215,15 @@ void apps_calc_start(twin_screen_t *screen,
                      int h)
 {
     apps_calc_t *calc = malloc(sizeof(apps_calc_t));
+    if (!calc)
+        return false;
 
     calc->toplevel = twin_toplevel_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
+    if (!calc->toplevel) {
+        free(calc);
+        return false;
+    }
     twin_box_t *top = twin_toplevel_box(calc->toplevel);
     calc->display =
         twin_label_create(top, "0", APPS_CALC_VALUE_FG, APPS_CALC_VALUE_SIZE,
@@ -250,4 +256,5 @@ void apps_calc_start(twin_screen_t *screen,
     calc->pending_delete = true;
     calc->pending_op = 0;
     twin_toplevel_show(calc->toplevel);
+    return true;
 }

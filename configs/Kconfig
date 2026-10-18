@@ -227,11 +227,17 @@ config CURSOR
 
 menu "Window Management"
 
-comment "The 'none' policy is always built: no decorations, no placement"
+choice
+    prompt "Window manager"
+    default WM_DESKTOP
+    help
+      Select the window manager policy built into the library.  Only one
+      can be built at a time; the 'none' policy (no decorations, no
+      placement) is always available besides it, and
+      twin_screen_set_wm() switches between the two at run time.
 
 config WM_DESKTOP
     bool "Desktop window manager"
-    default y
     help
       Overlapping windows with title bars, click-to-raise, drag-to-move,
       double-click maximize, edge snapping, corner resizing,
@@ -242,7 +248,6 @@ config WM_DESKTOP
 
 config WM_MOBILE
     bool "Mobile window manager"
-    default y
     help
       Phone-style shell: application windows stack over the work area
       between optional system bars (status bar, navigation bar), only the
@@ -250,6 +255,15 @@ config WM_MOBILE
       an edge-swipe back gesture animate retained pixels without
       repainting applications.  Escape also goes back.
       Selected at run time with twin_screen_set_wm(screen, TwinWmMobile).
+
+config WM_NONE
+    bool "None"
+    help
+      Build only the 'none' policy: no decorations, every application
+      window covers the screen, and the keyboard goes to the newest or the
+      last pressed window.
+
+endchoice
 
 config WM_MOBILE_EVICT
     bool "Release pixels of covered applications"
@@ -263,7 +277,7 @@ config WM_MOBILE_EVICT
 config DROP_SHADOW
     bool "Window drop shadows"
     default y
-    depends on WM_DESKTOP || WM_MOBILE
+    depends on !WM_NONE
     help
       Cast a soft shadow under the active desktop window and under the
       sliding window of mobile transitions.  The compositor synthesizes
@@ -415,8 +429,9 @@ config DEMO_CELLPHONE
       Phone user interface: lock screen, home screen, dialer, contacts,
       messages, calculator, music, photos, camera, settings, call log and
       games, drawn with vector graphics on the mobile window manager.
-      Settings can switch the running system to the desktop or 'none'
-      window manager.
+      Every other app in apps/apps.c marked for the mobile policy (the
+      demos selected below) gets a launcher icon too and runs as a
+      stacked app; Back closes its windows one at a time.
 
 config DEMO_CELLPHONE_RGB16
     bool "Use RGB565 surfaces for phone screens"
@@ -430,15 +445,19 @@ config DEMO_CELLPHONE_RGB16
 choice
     prompt "Demo scene at startup"
     depends on DEMO_APPLICATIONS
-    default DEMO_SCENE_MOBILE if DEMO_CELLPHONE
+    default DEMO_SCENE_MOBILE if WM_MOBILE
     default DEMO_SCENE_DESKTOP
     help
-      The demo launcher starts either the phone shell or the desktop
-      demos.  MADO_SCENE=mobile|desktop|none overrides it at run time.
+      The window manager the demo launcher starts under.  Each app in
+      apps/apps.c is marked with the window managers it runs under; the
+      launcher starts those marked for the scene, or the shell that owns
+      it (the phone under the mobile policy).  'No window manager' shows
+      the first app full screen.  MADO_SCENE=mobile|desktop|none overrides
+      the choice at run time.
 
 config DEMO_SCENE_MOBILE
-    bool "Mobile (cellphone)"
-    depends on DEMO_CELLPHONE
+    bool "Mobile"
+    depends on WM_MOBILE
 
 config DEMO_SCENE_DESKTOP
     bool "Desktop"
@@ -452,12 +471,12 @@ endchoice
 config DEMO_MULTI
     bool "Build multi demo"
     default y
-    depends on DEMO_APPLICATIONS && WM_DESKTOP && WIDGETS
+    depends on DEMO_APPLICATIONS && WIDGETS
     help
       Comprehensive demo with multiple windows and widgets.
-      Demonstrates window management and event handling.
-      Requires window manager for staggered placement and
-      overlapping window interaction.
+      Demonstrates window management and event handling: the desktop
+      policy staggers its windows, the mobile one stacks them and Back
+      closes one at a time.
 
 config DEMO_CLOCK
     bool "Build clock demo"

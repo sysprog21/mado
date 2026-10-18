@@ -1188,6 +1188,10 @@ typedef struct _twin_wm_ops {
     void (*work_area)(const twin_screen_t *screen, twin_rect_t *area);
 } twin_wm_ops_t;
 
+#if defined(CONFIG_WM_DESKTOP) && defined(CONFIG_WM_MOBILE)
+#error "CONFIG_WM_DESKTOP and CONFIG_WM_MOBILE are mutually exclusive"
+#endif
+
 extern const twin_wm_ops_t _twin_wm_none;
 #if defined(CONFIG_WM_DESKTOP)
 extern const twin_wm_ops_t _twin_wm_desktop;

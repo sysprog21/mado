@@ -151,6 +151,7 @@ endif
 # Applications
 
 libapps.a_files-y := apps/dummy.c
+libapps.a_files-$(CONFIG_DEMO_APPLICATIONS) += apps/apps.c
 libapps.a_files-$(CONFIG_DEMO_MULTI) += apps/multi.c
 libapps.a_files-$(CONFIG_DEMO_CLOCK) += apps/clock.c
 libapps.a_files-$(CONFIG_DEMO_CALCULATOR) += apps/calc.c
@@ -180,7 +181,7 @@ libapps.a_files-$(CONFIG_DEMO_CELLPHONE) += \
 	apps/cellphone/pong.c \
 	apps/cellphone/tetris.c
 
-libapps.a_includes-y := include apps/cellphone
+libapps.a_includes-y := include apps apps/cellphone
 # Emscripten size optimization
 libapps.a_cflags-$(CC_IS_EMCC) += -Oz
 
@@ -314,6 +315,9 @@ endif
 # Headless tests: built only for 'make check' / 'make check-update'
 # (and listed for 'make clean' so their binaries are removed)
 TESTS := test-core test-wm test-lifetime
+ifeq ($(CONFIG_DEMO_APPLICATIONS), y)
+TESTS += test-demos
+endif
 ifeq ($(CONFIG_DEMO_CELLPHONE), y)
 TESTS += test-cellphone
 endif

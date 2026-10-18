@@ -46,7 +46,7 @@ jobs:
             sudo apt-get update -q -y
             sudo apt-get install -y libsdl2-dev libjpeg-dev libpng-dev libcairo2-dev
       shell: bash
-    - name: default build
+    - name: default build (desktop window manager)
       run: |
             make defconfig
             make
@@ -56,7 +56,22 @@ jobs:
     - name: headless tests under Valgrind
       run: |
             sudo apt-get install -y -q valgrind
-            for t in test-core test-wm test-lifetime test-cellphone; do
+            for t in test-core test-wm test-lifetime test-demos; do
+              DEBUGINFOD_URLS= valgrind -q --error-exitcode=1 \
+                --leak-check=full --errors-for-leak-kinds=definite ./$t
+            done
+      shell: bash
+    - name: mobile build (phone and demos)
+      run: |
+            python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig WM_MOBILE=y
+            python3 tools/kconfig/genconfig.py configs/Kconfig
+            make
+    - name: headless tests (mobile)
+      run: |
+            make check
+    - name: headless tests under Valgrind (mobile)
+      run: |
+            for t in test-core test-wm test-lifetime test-demos test-cellphone; do
               DEBUGINFOD_URLS= valgrind -q --error-exitcode=1 \
                 --leak-check=full --errors-for-leak-kinds=definite ./$t
             done
@@ -74,10 +89,16 @@ jobs:
             sudo apt-get install -y libsdl2-dev libjpeg-dev libpng-dev
     - name: AddressSanitizer + UndefinedBehaviorSanitizer
       run: |
-            make defconfig
-            make check \
-              CFLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined" \
-              LDFLAGS="-fsanitize=address,undefined"
+            for wm in WM_DESKTOP WM_MOBILE; do
+              make defconfig
+              python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig $wm=y
+              python3 tools/kconfig/genconfig.py configs/Kconfig
+              make clean
+              make check \
+                CFLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined" \
+                LDFLAGS="-fsanitize=address,undefined"
+            done
+      shell: bash
 
   config-matrix:
     needs: [detect-code-related-file-changes]
@@ -88,24 +109,22 @@ jobs:
       matrix:
         include:
           - name: no window manager
-            options: WM_DESKTOP=n WM_MOBILE=n
-          - name: mobile only
-            options: WM_DESKTOP=n
-          - name: desktop only
-            options: WM_MOBILE=n
+            options: WM_NONE=y
           - name: no coverage cache
-            options: CACHE_SIZE=0
+            options: WM_MOBILE=y CACHE_SIZE=0
           - name: no mobile eviction
-            options: WM_MOBILE_EVICT=n
+            options: WM_MOBILE=y WM_MOBILE_EVICT=n
           - name: no allocator stats
             options: MEMORY_STATS=n
           - name: no widget toolkit
-            options: WIDGETS=n
+            options: WM_MOBILE=y WIDGETS=n
           - name: RGB565 phone surfaces
-            options: DEMO_CELLPHONE_RGB16=y
+            options: WM_MOBILE=y DEMO_CELLPHONE_RGB16=y
           - name: TLSF heap
-            options: MEM_TLSF=y MEM_TLSF_POOL_SIZE=4194304
+            options: WM_MOBILE=y MEM_TLSF=y MEM_TLSF_POOL_SIZE=4194304
           - name: Pixman renderer
+            options: WM_MOBILE=y RENDERER_PIXMAN=y
+          - name: Pixman renderer, desktop
             options: RENDERER_PIXMAN=y
     name: config (${{ matrix.name }})
     steps:

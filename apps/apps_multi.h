@@ -7,9 +7,10 @@
 #ifndef _APPS_MULTI_H_
 #define _APPS_MULTI_H_
 
+#include <stdbool.h>
 #include <twin.h>
 
-void apps_multi_start(twin_screen_t *screen,
+bool apps_multi_start(twin_screen_t *screen,
                       const char *name,
                       int x,
                       int y,

@@ -7,9 +7,10 @@
 #ifndef _APPS_CALC_H_
 #define _APPS_CALC_H_
 
+#include <stdbool.h>
 #include <twin.h>
 
-void apps_calc_start(twin_screen_t *screen,
+bool apps_calc_start(twin_screen_t *screen,
                      const char *name,
                      int x,
                      int y,

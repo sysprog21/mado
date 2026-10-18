@@ -124,19 +124,32 @@ Run the demo program:
 $ ./demo-sdl
 ```
 
-The default scene is a phone: a lock screen (drag the knob to unlock), a
-home screen and a dozen apps drawn with vector graphics on the mobile window
-manager.  Drag from the left edge of an app to go back.  Other scenes run
-the same window system under a different window-manager policy:
+The default build uses the desktop window manager: overlapping, decorated
+windows running the demo apps.  The window manager is a build-time
+choice, and the desktop and mobile policies are mutually exclusive.  Build
+the phone instead, a lock screen (drag the knob to unlock), a home screen
+and a dozen apps drawn with vector graphics on the mobile window manager;
+the launcher also lists every demo app that is built:
 
 ```shell
-$ MADO_SCENE=desktop ./demo-sdl   # overlapping, decorated windows
-$ MADO_SCENE=none ./demo-sdl      # no window manager at all
+$ make defconfig
+$ python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig WM_MOBILE=y
+$ python3 tools/kconfig/genconfig.py configs/Kconfig
+$ make
+$ ./demo-sdl                      # phone; drag from the left edge to go back
 ```
 
-Each policy can be compiled out (`WM_DESKTOP`, `WM_MOBILE`) and switched at
-run time with `twin_screen_set_wm()`.  See [docs/phone.md](docs/phone.md)
-for the design of the window manager, compositor and caches.
+Either build also runs with no window manager at all:
+
+```shell
+$ MADO_SCENE=none ./demo-sdl
+```
+
+`twin_screen_set_wm()` switches between the built policy and the 'none'
+policy at run time.  Each demo app is registered in `apps/apps.c` with the
+window managers it runs under: all three by default, the mobile one only
+for the phone shell.  See [docs/phone.md](docs/phone.md) for the design of
+the window manager, compositor and caches.
 
 ### Verification
 
@@ -145,7 +158,7 @@ they check the incrementally updated frame against a full recomposite, and
 the core and phone suites also compare golden frame checksums:
 
 ```shell
-$ make check          # core, window manager, lifetime and phone suites
+$ make check          # core, window manager, lifetime (and phone) suites
 $ make check-update   # re-record golden frame checksums
 ```
 

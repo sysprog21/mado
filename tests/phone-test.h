@@ -60,6 +60,7 @@ void test_camera(void);
 void test_settings(void);
 void test_games(void);
 void test_scenes(void);
+void test_demos(void);
 void test_regress(void);
 
 #endif /* _TWIN_PHONE_TEST_H_ */

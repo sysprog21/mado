@@ -31,7 +31,6 @@
 #define INFO_H 30
 #define CLOCK_H 86
 #define PLATE 26
-#define BACK_W 40
 #define TILE_GAP 12
 #define TILE_LABEL_H 20
 #define TILE_R 8
@@ -52,14 +51,12 @@ typedef enum {
     PAGE_DISPLAY,
     PAGE_SOUND,
     PAGE_WALLPAPER,
-    PAGE_WM,
     PAGE_TIME,
     PAGE_ABOUT,
 } page_id_t;
 
 static const char *const page_titles[] = {
-    "Settings",       "Display",     "Sound", "Wallpaper",
-    "Window manager", "Date & time", "About",
+    "Settings", "Display", "Sound", "Wallpaper", "Date & time", "About",
 };
 
 typedef enum {
@@ -74,13 +71,12 @@ typedef enum {
     IT_CLOCK,      /* large time and date */
 } item_kind_t;
 
-enum { GROUP_THEME, GROUP_WM };
+enum { GROUP_THEME };
 
 /* Info values; those from VAL_HEAP on are refreshed once per second */
 enum {
     VAL_NAME,
     VAL_SCREEN,
-    VAL_WM,
     VAL_TZ,
     VAL_HEAP,
     VAL_PEAK,
@@ -109,41 +105,16 @@ typedef struct {
     /* Layout in content coordinates, refreshed from the view size */
     twin_coord_t y[MAX_ITEMS], h[MAX_ITEMS];
     ui_scroll_t scroll;
-    int pressed;      /* item under the finger, -1 when none */
-    int pressed_tile; /* wallpaper tile under the finger */
-    int grab;         /* slider item being dragged, -1 when none */
-    int minute;       /* last minute shown by the clock */
-    int refreshes;    /* About: value refresh ticks (tests) */
-    twin_wm_mode_t pending_wm;
+    int pressed;                   /* item under the finger, -1 when none */
+    int pressed_tile;              /* wallpaper tile under the finger */
+    int grab;                      /* slider item being dragged, -1 when none */
+    int minute;                    /* last minute shown by the clock */
+    int refreshes;                 /* About: value refresh ticks (tests) */
     char vals[MAX_ITEMS][VAL_LEN]; /* About: live values last painted */
 } page_t;
 
 static void settings_paint(ui_view_t *v, twin_pixmap_t *px);
 static void open_page(page_id_t page);
-
-static const char *wm_name(twin_wm_mode_t mode)
-{
-    switch (mode) {
-    case TwinWmDesktop:
-        return "Desktop";
-    case TwinWmNone:
-        return "None";
-    case TwinWmMobile:
-    default:
-        return "Mobile";
-    }
-}
-
-static twin_wm_mode_t current_wm(void)
-{
-    return phone_screen() ? twin_screen_get_wm(phone_screen()) : TwinWmMobile;
-}
-
-/* Without the phone's nav bar there is no Back: offer one in the header */
-static bool has_back(void)
-{
-    return current_wm() != TwinWmMobile;
-}
 
 static int *pref_int(int id)
 {
@@ -202,8 +173,6 @@ static void format_value(int id, char *buf, size_t len)
     case VAL_SCREEN:
         snprintf(buf, len, "%dx%d", PHONE_W, PHONE_H);
         return;
-    case VAL_WM:
-        snprintf(buf, len, "%s", wm_name(current_wm()));
         return;
     case VAL_TZ:
         snprintf(buf, len, "GMT+8 Taipei");
@@ -289,8 +258,6 @@ static void build(page_t *s)
         add(s, IT_LINK, PAGE_WALLPAPER, 0, TWIN_SYM_IMAGE, UI_RGB(0xf97316),
             "Wallpaper", NULL);
         section(s, "System");
-        add(s, IT_LINK, PAGE_WM, 0, TWIN_SYM_MOBILE, UI_RGB(0x8b5cf6),
-            "Window manager", NULL);
         add(s, IT_LINK, PAGE_TIME, 0, TWIN_SYM_CLOCK, UI_RGB(0x10b981),
             "Date & time", NULL);
         add(s, IT_LINK, PAGE_ABOUT, 0, TWIN_SYM_LIST, UI_RGB(0x64748b), "About",
@@ -316,21 +283,6 @@ static void build(page_t *s)
     case PAGE_WALLPAPER:
         add(s, IT_WALLPAPERS, 0, 0, NULL, 0, "Wallpapers", NULL);
         break;
-    case PAGE_WM:
-        section(s, "Scene");
-        add(s, IT_RADIO, GROUP_WM, TwinWmMobile, NULL, 0, "Mobile",
-            "App stack with phone bars");
-#if defined(CONFIG_WM_DESKTOP)
-        /* Only offer policies that were compiled in */
-        add(s, IT_RADIO, GROUP_WM, TwinWmDesktop, NULL, 0, "Desktop",
-            "Overlapping, title bars");
-#endif
-        add(s, IT_RADIO, GROUP_WM, TwinWmNone, NULL, 0, "None",
-            "Every window full screen");
-        add(s, IT_NOTE, 0, 0, NULL, 0, NULL,
-            "Desktop and None hide the status and nav bars. Come back here "
-            "to return to Mobile.");
-        break;
     case PAGE_TIME:
         add(s, IT_CLOCK, 0, 0, NULL, 0, "Clock", NULL);
         section(s, "Format");
@@ -344,7 +296,6 @@ static void build(page_t *s)
         section(s, "Device");
         info(s, "Name", VAL_NAME);
         info(s, "Screen", VAL_SCREEN);
-        info(s, "Window manager", VAL_WM);
         section(s, "Memory");
         info(s, "Heap in use", VAL_HEAP);
         info(s, "Heap peak", VAL_PEAK);
@@ -475,12 +426,7 @@ static void paint_header(page_t *s, twin_pixmap_t *px)
     twin_coord_t w = ui_view_width(&s->view);
     ui_rect_t r = ui_rect(0, 0, w, HEADER_H);
     twin_coord_t x = 6;
-    /* Same look as ui_header(), with room for a back arrow */
     ui_vgrad(px, r, th->card, ui_mix(th->card, th->bg, 96));
-    if (has_back()) {
-        ui_icon(px, TWIN_SYM_LEFT, FONT_NORMAL, 16, HEADER_H / 2, th->primary);
-        x = 28;
-    }
     ui_text_in(px, FONT_HEADING, ui_rect(x, 0, w - x - 8, HEADER_H), UI_LEFT,
                th->text, s->view.title);
     ui_separator(px, r);
@@ -509,9 +455,7 @@ static void paint_swatch(twin_pixmap_t *px, twin_coord_t cy, int theme)
 
 static bool radio_on(const item_t *it)
 {
-    if (it->id == GROUP_THEME)
-        return phone_theme_index() == it->arg;
-    return (int) current_wm() == it->arg;
+    return it->id == GROUP_THEME && phone_theme_index() == it->arg;
 }
 
 static void link_detail(const item_t *it, char *buf, size_t len)
@@ -526,9 +470,6 @@ static void link_detail(const item_t *it, char *buf, size_t len)
         break;
     case PAGE_WALLPAPER:
         snprintf(buf, len, "%s", phone_wallpaper_name(phone_wallpaper()));
-        break;
-    case PAGE_WM:
-        snprintf(buf, len, "%s", wm_name(current_wm()));
         break;
     default:
         break;
@@ -810,17 +751,6 @@ static void slide(page_t *s, twin_coord_t x)
     }
 }
 
-/* Switching scenes re-lays out every window, this one included: do it
- * from a timer once the current event has been fully dispatched. */
-static twin_time_t apply_scene(ui_view_t *v)
-{
-    page_t *s = (page_t *) v;
-    phone_set_scene(s->pending_wm);
-    refresh_others(s);
-    ui_view_invalidate_all(v);
-    return -1;
-}
-
 static void activate(page_t *s, int i, int tile)
 {
     item_t *it = &s->items[i];
@@ -831,12 +761,7 @@ static void activate(page_t *s, int i, int tile)
     case IT_RADIO:
         if (radio_on(it))
             break;
-        if (it->id == GROUP_THEME) {
-            phone_theme_set(it->arg); /* repaints every window */
-        } else {
-            s->pending_wm = (twin_wm_mode_t) it->arg;
-            ui_view_every(&s->view, 0, apply_scene);
-        }
+        phone_theme_set(it->arg); /* repaints every window */
         break;
     case IT_SWITCH: {
         bool *b = pref_bool(it->id);
@@ -909,10 +834,6 @@ static bool settings_event(ui_view_t *v, const ui_event_t *e)
     case UI_TAP: {
         int i = s->pressed, tile = s->pressed_tile;
         set_pressed(s, -1, -1);
-        if (e->y < HEADER_H && e->x < BACK_W && has_back()) {
-            ui_view_close(v);
-            return true;
-        }
         if (i >= 0 && i == item_at(s, e->x, e->y))
             activate(s, i, tile);
         return true;

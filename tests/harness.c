@@ -323,8 +323,7 @@ static uint32_t config_fingerprint(void)
 {
     char buf[256];
     snprintf(buf, sizeof(buf),
-             "builtin=%d shadow=%d/%d/%d mont=%d icons=%d rgb16=%d jpeg=%d "
-             "wm=%d",
+             "builtin=%d shadow=%d/%d/%d mont=%d icons=%d rgb16=%d jpeg=%d",
 #if defined(CONFIG_RENDERER_BUILTIN)
              1,
 #else
@@ -352,17 +351,9 @@ static uint32_t config_fingerprint(void)
              0,
 #endif
 #if defined(CONFIG_LOADER_JPEG)
-             1,
+             1
 #else
-             0,
-#endif
-             /* Screens list the policies that are built (Settings) */
              0
-#if defined(CONFIG_WM_DESKTOP)
-                 | 1
-#endif
-#if defined(CONFIG_WM_MOBILE)
-                 | 2
 #endif
     );
     return th_crc_bytes(buf, strlen(buf));

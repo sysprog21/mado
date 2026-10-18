@@ -32,8 +32,8 @@ Run:
 ./demo-sdl
 ```
 
-Once the window appears, interact with the phone (the default scene) or, with
-`MADO_SCENE=desktop`, move windows and interact with widgets.  Screens up to
+Once the window appears, move windows and interact with widgets (the default
+desktop build), or use the phone in a `WM_MOBILE` build.  Screens up to
 320x480 open at twice their size so a phone display is readable on a desktop
 monitor; `MADO_SCALE=n` picks another integer factor from 1 through 8.
 When nothing is damaged the backend waits for input or the next timeout,

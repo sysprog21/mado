@@ -6,8 +6,7 @@
 
 /*
  * Settings scenarios: every sub-screen opens and closes, theme, wallpaper,
- * sliders and switches change state, the window manager scene switches to
- * Desktop and None and back, and About refreshes only its values.
+ * sliders and switches change state, and About refreshes only its values.
  */
 
 #include <string.h>
@@ -204,51 +203,6 @@ static void test_wallpaper(void)
     back_to_root();
 }
 
-static void test_window_manager(void)
-{
-    twin_screen_t *screen = phone_screen();
-    if (!open_sub("Window manager"))
-        return;
-    ph_shot("settings-wm");
-
-#if defined(CONFIG_WM_DESKTOP)
-    /* Desktop: views get title bars, the bars disappear */
-    tap_item("Desktop");
-    CHECK_EQ(twin_screen_get_wm(screen), TwinWmDesktop, "desktop scene");
-    CHECK(top_is("Window manager"), "settings still on top in desktop");
-    ph_shot("settings-desktop");
-    tap_item("Mobile");
-    CHECK_EQ(twin_screen_get_wm(screen), TwinWmMobile, "back to mobile");
-    CHECK_EQ(phone_depth(), 2, "stack intact after desktop");
-    CHECK_EQ(ui_view_height(phone_top()), PHONE_CONTENT_H,
-             "work-area height restored");
-    ph_shot("settings-wm-mobile");
-#else
-    ui_rect_t none;
-    CHECK(!app_settings_item_rect("Desktop", &none),
-          "compiled-out desktop policy not offered");
-#endif
-
-    /* None: every view covers the screen; the header offers Back */
-    tap_item("None");
-    CHECK_EQ(twin_screen_get_wm(screen), TwinWmNone, "none scene");
-    CHECK_EQ(ui_view_height(phone_top()), PHONE_H, "view resized to screen");
-    ph_shot("settings-none");
-    view_tap(14, PHONE_HEADER_H / 2);
-    CHECK(top_is("Settings"), "header Back works without a nav bar");
-    open_sub("Window manager");
-    tap_item("Mobile");
-    CHECK_EQ(twin_screen_get_wm(screen), TwinWmMobile, "mobile again");
-    CHECK_EQ(ui_view_height(phone_top()), PHONE_CONTENT_H,
-             "view back in the work area");
-
-    /* The phone still navigates normally */
-    back_to_root();
-    if (open_sub("Display"))
-        back_to_root();
-    CHECK_EQ(th_damage_check(phone_th), 0, "consistent after scene switches");
-}
-
 static void test_about(void)
 {
     if (!open_sub("About"))
@@ -283,7 +237,6 @@ void test_settings(void)
     test_display();
     test_sound();
     test_wallpaper();
-    test_window_manager();
     test_about();
 
     ph_home();

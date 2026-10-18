@@ -135,10 +135,9 @@ static const apps_entry_t *scene_shell(twin_wm_mode_t mode)
     return NULL;
 }
 
-/* Start the shell of the scene, or else every app that runs under it,
- * last to first so that the first registry entries end up on top.
- * Without a window manager every window covers the screen, so overlapping
- * apps would hide each other: start only the first one.
+/* Start the shell of the scene, or else every app that runs under it in
+ * registry order.  Without a window manager every window covers the screen,
+ * so overlapping apps would hide each other: start only the first one.
  * Shared by both native and WebAssembly builds.
  */
 static void init_demo_apps(twin_context_t *ctx)
@@ -170,7 +169,7 @@ static void init_demo_apps(twin_context_t *ctx)
         }
         return;
     }
-    for (int i = apps_count() - 1; i >= 0; i--) {
+    for (int i = 0; i < apps_count(); i++) {
         const apps_entry_t *app = apps_at(i);
         if (!app->shell && apps_runs_under(app, scene))
             app->start(screen, app->x, app->y, app->w, app->h);

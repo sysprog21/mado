@@ -81,6 +81,10 @@ static const apps_entry_t apps[] = {
     {"Phone", TWIN_SYM_MOBILE, APPS_WM(TwinWmMobile), true, 0, 0, PHONE_W,
      PHONE_H, start_phone, phone_shutdown},
 #endif
+#if defined(CONFIG_DEMO_MULTI)
+    {"Demo", TWIN_SYM_LIST, APPS_WM_ALL, false, 100, 100, 400, 400, start_multi,
+     NULL},
+#endif
 #if defined(CONFIG_DEMO_CLOCK)
     {"Clock", TWIN_SYM_CLOCK, APPS_WM_ALL, false, 10, 10, 200, 200, start_clock,
      NULL},
@@ -99,10 +103,6 @@ static const apps_entry_t apps[] = {
 #endif
 #if defined(CONFIG_DEMO_IMAGE)
     {"Vectors", TWIN_SYM_GLOBE, APPS_WM_ALL, false, 20, 20, 0, 0, start_image,
-     NULL},
-#endif
-#if defined(CONFIG_DEMO_MULTI)
-    {"Demo", TWIN_SYM_LIST, APPS_WM_ALL, false, 100, 100, 400, 400, start_multi,
      NULL},
 #endif
     {0}, /* keeps the table valid when nothing is built */

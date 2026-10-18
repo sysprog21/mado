@@ -846,8 +846,9 @@ typedef struct _twin_custom_widget twin_custom_widget_t;
 
 /**
  * Event handler of a custom widget: called after the toolkit's own
- * handling, and with TwinEventDestroy last, before the widget and its data
- * are freed
+ * handling, except TwinEventDestroy, which reaches the handler first,
+ * while the widget and its data are still intact, so the handler can
+ * release what the data points to
  */
 typedef twin_dispatch_result_t (
     *twin_custom_proc_t)(twin_custom_widget_t *custom, twin_event_t *event);

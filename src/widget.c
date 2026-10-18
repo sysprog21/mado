@@ -239,6 +239,8 @@ twin_custom_widget_t *twin_custom_widget_create(twin_box_t *parent,
                                                 twin_custom_proc_t handler,
                                                 size_t data_size)
 {
+    if (data_size > SIZE_MAX - CUSTOM_DATA_OFFSET)
+        return NULL;
     twin_custom_widget_t *custom =
         twin_calloc(1, CUSTOM_DATA_OFFSET + data_size);
     if (!custom)

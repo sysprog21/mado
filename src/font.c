@@ -226,9 +226,10 @@ bool twin_has_ucs4(twin_font_t *font, twin_ucs4_t ucs4)
 {
     if (!twin_find_ucs4_page(font, twin_ucs_page(ucs4)))
         return false;
-    /* Offset 0 marks a code point the font does not cover */
+    /* Offset 0 marks a code point the font does not cover, except in stroke
+     * fonts, whose U+0000 glyph sits at offset 0; TrueType tables reserve it */
     return font->cur_page->offsets[twin_ucs_char_in_page(ucs4)] != 0 ||
-           ucs4 == 0;
+           (ucs4 == 0 && font->type == TWIN_FONT_TYPE_STROKE);
 }
 
 #define SNAPX(p) _snap(path, p, snap_x, nsnap_x)
@@ -277,6 +278,44 @@ static twin_fixed_t _twin_glyph_width(twin_text_info_t *info,
     return width;
 }
 
+/*
+ * Horizontal extent of a TrueType glyph's outline in font units.  Control
+ * points are included, so this bounds the ink (TrueType places on-curve
+ * points at the extrema, making it exact in practice).  Returns false for a
+ * glyph without ink, such as a space.
+ */
+static bool _twin_ttf_glyph_x_bounds(const signed char *b,
+                                     signed char *min_x,
+                                     signed char *max_x)
+{
+    const signed char *g = b + 1; /* skip the advance byte */
+    bool any = false;
+    for (;;) {
+        int points;
+        switch (*g++) {
+        case 'm':
+        case 'l':
+            points = 1;
+            break;
+        case '2':
+            points = 2;
+            break;
+        case 'c':
+            points = 3;
+            break;
+        default:
+            return any;
+        }
+        for (; points; points--, g += 2) {
+            if (!any || g[0] < *min_x)
+                *min_x = g[0];
+            if (!any || g[0] > *max_x)
+                *max_x = g[0];
+            any = true;
+        }
+    }
+}
+
 static inline twin_font_t *_twin_path_font(const twin_path_t *path)
 {
     return path->state.font ? path->state.font : g_twin_font;
@@ -297,10 +336,16 @@ static void twin_text_metrics_ucs4(twin_path_t *path,
 
     _twin_text_compute_info(path, font, &info);
     if (_twin_font_is_ttf(font)) {
-        /* TrueType: advance only; vertical metrics come from the font */
+        /* TrueType: bearings from the outline; vertical metrics from the font
+         */
         twin_fixed_t adv = FX(b[0], &info);
-        m->left_side_bearing = 0;
-        m->right_side_bearing = adv;
+        signed char min_x, max_x;
+        if (_twin_ttf_glyph_x_bounds(b, &min_x, &max_x)) {
+            m->left_side_bearing = FX(min_x, &info);
+            m->right_side_bearing = FX(max_x, &info);
+        } else {
+            m->left_side_bearing = m->right_side_bearing = 0; /* no ink */
+        }
         m->width = adv;
         m->ascent = m->font_ascent = FY(font->ascender, &info);
         m->descent = m->font_descent = FY(-font->descender, &info);

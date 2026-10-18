@@ -96,19 +96,23 @@ extern int th_checks, th_failures;
         }                                                                   \
     } while (0)
 
-/* Evaluates each operand once (they may have side effects) */
-#define CHECK_EQ(a, b, what)                                          \
-    do {                                                              \
-        long long _a = (long long) (a), _b = (long long) (b);         \
-        CHECK(_a == _b, "%s: got %lld, expected %lld", what, _a, _b); \
+/* Evaluates each operand once (they may have side effects).  The
+ * temporaries carry a prefix no test uses, so they cannot shadow an
+ * identifier an operand names. */
+#define CHECK_EQ(a, b, what)                                              \
+    do {                                                                  \
+        long long th_eq_a_ = (long long) (a), th_eq_b_ = (long long) (b); \
+        CHECK(th_eq_a_ == th_eq_b_, "%s: got %lld, expected %lld", what,  \
+              th_eq_a_, th_eq_b_);                                        \
     } while (0)
 
 /* NUL-terminated strings; @a may be NULL */
-#define CHECK_STR(a, b, what)                                                 \
-    do {                                                                      \
-        const char *_s = (a), *_t = (b);                                      \
-        CHECK(_s && !strcmp(_s, _t), "%s: got \"%s\", expected \"%s\"", what, \
-              _s ? _s : "(null)", _t);                                        \
+#define CHECK_STR(a, b, what)                               \
+    do {                                                    \
+        const char *th_str_a_ = (a), *th_str_b_ = (b);      \
+        CHECK(th_str_a_ && !strcmp(th_str_a_, th_str_b_),   \
+              "%s: got \"%s\", expected \"%s\"", what,      \
+              th_str_a_ ? th_str_a_ : "(null)", th_str_b_); \
     } while (0)
 
 /* Print the summary line and return the process exit status */

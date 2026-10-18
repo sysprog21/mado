@@ -78,8 +78,9 @@ static twin_time_t _twin_tween_tick(twin_time_t now, void *closure)
 
     tween->running = true;
     bool keep = (*tween->proc)(value, tween->closure);
-    /* twin_tween_finish() from inside proc still promises the end value */
-    if (tween->finished && !last && keep)
+    /* twin_tween_finish() from inside proc still promises the end value,
+     * even when proc also returns false to stop */
+    if (tween->finished && !last)
         (*tween->proc)(TWIN_FIXED_ONE, tween->closure);
     tween->running = false;
 

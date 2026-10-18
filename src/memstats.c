@@ -179,6 +179,10 @@ void *_twin_realloc(void *old, size_t size, const char *file, int line)
         return NULL;
     }
 
+    /* A failed realloc leaves @old allocated, as realloc() does */
+    if (_injected_failure())
+        return NULL;
+
     ptrdiff_t old_idx = old ? memtbl_find(old) : -1;
     if (old_idx < 0 && memtbl_count == memtbl_capacity && !memtbl_grow())
         return NULL;

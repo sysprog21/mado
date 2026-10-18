@@ -40,6 +40,8 @@ th_t *th_create(twin_coord_t width, twin_coord_t height, twin_wm_mode_t wm)
     t->fb = calloc((size_t) width * height, sizeof(twin_argb32_t));
     t->screen = twin_screen_create(width, height, NULL, th_put_span, t);
     if (!t->fb || !t->screen) {
+        if (t->screen)
+            twin_screen_destroy(t->screen);
         free(t->fb);
         free(t);
         return NULL;
@@ -94,12 +96,15 @@ void th_advance(th_t *t, int ms)
 
 void th_settle(th_t *t, int max_ms)
 {
-    for (int spent = 0; spent < max_ms; spent += 16) {
+    for (int spent = 0; spent < max_ms;) {
         th_frame(t);
         twin_time_t delay = _twin_timeout_delay();
         if (delay < 0 || delay > max_ms - spent)
             break;
-        virtual_now += 16;
+        /* Never step past the budget */
+        int step = max_ms - spent < 16 ? max_ms - spent : 16;
+        virtual_now += step;
+        spent += step;
     }
     th_frame(t);
 }
@@ -381,15 +386,22 @@ static const char *golden_dir(void)
     return d ? d : "tests/golden";
 }
 
+/* How a golden file's recorded configuration compares with this build */
+typedef enum {
+    GOLDEN_UNAVAILABLE, /* file missing, or no "# config" line */
+    GOLDEN_OTHER_CONFIG,
+    GOLDEN_SAME_CONFIG,
+} golden_config_t;
+
 static bool golden_lookup(const char *suite,
                           const char *name,
                           uint32_t *crc,
-                          bool *config_ok)
+                          golden_config_t *config)
 {
     char path[512], line[256];
     snprintf(path, sizeof(path), "%s/%s.txt", golden_dir(), suite);
     FILE *f = fopen(path, "r");
-    *config_ok = false;
+    *config = GOLDEN_UNAVAILABLE;
     if (!f)
         return false;
     bool found = false;
@@ -397,7 +409,8 @@ static bool golden_lookup(const char *suite,
         char key[64];
         unsigned v;
         if (sscanf(line, "# config %x", &v) == 1) {
-            *config_ok = v == config_fingerprint();
+            *config = v == config_fingerprint() ? GOLDEN_SAME_CONFIG
+                                                : GOLDEN_OTHER_CONFIG;
             continue;
         }
         if (sscanf(line, "%63s %x", key, &v) == 2 && !strcmp(key, name)) {
@@ -429,10 +442,19 @@ void th_golden(const char *suite, const char *name, uint32_t crc, const th_t *t)
     }
 
     uint32_t want = 0;
-    bool config_ok;
-    bool found = golden_lookup(suite, name, &want, &config_ok);
-    if (!config_ok) {
+    golden_config_t config;
+    bool found = golden_lookup(suite, name, &want, &config);
+    /* Skip only a known configuration mismatch; a missing or malformed
+     * file must not silently disable the comparison */
+    if (config == GOLDEN_OTHER_CONFIG) {
         golden_skipped++;
+        return;
+    }
+    if (config == GOLDEN_UNAVAILABLE) {
+        CHECK(
+            false,
+            "%s/%s.txt missing or lacks a config line (run make check-update)",
+            golden_dir(), suite);
         return;
     }
     CHECK(found, "no golden checksum for %s/%s (run make check-update)", suite,

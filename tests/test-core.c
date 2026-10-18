@@ -400,7 +400,25 @@ static void test_text(void)
     twin_fixed_t asc, desc;
     twin_font_extents(font, size, &asc, &desc);
     CHECK(asc > 0 && desc > 0, "font extents positive");
+    /* Stroke fonts draw U+0000 from offset 0; TrueType tables reserve it */
+    CHECK(twin_has_ucs4(g_twin_font, 0), "stroke font has U+0000");
+#if defined(CONFIG_FONT_MONTSERRAT)
+    CHECK(!twin_has_ucs4(&twin_font_montserrat, 0), "TTF lacks U+0000");
+
+    /* TrueType bearings come from the outline: 'j' inks left of the pen */
+    twin_path_t *mp = twin_path_create();
+    twin_path_set_font(mp, &twin_font_montserrat);
+    twin_path_set_font_size(mp, size);
+    twin_text_metrics_t jm, om;
+    twin_text_metrics_utf8(mp, "j", &jm);
+    CHECK(jm.left_side_bearing < 0, "TTF 'j' has a negative left bearing");
+    twin_text_metrics_utf8(mp, "o", &om);
+    CHECK(om.left_side_bearing > 0 && om.right_side_bearing < om.width,
+          "TTF 'o' ink lies inside its advance");
+    twin_path_destroy(mp);
+#endif
 #if defined(CONFIG_FONT_ICONS)
+    CHECK(!twin_has_ucs4(&twin_font_icons, 0), "icon font lacks U+0000");
     CHECK(twin_has_ucs4(&twin_font_icons, 0xf095), "icon font has phone");
     CHECK(!twin_has_ucs4(&twin_font_icons, 0xf096), "icon font lacks U+F096");
     CHECK(twin_text_width(&twin_font_icons, size, TWIN_SYM_PHONE) > 0,
@@ -461,6 +479,23 @@ static bool tween_probe(twin_fixed_t v, void *closure)
     return !pr->stop_after || pr->calls < pr->stop_after;
 }
 
+typedef struct {
+    twin_tween_t *self;
+    int calls;
+    twin_fixed_t last;
+} finish_probe_t;
+
+static bool finish_and_stop(twin_fixed_t v, void *closure)
+{
+    finish_probe_t *f = closure;
+    f->last = v;
+    if (++f->calls == 2) {
+        twin_tween_finish(f->self);
+        return false;
+    }
+    return true;
+}
+
 static void test_tween(void)
 {
     th_t *t = th_create(W, H, TwinWmNone);
@@ -493,6 +528,16 @@ static void test_tween(void)
     twin_tween_start(1000, TwinEaseLinear, tween_probe, &d);
     th_advance(t, 400);
     CHECK_EQ(d.calls, 3, "returning false stops the tween");
+
+    /* finish() from the step callback delivers the end value even when the
+     * callback also returns false */
+    finish_probe_t f = {0};
+    f.self = twin_tween_start(1000, TwinEaseLinear, finish_and_stop, &f);
+    th_advance(t, 100);
+    CHECK_EQ(f.last, TWIN_FIXED_ONE, "finish-and-stop delivers the end value");
+    CHECK_EQ(f.calls, 3, "end value delivered once, then stopped");
+    th_advance(t, 200);
+    CHECK_EQ(f.calls, 3, "finish-and-stop tween is gone");
 
     CHECK(twin_ease(TwinEaseOutBack, TWIN_FIXED_ONE * 3 / 4) > TWIN_FIXED_ONE,
           "ease-out-back overshoots");
@@ -697,6 +742,28 @@ static void test_scaled_clip(void)
     twin_pixmap_destroy(b);
 }
 
+/* A translated source transform shifts which source pixels land where,
+ * with every renderer (pixman used to drop the translation) */
+static void test_translated_source(void)
+{
+    twin_pixmap_t *src = twin_pixmap_create(TWIN_ARGB32, 16, 16);
+    twin_fill(src, 0x00000000, TWIN_SOURCE, 0, 0, 16, 16);
+    twin_fill(src, 0xffff0000, TWIN_SOURCE, 8, 8, 16, 16);
+    twin_matrix_t m;
+    twin_matrix_identity(&m);
+    twin_matrix_translate(&m, twin_int_to_fixed(8), twin_int_to_fixed(8));
+    twin_pixmap_set_transform(src, &m);
+    twin_operand_t op = {.source_kind = TWIN_PIXMAP, .u.pixmap = src};
+
+    twin_pixmap_t *dst = twin_pixmap_create(TWIN_ARGB32, 16, 16);
+    twin_fill(dst, 0xff000000, TWIN_SOURCE, 0, 0, 16, 16);
+    twin_composite(dst, 0, 0, &op, 0, 0, NULL, 0, 0, TWIN_SOURCE, 6, 6);
+    CHECK_EQ(*twin_pixmap_pointer(dst, 2, 2).argb32, 0xffff0000,
+             "translated source: (2,2) reads source (10,10)");
+    twin_pixmap_destroy(src);
+    twin_pixmap_destroy(dst);
+}
+
 static void test_leaks(void)
 {
     th_t *t = th_create(W, H, TwinWmNone);
@@ -716,6 +783,23 @@ static void test_leaks(void)
     th_frame(t);
     CHECK(th_heap_net(t) <= base, "heap back to baseline (%zu > %zu)",
           th_heap_net(t), base);
+
+#if defined(CONFIG_MEMORY_STATS)
+    /* Injected failures reach realloc too, leaving the block intact */
+    char *buf = twin_malloc(16);
+    CHECK(buf, "malloc");
+    if (buf) {
+        buf[0] = 'x';
+        _twin_alloc_fail_next = 1;
+        CHECK(!twin_realloc(buf, 64), "injected realloc failure");
+        CHECK_EQ(_twin_alloc_fail_next, 0, "realloc consumed the failure");
+        _twin_alloc_fail_next = 0;
+        CHECK_EQ(buf[0], 'x', "block kept after a failed realloc");
+        twin_free(buf);
+    }
+    CHECK(th_heap_net(t) <= base, "failed realloc leaks (%zu > %zu)",
+          th_heap_net(t), base);
+#endif
     th_destroy(t);
 }
 
@@ -792,6 +876,16 @@ static twin_time_t victim_proc(twin_time_t now, void *closure)
     return -1;
 }
 
+static twin_tween_t *victim_tween;
+static twin_time_t cancel_victim_tween(twin_time_t now, void *closure)
+{
+    (void) now;
+    (void) closure;
+    twin_tween_cancel(victim_tween);
+    victim_tween = NULL;
+    return -1;
+}
+
 static void test_cleared_in_pass(void)
 {
     th_t *t = th_create(W, H, TwinWmNone);
@@ -802,13 +896,17 @@ static void test_cleared_in_pass(void)
     th_advance(t, 20);
     CHECK_EQ(victim_runs, 0, "timeout cleared earlier in the pass stays dead");
 
-    /* Same for a tween cancelled by a timeout due in the same pass */
+    /* Same for a tween cancelled by a timeout due in the same pass, just
+     * ahead of the tween's own tick */
     tween_probe_t p = {.monotonic = true};
-    twin_tween_t *tw = twin_tween_start(100, TwinEaseLinear, tween_probe, &p);
-    victim = NULL;
-    th_advance(t, 16);
+    victim_tween = twin_tween_start(100, TwinEaseLinear, tween_probe, &p);
+    th_advance(t, 16); /* first tick ran; next one due 16 ms from now */
     int calls = p.calls;
-    twin_tween_cancel(tw);
+    CHECK_EQ(calls, 1, "tween ticked once");
+    twin_set_timeout(cancel_victim_tween, 15, &a);
+    th_advance(t, 16); /* both due: the canceller runs first */
+    CHECK(!victim_tween, "canceller ran");
+    CHECK_EQ(p.calls, calls, "tween cancelled in the pass does not tick");
     th_advance(t, 50);
     CHECK_EQ(p.calls, calls, "cancelled tween never ticks again");
     th_destroy(t);
@@ -984,6 +1082,7 @@ int main(void)
     test_scroll();
     test_window_damage_rects();
     test_scaled_clip();
+    test_translated_source();
     test_cleared_in_pass();
     test_text_clip_overshoot();
     test_destroyed_paint();

@@ -50,14 +50,17 @@ static pixman_op_t twin_to_pixman_op(const twin_operator_t twin_op)
                                  (_pixmap)->p.argb32, (_pixmap)->stride);  \
     })
 
-static void pixmap_matrix_scale(pixman_image_t *src, twin_matrix_t *matrix)
+/* Twin and pixman both map destination to source with 16.16 fixed point:
+ * src.x = m00 * x + m10 * y + m20, src.y = m01 * x + m11 * y + m21.
+ * Carry the whole affine matrix, translation included. */
+static void pixmap_matrix_transform(pixman_image_t *src,
+                                    const twin_matrix_t *matrix)
 {
-    pixman_transform_t transform;
-    pixman_transform_init_identity(&transform);
-
-    pixman_fixed_t sx = matrix->m[0][0], sy = matrix->m[1][1];
-
-    pixman_transform_scale(&transform, NULL, sx, sy);
+    pixman_transform_t transform = {{
+        {matrix->m[0][0], matrix->m[1][0], matrix->m[2][0]},
+        {matrix->m[0][1], matrix->m[1][1], matrix->m[2][1]},
+        {0, 0, pixman_fixed_1},
+    }};
     pixman_image_set_transform(src, &transform);
 }
 
@@ -84,7 +87,7 @@ void twin_composite(twin_pixmap_t *_dst,
         src = create_pixman_image_from_twin_pixmap(src_pixmap);
 
         if (!twin_matrix_is_identity(&(src_pixmap->transform)))
-            pixmap_matrix_scale(src, &(src_pixmap->transform));
+            pixmap_matrix_transform(src, &(src_pixmap->transform));
     }
 
     pixman_image_t *dst = create_pixman_image_from_twin_pixmap(_dst);

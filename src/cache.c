@@ -108,6 +108,8 @@ bool _twin_cache_enabled(void)
 
 twin_cache_entry_t *_twin_cache_lookup(uint64_t key)
 {
+    /* Disabled: the cache is not consulted, so this is neither a hit nor a
+     * miss (path masks skip the lookup outright, see _twin_cache_enabled) */
     if (!cache.budget)
         return NULL;
     for (twin_cache_entry_t *e = cache.buckets[_bucket(key)]; e; e = e->hnext) {

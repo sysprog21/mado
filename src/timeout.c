@@ -10,13 +10,35 @@
 
 #include "twin_private.h"
 
-#define twin_time_compare(a, op, b) (((a) - (b)) op 0)
+static twin_time_t (*_twin_time_source)(void);
 
-static twin_time_t twin_now(void)
+/* Millisecond time wraps; do the arithmetic unsigned to avoid overflow */
+static inline twin_time_t _twin_time_add(twin_time_t t, twin_time_t d)
 {
+    return (twin_time_t) ((uint32_t) t + (uint32_t) d);
+}
+
+void _twin_set_time_source(twin_time_t (*now)(void))
+{
+    _twin_time_source = now;
+}
+
+twin_time_t twin_now(void)
+{
+    if (_twin_time_source)
+        return _twin_time_source();
+    /* Wraps every ~24 days; callers compare with twin_time_compare(). */
+#ifdef CLOCK_MONOTONIC
+    /* Immune to the wall clock being set (RTC or NTP after boot) */
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+        return (twin_time_t) ((uint32_t) ts.tv_sec * 1000u +
+                              (uint32_t) ts.tv_nsec / 1000000u);
+#endif
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+    return (twin_time_t) ((uint32_t) tv.tv_sec * 1000u +
+                          (uint32_t) tv.tv_usec / 1000u);
 }
 
 static twin_queue_t *head;
@@ -92,15 +114,20 @@ void _twin_run_timeout(void)
         for (timeout = first;
              timeout && twin_time_compare(now, >=, timeout->time);
              timeout = (twin_timeout_t *) timeout->queue.order) {
-            /* Validate closure pointer using closure lifetime tracking */
-            if (!_twin_closure_is_valid(timeout->closure))
+            /* Cleared earlier in this pass (its closure is gone too) */
+            if (timeout->queue.deleted)
                 continue;
+            /* Owner gone: drop the timeout instead of skipping it forever */
+            if (timeout->closure && !_twin_closure_is_valid(timeout->closure)) {
+                _twin_delete_timeout(timeout);
+                continue;
+            }
 
             delay = (*timeout->proc)(now, timeout->closure);
             if (timeout->queue.deleted) {
                 continue;
             } else if (delay >= 0) {
-                timeout->time = twin_now() + delay;
+                timeout->time = _twin_time_add(twin_now(), delay);
                 _twin_queue_reorder(&head, _twin_timeout_order,
                                     &timeout->queue);
             } else {
@@ -129,8 +156,11 @@ void _twin_run_timeout(void)
                 timeout = snapshot[i];
                 if (timeout->queue.deleted)
                     continue;
-                if (!_twin_closure_is_valid(timeout->closure))
+                if (timeout->closure &&
+                    !_twin_closure_is_valid(timeout->closure)) {
+                    _twin_delete_timeout(timeout);
                     continue;
+                }
                 if (!twin_time_compare(now, >=, timeout->time))
                     break;
 
@@ -138,7 +168,7 @@ void _twin_run_timeout(void)
                 if (timeout->queue.deleted) {
                     continue;
                 } else if (delay >= 0) {
-                    timeout->time = twin_now() + delay;
+                    timeout->time = _twin_time_add(twin_now(), delay);
                     _twin_queue_reorder(&head, _twin_timeout_order,
                                         &timeout->queue);
                 } else {
@@ -169,13 +199,11 @@ twin_timeout_t *twin_set_timeout(twin_timeout_proc_t timeout_proc,
 
     /* Register closure with lifetime tracking if provided */
     if (closure) {
+        /* One reference per pending timeout, dropped on release */
         if (!_twin_closure_register(closure)) {
-            /* Failed to register closure */
             twin_free(timeout);
             return NULL;
         }
-        /* Add reference for this timeout */
-        _twin_closure_ref(closure);
     }
 
     if (!start)
@@ -183,7 +211,7 @@ twin_timeout_t *twin_set_timeout(twin_timeout_proc_t timeout_proc,
     timeout->delay = delay;
     timeout->proc = timeout_proc;
     timeout->closure = closure;
-    _twin_queue_timeout(timeout, twin_now() + delay);
+    _twin_queue_timeout(timeout, _twin_time_add(twin_now(), delay));
     return timeout;
 }
 
@@ -202,7 +230,7 @@ twin_time_t _twin_timeout_delay(void)
         twin_time_t now = twin_now();
         if (twin_time_compare(now, >=, thead->time))
             return 0;
-        return thead->time - now;
+        return (twin_time_t) ((uint32_t) thead->time - (uint32_t) now);
     }
     return -1;
 }

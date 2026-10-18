@@ -43,36 +43,49 @@ libtwin.a_cflags-y :=
 libtwin.a_cflags-$(CC_IS_EMCC) += -Oz
 
 libtwin.a_files-y = \
-	src/box.c \
 	src/poly.c \
-	src/toplevel.c \
-	src/button.c \
 	src/fixed.c \
-	src/label.c \
 	src/trig.c \
 	src/convolve.c \
 	src/font.c \
+	src/text.c \
+	src/cache.c \
 	src/matrix.c \
 	src/queue.c \
-	src/widget.c \
 	src/font_default.c \
 	src/path.c \
 	src/screen.c \
 	src/window.c \
+	src/wm.c \
 	src/dispatch.c \
 	src/geom.c \
 	src/pattern.c \
 	src/spline.c \
 	src/work.c \
-	src/draw-common.c \
 	src/hull.c \
-	src/icon.c \
 	src/pixmap.c \
 	src/timeout.c \
+	src/anim.c \
 	src/image.c \
 	src/animation.c \
 	src/closure.c \
 	src/api.c
+
+# Window manager policies ('none' is part of wm.c)
+libtwin.a_files-$(CONFIG_WM_DESKTOP) += src/wm-desktop.c src/icon.c
+libtwin.a_files-$(CONFIG_WM_MOBILE) += src/wm-mobile.c
+
+# Box layout toolkit
+libtwin.a_files-$(CONFIG_WIDGETS) += \
+	src/widget.c \
+	src/box.c \
+	src/label.c \
+	src/button.c \
+	src/toplevel.c
+
+# Fonts
+libtwin.a_files-$(CONFIG_FONT_MONTSERRAT) += src/font-montserrat.c
+libtwin.a_files-$(CONFIG_FONT_ICONS) += src/font-icons.c
 
 libtwin.a_includes-y := \
 	include \
@@ -82,10 +95,6 @@ libtwin.a_includes-y := \
 src/composite-decls.h: scripts/gen-composite-decls.py
 	@echo "  GEN        $@"
 	@$< > $@
-
-src/shadow-gaussian-lut.h: scripts/gen-shadow-lut.py
-	@echo "  GEN        $@"
-	@./scripts/gen-shadow-lut.py $@
 
 # Optional features
 
@@ -149,7 +158,29 @@ libapps.a_files-$(CONFIG_DEMO_SPLINE) += apps/spline.c
 libapps.a_files-$(CONFIG_DEMO_ANIMATION) += apps/animation.c
 libapps.a_files-$(CONFIG_DEMO_IMAGE) += apps/image.c
 
-libapps.a_includes-y := include
+libapps.a_files-$(CONFIG_DEMO_CELLPHONE) += \
+	apps/cellphone/ui.c \
+	apps/cellphone/ui-paint.c \
+	apps/cellphone/ui-input.c \
+	apps/cellphone/shell.c \
+	apps/cellphone/home.c \
+	apps/cellphone/lock.c \
+	apps/cellphone/data.c \
+	apps/cellphone/calc.c \
+	apps/cellphone/dialer.c \
+	apps/cellphone/contacts.c \
+	apps/cellphone/sms.c \
+	apps/cellphone/music.c \
+	apps/cellphone/photos.c \
+	apps/cellphone/camera.c \
+	apps/cellphone/settings.c \
+	apps/cellphone/calllog.c \
+	apps/cellphone/games.c \
+	apps/cellphone/snake.c \
+	apps/cellphone/pong.c \
+	apps/cellphone/tetris.c
+
+libapps.a_includes-y := include apps/cellphone
 # Emscripten size optimization
 libapps.a_cflags-$(CC_IS_EMCC) += -Oz
 
@@ -204,7 +235,7 @@ ifeq ($(CONFIG_PERF_TEST), y)
 target-$(CONFIG_PERF_TEST) += mado-perf
 mado-perf_depends-y += $(target.a-y)
 mado-perf_files-y += tools/perf.c
-mado-perf_includes-y := include
+mado-perf_includes-y := include src
 mado-perf_ldflags-y := \
 	$(target.a-y) \
 	$(TARGET_LIBS)
@@ -216,7 +247,7 @@ ifeq ($(CONFIG_DEMO_APPLICATIONS), y)
 target-y += demo-$(BACKEND)
 demo-$(BACKEND)_depends-y += $(target.a-y)
 demo-$(BACKEND)_files-y = apps/main.c
-demo-$(BACKEND)_includes-y := include
+demo-$(BACKEND)_includes-y := include apps/cellphone
 # Emscripten size optimization
 demo-$(BACKEND)_cflags-$(CC_IS_EMCC) += -Oz
 demo-$(BACKEND)_ldflags-y := \
@@ -280,18 +311,47 @@ headless-ctl_ldflags-y := # -lrt
 endif
 endif
 
+# Headless tests: built only for 'make check' / 'make check-update'
+TESTS := test-core test-wm test-lifetime
+ifeq ($(CONFIG_DEMO_CELLPHONE), y)
+TESTS += test-cellphone
+endif
+
+ifneq ($(filter check check-update,$(MAKECMDGOALS)),)
+ifneq ($(CC_IS_EMCC), 1)
+define test-target
+target-y += $(1)
+$(1)_depends-y += $(target.a-y)
+$(1)_files-y := tests/$(1).c tests/harness.c \
+	$(if $(filter test-cellphone,$(1)),$(wildcard tests/phone-*.c))
+$(1)_includes-y := include src tests apps apps/cellphone
+$(1)_ldflags-y := $(target.a-y) $(TARGET_LIBS)
+endef
+$(foreach t,$(TESTS),$(eval $(call test-target,$(t))))
+endif
+endif
+
+# Goals that build targets, so header dependencies apply to them too
+extra-build-goals := check check-update
+
+.PHONY: check check-update
+check: $(TESTS)
+	@mkdir -p tests/golden
+	@status=0; for t in $(TESTS); do ./$$t || status=1; done; exit $$status
+
+check-update: $(TESTS)
+	@mkdir -p tests/golden
+	@for t in $(TESTS); do MADO_UPDATE_GOLDEN=1 ./$$t; done
+
 # Build system integration
 
-CFLAGS += -include config.h
+override CFLAGS += -include config.h
 
 # Ensure composite-decls.h exists before including build rules
 # (needed for dependency generation in mk/common.mk)
 ifeq ($(filter config defconfig clean distclean,$(MAKECMDGOALS)),)
     ifeq ($(wildcard src/composite-decls.h),)
         $(shell scripts/gen-composite-decls.py > src/composite-decls.h)
-    endif
-    ifeq ($(wildcard src/shadow-gaussian-lut.h),)
-        $(shell ./scripts/gen-shadow-lut.py src/shadow-gaussian-lut.h)
     endif
 endif
 

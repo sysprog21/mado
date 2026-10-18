@@ -32,7 +32,12 @@ Run:
 ./demo-sdl
 ```
 
-Once the window appears, you can move windows and interact with widgets.
+Once the window appears, interact with the phone (the default scene) or, with
+`MADO_SCENE=desktop`, move windows and interact with widgets.  Screens up to
+320x480 open at twice their size so a phone display is readable on a desktop
+monitor; `MADO_SCALE=n` picks another integer factor.  The backend sleeps
+until input or the next timeout when nothing is damaged, and presents once
+per screen update.
 
 Use Cases:
 - Desktop applications
@@ -392,6 +397,9 @@ Screenshot saved to screenshot.png
 ./headless-ctl mouse move 100 200
 ./headless-ctl mouse down 100 200 1
 ./headless-ctl mouse up 100 200 1
+
+# Type text into the focused window (delivered as UCS-4 key events)
+./headless-ctl type "12+30="
 
 # Monitor backend activity in real-time
 $ ./headless-ctl monitor

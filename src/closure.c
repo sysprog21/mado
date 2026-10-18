@@ -39,19 +39,11 @@
 
 #include "twin_private.h"
 
-/* Global closure tracker instance */
-twin_closure_tracker_t _twin_closure_tracker = {0};
-
-/*
- * Initialize the closure tracking system.
- * Called once during screen initialization to set up the tracking table.
+/* Global closure tracker instance, live from program start so timeouts set
+ * before any screen are tracked.
+ * TODO: add a mutex when threading support is added
  */
-void _twin_closure_tracker_init(void)
-{
-    memset(&_twin_closure_tracker, 0, sizeof(_twin_closure_tracker));
-    _twin_closure_tracker.initialized = true;
-    /* TODO: Initialize mutex when threading support is added */
-}
+twin_closure_tracker_t _twin_closure_tracker;
 
 /*
  * Find an entry for a given closure pointer.
@@ -93,10 +85,6 @@ bool _twin_closure_register(void *closure)
     /* Quick rejection of obviously invalid pointers */
     if (!twin_pointer_valid(closure))
         return false;
-
-    /* If tracker not initialized, skip registration */
-    if (!_twin_closure_tracker.initialized)
-        return true; /* Pretend success if tracking not yet enabled */
 
     /* Check if already registered */
     twin_closure_entry_t *entry = _twin_closure_find_entry(closure);
@@ -153,10 +141,6 @@ void _twin_closure_unregister(void *closure)
  */
 bool _twin_closure_ref(void *closure)
 {
-    /* Skip if tracker not initialized */
-    if (!_twin_closure_tracker.initialized)
-        return true;
-
     twin_closure_entry_t *entry = _twin_closure_find_entry(closure);
     if (!entry || entry->marked_for_free)
         return false;
@@ -167,23 +151,24 @@ bool _twin_closure_ref(void *closure)
 
 /*
  * Decrement the reference count for a closure.
- * Called when work items complete or timeouts are cleared.
- *
- * Note: We don't auto-unregister at zero refs to maintain explicit
- * ownership semantics. The owner must call unregister during destruction.
+ * Called when work items complete or timeouts are cleared; the entry goes
+ * away with its last reference.
  */
 bool _twin_closure_unref(void *closure)
 {
-    /* Skip if tracker not initialized */
-    if (!_twin_closure_tracker.initialized)
-        return true;
-
     twin_closure_entry_t *entry = _twin_closure_find_entry(closure);
     if (!entry)
         return false;
 
+    /* Drop the entry with its last holder so the table only ever tracks
+     * closures that still have pending timeouts or work.  Otherwise every
+     * distinct closure ever scheduled leaks a slot until the table fills
+     * and scheduling starts failing.
+     */
     if (entry->ref_count > 0)
         entry->ref_count--;
+    if (entry->ref_count == 0)
+        _twin_closure_unregister(closure);
 
     return true;
 }
@@ -209,10 +194,6 @@ bool _twin_closure_is_valid(void *closure)
     /* First-line defense: basic pointer sanity */
     if (!twin_pointer_valid(closure))
         return false;
-
-    /* If tracker not initialized, fall back to basic pointer validation */
-    if (!_twin_closure_tracker.initialized)
-        return true; /* Assume valid if tracking not yet enabled */
 
     /* Must be tracked to be valid */
     twin_closure_entry_t *entry = _twin_closure_find_entry(closure);

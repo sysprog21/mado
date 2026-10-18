@@ -73,9 +73,14 @@ void _twin_run_work(void)
     if (running_depth++ == 0) {
         first = (twin_work_t *) _twin_queue_set_order(&head);
         for (work = first; work; work = (twin_work_t *) work->queue.order) {
-            /* Validate closure pointer using closure lifetime tracking */
-            if (!_twin_closure_is_valid(work->closure))
+            /* Cleared earlier in this pass (its closure is gone too) */
+            if (work->queue.deleted)
                 continue;
+            /* Owner gone: drop the item instead of skipping it forever */
+            if (work->closure && !_twin_closure_is_valid(work->closure)) {
+                _twin_delete_work(work);
+                continue;
+            }
 
             if (!(*work->proc)(work->closure))
                 _twin_delete_work(work);
@@ -100,8 +105,10 @@ void _twin_run_work(void)
                 work = snapshot[i];
                 if (work->queue.deleted)
                     continue;
-                if (!_twin_closure_is_valid(work->closure))
+                if (work->closure && !_twin_closure_is_valid(work->closure)) {
+                    _twin_delete_work(work);
                     continue;
+                }
 
                 if (!(*work->proc)(work->closure))
                     _twin_delete_work(work);
@@ -132,13 +139,11 @@ twin_work_t *twin_set_work(twin_work_proc_t work_proc,
 
     /* Register closure with lifetime tracking if provided */
     if (closure) {
+        /* One reference per pending work item, dropped on release */
         if (!_twin_closure_register(closure)) {
-            /* Failed to register closure */
             twin_free(work);
             return NULL;
         }
-        /* Add reference for this work item */
-        _twin_closure_ref(closure);
     }
 
     work->proc = work_proc;

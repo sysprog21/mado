@@ -108,10 +108,23 @@ static size_t memtbl_remove(void *ptr)
     return sz;
 }
 
+unsigned int _twin_alloc_fail_next;
+
+/* Consume one injected failure, if any is pending */
+static bool _injected_failure(void)
+{
+    if (!_twin_alloc_fail_next)
+        return false;
+    _twin_alloc_fail_next--;
+    return true;
+}
+
 void *_twin_malloc(size_t size, const char *file, int line)
 {
     (void) file;
     (void) line;
+    if (_injected_failure())
+        return NULL;
     void *ptr = twin_raw_malloc(size);
     if (ptr) {
         if (!memtbl_insert(ptr, size)) {
@@ -133,6 +146,8 @@ void *_twin_calloc(size_t n, size_t size, const char *file, int line)
     (void) line;
     /* Overflow check */
     if (n && size > SIZE_MAX / n)
+        return NULL;
+    if (_injected_failure())
         return NULL;
     void *ptr = twin_raw_calloc(n, size);
     if (ptr) {

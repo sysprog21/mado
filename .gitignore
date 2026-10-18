@@ -5,11 +5,14 @@
 demo-*
 .demo-*
 mado-perf
+test-*
+!tests/test-*.c
+.test-*
+*.fail.ppm
 .mado-perf
 font-edit
 .font-edit
 src/composite-decls.h
-src/shadow-gaussian-lut.h
 
 # Swap
 [._]*.s[a-v][a-z]

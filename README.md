@@ -124,7 +124,29 @@ Run the demo program:
 $ ./demo-sdl
 ```
 
-Once the window appears, you can move the windows and interact with the widgets.
+The default scene is a phone: a lock screen (drag the knob to unlock), a
+home screen and a dozen apps drawn with vector graphics on the mobile window
+manager.  Drag from the left edge of an app to go back.  Other scenes run
+the same window system under a different window-manager policy:
+
+```shell
+$ MADO_SCENE=desktop ./demo-sdl   # overlapping, decorated windows
+$ MADO_SCENE=none ./demo-sdl      # no window manager at all
+```
+
+Each policy can be compiled out (`WM_DESKTOP`, `WM_MOBILE`) and switched at
+run time with `twin_screen_set_wm()`.  See [docs/phone.md](docs/phone.md)
+for the design of the window manager, compositor and caches.
+
+### Verification
+
+Headless test suites run in-process with a virtual clock and compare every
+incrementally updated frame against a full recomposite:
+
+```shell
+$ make check          # core, window manager and phone suites
+$ make check-update   # re-record golden frame checksums
+```
 
 For information about other backends (Linux framebuffer, VNC, headless), see [docs/backends.md](docs/backends.md).
 

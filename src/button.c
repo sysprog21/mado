@@ -119,3 +119,8 @@ twin_button_t *twin_button_create(twin_box_t *parent,
                       _twin_button_dispatch);
     return button;
 }
+
+twin_widget_t *twin_button_widget(twin_button_t *button)
+{
+    return &button->label.widget;
+}

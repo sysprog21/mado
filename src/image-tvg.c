@@ -15,7 +15,9 @@
 
 #define D(x) twin_double_to_fixed(x)
 #define GET_COLOR(ctx, idx) ctx->colors[idx]
-#define PIXEL_ARGB(a, r, g, b) (((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
+#define PIXEL_ARGB(a, r, g, b)                                                 \
+    (((uint32_t) (a) << 24) | ((uint32_t) (r) << 16) | ((uint32_t) (g) << 8) | \
+     (b))
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
 #define ALIGN_UP(sz, alignment)                            \
     (((alignment) & ((alignment) - 1)) == 0                \

@@ -139,3 +139,14 @@ twin_label_t *twin_label_create(twin_box_t *parent,
                      _twin_label_dispatch);
     return label;
 }
+
+void twin_label_set_align(twin_label_t *label, twin_align_t align)
+{
+    label->align = align;
+    _twin_widget_queue_paint(&label->widget);
+}
+
+twin_widget_t *twin_label_widget(twin_label_t *label)
+{
+    return &label->widget;
+}

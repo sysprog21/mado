@@ -70,6 +70,9 @@ void twin_destroy(twin_context_t *ctx)
     /* Backend frees its private data and ctx */
     g_twin_backend.exit(ctx);
 
+    /* Cached coverage outlives screens; release it with the system */
+    twin_cache_flush();
+
     /* Report memory statistics after all teardown */
     twin_memory_info_t mem;
     twin_memory_get_info(&mem);
@@ -111,4 +114,9 @@ void twin_run(twin_context_t *ctx, void (*init_callback)(twin_context_t *))
     assert(g_twin_backend.start && "Backend start function not registered");
 
     g_twin_backend.start(ctx, init_callback);
+}
+
+twin_screen_t *twin_context_screen(const twin_context_t *ctx)
+{
+    return ctx->screen;
 }

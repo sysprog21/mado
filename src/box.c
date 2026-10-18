@@ -19,7 +19,6 @@ void _twin_box_init(twin_box_t *box,
     box->dir = dir;
     box->children = NULL;
     box->button_down = NULL;
-    box->focus = NULL;
 }
 
 static twin_dispatch_result_t _twin_box_query_geometry(twin_box_t *box)
@@ -165,9 +164,11 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
             child = box->children;
             box->children = child->next;
 
-            /* Send destroy event to child */
+            /* Send destroy event to child, then release it: the box owns
+             * the widgets created inside it */
             ev.kind = TwinEventDestroy;
             child->handler(child, &ev, _twin_widget_callback_data(child));
+            twin_free(child);
         }
         break;
     case TwinEventQueryGeometry:
@@ -178,8 +179,6 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
         twin_window_show(widget->window);
         box->button_down =
             _twin_box_xy_to_widget(box, event->u.pointer.x, event->u.pointer.y);
-        if (box->button_down && _twin_widget_want_focus(box->button_down))
-            box->focus = box->button_down;
         fallthrough;
     case TwinEventButtonUp:
     case TwinEventMotion:
@@ -191,13 +190,6 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
             return child->handler(child, &ev,
                                   _twin_widget_callback_data(child));
         }
-        break;
-    case TwinEventKeyDown:
-    case TwinEventKeyUp:
-    case TwinEventUcs4:
-        if (box->focus)
-            return box->focus->handler(box->focus, event,
-                                       _twin_widget_callback_data(box->focus));
         break;
     case TwinEventPaint:
         box->widget.paint = false;

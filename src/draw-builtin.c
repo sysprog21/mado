@@ -691,6 +691,7 @@ static twin_xform_t *twin_pixmap_init_xform(twin_pixmap_t *pixmap,
     xform->width = width;
     xform->src_x = src_x;
     xform->src_y = src_y;
+    xform->off_x = xform->off_y = 0;
 
     return xform;
 }
@@ -756,8 +757,10 @@ static void twin_pixmap_read_xform_8(twin_xform_t *xform, twin_coord_t line)
     twin_matrix_t *tfm = &xform->pixmap->transform;
 
     /* for each row in the dest line */
-    dy = twin_int_to_fixed(line);
-    for (dx = 0; dx < twin_int_to_fixed(xform->width); dx += TWIN_FIXED_ONE) {
+    dy = twin_int_to_fixed(line + xform->off_y);
+    for (dx = twin_int_to_fixed(xform->off_x);
+         dx < twin_int_to_fixed(xform->off_x + xform->width);
+         dx += TWIN_FIXED_ONE) {
         sx = _twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x);
         sy = _twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y);
         _get_pix_8(pts[0], pix, sx, sy);
@@ -780,8 +783,10 @@ static void twin_pixmap_read_xform_16(twin_xform_t *xform, twin_coord_t line)
     twin_matrix_t *tfm = &xform->pixmap->transform;
 
     /* for each row in the dest line */
-    dy = twin_int_to_fixed(line);
-    for (dx = 0; dx < twin_int_to_fixed(xform->width); dx += TWIN_FIXED_ONE) {
+    dy = twin_int_to_fixed(line + xform->off_y);
+    for (dx = twin_int_to_fixed(xform->off_x);
+         dx < twin_int_to_fixed(xform->off_x + xform->width);
+         dx += TWIN_FIXED_ONE) {
         sx = _twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x);
         sy = _twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y);
         _get_pix_16(pts[0], pix, sx, sy);
@@ -811,8 +816,10 @@ static void twin_pixmap_read_xform_32(twin_xform_t *xform, twin_coord_t line)
     twin_matrix_t *tfm = &xform->pixmap->transform;
 
     /* for each row in the dest line */
-    dy = twin_int_to_fixed(line);
-    for (dx = 0; dx < twin_int_to_fixed(xform->width); dx += TWIN_FIXED_ONE) {
+    dy = twin_int_to_fixed(line + xform->off_y);
+    for (dx = twin_int_to_fixed(xform->off_x);
+         dx < twin_int_to_fixed(xform->off_x + xform->width);
+         dx += TWIN_FIXED_ONE) {
         sx = _twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x);
         sy = _twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y);
         _get_pix_32(pts[0], pix, sx, sy);
@@ -889,6 +896,8 @@ static void _twin_composite_xform(twin_pixmap_t *dst,
             twin_pixmap_init_xform(src->u.pixmap, left, width, src_x, src_y);
         if (!sxform)
             return;
+        sxform->off_x = left - dst_x;
+        sxform->off_y = top - dst_y;
         s.p = sxform->span;
     } else {
         s.c = src->u.argb;
@@ -904,6 +913,8 @@ static void _twin_composite_xform(twin_pixmap_t *dst,
                                             msk_y);
             if (!mxform)
                 return;
+            mxform->off_x = left - dst_x;
+            mxform->off_y = top - dst_y;
             m.p = mxform->span;
         } else {
             m.c = msk->u.argb;

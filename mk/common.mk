@@ -678,8 +678,9 @@ clean: __FORCE
 __FORCE:
 	@true
 
-# Only include dependencies when building known targets
-build-goals := all clean $(target-builds)
+# Only include dependencies when building known targets.  Projects add
+# goals that build targets (e.g. a test runner) through extra-build-goals.
+build-goals := all clean $(target-builds) $(extra-build-goals)
 ifneq ($(MAKECMDGOALS),)
     # MAKECMDGOALS is not empty, check if ALL goals are known
     # (i.e., no unknown goals remain after filtering out known ones)

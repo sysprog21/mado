@@ -107,7 +107,7 @@ const uint16_t _twin_icons[] = {
     TWIN_CLOSE_POS, TWIN_RESIZE_POS,
 };
 
-#define V(i) (g[i] << 10)
+#define V(i) (g[i] * 1024) /* not a shift: g[i] may be negative */
 
 #define TWIN_ICON_FILL 0xff808080
 #define TWIN_ICON_STROKE 0xff202020

@@ -7,6 +7,7 @@
 #ifndef _TWIN_HEADLESS_SHM_H_
 #define _TWIN_HEADLESS_SHM_H_
 
+#include <stddef.h>
 #include <stdint.h>
 #include <twin.h>
 
@@ -14,7 +15,7 @@
 
 #define TWIN_HEADLESS_SHM_NAME "/mado-headless-shm"
 #define TWIN_HEADLESS_MAGIC 0x5457494E /* "TWIN" */
-#define TWIN_HEADLESS_VERSION 1
+#define TWIN_HEADLESS_VERSION 2
 #define TWIN_HEADLESS_MAX_EVENTS 64
 
 typedef enum {
@@ -32,6 +33,9 @@ typedef struct {
             twin_coord_t x, y;
             twin_count_t button;
         } pointer;
+        struct {
+            twin_ucs4_t ucs4;
+        } ucs4;
     } u;
 } twin_headless_event_t;
 
@@ -71,5 +75,22 @@ typedef struct {
     /* Framebuffer follows this header */
     /* twin_argb32_t framebuffer[width * height]; */
 } twin_headless_shm_t;
+
+/*
+ * Bytes for the header plus @frames frames of @width x @height ARGB32, or 0
+ * when that overflows.  The backend sizes the object with it and clients
+ * check what they mapped against it, so both agree on the layout.
+ */
+static inline size_t twin_headless_shm_bytes(size_t width,
+                                             size_t height,
+                                             size_t frames)
+{
+    size_t n;
+    if (__builtin_mul_overflow(width, height, &n) ||
+        __builtin_mul_overflow(n, frames * sizeof(twin_argb32_t), &n) ||
+        __builtin_add_overflow(n, sizeof(twin_headless_shm_t), &n))
+        return 0;
+    return n;
+}
 
 #endif /* _TWIN_HEADLESS_SHM_H_ */

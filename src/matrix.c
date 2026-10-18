@@ -85,19 +85,6 @@ twin_fixed_t _twin_matrix_determinant(twin_matrix_t *matrix)
     return det;
 }
 
-twin_point_t _twin_matrix_expand(twin_matrix_t *matrix)
-{
-    twin_fixed_t a = matrix->m[0][0];
-    twin_fixed_t d = matrix->m[1][1];
-    twin_fixed_t aa = twin_fixed_mul(a, a);
-    twin_fixed_t dd = twin_fixed_mul(d, d);
-    twin_point_t expand;
-
-    expand.x = twin_fixed_sqrt(aa + dd);
-    expand.y = twin_fixed_div(_twin_matrix_determinant(matrix), expand.x);
-    return expand;
-}
-
 void twin_matrix_rotate(twin_matrix_t *m, twin_angle_t a)
 {
     twin_fixed_t c, s;
@@ -152,18 +139,6 @@ twin_sfixed_t _twin_matrix_dy(twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y)
 {
     return twin_fixed_to_sfixed(twin_fixed_mul(m->m[0][1], x) +
                                 twin_fixed_mul(m->m[1][1], y));
-}
-
-twin_sfixed_t _twin_matrix_len(twin_matrix_t *m,
-                               twin_fixed_t dx,
-                               twin_fixed_t dy)
-{
-    twin_fixed_t xs =
-        (twin_fixed_mul(m->m[0][0], dx) + twin_fixed_mul(m->m[1][0], dy));
-    twin_fixed_t ys =
-        (twin_fixed_mul(m->m[0][1], dx) + twin_fixed_mul(m->m[1][1], dy));
-    twin_fixed_t ds = (twin_fixed_mul(xs, xs) + twin_fixed_mul(ys, ys));
-    return (twin_fixed_to_sfixed(twin_fixed_sqrt(ds)));
 }
 
 twin_fixed_t twin_matrix_transform_x(const twin_matrix_t *m,

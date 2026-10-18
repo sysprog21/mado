@@ -126,14 +126,6 @@ void twin_path_move(twin_path_t *path, twin_fixed_t x, twin_fixed_t y)
                      _twin_matrix_y(&path->state.matrix, x, y));
 }
 
-void twin_path_rmove(twin_path_t *path, twin_fixed_t dx, twin_fixed_t dy)
-{
-    twin_spoint_t here = _twin_path_current_spoint(path);
-    _twin_path_smove(path,
-                     here.x + _twin_matrix_dx(&path->state.matrix, dx, dy),
-                     here.y + _twin_matrix_dy(&path->state.matrix, dx, dy));
-}
-
 void twin_path_draw(twin_path_t *path, twin_fixed_t x, twin_fixed_t y)
 {
     _twin_path_sdraw(path, _twin_matrix_x(&path->state.matrix, x, y),
@@ -145,14 +137,6 @@ static void twin_path_draw_polar(twin_path_t *path, twin_angle_t deg)
     twin_fixed_t s, c;
     twin_sincos(deg, &s, &c);
     twin_path_draw(path, c, s);
-}
-
-void twin_path_rdraw(twin_path_t *path, twin_fixed_t dx, twin_fixed_t dy)
-{
-    twin_spoint_t here = _twin_path_current_spoint(path);
-    _twin_path_sdraw(path,
-                     here.x + _twin_matrix_dx(&path->state.matrix, dx, dy),
-                     here.y + _twin_matrix_dy(&path->state.matrix, dx, dy));
 }
 
 void twin_path_close(twin_path_t *path)
@@ -203,7 +187,7 @@ void twin_path_arc(twin_path_t *path,
                    twin_angle_t start,
                    twin_angle_t extent)
 {
-    twin_matrix_t save = twin_path_current_matrix(path);
+    twin_matrix_t save = path->state.matrix;
 
     twin_path_translate(path, x, y);
     twin_path_scale(path, x_radius, y_radius);
@@ -363,7 +347,7 @@ void twin_path_arc_ellipse(twin_path_t *path,
     twin_ellipse_param_t param;
     param = get_center_parameters(cur_x, cur_y, target_x, target_y, large_arc,
                                   sweep, radius_x, radius_y, rotation);
-    twin_matrix_t save = twin_path_current_matrix(path);
+    twin_matrix_t save = path->state.matrix;
 
     twin_path_translate(path, param.cx, param.cy);
     twin_path_rotate(path, rotation);
@@ -408,7 +392,7 @@ void twin_path_rounded_rectangle(twin_path_t *path,
                                  twin_fixed_t x_radius,
                                  twin_fixed_t y_radius)
 {
-    twin_matrix_t save = twin_path_current_matrix(path);
+    twin_matrix_t save = path->state.matrix;
 
     twin_path_translate(path, x, y);
     twin_path_move(path, 0, y_radius);
@@ -450,7 +434,7 @@ void twin_path_tab(twin_path_t *path,
                    twin_fixed_t x_radius,
                    twin_fixed_t y_radius)
 {
-    twin_matrix_t save = twin_path_current_matrix(path);
+    twin_matrix_t save = path->state.matrix;
 
     twin_path_translate(path, x, y);
     twin_path_move(path, 0, y_radius);
@@ -468,16 +452,6 @@ void twin_path_tab(twin_path_t *path,
 void twin_path_set_matrix(twin_path_t *path, twin_matrix_t matrix)
 {
     path->state.matrix = matrix;
-}
-
-twin_matrix_t twin_path_current_matrix(twin_path_t *path)
-{
-    return path->state.matrix;
-}
-
-void twin_path_identity(twin_path_t *path)
-{
-    twin_matrix_identity(&path->state.matrix);
 }
 
 void twin_path_translate(twin_path_t *path, twin_fixed_t tx, twin_fixed_t ty)
@@ -500,29 +474,14 @@ void twin_path_set_font_size(twin_path_t *path, twin_fixed_t font_size)
     path->state.font_size = font_size;
 }
 
-twin_fixed_t twin_path_current_font_size(twin_path_t *path)
-{
-    return path->state.font_size;
-}
-
 void twin_path_set_font_style(twin_path_t *path, twin_style_t font_style)
 {
     path->state.font_style = font_style;
 }
 
-twin_style_t twin_path_current_font_style(twin_path_t *path)
-{
-    return path->state.font_style;
-}
-
 void twin_path_set_cap_style(twin_path_t *path, twin_cap_t cap_style)
 {
     path->state.cap_style = cap_style;
-}
-
-twin_cap_t twin_path_current_cap_style(twin_path_t *path)
-{
-    return path->state.cap_style;
 }
 
 void twin_path_empty(twin_path_t *path)
@@ -535,9 +494,15 @@ static void _twin_path_reset_state(twin_path_t *path)
 {
     twin_path_empty(path);
     twin_matrix_identity(&path->state.matrix);
+    path->state.font = NULL;
     path->state.font_size = TWIN_FIXED_ONE * 15;
     path->state.font_style = TwinStyleRoman;
     path->state.cap_style = TwinCapRound;
+}
+
+void twin_path_set_font(twin_path_t *path, twin_font_t *font)
+{
+    path->state.font = font;
 }
 
 twin_path_t *_twin_path_acquire(twin_screen_t *screen)
@@ -580,13 +545,19 @@ void _twin_path_release(twin_screen_t *screen, twin_path_t *path)
 
 void twin_path_bounds(twin_path_t *path, twin_rect_t *rect)
 {
+    _twin_path_bounds_from(path, 0, rect);
+}
+
+void _twin_path_bounds_from(const twin_path_t *path,
+                            int first,
+                            twin_rect_t *rect)
+{
     twin_sfixed_t left = TWIN_SFIXED_MAX;
     twin_sfixed_t top = TWIN_SFIXED_MAX;
     twin_sfixed_t right = TWIN_SFIXED_MIN;
     twin_sfixed_t bottom = TWIN_SFIXED_MIN;
-    int i;
 
-    for (i = 0; i < path->npoints; i++) {
+    for (int i = first; i < path->npoints; i++) {
         twin_sfixed_t x = path->points[i].x;
         twin_sfixed_t y = path->points[i].y;
         if (x < left)
@@ -627,33 +598,178 @@ void twin_path_restore(twin_path_t *path, twin_state_t *state)
     path->state = *state;
 }
 
-twin_path_t *twin_path_create(void)
+void _twin_path_init(twin_path_t *path)
 {
-    twin_path_t *path;
-
-    path = twin_malloc(sizeof(twin_path_t));
-    if (!path)
-        return NULL;
-    path->npoints = 0;
-    path->nsublen = 0;
     path->points = path->inline_points;
     path->size_points = TWIN_PATH_INLINE_POINTS;
     path->sublen = path->inline_sublen;
     path->size_sublen = TWIN_PATH_INLINE_SUBLEN;
-    twin_matrix_identity(&path->state.matrix);
-    path->state.font_size = TWIN_FIXED_ONE * 15;
-    path->state.font_style = TwinStyleRoman;
-    path->state.cap_style = TwinCapRound;
-    return path;
+    _twin_path_reset_state(path);
 }
 
-void twin_path_destroy(twin_path_t *path)
+void _twin_path_fini(twin_path_t *path)
 {
     if (path->points != path->inline_points)
         twin_free(path->points);
     if (path->sublen != path->inline_sublen)
         twin_free(path->sublen);
+}
+
+twin_path_t *twin_path_create(void)
+{
+    twin_path_t *path = twin_malloc(sizeof(twin_path_t));
+    if (path)
+        _twin_path_init(path);
+    return path;
+}
+
+void twin_path_destroy(twin_path_t *path)
+{
+    _twin_path_fini(path);
     twin_free(path);
+}
+
+/*
+ * Coverage for @path on @dst.
+ *
+ * On return @mask describes A8 coverage whose (0, 0) sits at (*mx, *my) in
+ * path coordinates, and @vis is the part of the path bounds inside the
+ * destination clip.  Small shapes come from (or go into) the coverage cache
+ * as full-bounds masks; large ones are rasterized only where visible.
+ * Returns false when nothing is visible or memory ran out.
+ */
+typedef struct {
+    twin_pixmap_t hdr;   /* mask pixmap header (no allocation) */
+    twin_pixmap_t *heap; /* heap mask to release, if any */
+    bool scratch;        /* mask lives in the scratch arena */
+    size_t scratch_saved;
+} twin_mask_t;
+
+static uint64_t _twin_path_key(const twin_path_t *path, const twin_rect_t *b)
+{
+    uint64_t h = TWIN_HASH_INIT ^ 0x50; /* 'P': path domain */
+    twin_sfixed_t ox = twin_int_to_sfixed(b->left);
+    twin_sfixed_t oy = twin_int_to_sfixed(b->top);
+    for (int i = 0; i < path->npoints; i++) {
+        twin_sfixed_t xy[2] = {(twin_sfixed_t) (path->points[i].x - ox),
+                               (twin_sfixed_t) (path->points[i].y - oy)};
+        h = _twin_hash(h, xy, sizeof(xy));
+    }
+    h = _twin_hash(h, path->sublen, sizeof(int) * path->nsublen);
+    h = _twin_hash(h, &path->npoints, sizeof(path->npoints));
+    return h;
+}
+
+static bool _twin_path_mask(twin_pixmap_t *dst,
+                            twin_path_t *path,
+                            twin_scratch_t *scratch,
+                            twin_mask_t *m,
+                            twin_coord_t *mx,
+                            twin_coord_t *my,
+                            twin_rect_t *vis)
+{
+    twin_rect_t b;
+    twin_path_bounds(path, &b);
+    if (b.left >= b.right || b.top >= b.bottom)
+        return false;
+
+    twin_rect_t c = twin_pixmap_get_clip(dst); /* in path coordinates */
+    *vis = (twin_rect_t) {max(b.left, c.left), min(b.right, c.right),
+                          max(b.top, c.top), min(b.bottom, c.bottom)};
+    if (vis->left >= vis->right || vis->top >= vis->bottom)
+        return false;
+
+    m->heap = NULL;
+    m->scratch = false;
+    twin_coord_t w = b.right - b.left, h = b.bottom - b.top;
+    size_t full = (size_t) _twin_a8_stride(w) * (size_t) h;
+
+    if (full <= CONFIG_CACHE_MAX_ENTRY && _twin_cache_enabled()) {
+        uint64_t key = _twin_path_key(path, &b);
+        twin_cache_entry_t *e = _twin_cache_lookup(key);
+        bool fresh = false, collide = false;
+        /* A 64-bit hash collision must never hand back a mask of another
+         * size: that would read outside it.  Nor may it insert a duplicate
+         * key, which lookups could never reach: rasterize uncached. */
+        if (e && (e->width != w || e->height != h)) {
+            e = NULL;
+            collide = true;
+        }
+        if (!e && !collide) {
+            e = _twin_cache_insert(key, w, h);
+            fresh = e != NULL;
+        }
+        if (e) {
+            _twin_pixmap_init_a8(&m->hdr, e->width, e->height, e->stride,
+                                 e->data);
+            if (fresh)
+                twin_fill_path(&m->hdr, path, -b.left, -b.top, scratch);
+            *mx = b.left;
+            *my = b.top;
+            return true;
+        }
+    }
+
+    /* Rasterize only the visible part */
+    w = vis->right - vis->left;
+    h = vis->bottom - vis->top;
+    twin_coord_t stride = _twin_a8_stride(w);
+    size_t bytes = (size_t) stride * (size_t) h;
+    void *pixels = NULL;
+    if (scratch) {
+        m->scratch_saved = twin_scratch_save(scratch);
+        pixels = twin_scratch_alloc(scratch, bytes, 4);
+        m->scratch = pixels != NULL;
+    }
+    if (pixels) {
+        memset(pixels, 0, bytes);
+        _twin_pixmap_init_a8(&m->hdr, w, h, stride, pixels);
+    } else {
+        /* Reuse the screen's mask buffer, growing it to the high-water mark */
+        twin_screen_t *screen = dst->screen;
+        twin_pixmap_t *mask = NULL;
+        if (screen && screen->mask_cache && screen->mask_cache_width >= w &&
+            screen->mask_cache_height >= h) {
+            mask = screen->mask_cache;
+        } else {
+            /* Grow to the larger of old and new in each dimension, so a wide
+             * mask followed by a tall one does not reallocate every time */
+            twin_coord_t cw = w, ch = h;
+            if (screen && screen->mask_cache) {
+                cw = max(cw, screen->mask_cache_width);
+                ch = max(ch, screen->mask_cache_height);
+            }
+            mask =
+                twin_pixmap_create(TWIN_A8, screen ? cw : w, screen ? ch : h);
+            if (!mask)
+                return false;
+            if (screen) {
+                if (screen->mask_cache)
+                    twin_pixmap_destroy(screen->mask_cache);
+                screen->mask_cache = mask;
+                screen->mask_cache_width = cw;
+                screen->mask_cache_height = ch;
+            } else {
+                m->heap = mask;
+            }
+        }
+        for (twin_coord_t y = 0; y < h; y++)
+            memset(twin_pixmap_pointer(mask, 0, y).v, 0, (size_t) w);
+        _twin_pixmap_init_a8(&m->hdr, w, h, mask->stride, mask->p.v);
+    }
+    twin_fill_path(&m->hdr, path, -vis->left, -vis->top, scratch);
+    *mx = vis->left;
+    *my = vis->top;
+    return true;
+}
+
+static void _twin_mask_release(twin_mask_t *m, twin_scratch_t *scratch)
+{
+    twin_pixmap_reset_xform_cache(&m->hdr);
+    if (m->scratch)
+        twin_scratch_restore(scratch, m->scratch_saved);
+    if (m->heap)
+        twin_pixmap_destroy(m->heap);
 }
 
 void twin_composite_path(twin_pixmap_t *dst,
@@ -664,109 +780,155 @@ void twin_composite_path(twin_pixmap_t *dst,
                          twin_operator_t operator,
                          twin_scratch_t * scratch)
 {
-    twin_rect_t bounds;
-    twin_path_bounds(path, &bounds);
-    if (bounds.left >= bounds.right || bounds.top >= bounds.bottom)
+    twin_mask_t m;
+    twin_coord_t mx, my;
+    twin_rect_t vis;
+
+    if (!_twin_path_mask(dst, path, scratch, &m, &mx, &my, &vis))
+        return;
+    twin_operand_t msk = {.source_kind = TWIN_PIXMAP, .u.pixmap = &m.hdr};
+    twin_composite(dst, vis.left, vis.top, src, src_x + vis.left,
+                   src_y + vis.top, &msk, vis.left - mx, vis.top - my, operator,
+                   vis.right - vis.left, vis.bottom - vis.top);
+    _twin_mask_release(&m, scratch);
+}
+
+/* The screen's scratch arena for drawing on @dst, or NULL off screen */
+static twin_scratch_t *_twin_screen_scratch(twin_pixmap_t *dst,
+                                            twin_scratch_t *s)
+{
+    if (!dst->screen || !dst->screen->scratch_buf)
+        return NULL;
+    twin_scratch_init(s, dst->screen->scratch_buf, dst->screen->scratch_size);
+    return s;
+}
+
+static twin_argb32_t _twin_lerp_argb(twin_argb32_t c0,
+                                     twin_argb32_t c1,
+                                     twin_fixed_t t)
+{
+    if (t <= 0)
+        return c0;
+    if (t >= TWIN_FIXED_ONE)
+        return c1;
+    twin_argb32_t out = 0;
+    for (int shift = 0; shift < 32; shift += 8) {
+        int32_t a = (c0 >> shift) & 0xff, b = (c1 >> shift) & 0xff;
+        int32_t v = a + (int32_t) (((int64_t) (b - a) * t + 0x8000) >> 16);
+        out |= (twin_argb32_t) (v & 0xff) << shift;
+    }
+    return out;
+}
+
+void twin_paint_path_linear(twin_pixmap_t *dst,
+                            twin_path_t *path,
+                            twin_fixed_t x0,
+                            twin_fixed_t y0,
+                            twin_argb32_t c0,
+                            twin_fixed_t x1,
+                            twin_fixed_t y1,
+                            twin_argb32_t c1)
+{
+    twin_scratch_t scratch;
+    twin_scratch_t *sp = _twin_screen_scratch(dst, &scratch);
+
+    twin_mask_t m;
+    twin_coord_t mx, my;
+    twin_rect_t vis;
+    if (!_twin_path_mask(dst, path, sp, &m, &mx, &my, &vis))
         return;
 
-    twin_coord_t width = bounds.right - bounds.left;
-    twin_coord_t height = bounds.bottom - bounds.top;
+    twin_operand_t msk = {.source_kind = TWIN_PIXMAP, .u.pixmap = &m.hdr};
+    twin_coord_t w = vis.right - vis.left;
+    int64_t gx = (int64_t) x1 - x0, gy = (int64_t) y1 - y0;
+    int64_t len2 = (gx * gx + gy * gy) >> 16; /* 16.16 */
 
-    /* Try allocating mask pixmap from scratch arena */
-    size_t s_stride = (size_t) width; /* TWIN_A8: 1 byte per pixel */
-    if (s_stride & 3)
-        s_stride = (s_stride + 3) & ~3;
-    size_t mask_size = sizeof(twin_pixmap_t) + s_stride * (size_t) height;
-    twin_pixmap_t *mask = NULL;
-    bool mask_from_scratch = false;
-    size_t saved = 0;
-
-    if (scratch) {
-        saved = twin_scratch_save(scratch);
-        mask = twin_scratch_alloc(scratch, mask_size, _Alignof(twin_pixmap_t));
-    }
-    if (mask) {
-        mask_from_scratch = true;
-        memset(mask, 0, mask_size);
-        mask->screen = 0;
-        mask->up = 0;
-        mask->down = 0;
-        mask->x = mask->y = 0;
-        mask->format = TWIN_A8;
-        mask->width = width;
-        mask->height = height;
-        twin_matrix_identity(&mask->transform);
-        mask->clip.left = mask->clip.top = 0;
-        mask->clip.right = width;
-        mask->clip.bottom = height;
-        mask->origin_x = mask->origin_y = 0;
-        mask->stride = (twin_coord_t) s_stride;
-        mask->disable = 0;
-        mask->animation = NULL;
-#if defined(CONFIG_DROP_SHADOW)
-        mask->shadow = false;
-#endif
-        mask->window = NULL;
-        mask->xform_cache = NULL;
-        mask->xform_cache_size = 0;
-        mask->p.v = mask + 1;
-    } else {
-        /* Try the screen's reusable mask cache before a fresh alloc.
-         * The cache grows to the high-water mark and persists across
-         * composite calls, eliminating repeated malloc/free. */
-        twin_screen_t *screen = dst->screen;
-        if (screen && screen->mask_cache && screen->mask_cache_width >= width &&
-            screen->mask_cache_height >= height) {
-            mask = screen->mask_cache;
-        } else if (screen) {
-            if (screen->mask_cache)
-                twin_pixmap_destroy(screen->mask_cache);
-            mask = twin_pixmap_create(TWIN_A8, width, height);
-            screen->mask_cache = mask;
-            screen->mask_cache_width = mask ? width : 0;
-            screen->mask_cache_height = mask ? height : 0;
-        } else {
-            mask = twin_pixmap_create(TWIN_A8, width, height);
+    if (gx == 0 || len2 == 0) {
+        /* Vertical (or degenerate): one solid color per scanline */
+        for (twin_coord_t y = vis.top; y < vis.bottom; y++) {
+            twin_fixed_t t = 0;
+            if (gy) {
+                twin_fixed_t cy = twin_int_to_fixed(y) + TWIN_FIXED_HALF;
+                t = (twin_fixed_t) ((((int64_t) cy - y0) * 65536) / gy);
+            }
+            twin_operand_t src = {.source_kind = TWIN_SOLID,
+                                  .u.argb = _twin_lerp_argb(c0, c1, t)};
+            twin_composite(dst, vis.left, y, &src, 0, 0, &msk, vis.left - mx,
+                           y - my, TWIN_OVER, w, 1);
         }
-        if (!mask)
-            return;
-        /* Reset mask state for this composite operation */
-        memset(mask->p.v, 0, (size_t) mask->stride * height);
-        mask->clip.left = mask->clip.top = 0;
-        mask->clip.right = width;
-        mask->clip.bottom = height;
-        mask->origin_x = mask->origin_y = 0;
-        twin_matrix_identity(&mask->transform);
+        _twin_mask_release(&m, sp);
+        return;
     }
 
-    twin_fill_path(mask, path, -bounds.left, -bounds.top, scratch);
-    twin_operand_t msk = {.source_kind = TWIN_PIXMAP, .u.pixmap = mask};
-    twin_composite(dst, bounds.left, bounds.top, src, src_x + bounds.left,
-                   src_y + bounds.top, &msk, 0, 0, operator, width, height);
+    /* General direction: build each row's colors, then composite it */
+    twin_argb32_t *row = twin_malloc(sizeof(twin_argb32_t) * (size_t) w);
+    if (!row) {
+        _twin_mask_release(&m, sp);
+        return;
+    }
+    twin_pixmap_t span;
+    _twin_pixmap_init(&span, TWIN_ARGB32, w, 1, (twin_coord_t) (w * 4), row);
+    twin_operand_t src = {.source_kind = TWIN_PIXMAP, .u.pixmap = &span};
 
-    if (mask_from_scratch) {
-        twin_pixmap_reset_xform_cache(mask);
-        twin_scratch_restore(scratch, saved);
+    for (twin_coord_t y = vis.top; y < vis.bottom; y++) {
+        if (y == vis.top || gy) {
+            twin_fixed_t cy = twin_int_to_fixed(y) + TWIN_FIXED_HALF;
+            for (twin_coord_t i = 0; i < w; i++) {
+                twin_fixed_t cx =
+                    twin_int_to_fixed(vis.left + i) + TWIN_FIXED_HALF;
+                int64_t dot =
+                    (((int64_t) cx - x0) * gx + ((int64_t) cy - y0) * gy) >> 16;
+                twin_fixed_t t = (twin_fixed_t) ((dot * 65536) / len2);
+                row[i] = _twin_lerp_argb(c0, c1, t);
+            }
+        }
+        twin_composite(dst, vis.left, y, &src, 0, 0, &msk, vis.left - mx,
+                       y - my, TWIN_OVER, w, 1);
     }
-    /* Heap-allocated masks are either in the screen cache (kept)
-     * or allocated without a screen (freed). */
-    if (!mask_from_scratch &&
-        (!dst->screen || mask != dst->screen->mask_cache)) {
-        twin_pixmap_destroy(mask);
-    }
+    twin_pixmap_reset_xform_cache(&span);
+    twin_free(row);
+    _twin_mask_release(&m, sp);
 }
 
 void twin_paint_path(twin_pixmap_t *dst, twin_argb32_t argb, twin_path_t *path)
 {
     twin_operand_t src = {.source_kind = TWIN_SOLID, .u.argb = argb};
     twin_scratch_t scratch;
-    twin_scratch_t *sp = NULL;
-    if (dst->screen && dst->screen->scratch_buf) {
-        twin_scratch_init(&scratch, dst->screen->scratch_buf,
-                          dst->screen->scratch_size);
-        sp = &scratch;
-    }
+    twin_scratch_t *sp = _twin_screen_scratch(dst, &scratch);
     twin_composite_path(dst, &src, 0, 0, path, TWIN_OVER, sp);
+}
+
+/*
+ * True when nothing of @stroke drawn with @pen can reach the clip, so the
+ * convolution can be skipped.  The extent is taken from the points directly
+ * because twin_path_bounds() reports flat lines as empty.  Twice the pen's
+ * reach covers square caps and miters.
+ */
+static bool _twin_stroke_misses_clip(twin_pixmap_t *dst,
+                                     const twin_path_t *stroke,
+                                     const twin_path_t *pen)
+{
+    if (!stroke->npoints)
+        return true;
+    int reach = 0;
+    for (int i = 0; i < pen->npoints; i++) {
+        int ax = abs(pen->points[i].x), ay = abs(pen->points[i].y);
+        reach = max(reach, max(ax, ay));
+    }
+    twin_sfixed_t l = stroke->points[0].x, r = l;
+    twin_sfixed_t t = stroke->points[0].y, b = t;
+    for (int i = 1; i < stroke->npoints; i++) {
+        l = min(l, stroke->points[i].x);
+        r = max(r, stroke->points[i].x);
+        t = min(t, stroke->points[i].y);
+        b = max(b, stroke->points[i].y);
+    }
+    twin_coord_t grow = twin_sfixed_trunc(twin_sfixed_ceil(2 * reach)) + 2;
+    twin_rect_t clip = twin_pixmap_get_clip(dst);
+    return twin_sfixed_trunc(l) - grow >= clip.right ||
+           twin_sfixed_trunc(twin_sfixed_ceil(r)) + grow <= clip.left ||
+           twin_sfixed_trunc(t) - grow >= clip.bottom ||
+           twin_sfixed_trunc(twin_sfixed_ceil(b)) + grow <= clip.top;
 }
 
 void twin_composite_stroke(twin_pixmap_t *dst,
@@ -786,13 +948,19 @@ void twin_composite_stroke(twin_pixmap_t *dst,
         _twin_path_release(screen, pen);
         return;
     }
-    twin_matrix_t m = twin_path_current_matrix(stroke);
+    twin_matrix_t m = stroke->state.matrix;
 
     m.m[2][0] = 0;
     m.m[2][1] = 0;
     twin_path_set_matrix(pen, m);
-    twin_path_set_cap_style(path, twin_path_current_cap_style(stroke));
+    twin_path_set_cap_style(path, stroke->state.cap_style);
     twin_path_circle(pen, 0, 0, pen_width / 2);
+
+    if (_twin_stroke_misses_clip(dst, stroke, pen)) {
+        _twin_path_release(screen, path);
+        _twin_path_release(screen, pen);
+        return;
+    }
     twin_path_convolve(path, stroke, pen, scratch);
     twin_composite_path(dst, src, src_x, src_y, path, operator, scratch);
     _twin_path_release(screen, path);
@@ -806,11 +974,6 @@ void twin_paint_stroke(twin_pixmap_t *dst,
 {
     twin_operand_t src = {.source_kind = TWIN_SOLID, .u.argb = argb};
     twin_scratch_t scratch;
-    twin_scratch_t *sp = NULL;
-    if (dst->screen && dst->screen->scratch_buf) {
-        twin_scratch_init(&scratch, dst->screen->scratch_buf,
-                          dst->screen->scratch_size);
-        sp = &scratch;
-    }
+    twin_scratch_t *sp = _twin_screen_scratch(dst, &scratch);
     twin_composite_stroke(dst, &src, 0, 0, stroke, pen_width, TWIN_OVER, sp);
 }

@@ -34,7 +34,7 @@ typedef struct {
 
     /* Linux virtual terminal (VT) */
     int vt_fd;
-    bool vt_active;
+    volatile sig_atomic_t vt_active; /* written by the VT signal handler */
     struct vt_mode old_vtm;
 
     /* DRM driver */
@@ -286,30 +286,9 @@ static bool twin_drm_open(twin_drm_t *tx, const char *path)
     return true;
 }
 
-static void twin_drm_damage(twin_drm_t *tx)
-{
-    int width, height;
-    twin_drm_get_screen_size(tx, &width, &height);
-    twin_screen_damage(tx->screen, 0, 0, width, height);
-}
-
 static void twin_drm_flush(twin_drm_t *tx)
 {
     drmModeDirtyFB(tx->drm_dri_fd, tx->fb_id, NULL, 0);
-}
-
-static bool twin_drm_update_damage(void *closure)
-{
-    twin_drm_t *tx = PRIV(closure);
-    twin_screen_t *screen = SCREEN(closure);
-
-    if (!tx->vt_active && (tx->fb_base != MAP_FAILED) &&
-        twin_screen_damaged(screen)) {
-        twin_screen_update(screen);
-        twin_drm_flush(tx);
-    }
-
-    return true;
 }
 
 static bool twin_drm_work(void *closure)
@@ -342,7 +321,9 @@ static bool twin_drm_work(void *closure)
         twin_screen_damage(screen, 0, 0, screen->width, screen->height);
     }
 
-    if (!tx->vt_active && twin_screen_damaged(screen)) {
+    /* No mapping (restoring it failed): keep the damage for the next try */
+    if (!tx->vt_active && tx->fb_base != MAP_FAILED &&
+        twin_screen_damaged(screen)) {
         twin_screen_update(screen);
         twin_drm_flush(tx);
     }
@@ -457,8 +438,6 @@ twin_context_t *twin_drm_init(int width maybe_unused, int height maybe_unused)
     /* Setup file handler and work functions */
     twin_set_work(twin_drm_work, TWIN_WORK_REDISPLAY, ctx);
 
-    /* Register a callback function to handle damaged rendering */
-    twin_screen_register_damaged(ctx->screen, twin_drm_update_damage, ctx);
 
     return ctx;
 

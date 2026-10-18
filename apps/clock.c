@@ -217,6 +217,15 @@ static twin_dispatch_result_t _apps_clock_dispatch(twin_widget_t *widget,
     case TwinEventPaint:
         _apps_clock_paint(custom);
         break;
+    case TwinEventDestroy: {
+        /* The ticking timeout would outlive the clock */
+        apps_clock_data_t *data =
+            (apps_clock_data_t *) twin_custom_widget_data(custom);
+        if (data->timeout)
+            twin_clear_timeout(data->timeout);
+        data->timeout = NULL;
+        break;
+    }
     default:
         break;
     }
@@ -252,7 +261,8 @@ void apps_clock_start(twin_screen_t *screen,
 {
     twin_toplevel_t *toplevel = twin_toplevel_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
-    twin_custom_widget_t *clock = apps_clock_create(&toplevel->box);
+    twin_custom_widget_t *clock =
+        apps_clock_create(twin_toplevel_box(toplevel));
     (void) clock;
     twin_toplevel_show(toplevel);
 }

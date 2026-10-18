@@ -7,36 +7,11 @@
 
 #include "twin_private.h"
 
-/* angles are measured from -2048 .. 2048 */
-
-twin_fixed_t twin_sin(twin_angle_t a)
-{
-    twin_fixed_t sin_val = 0;
-    twin_sincos(a, &sin_val, NULL);
-    return sin_val;
-}
-
 twin_fixed_t twin_cos(twin_angle_t a)
 {
     twin_fixed_t cos_val = 0;
     twin_sincos(a, NULL, &cos_val);
     return cos_val;
-}
-
-twin_fixed_t twin_tan(twin_angle_t a)
-{
-    twin_fixed_t s, c;
-    twin_sincos(a, &s, &c);
-
-    if (c == 0) {
-        if (s > 0)
-            return TWIN_FIXED_MAX;
-        return TWIN_FIXED_MIN;
-    }
-    if (s == 0)
-        return 0;
-
-    return ((s << 15) / c) << 1;
 }
 
 static inline twin_fixed_t sin_poly(twin_angle_t x)
@@ -157,34 +132,6 @@ static twin_angle_t twin_atan2_first_quadrant(twin_fixed_t y, twin_fixed_t x)
      * required.
      */
     return (twin_angle_t) (angle / 8);
-}
-
-twin_angle_t twin_atan2(twin_fixed_t y, twin_fixed_t x)
-{
-    if (x == 0 && y == 0)
-        return TWIN_ANGLE_0;
-    if (x == 0)
-        return (y > 0) ? TWIN_ANGLE_90 : TWIN_ANGLE_270;
-    if (y == 0)
-        return (x > 0) ? TWIN_ANGLE_0 : TWIN_ANGLE_180;
-
-    twin_fixed_t x_sign_mask = x >> 31;
-    twin_fixed_t abs_x = (x ^ x_sign_mask) - x_sign_mask;
-    twin_fixed_t y_sign_mask = y >> 31;
-    twin_fixed_t abs_y = (y ^ y_sign_mask) - y_sign_mask;
-    twin_fixed_t m = ((~x_sign_mask & ~y_sign_mask) * 0) +
-                     ((x_sign_mask & ~y_sign_mask) * 1) +
-                     ((x_sign_mask & y_sign_mask) * 1) +
-                     ((~x_sign_mask & y_sign_mask) * 2);
-    twin_fixed_t sign = 1 - 2 * (x_sign_mask ^ y_sign_mask);
-    twin_angle_t angle = twin_atan2_first_quadrant(abs_y, abs_x);
-
-    /* First quadrant  : angle
-     * Second quadrant : 180 - angle
-     * Third quadrant  : 180 + angle
-     * Fourth quadrant : 360 - angle
-     */
-    return TWIN_ANGLE_180 * m + sign * angle;
 }
 
 twin_angle_t twin_acos(twin_fixed_t x)

@@ -108,8 +108,11 @@ void twin_composite(twin_pixmap_t *_dst,
     if (oy + height > _dst->clip.bottom)
         height = _dst->clip.bottom - oy;
 
-    if (width < 0 || height < 0)
+    if (width <= 0 || height <= 0) {
+        pixman_image_unref(src);
+        pixman_image_unref(dst);
         return;
+    }
 
     if (!_msk) {
         pixman_image_composite(twin_to_pixman_op(operator), src, NULL, dst,

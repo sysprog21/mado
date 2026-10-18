@@ -29,7 +29,7 @@ typedef struct {
 
     /* Linux virtual terminal (VT) */
     int vt_fd;
-    bool vt_active;
+    volatile sig_atomic_t vt_active; /* written by the VT signal handler */
     struct vt_mode old_vtm;
 
     /* Linux framebuffer */
@@ -174,25 +174,6 @@ static bool twin_fbdev_apply_config(twin_fbdev_t *tx)
     return true;
 }
 
-static void twin_fbdev_damage(twin_fbdev_t *tx)
-{
-    int width, height;
-    twin_fbdev_get_screen_size(tx, &width, &height);
-    twin_screen_damage(tx->screen, 0, 0, width, height);
-}
-
-static bool twin_fbdev_update_damage(void *closure)
-{
-    twin_fbdev_t *tx = PRIV(closure);
-    twin_screen_t *screen = SCREEN(closure);
-
-    if (!tx->vt_active && (tx->fb_base != MAP_FAILED) &&
-        twin_screen_damaged(screen))
-        twin_screen_update(screen);
-
-    return true;
-}
-
 static bool twin_fbdev_work(void *closure)
 {
     twin_fbdev_t *tx = PRIV(closure);
@@ -223,7 +204,9 @@ static bool twin_fbdev_work(void *closure)
         twin_screen_damage(screen, 0, 0, screen->width, screen->height);
     }
 
-    if (!tx->vt_active && twin_screen_damaged(screen))
+    /* No mapping (restoring it failed): keep the damage for the next try */
+    if (!tx->vt_active && tx->fb_base != MAP_FAILED &&
+        twin_screen_damaged(screen))
         twin_screen_update(screen);
 
     return true;
@@ -310,8 +293,6 @@ twin_context_t *twin_fbdev_init(int width maybe_unused, int height maybe_unused)
     /* Setup file handler and work functions */
     twin_set_work(twin_fbdev_work, TWIN_WORK_REDISPLAY, ctx);
 
-    /* Register a callback function to handle damaged rendering */
-    twin_screen_register_damaged(ctx->screen, twin_fbdev_update_damage, ctx);
 
     return ctx;
 

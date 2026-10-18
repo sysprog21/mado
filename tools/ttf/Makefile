@@ -1,7 +1,7 @@
 TARGET = twin-ttf
 
 CFLAGS = $(shell pkg-config --cflags freetype2) -g -Wall
-LIBS = $(shell pkg-config --libs freetype2)
+LIBS = $(shell pkg-config --libs freetype2) -lm
 
 OBJS = \
 	twin-ttf.o

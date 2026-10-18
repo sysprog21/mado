@@ -76,7 +76,7 @@ static inline void twin_vt_setup_signal_handler()
 
 static inline bool twin_vt_setup(int *fd_ptr,
                                  struct vt_mode *old_vtm,
-                                 bool *vt_active)
+                                 volatile sig_atomic_t *vt_active)
 {
     /* Open VT0 to inquire information */
     if ((*fd_ptr = twin_vt_open(0)) < -1) {

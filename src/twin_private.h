@@ -16,6 +16,442 @@
 
 #include "twin.h"
 
+#define twin_bytes_per_pixel(format) (1 << (twin_coord_t) (format))
+
+#define twin_fixed_ceil(f) (((f) + 0xffff) & ~0xffff)
+#define twin_fixed_floor(f) ((f) & ~0xffff)
+
+/* Wrap-safe: the difference is taken modulo 2^32 */
+#define twin_time_compare(a, op, b) \
+    ((twin_time_t) ((uint32_t) (a) - (uint32_t) (b)) op 0)
+
+#define _twin_widget_width(w)                 \
+    (((twin_widget_t *) (w))->extents.right - \
+     ((twin_widget_t *) (w))->extents.left)
+
+#define _twin_widget_height(w)                 \
+    (((twin_widget_t *) (w))->extents.bottom - \
+     ((twin_widget_t *) (w))->extents.top)
+
+/*
+ * Object layouts.  The public header declares these types opaque;
+ * only the library and its backends see their fields.
+ */
+
+/**
+ * Type-safe pointer union for different pixel formats
+ *
+ * Provides type-safe access to pixel data in different formats
+ * while maintaining memory efficiency through union storage.
+ */
+typedef union _twin_pointer {
+    void *v;               /**< Generic void pointer */
+    uint8_t *b;            /**< Raw byte array pointer */
+    twin_a8_t *a8;         /**< 8-bit alpha format pointer */
+    twin_rgb16_t *rgb16;   /**< 16-bit RGB format pointer */
+    twin_argb32_t *argb32; /**< 32-bit ARGB format pointer */
+} twin_pointer_t;
+
+/**
+ * Animation iterator for frame-by-frame playback
+ *
+ * Iterator state for stepping through animation frames.
+ * Maintains current position and timing information.
+ */
+typedef struct _twin_animation_iter {
+    twin_animation_t *anim;       /**< Animation being iterated */
+    twin_count_t current_index;   /**< Current frame index */
+    twin_pixmap_t *current_frame; /**< Current frame pixmap */
+    twin_time_t current_delay;    /**< Current frame delay time */
+} twin_animation_iter_t;
+
+/**
+ * Animation structure for frame-based animations
+ *
+ * Contains all data needed for frame-based animations including
+ * timing, frame data, and playback state.
+ */
+struct _twin_animation {
+    twin_pixmap_t **frames;      /**< Array of frame pixmaps */
+    twin_count_t n_frames;       /**< Number of frames */
+    twin_time_t *frame_delays;   /**< Per-frame timing in milliseconds */
+    bool loop;                   /**< Loop animation flag */
+    twin_animation_iter_t *iter; /**< Playback iterator */
+    twin_coord_t width, height;  /**< Animation dimensions in pixels */
+};
+
+/**
+ * Procedural drop shadow attached to a pixmap
+ *
+ * The compositor synthesizes the shadow while scanning out: each edge fades
+ * along a smoothstep ramp 2 * blur + 1 pixels wide, a close match to a
+ * blurred rectangle.  No pixels are stored: a shadow costs four bytes per
+ * pixmap and no blur pass.
+ */
+typedef struct _twin_shadow {
+    int8_t dx, dy;   /**< Offset of the shadow rectangle */
+    uint8_t blur;    /**< Blur radius in pixels (0 disables the shadow) */
+    twin_a8_t alpha; /**< Peak shadow opacity */
+} twin_shadow_t;
+
+/**
+ * Pixmap structure representing a rectangular array of pixels
+ *
+ * Core structure representing drawable surfaces with pixels.
+ * Can be displayed on screen or used as off-screen render targets.
+ */
+struct _twin_pixmap {
+    /* Screen management */
+    struct _twin_screen *screen; /**< Screen displaying this pixmap */
+    twin_count_t disable;        /**< Update disable counter */
+
+    /* Display list linkage */
+    struct _twin_pixmap *down, *up; /**< Z-order linked list pointers */
+
+    /* Position and layout */
+    twin_coord_t x, y;          /**< Screen position */
+    twin_format_t format;       /**< Pixel format */
+    twin_coord_t width, height; /**< Dimensions in pixels */
+    twin_coord_t stride;        /**< Row stride in bytes */
+    twin_matrix_t transform;    /**< 2D transformation matrix */
+
+    /* Clipping and origin */
+    twin_rect_t clip;                /**< Clipping rectangle */
+    twin_coord_t origin_x, origin_y; /**< Drawing origin offset */
+
+    /* Pixel data */
+    twin_animation_t *animation; /**< Animation data if animated */
+    twin_pointer_t p;            /**< Pixel data pointer (NULL if evicted) */
+
+    /* Compositing attributes, applied by the screen compositor */
+    twin_a8_t opacity;        /**< Constant alpha applied on scan-out */
+    twin_rect_t opaque_rect;  /**< Region (pixmap coords) known to be opaque */
+    twin_shadow_t shadow;     /**< Procedural drop shadow */
+    twin_coord_t scan_height; /**< Rows shown from the top on scan-out and
+                                   hit by the pointer (normally height) */
+
+    twin_window_t *window; /**< Associated window (if any) */
+
+    /* Transform buffer cache for compositing operations */
+    void *xform_cache;       /**< Cached xform buffer */
+    size_t xform_cache_size; /**< Cached xform buffer size in bytes */
+};
+
+/**
+ * Scanline drawing callback called before drawing operation begins
+ * @left    : Left edge of drawing region
+ * @top     : Top edge of drawing region
+ * @right   : Right edge of drawing region
+ * @bottom  : Bottom edge of drawing region
+ * @closure : User data pointer
+ *
+ * Backend callback invoked before any scanlines are drawn.
+ * Used for setup operations like buffer preparation.
+ */
+typedef void (*twin_put_begin_t)(twin_coord_t left,
+                                 twin_coord_t top,
+                                 twin_coord_t right,
+                                 twin_coord_t bottom,
+                                 void *closure);
+
+/**
+ * Scanline drawing callback for outputting pixel data
+ * @left    : Left X coordinate of scanline
+ * @top     : Y coordinate of scanline
+ * @right   : Right X coordinate of scanline
+ * @pixels  : Array of ARGB32 pixel data to draw
+ * @closure : User data pointer
+ *
+ * Backend callback invoked for each scanline to be drawn.
+ * Pixels array contains (right-left+1) ARGB32 values.
+ */
+typedef void (*twin_put_span_t)(twin_coord_t left,
+                                twin_coord_t top,
+                                twin_coord_t right,
+                                twin_argb32_t *pixels,
+                                void *closure);
+
+struct _twin_wm_ops;
+
+/** Maximum number of disjoint damage rectangles tracked per frame */
+#define TWIN_DAMAGE_RECTS 8
+
+/**
+ * Screen structure managing display and window system
+ *
+ * Manages the display surface and coordinates drawing operations.
+ * Maintains Z-order of pixmaps and handles input event routing.
+ */
+struct _twin_screen {
+    /* Display list management */
+    twin_pixmap_t *top, *bottom; /**< Z-order display list */
+    twin_pixmap_t *active;       /**< Active pixmap for key events */
+
+    /* Mouse event targeting */
+    twin_pixmap_t *target; /**< Current mouse event target */
+    bool clicklock;        /**< Mouse click lock state */
+
+    /* Cursor management */
+    twin_pixmap_t *cursor;         /**< Mouse cursor pixmap */
+    twin_coord_t curs_hx, curs_hy; /**< Cursor hotspot offset */
+    twin_coord_t curs_x, curs_y;   /**< Current cursor position */
+
+    /* Display properties */
+    twin_coord_t width, height;     /**< Screen dimensions */
+    twin_pixmap_t *background;      /**< Background pattern */
+    twin_argb32_t background_color; /**< Fill when no background pixmap */
+
+    /* Damage tracking: a short list of rectangles, merged when cheap */
+    twin_rect_t damage[TWIN_DAMAGE_RECTS]; /**< Pending damage */
+    int n_damage;                          /**< Valid entries in damage[] */
+    twin_count_t disable;                  /**< Update disable counter */
+
+    /* Backend interface */
+    twin_put_begin_t put_begin; /**< Scanline begin callback */
+    twin_put_span_t put_span;   /**< Scanline drawing callback */
+    void *closure;              /**< Backend user data */
+
+    /* Window manager policy */
+    const struct _twin_wm_ops *wm; /**< Active policy */
+    void *wm_data;                 /**< Policy private state */
+    twin_window_t *windows;        /**< Every window, bottom to top */
+    twin_window_t *bar_top;        /**< System bar above the work area */
+    twin_window_t *bar_bottom;     /**< System bar below the work area */
+    const struct _twin_wm_ops *wm_pending; /**< Switch requested mid-event */
+    struct _twin_work *wm_work;            /**< Work item applying it */
+    int dispatching;           /**< Busy depth: dispatch, relayout, switch */
+    twin_coord_t inset_bottom; /**< Reserved above the bottom bar (IME) */
+    twin_window_t *zombies;    /**< Destroyed while busy, freed when idle */
+
+    twin_screen_stats_t stats; /**< Compositor work counters */
+
+    /* Span buffer cache for screen updates */
+    twin_argb32_t *span_cache;     /**< Cached span buffer */
+    twin_coord_t span_cache_width; /**< Cached span buffer width */
+
+    /* Scratch arena for per-frame temporary allocations */
+    void *scratch_buf;   /**< Scratch buffer (bump allocator) */
+    size_t scratch_size; /**< Scratch buffer capacity in bytes */
+
+    /* Reusable path object cache to avoid repeated alloc/free */
+#define TWIN_PATH_CACHE_SIZE 4
+    struct _twin_path *path_cache[TWIN_PATH_CACHE_SIZE];
+    int path_cache_count;
+
+    /* Cached A8 mask pixmap for twin_composite_path -- avoids
+     * per-composite malloc for masks larger than the scratch arena. */
+    twin_pixmap_t *mask_cache;
+    twin_coord_t mask_cache_width;
+    twin_coord_t mask_cache_height;
+
+    /* Event processing: event filter callback */
+    bool (*event_filter)(twin_screen_t *screen, twin_event_t *event);
+};
+
+#define UCS_PAGE_SHIFT 7
+
+#define UCS_PER_PAGE (1 << UCS_PAGE_SHIFT)
+
+typedef struct _twin_charmap {
+    uint16_t page;                  /**< Unicode page number */
+    uint16_t offsets[UCS_PER_PAGE]; /**< Glyph offsets in outlines, 0: none */
+} twin_charmap_t;
+
+#define TWIN_FONT_TYPE_STROKE 1
+
+#define TWIN_FONT_TYPE_TTF 2
+
+struct _twin_font {
+    /* Font definition - must be initialized */
+    int type;                      /**< Font type (stroke or TTF) */
+    const char *name;              /**< Font name */
+    const char *style;             /**< Font style name */
+    const twin_charmap_t *charmap; /**< Character map array */
+    int n_charmap;                 /**< Number of character maps */
+    const signed char *outlines;   /**< Glyph outline data */
+    signed char ascender;          /**< Font ascender */
+    signed char descender;         /**< Font descender */
+    signed char height;            /**< Font height */
+
+    /* Runtime caching */
+    const twin_charmap_t *cur_page; /**< Currently cached page */
+};
+
+/* Font used by paths that did not select one with twin_path_set_font() */
+extern twin_font_t *g_twin_font;
+
+/* Built-in default stroke font */
+extern twin_font_t twin_Default_Font_Roman;
+
+struct _twin_window {
+    /* Window basics */
+    twin_screen_t *screen; /**< Parent screen */
+    twin_pixmap_t *pixmap; /**< Window pixmap */
+
+    /* Window properties */
+    twin_window_style_t style; /**< Window style */
+    twin_format_t format;      /**< Pixel format of the window pixmap */
+    twin_rect_t request;       /**< Requested client geometry (screen) */
+    twin_rect_t client;        /**< Client area rectangle (pixmap) */
+#define TWIN_WINDOW_DAMAGE_RECTS 4
+    twin_rect_t damage[TWIN_WINDOW_DAMAGE_RECTS]; /**< Pending repaint */
+    int n_damage;                                 /**< Valid damage[] */
+
+    /* Window state */
+    bool active;          /**< Active window flag */
+    bool client_grab;     /**< Mouse grab state */
+    bool draw_queued;     /**< Draw pending flag */
+    bool opaque;          /**< Client area is fully painted by draw() */
+    bool mapped;          /**< Shown by the application */
+    bool frame_dirty;     /**< Decorations need repainting */
+    bool dead;            /**< Destroyed; the struct outlives a busy screen */
+    bool wm_placed;       /**< Policy already chose a position (desktop) */
+    bool wm_maximized;    /**< Covers the work area; wm_saved is the request */
+    twin_rect_t wm_saved; /**< Request to restore after maximize */
+
+    struct _twin_work *paint_work; /**< Queued repaint, if any */
+
+    /* Window manager bookkeeping */
+    twin_window_t *wm_next;     /**< Next window in the screen's window list */
+    twin_window_t *zombie_next; /**< Next in screen->zombies once dead */
+
+    /* Window data */
+    void *client_data; /**< User data pointer */
+    char *name;        /**< Window title */
+
+    /* Window callbacks */
+    twin_draw_func_t draw;       /**< Draw callback */
+    twin_event_func_t event;     /**< Event handler */
+    twin_destroy_func_t destroy; /**< Destroy callback */
+};
+
+typedef struct _twin_widget_layout {
+    twin_coord_t width, height;    /**< Preferred dimensions */
+    twin_stretch_t stretch_width;  /**< Horizontal stretch factor */
+    twin_stretch_t stretch_height; /**< Vertical stretch factor */
+} twin_widget_layout_t;
+
+/**
+ * Optional widget attributes, lazily allocated on first use.
+ * Widgets that never register a callback pay zero RAM cost for these
+ * fields. Allocated on first callback use.
+ */
+typedef struct _twin_widget_ext {
+    twin_widget_proc_t callback; /**< Application callback (optional) */
+    void *callback_data;         /**< Callback user data */
+} twin_widget_ext_t;
+
+struct _twin_widget {
+    /* Widget hierarchy */
+    twin_window_t *window; /**< Parent window */
+    twin_widget_t *next;   /**< Next sibling widget */
+    twin_box_t *parent;    /**< Parent container */
+
+    /* Event handling */
+    twin_widget_proc_t handler; /**< Widget event handler (framework) */
+    twin_widget_ext_t *ext;     /**< Optional attributes (lazy, may be NULL) */
+    twin_rect_t extents;        /**< Current geometry */
+    twin_widget_t *copy_geom;   /**< Geometry source widget (optional) */
+
+    /* Widget state */
+    bool paint;  /**< Needs painting */
+    bool layout; /**< Needs layout */
+
+    /* Widget appearance */
+    twin_argb32_t background;       /**< Background color */
+    twin_widget_layout_t preferred; /**< Preferred dimensions */
+    twin_shape_t shape;             /**< Widget shape */
+    twin_fixed_t radius;            /**< Corner radius */
+};
+
+struct _twin_box {
+    twin_widget_t widget;       /**< Base widget */
+    twin_box_dir_t dir;         /**< Layout direction */
+    twin_widget_t *children;    /**< Child widget list */
+    twin_widget_t *button_down; /**< Button press target */
+};
+
+struct _twin_toplevel {
+    twin_box_t box;                 /**< Base box container */
+    struct _twin_work *paint_work;  /**< Queued repaint, if any */
+    struct _twin_work *layout_work; /**< Queued layout, if any */
+};
+
+struct _twin_label {
+    twin_widget_t widget;     /**< Base widget */
+    char *label;              /**< Label text */
+    twin_argb32_t foreground; /**< Text color */
+    twin_fixed_t font_size;   /**< Font size */
+    twin_style_t font_style;  /**< Font style */
+    twin_point_t offset;      /**< Text offset */
+    twin_align_t align;       /**< Text alignment */
+};
+
+struct _twin_button {
+    twin_label_t label; /**< Base label widget */
+    bool pressed;       /**< Button pressed state */
+    bool active;        /**< Button active state */
+};
+
+struct _twin_context {
+    twin_screen_t *screen; /**< Screen context */
+    void *priv;            /**< Private backend data */
+};
+
+/**
+ * Structure representing a custom widget with user data.
+ * Encapsulates a base widget and allows attaching custom data.
+ */
+struct _twin_custom_widget {
+    twin_widget_t *widget; /**< Base widget functionality */
+    void *data;            /**< User-defined data */
+};
+
+/*
+ * Backend interface: a backend creates the screen, feeds it events and
+ * scans it out.  Applications only see the twin_create()/twin_run() layer.
+ */
+
+/**
+ * Create screen for window system display
+ * @width     : Screen width in pixels
+ * @height    : Screen height in pixels
+ * @put_begin : Backend callback for drawing preparation
+ * @put_span  : Backend callback for scanline output
+ * @closure   : User data passed to backend callbacks
+ *
+ * Return Newly created screen, or NULL on failure
+ */
+twin_screen_t *twin_screen_create(twin_coord_t width,
+                                  twin_coord_t height,
+                                  twin_put_begin_t put_begin,
+                                  twin_put_span_t put_span,
+                                  void *closure);
+
+/**
+ * Destroy screen and free resources
+ * @screen : Screen to destroy
+ *
+ * Cleans up screen resources including all associated pixmaps.
+ */
+void twin_screen_destroy(twin_screen_t *screen);
+
+void twin_screen_damage(twin_screen_t *screen,
+                        twin_coord_t left,
+                        twin_coord_t top,
+                        twin_coord_t right,
+                        twin_coord_t bottom);
+
+void twin_screen_resize(twin_screen_t *screen,
+                        twin_coord_t width,
+                        twin_coord_t height);
+
+bool twin_screen_damaged(twin_screen_t *screen);
+
+void twin_screen_update(twin_screen_t *screen);
+
+bool twin_screen_dispatch(twin_screen_t *screen, twin_event_t *event);
+
 /* Portability: _Alignof is C11; older toolchains may need __alignof__ */
 #if !defined(_Alignof) && !defined(__cplusplus)
 #if defined(__GNUC__) || defined(__clang__)
@@ -44,11 +480,6 @@ static inline void twin_scratch_init(twin_scratch_t *s, void *buf, size_t sz)
     s->size = sz;
     s->used = 0;
     s->high_water = 0;
-}
-
-static inline void twin_scratch_reset(twin_scratch_t *s)
-{
-    s->used = 0;
 }
 
 static inline size_t twin_scratch_save(twin_scratch_t *s)
@@ -157,21 +588,17 @@ typedef int32_t twin_dfixed_t;
 typedef int8_t twin_gfixed_t;
 typedef int64_t twin_xfixed_t;
 
-#define twin_sfixed_floor(f) ((f) & ~0xf)
 #define twin_sfixed_trunc(f) ((f) >> 4)
 #define twin_sfixed_ceil(f) (((f) + 0xf) & ~0xf)
-#define twin_sfixed_mod(f) ((f) & 0xf)
 
 #define twin_int_to_sfixed(i) ((twin_sfixed_t) ((i) * 16))
 
 #define twin_sfixed_to_fixed(s) (((twin_fixed_t) (s)) << 12)
 #define twin_fixed_to_sfixed(f) ((twin_sfixed_t) ((f) >> 12))
 
-#define twin_sfixed_to_dfixed(s) (((twin_dfixed_t) (s)) << 4)
-#define twin_dfixed_to_sfixed(d) ((twin_sfixed_t) ((d) >> 4))
 
 #define twin_xfixed_to_fixed(x) ((twin_fixed_t) ((x) >> 16))
-#define twin_fixed_to_xfixed(f) (((twin_xfixed_t) (f)) << 16)
+#define twin_fixed_to_xfixed(f) (((twin_xfixed_t) (f)) * 65536)
 
 /*
  * twin_sfixed_t a = b'10100;
@@ -200,8 +627,6 @@ typedef int64_t twin_xfixed_t;
 
 #define twin_dfixed_mul(a, b) \
     (twin_dfixed_t)((((int64_t) (a)) * ((int64_t) (b))) >> 8)
-#define twin_dfixed_div(a, b) \
-    (twin_dfixed_t)((((int64_t) (a)) << 8) / ((int64_t) (b)))
 
 /* 64-bit fixed-point multiplication and division
  * These require 128-bit intermediate results for full precision.
@@ -307,7 +732,6 @@ static inline twin_xfixed_t _twin_xfixed_div_32bit(twin_xfixed_t a,
 #define twin_sfixed_to_double(f) ((double) (f) / 16.0)
 
 #define TWIN_SFIXED_ONE (0x10)
-#define TWIN_SFIXED_HALF (0x08)
 #define TWIN_SFIXED_TOLERANCE (TWIN_SFIXED_ONE >> 2)
 #define TWIN_SFIXED_MIN (-0x7fff)
 #define TWIN_SFIXED_MAX (0x7fff)
@@ -321,9 +745,28 @@ static inline twin_xfixed_t _twin_xfixed_div_32bit(twin_xfixed_t a,
  */
 #define twin_int_mult(a, b, t) \
     ((t) = (a) * (b) + 0x80, ((((t) >> 8) + (t)) >> 8))
-#define twin_int_div(a, b) (((uint16_t) (a) * 255) / (b))
 #define twin_get_8(v, i) ((uint16_t) (uint8_t) ((v) >> (i)))
 #define twin_sat(t) ((uint8_t) ((t) | (0 - ((t) >> 8))))
+
+/*
+ * Two channels at a time: 16-bit lanes hold the red/blue or alpha/green
+ * pair.  A lane never overflows (255 * 255 + 0x80 + 0xff < 0x10000), so this
+ * rounds exactly like twin_int_mult does per channel.
+ */
+#define TWIN_LANES 0x00ff00ffu
+
+static inline uint32_t _twin_mul_lanes(uint32_t x, uint32_t m)
+{
+    uint32_t t = x * m + 0x00800080u;
+    return ((t + ((t >> 8) & TWIN_LANES)) >> 8) & TWIN_LANES;
+}
+
+/* Saturate each lane to 0xff */
+static inline uint32_t _twin_sat_lanes(uint32_t x)
+{
+    uint32_t carry = (x >> 8) & 0x00010001u;
+    return (x | (carry * 0xff)) & TWIN_LANES;
+}
 
 #define twin_in(s, i, m, t) \
     ((twin_argb32_t) twin_int_mult(twin_get_8(s, i), (m), (t)) << (i))
@@ -336,14 +779,6 @@ static inline twin_xfixed_t _twin_xfixed_div_32bit(twin_xfixed_t a,
     (((t) = twin_get_8(d, i) + twin_get_8(s, i)), (twin_argb32_t) twin_sat(t) \
                                                       << (i))
 
-#define _twin_add_ARGB(s, d, i, t) (((t) = (s) + twin_get_8(d, i)))
-#define _twin_add(s, d, t) (((t) = (s) + (d)))
-#define _twin_div(d, den, i, t)                     \
-    (((t) = (d) / (den)), (t) = twin_get_8((t), 0), \
-     (twin_argb32_t) twin_sat(t) << (i))
-#define _twin_sub_ARGB(s, d, i, t) (((t) = (s) - twin_get_8(d, i)))
-#define _twin_sub(s, d, t) (((t) = (s) - (d)))
-#define twin_put_8(d, i, t) (((t) = (d) << (i)))
 
 #define twin_argb32_to_rgb16(s) \
     ((((s) >> 3) & 0x001f) | (((s) >> 5) & 0x07e0) | (((s) >> 8) & 0xf800))
@@ -400,6 +835,9 @@ typedef struct _twin_xform {
     twin_coord_t width;
     twin_coord_t src_x;
     twin_coord_t src_y;
+    /* Where the clipped destination starts relative to the requested one;
+     * the transform maps unclipped destination offsets to the source. */
+    twin_coord_t off_x, off_y;
 } twin_xform_t;
 
 /* twin_primitive.c */
@@ -447,18 +885,6 @@ typedef struct _twin_gpoint {
 /* Compositing function declarations - auto-generated */
 #include "composite-decls.h"
 
-twin_argb32_t *_twin_fetch_rgb16(twin_pixmap_t *pixmap,
-                                 int x,
-                                 int y,
-                                 int w,
-                                 twin_argb32_t *span);
-
-twin_argb32_t *_twin_fetch_argb32(twin_pixmap_t *pixmap,
-                                  int x,
-                                  int y,
-                                  int w,
-                                  twin_argb32_t *span);
-
 /*
  * Geometry helper functions
  */
@@ -470,10 +896,6 @@ twin_dfixed_t _twin_distance_to_line_squared(twin_spoint_t *p,
  * Polygon stuff
  */
 
-/*
- * Fixed point helper functions
- */
-twin_sfixed_t _twin_sfixed_sqrt(twin_sfixed_t as);
 twin_xfixed_t _twin_xfixed_sqrt(twin_xfixed_t a);
 /*
  * Matrix stuff
@@ -495,12 +917,6 @@ twin_sfixed_t _twin_matrix_dy(twin_matrix_t *m,
                               twin_fixed_t dy);
 
 twin_fixed_t _twin_matrix_determinant(twin_matrix_t *matrix);
-
-twin_sfixed_t _twin_matrix_len(twin_matrix_t *m,
-                               twin_fixed_t dx,
-                               twin_fixed_t dy);
-
-twin_point_t _twin_matrix_expand(twin_matrix_t *matrix);
 
 /*
  * Path stuff
@@ -713,25 +1129,374 @@ typedef struct twin_backend {
 } twin_backend_t;
 
 /*
- * Visual effect stuff
+ * Window manager policy interface
+ *
+ * A policy decides window geometry, decorations, stacking, and how pointer
+ * events reach clients.  window.c owns the window objects and calls into the
+ * active policy at a handful of well-defined points; policies never free a
+ * window.  The 'none' policy (wm.c) is always present.
+ */
+typedef struct _twin_wm_ops {
+    twin_wm_mode_t mode;
+
+    /* Policy becomes active / inactive.  enter() re-lays out and maps every
+     * window; returning false (e.g. out of memory for its state) makes the
+     * screen fall back to the 'none' policy. */
+    bool (*enter)(twin_screen_t *screen);
+    void (*leave)(twin_screen_t *screen);
+
+    /* Compute pixmap geometry (screen coordinates) and decoration border */
+    void (*layout)(twin_window_t *window,
+                   twin_rect_t *geom,
+                   twin_rect_t *border);
+
+    /* Application mapped / unmapped a window.  On destroy, the policy may
+     * take ownership of window->pixmap (setting it to NULL) to animate the
+     * departure after the window object is gone. */
+    void (*map)(twin_window_t *window);
+    void (*unmap)(twin_window_t *window, bool destroying);
+
+    /* Paint decorations into window->pixmap (NULL: none) */
+    void (*decorate)(twin_window_t *window);
+
+    /* Deliver an event targeted at a window (NULL: forward to client) */
+    bool (*dispatch)(twin_window_t *window, twin_event_t *event);
+
+    /* Pointer hit test in screen coordinates (NULL: pixmap rectangle) */
+    bool (*hit)(twin_window_t *window, twin_coord_t x, twin_coord_t y);
+
+    /* Gesture hook: sees every pointer event (motion, button down/up) before
+     * it is routed to a window; true consumes it.  Other kinds bypass it. */
+    bool (*filter)(twin_screen_t *screen, twin_event_t *event);
+
+    /* Re-place the stack after a mapped window changed style or opacity, or
+     * the system bars, the inset or the screen size changed (NULL: nothing
+     * to do).  Every window has been re-laid out already. */
+    void (*refresh)(twin_screen_t *screen);
+
+    /* Explicit activation request (twin_window_activate); NULL: map() */
+    void (*activate)(twin_window_t *window);
+
+    /* Shrink @area (preset to the whole screen) to what application windows
+     * may cover, e.g. minus the system bars.  NULL: the whole screen, and
+     * the policy does not show system bars, so twin_screen_set_bars() hides
+     * them. */
+    void (*work_area)(const twin_screen_t *screen, twin_rect_t *area);
+} twin_wm_ops_t;
+
+extern const twin_wm_ops_t _twin_wm_none;
+#if defined(CONFIG_WM_DESKTOP)
+extern const twin_wm_ops_t _twin_wm_desktop;
+#endif
+#if defined(CONFIG_WM_MOBILE)
+extern const twin_wm_ops_t _twin_wm_mobile;
+#endif
+
+/* window.c services used by policies */
+void _twin_window_relayout(twin_window_t *window);
+bool _twin_window_deliver(twin_window_t *window, twin_event_t *event);
+void _twin_window_evict(twin_window_t *window);
+bool _twin_window_restore(twin_window_t *window);
+bool _twin_window_is_bar(const twin_window_t *window);
+/* On screen with its pixels (not hidden, not evicted) */
+bool _twin_window_shown(const twin_window_t *window);
+/* Mapped window the policy stacks and focuses (not Plain, not a bar) */
+bool _twin_window_managed(const twin_window_t *window);
+void _twin_window_raise(twin_window_t *window);
+/*
+ * Client callbacks run while the screen is busy (an event, a relayout, a
+ * policy switch).  A window destroyed then is torn down and unlinked at
+ * once, but its struct stays readable (window->dead) until the outermost
+ * busy section ends, so code holding the pointer can check it.
+ */
+void _twin_screen_busy(twin_screen_t *screen);
+void _twin_screen_idle(twin_screen_t *screen);
+
+/* screen.c: route a pointer event to windows (grab, hover, delivery),
+ * skipping the policy's gesture filter */
+bool _twin_screen_route(twin_screen_t *screen, twin_event_t *event);
+
+/* wm.c: forget a policy switch queued from an event handler */
+void _twin_screen_drop_pending_wm(twin_screen_t *screen);
+
+/* wm.c: re-lay out every window after the screen, the bars or the inset
+ * changed, then let the policy re-place the stack */
+void _twin_screen_relayout(twin_screen_t *screen);
+
+/*
+ * Pixmap internals
  */
 
-#if defined(CONFIG_DROP_SHADOW)
-#define TWIN_SHADOW_SOFTNESS_TAIL (((CONFIG_SHADOW_BLUR) + 1) / 2)
-#define TWIN_SHADOW_FADE_EXTENT                            \
-    ((CONFIG_SHADOW_FADE_TAIL > TWIN_SHADOW_SOFTNESS_TAIL) \
-         ? CONFIG_SHADOW_FADE_TAIL                         \
-         : TWIN_SHADOW_SOFTNESS_TAIL)
-#define TWIN_SHADOW_EXTENT_X \
-    (CONFIG_HORIZONTAL_OFFSET + TWIN_SHADOW_FADE_EXTENT)
-#define TWIN_SHADOW_EXTENT_Y (CONFIG_VERTICAL_OFFSET + TWIN_SHADOW_FADE_EXTENT)
+/* Screen-space rectangle touched by the pixmap, including its shadow */
+twin_rect_t _twin_pixmap_extents(const twin_pixmap_t *pixmap);
+
+/* Show only the top @rows rows on scan-out and to the pointer (the rest
+ * keeps its pixels); pixmap->height shows everything.  Used by the desktop
+ * policy to iconify a window down to its title bar. */
+void _twin_pixmap_set_scan_height(twin_pixmap_t *pixmap, twin_coord_t rows);
+
+/* Damage everything the pixmap covers on screen, shadow included */
+void _twin_pixmap_damage_extents(twin_pixmap_t *pixmap);
+
 /*
- * Render a CSS-style drop shadow mask onto the pixmap's shadow region.
- * Offsets and blur are compile-time constants (CONFIG_HORIZONTAL_OFFSET,
- * CONFIG_VERTICAL_OFFSET, CONFIG_SHADOW_BLUR).  Requires ARGB32 format.
+ * Add @r to a rectangle list of capacity @max.  Rectangles merge only when
+ * their union costs no more pixels than the pair; a full list folds @r into
+ * the entry that grows least.  Shared by screen and window damage.
  */
-void twin_shadow_border(twin_pixmap_t *shadow, twin_argb32_t color);
+void _twin_rect_list_add(twin_rect_t *list, int *n, int max, twin_rect_t r);
+
+/* Unlink from the display list without dropping focus/pointer state */
+void _twin_pixmap_unlink(twin_pixmap_t *pixmap);
+
+/* Drop the screen's focus and pointer references to @pixmap */
+void _twin_screen_forget(twin_screen_t *screen, const twin_pixmap_t *pixmap);
+
+/* Pixmap header with no pixel storage; every drawing operation clips out */
+twin_pixmap_t *_twin_pixmap_create_stub(twin_format_t format,
+                                        twin_coord_t width,
+                                        twin_coord_t height);
+
+static inline bool _twin_pixmap_is_stub(const twin_pixmap_t *pixmap)
+{
+    return pixmap->p.v == NULL;
+}
+
+/* Wrap caller-owned pixels in a pixmap header without allocating */
+void _twin_pixmap_init(twin_pixmap_t *pixmap,
+                       twin_format_t format,
+                       twin_coord_t width,
+                       twin_coord_t height,
+                       twin_coord_t stride,
+                       void *pixels);
+void _twin_pixmap_init_a8(twin_pixmap_t *pixmap,
+                          twin_coord_t width,
+                          twin_coord_t height,
+                          twin_coord_t stride,
+                          void *pixels);
+
+/*
+ * Screen compositor primitives (screen-ops.c, renderer independent)
+ */
+void _twin_screen_blend_argb32(twin_argb32_t *dst,
+                               const twin_argb32_t *src,
+                               twin_a8_t alpha,
+                               int width);
+void _twin_screen_blend_rgb16(twin_argb32_t *dst,
+                              const twin_rgb16_t *src,
+                              twin_a8_t alpha,
+                              int width);
+void _twin_screen_fill(twin_argb32_t *dst, twin_argb32_t color, int width);
+
+/*
+ * Coverage cache (cache.c)
+ *
+ * Entries hold A8 coverage plus placement.  Lookups bump LRU order; inserts
+ * evict least recently used entries until the budget is honored.
+ */
+typedef struct _twin_cache_entry {
+    struct _twin_cache_entry *hnext;       /* hash chain */
+    struct _twin_cache_entry *prev, *next; /* LRU list */
+    uint64_t key;
+    uint32_t size; /* bytes charged to the budget */
+    twin_coord_t width, height, stride;
+    twin_coord_t left, top; /* placement relative to the key's origin */
+    twin_fixed_t advance;   /* glyph advance (glyph entries only) */
+    uint8_t data[];         /* stride * height bytes of A8 coverage */
+} twin_cache_entry_t;
+
+/* Row stride of A8 coverage: rows start on 4-byte boundaries */
+static inline twin_coord_t _twin_a8_stride(twin_coord_t width)
+{
+    return (twin_coord_t) ((width + 3) & ~3);
+}
+
+/* Zeroed entry outside the cache (caller frees); the cache uses it too */
+twin_cache_entry_t *_twin_cache_entry_alloc(twin_coord_t width,
+                                            twin_coord_t height);
+twin_cache_entry_t *_twin_cache_lookup(uint64_t key);
+twin_cache_entry_t *_twin_cache_insert(uint64_t key,
+                                       twin_coord_t width,
+                                       twin_coord_t height);
+bool _twin_cache_enabled(void);
+
+/* Largest single entry admitted to the cache, in bytes */
+#ifndef CONFIG_CACHE_MAX_ENTRY
+#define CONFIG_CACHE_MAX_ENTRY 4096
 #endif
+#ifndef CONFIG_CACHE_SIZE
+#define CONFIG_CACHE_SIZE 24
+#endif
+
+/* 64-bit FNV-1a */
+#define TWIN_HASH_INIT 0xcbf29ce484222325ULL
+static inline uint64_t _twin_hash(uint64_t h, const void *data, size_t len)
+{
+    const uint8_t *p = data;
+    while (len--) {
+        h ^= *p++;
+        h *= 0x100000001b3ULL;
+    }
+    return h;
+}
+
+/* Set up a caller-owned path (inline storage, default state) / release it */
+void _twin_path_init(twin_path_t *path);
+void _twin_path_fini(twin_path_t *path);
+
+/* Bounds of points [first, npoints), as twin_path_bounds() */
+void _twin_path_bounds_from(const twin_path_t *path,
+                            int first,
+                            twin_rect_t *rect);
+
+int _twin_utf8_to_ucs4(const char *src, twin_ucs4_t *dst);
+
+/*
+ * Test and diagnostics hooks (not part of the public API)
+ */
+
+#if defined(CONFIG_MEMORY_STATS)
+/* Make the next @n tracked allocations fail (out-of-memory tests) */
+extern unsigned int _twin_alloc_fail_next;
+#endif
+
+/*
+ * Library-internal helpers: used across src/, not part of the public API
+ */
+
+twin_angle_t twin_acos(twin_fixed_t x);
+
+/**
+ * Calculate square root of fixed-point number
+ * @a : Input value in fixed-point format
+ *
+ * Return Square root in fixed-point format
+ */
+twin_fixed_t twin_fixed_sqrt(twin_fixed_t a);
+
+bool twin_matrix_is_identity(twin_matrix_t *m);
+
+void twin_matrix_multiply(twin_matrix_t *result,
+                          const twin_matrix_t *a,
+                          const twin_matrix_t *b);
+
+void twin_matrix_translate(twin_matrix_t *m, twin_fixed_t tx, twin_fixed_t ty);
+
+void twin_path_append(twin_path_t *dst, twin_path_t *src);
+
+void twin_path_arc_circle(twin_path_t *path,
+                          bool large_arc,
+                          bool sweep,
+                          twin_fixed_t radius,
+                          twin_fixed_t cur_x,
+                          twin_fixed_t cur_y,
+                          twin_fixed_t target_x,
+                          twin_fixed_t target_y);
+
+void twin_path_lozenge(twin_path_t *path,
+                       twin_fixed_t x,
+                       twin_fixed_t y,
+                       twin_fixed_t w,
+                       twin_fixed_t h);
+
+void twin_path_tab(twin_path_t *path,
+                   twin_fixed_t x,
+                   twin_fixed_t y,
+                   twin_fixed_t w,
+                   twin_fixed_t h,
+                   twin_fixed_t x_radius,
+                   twin_fixed_t y_radius);
+
+/**
+ * Add filled outline of Unicode character to path
+ * @path : Path to add character to
+ * @ucs4 : Unicode character to add
+ *
+ * Adds character outline to path for filled text rendering.
+ */
+void twin_path_ucs4(twin_path_t *path, twin_ucs4_t ucs4);
+
+/**
+ * Get advance width of Unicode character
+ * @path : Path with current font settings
+ * @ucs4 : Unicode character
+ *
+ * Return Character advance width in fixed-point format
+ */
+twin_fixed_t twin_width_ucs4(twin_path_t *path, twin_ucs4_t ucs4);
+
+/**
+ * Create pixmap using existing pixel buffer
+ * @format : Pixel format
+ * @width  : Width in pixels
+ * @height : Height in pixels
+ * @stride : Row stride in bytes
+ * @pixels : Existing pixel buffer (not copied)
+ *
+ * Return Pixmap wrapper for existing buffer, or NULL on failure
+ */
+twin_pixmap_t *twin_pixmap_create_const(twin_format_t format,
+                                        twin_coord_t width,
+                                        twin_coord_t height,
+                                        twin_coord_t stride,
+                                        twin_pointer_t pixels);
+
+void twin_pixmap_damage(twin_pixmap_t *pixmap,
+                        twin_coord_t left,
+                        twin_coord_t top,
+                        twin_coord_t right,
+                        twin_coord_t bottom);
+
+bool twin_pixmap_dispatch(twin_pixmap_t *pixmap, twin_event_t *event);
+
+void twin_pixmap_get_origin(twin_pixmap_t *pixmap,
+                            twin_coord_t *ox,
+                            twin_coord_t *oy);
+
+void twin_pixmap_set_clip(twin_pixmap_t *pixmap, twin_rect_t clip);
+
+void twin_pixmap_set_origin(twin_pixmap_t *pixmap,
+                            twin_coord_t ox,
+                            twin_coord_t oy);
+
+static inline int twin_ucs_page(uint32_t ucs4)
+{
+    return ucs4 >> UCS_PAGE_SHIFT;
+}
+
+static inline int twin_ucs_char_in_page(uint32_t ucs4)
+{
+    return ucs4 & (UCS_PER_PAGE - 1);
+}
+
+/* Animations belong to their pixmap: twin_pixmap_destroy() frees them */
+void _twin_animation_destroy(twin_animation_t *anim);
+twin_animation_iter_t *_twin_animation_iter_init(twin_animation_t *anim);
+
+/* Title-bar icons of the desktop policy (built with CONFIG_WM_DESKTOP) */
+typedef enum _twin_icon {
+    TwinIconMenu,
+    TwinIconIconify,
+    TwinIconRestore,
+    TwinIconClose,
+    TwinIconResize,
+} twin_icon_t;
+
+void twin_icon_draw(twin_pixmap_t *pixmap,
+                    twin_icon_t icon,
+                    twin_matrix_t matrix);
+
+/* Replace the monotonic clock; NULL restores the system clock */
+void _twin_set_time_source(twin_time_t (*now)(void));
+
+/* Debug switches used by differential tests:
+ * NO_OCCLUSION composites every layer at every pixel;
+ * NO_ANIMATION makes window manager transitions instant;
+ * ROW_FALLBACK takes the plain bottom-up path that rows with too many
+ * layers use, so it can be compared with the culled one. */
+#define TWIN_DEBUG_NO_OCCLUSION 0x1
+#define TWIN_DEBUG_NO_ANIMATION 0x2
+#define TWIN_DEBUG_ROW_FALLBACK 0x4
+extern unsigned _twin_debug;
 
 /* utility */
 
@@ -819,13 +1584,6 @@ void twin_path_convolve(twin_path_t *dest,
                         twin_path_t *pen,
                         twin_scratch_t *scratch);
 
-void twin_premultiply_alpha(twin_pixmap_t *px);
-
-void twin_cover(twin_pixmap_t *dst,
-                twin_argb32_t color,
-                twin_coord_t x,
-                twin_coord_t y,
-                twin_coord_t width);
 
 void twin_fill_path(twin_pixmap_t *pixmap,
                     twin_path_t *path,
@@ -851,14 +1609,8 @@ void twin_composite_stroke(twin_pixmap_t *dst,
                            twin_scratch_t * scratch);
 
 /* Internal window management helpers */
-void _twin_window_style_size(twin_window_style_t style, twin_rect_t *size);
-bool _twin_window_valid_range(twin_window_t *window,
-                              twin_coord_t x,
-                              twin_coord_t y);
+bool _twin_window_hit(twin_window_t *window, twin_coord_t x, twin_coord_t y);
 bool _twin_window_dispatch(twin_window_t *window, twin_event_t *event);
-
-/* Internal event handling */
-void twin_event_enqueue(const twin_event_t *event);
 
 /* Internal pixmap operations */
 twin_pointer_t twin_pixmap_pointer(twin_pixmap_t *pixmap,
@@ -866,20 +1618,10 @@ twin_pointer_t twin_pixmap_pointer(twin_pixmap_t *pixmap,
                                    twin_coord_t y);
 void twin_pixmap_reset_xform_cache(twin_pixmap_t *pixmap);
 void twin_pixmap_origin_to_clip(twin_pixmap_t *pixmap);
-void twin_pixmap_offset(twin_pixmap_t *pixmap,
-                        twin_coord_t offx,
-                        twin_coord_t offy);
 
 /* Internal screen operations */
 void twin_screen_enable_update(twin_screen_t *screen);
 void twin_screen_disable_update(twin_screen_t *screen);
-void twin_screen_register_damaged(twin_screen_t *screen,
-                                  void (*damaged)(void *),
-                                  void *closure);
-
-/* Internal widget operations */
-void twin_widget_children_paint(twin_box_t *box);
-void twin_custom_widget_destroy(twin_custom_widget_t *custom);
 
 /* Reusable path acquisition -- avoids malloc/free per draw call */
 twin_path_t *_twin_path_acquire(twin_screen_t *screen);
@@ -931,7 +1673,7 @@ static inline bool twin_pointer_valid(const void *ptr)
  */
 
 /* Maximum number of tracked closures */
-#define TWIN_MAX_CLOSURES 1024
+#define TWIN_MAX_CLOSURES 128
 
 /* Closure tracking entry */
 typedef struct _twin_closure_entry {
@@ -944,15 +1686,11 @@ typedef struct _twin_closure_entry {
 typedef struct _twin_closure_tracker {
     twin_closure_entry_t entries[TWIN_MAX_CLOSURES];
     int count;
-    bool initialized; /* Track initialization status */
     /* Mutex would go here for thread safety if needed */
 } twin_closure_tracker_t;
 
 /* Global closure tracker instance */
 extern twin_closure_tracker_t _twin_closure_tracker;
-
-/* Initialize closure tracking system */
-void _twin_closure_tracker_init(void);
 
 /* Register a closure with the tracking system */
 bool _twin_closure_register(void *closure);
@@ -1040,10 +1778,9 @@ void _twin_free(void *ptr, const char *file, int line);
 /*
  * Lazy widget extension accessors.
  *
- * The optional fields (callback, callback_data, want_focus) live in a
- * separately allocated twin_widget_ext_t block. Widgets that never
- * register a callback or request focus keep ext == NULL and pay only
- * one pointer.
+ * The optional fields (callback, callback_data) live in a separately
+ * allocated twin_widget_ext_t block. Widgets that never register a
+ * callback keep ext == NULL and pay only one pointer.
  */
 
 /* Allocate the extension block if absent.  Returns ext or NULL on OOM. */
@@ -1063,11 +1800,6 @@ static inline twin_widget_proc_t _twin_widget_callback(const twin_widget_t *w)
 static inline void *_twin_widget_callback_data(const twin_widget_t *w)
 {
     return w->ext ? w->ext->callback_data : NULL;
-}
-
-static inline bool _twin_widget_want_focus(const twin_widget_t *w)
-{
-    return w->ext ? w->ext->want_focus : false;
 }
 
 #endif /* _TWIN_PRIVATE_H_ */

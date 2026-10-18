@@ -16,8 +16,9 @@ typedef struct {
     int *pixels;
     SDL_Renderer *render;
     SDL_Texture *texture;
-    twin_coord_t width, height;
-    int image_y;
+    /* Union of the rectangles scanned out since the last present */
+    twin_coord_t dirty_left, dirty_top, dirty_right, dirty_bottom;
+    bool dirty;
 } twin_sdl_t;
 
 #define SCREEN(x) ((twin_context_t *) x)->screen
@@ -30,9 +31,22 @@ static void _twin_sdl_put_begin(twin_coord_t left,
                                 void *closure)
 {
     twin_sdl_t *tx = PRIV(closure);
-    tx->width = right - left;
-    tx->height = bottom - top;
-    tx->image_y = top;
+    if (!tx->dirty) {
+        tx->dirty_left = left;
+        tx->dirty_top = top;
+        tx->dirty_right = right;
+        tx->dirty_bottom = bottom;
+        tx->dirty = true;
+        return;
+    }
+    if (left < tx->dirty_left)
+        tx->dirty_left = left;
+    if (top < tx->dirty_top)
+        tx->dirty_top = top;
+    if (right > tx->dirty_right)
+        tx->dirty_right = right;
+    if (bottom > tx->dirty_bottom)
+        tx->dirty_bottom = bottom;
 }
 
 static void _twin_sdl_put_span(twin_coord_t left,
@@ -44,16 +58,23 @@ static void _twin_sdl_put_span(twin_coord_t left,
     twin_screen_t *screen = SCREEN(closure);
     twin_sdl_t *tx = PRIV(closure);
 
-    for (twin_coord_t ix = left, iy = top; ix < right; ix++) {
-        twin_argb32_t pixel = *pixels++;
-        tx->pixels[iy * screen->width + ix] = pixel;
-    }
-    if ((top + 1 - tx->image_y) == tx->height) {
-        SDL_UpdateTexture(tx->texture, NULL, tx->pixels,
-                          screen->width * sizeof(*pixels));
-        SDL_RenderCopy(tx->render, tx->texture, NULL, NULL);
-        SDL_RenderPresent(tx->render);
-    }
+    memcpy(&tx->pixels[top * screen->width + left], pixels,
+           (size_t) (right - left) * sizeof(*pixels));
+}
+
+/* Upload only what changed, then present once per screen update */
+static void _twin_sdl_present(twin_screen_t *screen, twin_sdl_t *tx)
+{
+    if (!tx->dirty)
+        return;
+    SDL_Rect r = {tx->dirty_left, tx->dirty_top,
+                  tx->dirty_right - tx->dirty_left,
+                  tx->dirty_bottom - tx->dirty_top};
+    SDL_UpdateTexture(tx->texture, &r, &tx->pixels[r.y * screen->width + r.x],
+                      screen->width * sizeof(*tx->pixels));
+    SDL_RenderCopy(tx->render, tx->texture, NULL, NULL);
+    SDL_RenderPresent(tx->render);
+    tx->dirty = false;
 }
 
 static void _twin_sdl_destroy(twin_screen_t *screen maybe_unused,
@@ -75,20 +96,31 @@ static void _twin_sdl_destroy(twin_screen_t *screen maybe_unused,
     SDL_Quit();
 }
 
-static void twin_sdl_damage(twin_screen_t *screen, twin_sdl_t *tx)
-{
-    int width, height;
-    SDL_GetWindowSize(tx->win, &width, &height);
-    twin_screen_damage(screen, 0, 0, width, height);
-}
-
 static bool twin_sdl_work(void *closure)
 {
     twin_screen_t *screen = SCREEN(closure);
 
-    if (twin_screen_damaged(screen))
+    if (twin_screen_damaged(screen)) {
         twin_screen_update(screen);
+        _twin_sdl_present(screen, PRIV(closure));
+    }
     return true;
+}
+
+/*
+ * Window scale: MADO_SCALE=n, or 2x for phone-sized screens so a 240x320
+ * display is readable on a desktop monitor.  The renderer's logical size
+ * maps mouse coordinates back to screen pixels.
+ */
+static int _twin_sdl_scale(int width, int height)
+{
+    const char *env = getenv("MADO_SCALE");
+    if (env) {
+        int s = atoi(env);
+        if (s >= 1 && s <= 8)
+            return s;
+    }
+    return (width <= 320 && height <= 480) ? 2 : 1;
 }
 
 twin_context_t *twin_sdl_init(int width, int height)
@@ -110,9 +142,10 @@ twin_context_t *twin_sdl_init(int width, int height)
     twin_sdl_t *tx = ctx->priv;
 
     static char *title = "twin-sdl";
+    int scale = _twin_sdl_scale(width, height);
     tx->win = SDL_CreateWindow(title, SDL_WINDOWPOS_UNDEFINED,
-                               SDL_WINDOWPOS_UNDEFINED, width, height,
-                               SDL_WINDOW_SHOWN);
+                               SDL_WINDOWPOS_UNDEFINED, width * scale,
+                               height * scale, SDL_WINDOW_SHOWN);
     if (!tx->win) {
         log_error("%s", SDL_GetError());
         goto bail_sdl;
@@ -125,11 +158,16 @@ twin_context_t *twin_sdl_init(int width, int height)
     }
     memset(tx->pixels, 255, width * height * sizeof(*tx->pixels));
 
+    /* Mado composites in software anyway: any renderer that can present a
+     * texture will do, so fall back when there is no GPU. */
     tx->render = SDL_CreateRenderer(tx->win, -1, SDL_RENDERER_ACCELERATED);
+    if (!tx->render)
+        tx->render = SDL_CreateRenderer(tx->win, -1, SDL_RENDERER_SOFTWARE);
     if (!tx->render) {
         log_error("%s", SDL_GetError());
         goto bail_pixels;
     }
+    SDL_RenderSetLogicalSize(tx->render, width, height);
     SDL_SetRenderDrawColor(tx->render, 255, 255, 255, 255);
     SDL_RenderClear(tx->render);
 
@@ -169,9 +207,20 @@ bail:
 
 static void twin_sdl_configure(twin_context_t *ctx)
 {
+    /* Screen pixels are the renderer's logical size, not the (scaled)
+     * window size; the pixel buffer was allocated for the former. */
     int width, height;
-    SDL_GetWindowSize(PRIV(ctx)->win, &width, &height);
-    twin_screen_resize(ctx->screen, width, height);
+    SDL_RenderGetLogicalSize(PRIV(ctx)->render, &width, &height);
+    if (width > 0 && height > 0)
+        twin_screen_resize(ctx->screen, width, height);
+}
+
+/* Deliver a character to the focused window */
+static void _twin_sdl_ucs4(twin_screen_t *screen, twin_ucs4_t ucs4)
+{
+    twin_event_t tev = {.kind = TwinEventUcs4};
+    tev.u.ucs4.ucs4 = ucs4;
+    twin_screen_dispatch(screen, &tev);
 }
 
 static bool twin_sdl_poll(twin_context_t *ctx)
@@ -179,16 +228,24 @@ static bool twin_sdl_poll(twin_context_t *ctx)
     twin_screen_t *screen = SCREEN(ctx);
     twin_sdl_t *tx = PRIV(ctx);
 
+    /* Sleep until input arrives or the next timeout is due instead of
+     * spinning: an idle screen should cost no CPU. */
+    if (!twin_screen_damaged(screen)) {
+        twin_time_t wait = _twin_timeout_delay();
+        if (wait < 0 || wait > 100)
+            wait = 100;
+        if (wait > 0)
+            SDL_WaitEventTimeout(NULL, wait);
+    }
+
     SDL_Event ev;
-    bool has_event = false;
     while (SDL_PollEvent(&ev)) {
-        has_event = true;
         twin_event_t tev;
         switch (ev.type) {
         case SDL_WINDOWEVENT:
             if (ev.window.event == SDL_WINDOWEVENT_EXPOSED ||
                 ev.window.event == SDL_WINDOWEVENT_SHOWN) {
-                twin_sdl_damage(screen, tx);
+                twin_screen_damage(screen, 0, 0, screen->width, screen->height);
             }
             break;
         case SDL_QUIT:
@@ -206,11 +263,45 @@ static bool twin_sdl_poll(twin_context_t *ctx)
             break;
         case SDL_KEYDOWN:
         case SDL_KEYUP:
+            /* Alt+Tab cycles the windows instead of reaching the app */
+            if (ev.key.keysym.sym == SDLK_TAB &&
+                (ev.key.keysym.mod & KMOD_ALT)) {
+                if (ev.type == SDL_KEYDOWN)
+                    twin_screen_focus_next(screen);
+                break;
+            }
             tev.u.key.key = ev.key.keysym.sym;
             tev.kind = ((ev.key.type == SDL_KEYDOWN) ? TwinEventKeyDown
                                                      : TwinEventKeyUp);
             twin_screen_dispatch(screen, &tev);
+            /* Editing keys produce no SDL text input; send them as UCS-4 */
+            if (ev.type == SDL_KEYDOWN) {
+                switch (ev.key.keysym.sym) {
+                case SDLK_RETURN:
+                case SDLK_KP_ENTER:
+                    _twin_sdl_ucs4(screen, '\r');
+                    break;
+                case SDLK_BACKSPACE:
+                    _twin_sdl_ucs4(screen, 8);
+                    break;
+                case SDLK_ESCAPE:
+                    _twin_sdl_ucs4(screen, 27);
+                    break;
+                default:
+                    break;
+                }
+            }
             break;
+        case SDL_TEXTINPUT: {
+            twin_ucs4_t ucs4;
+            const char *p = ev.text.text;
+            int len;
+            while ((len = _twin_utf8_to_ucs4(p, &ucs4)) > 0) {
+                _twin_sdl_ucs4(screen, ucs4);
+                p += len;
+            }
+            break;
+        }
         case SDL_MOUSEMOTION:
             tev.u.pointer.screen_x = ev.motion.x;
             tev.u.pointer.screen_y = ev.motion.y;
@@ -220,12 +311,6 @@ static bool twin_sdl_poll(twin_context_t *ctx)
             break;
         }
     }
-
-    /* Yield CPU when idle to avoid busy-waiting.
-     * Skip delay if events were processed or screen needs update.
-     */
-    if (!has_event && !twin_screen_damaged(screen))
-        SDL_Delay(1); /* 1ms sleep reduces CPU usage when idle */
 
     return true;
 }

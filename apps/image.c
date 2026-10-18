@@ -62,8 +62,8 @@ static void _apps_image_paint(twin_custom_widget_t *custom)
     };
 
     twin_composite(_apps_image_pixmap(custom), 0, 0, &srcop, 0, 0, NULL, 0, 0,
-                   TWIN_SOURCE, img->current_pix->width,
-                   img->current_pix->height);
+                   TWIN_SOURCE, twin_pixmap_width(img->current_pix),
+                   twin_pixmap_height(img->current_pix));
 }
 
 static twin_dispatch_result_t _apps_image_dispatch(twin_widget_t *widget,
@@ -122,11 +122,12 @@ static twin_dispatch_result_t _apps_image_button_clicked(twin_widget_t *widget,
     return TwinDispatchDone;
 }
 
-static twin_custom_widget_t *_apps_image_init(twin_box_t *parent)
+static twin_custom_widget_t *_apps_image_init(twin_box_t *parent,
+                                              twin_coord_t height)
 {
     twin_custom_widget_t *custom = twin_custom_widget_create(
-        parent, 0, 0, parent->widget.window->screen->height * 3 / 4, 1, 1,
-        _apps_image_dispatch, sizeof(apps_image_data_t));
+        parent, 0, 0, height, 1, 1, _apps_image_dispatch,
+        sizeof(apps_image_data_t));
     if (!custom)
         return NULL;
 
@@ -138,17 +139,18 @@ static twin_custom_widget_t *_apps_image_init(twin_box_t *parent)
     twin_button_t *button =
         twin_button_create(parent, "Next Image", 0xFF482722, D(10),
                            TwinStyleBold | TwinStyleOblique);
-    twin_widget_set(&button->label.widget, 0xFFFEE4CE);
-    twin_widget_set_callback(&button->label.widget, _apps_image_button_clicked,
-                             custom);
-    button->label.widget.shape = TwinShapeRectangle;
+    twin_widget_t *bw = twin_button_widget(button);
+    twin_widget_set(bw, 0xFFFEE4CE);
+    twin_widget_set_callback(bw, _apps_image_button_clicked, custom);
+    twin_widget_set_shape(bw, TwinShapeRectangle);
 
     return custom;
 }
 
-static twin_custom_widget_t *apps_image_create(twin_box_t *parent)
+static twin_custom_widget_t *apps_image_create(twin_box_t *parent,
+                                               twin_coord_t height)
 {
-    return _apps_image_init(parent);
+    return _apps_image_init(parent, height);
 }
 
 void apps_image_start(twin_screen_t *screen, const char *name, int x, int y)
@@ -156,7 +158,8 @@ void apps_image_start(twin_screen_t *screen, const char *name, int x, int y)
     twin_toplevel_t *toplevel =
         twin_toplevel_create(screen, TWIN_ARGB32, TwinWindowApplication, x, y,
                              APP_WIDTH, APP_HEIGHT, name);
-    twin_custom_widget_t *img = apps_image_create(&toplevel->box);
+    twin_custom_widget_t *img = apps_image_create(
+        twin_toplevel_box(toplevel), twin_screen_height(screen) * 3 / 4);
     (void) img;
     twin_toplevel_show(toplevel);
 }

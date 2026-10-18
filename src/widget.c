@@ -101,6 +101,10 @@ twin_dispatch_result_t _twin_widget_dispatch(twin_widget_t *widget,
         widget->paint = false;
         break;
     case TwinEventDestroy:
+        /* Last call to the application callback: it may release whatever
+         * it attached as callback data */
+        if (widget->ext && widget->ext->callback)
+            widget->ext->callback(widget, event, widget->ext->callback_data);
         twin_free(widget->ext);
         widget->ext = NULL;
         break;
@@ -213,46 +217,30 @@ void _twin_widget_bevel(twin_widget_t *widget, twin_fixed_t b, bool down)
     }
 }
 
-void twin_widget_children_paint(twin_box_t *box)
-{
-    for (twin_widget_t *child = box->children; child; child = child->next)
-        _twin_widget_queue_paint(child);
-}
-
-twin_widget_t *twin_widget_create(twin_box_t *parent,
-                                  twin_argb32_t background,
-                                  twin_coord_t width,
-                                  twin_coord_t height,
-                                  twin_stretch_t stretch_width,
-                                  twin_stretch_t stretch_height)
-{
-    twin_widget_t *widget = twin_malloc(sizeof(twin_widget_t));
-    if (!widget)
-        return NULL;
-
-    twin_widget_layout_t preferred = {
-        .width = width,
-        .height = height,
-        .stretch_width = stretch_width,
-        .stretch_height = stretch_height,
-    };
-    _twin_widget_init(widget, parent, 0, preferred, _twin_widget_dispatch);
-    widget->background = background;
-    return widget;
-}
-
 void twin_widget_set(twin_widget_t *widget, twin_argb32_t background)
 {
     widget->background = background;
     _twin_widget_queue_paint(widget);
 }
 
-twin_fixed_t twin_widget_width(twin_widget_t *widget)
+void twin_widget_set_shape(twin_widget_t *widget, twin_shape_t shape)
+{
+    widget->shape = shape;
+    _twin_widget_queue_paint(widget);
+}
+
+void twin_widget_match_size(twin_widget_t *widget, twin_widget_t *source)
+{
+    widget->copy_geom = source;
+    _twin_widget_queue_layout(widget);
+}
+
+static twin_fixed_t twin_widget_width(twin_widget_t *widget)
 {
     return _twin_widget_width(widget);
 }
 
-twin_fixed_t twin_widget_height(twin_widget_t *widget)
+static twin_fixed_t twin_widget_height(twin_widget_t *widget)
 {
     return _twin_widget_height(widget);
 }
@@ -262,13 +250,14 @@ void twin_widget_queue_paint(twin_widget_t *widget)
     _twin_widget_queue_paint(widget);
 }
 
-twin_widget_t *twin_widget_create_with_handler(twin_box_t *parent,
-                                               twin_argb32_t background,
-                                               twin_coord_t width,
-                                               twin_coord_t height,
-                                               twin_stretch_t stretch_width,
-                                               twin_stretch_t stretch_height,
-                                               twin_widget_proc_t handler)
+static twin_widget_t *twin_widget_create_with_handler(
+    twin_box_t *parent,
+    twin_argb32_t background,
+    twin_coord_t width,
+    twin_coord_t height,
+    twin_stretch_t stretch_width,
+    twin_stretch_t stretch_height,
+    twin_widget_proc_t handler)
 {
     twin_widget_t *widget = twin_malloc(sizeof(twin_widget_t));
     if (!widget)
@@ -356,7 +345,13 @@ static twin_dispatch_result_t custom_widget_dispatch(twin_widget_t *widget,
             entry = entry->next;
         }
 
-        /* Unregister from custom widget map before base destruction */
+        /* The toolkit owns the wrapper and its data once the widget is
+         * created; release them with the widget. */
+        twin_custom_widget_t *custom = find_custom_widget(widget);
+        if (custom) {
+            twin_free(custom->data);
+            twin_free(custom);
+        }
         unregister_custom_widget(widget);
 
         /* Now call base widget dispatch to complete destruction */
@@ -420,23 +415,7 @@ twin_custom_widget_t *twin_custom_widget_create(twin_box_t *parent,
     return custom;
 }
 
-void twin_custom_widget_destroy(twin_custom_widget_t *custom)
-{
-    if (!custom)
-        return;
-
-    if (custom->widget) {
-        /* Unregister from dispatch map (idempotent if already done during
-         * TwinEventDestroy)
-         */
-        unregister_custom_widget(custom->widget);
-        /* Note: widget destruction should be handled by the parent/container */
-    }
-    twin_free(custom->data);
-    twin_free(custom);
-}
-
-twin_pixmap_t *twin_widget_pixmap(twin_widget_t *widget)
+static twin_pixmap_t *twin_widget_pixmap(twin_widget_t *widget)
 {
     if (!widget || !widget->window)
         return NULL;
@@ -451,11 +430,6 @@ twin_custom_widget_t *twin_widget_get_custom(twin_widget_t *widget)
 void *twin_custom_widget_data(twin_custom_widget_t *custom)
 {
     return custom ? custom->data : NULL;
-}
-
-twin_widget_t *twin_custom_widget_base(twin_custom_widget_t *custom)
-{
-    return custom ? custom->widget : NULL;
 }
 
 twin_fixed_t twin_custom_widget_width(twin_custom_widget_t *custom)
@@ -490,23 +464,4 @@ void twin_widget_set_callback(twin_widget_t *widget,
         return;
     ext->callback = callback;
     ext->callback_data = data;
-}
-
-void twin_widget_set_focusable(twin_widget_t *widget, bool focusable)
-{
-    if (!widget)
-        return;
-
-    if (!focusable) {
-        if (widget->ext)
-            widget->ext->want_focus = false;
-        if (widget->parent && widget->parent->focus == widget)
-            widget->parent->focus = NULL;
-        return;
-    }
-
-    twin_widget_ext_t *ext = _twin_widget_ensure_ext(widget);
-    if (!ext)
-        return;
-    ext->want_focus = true;
 }

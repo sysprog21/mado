@@ -196,6 +196,17 @@ static twin_dispatch_result_t _apps_calc_button_clicked(twin_widget_t *widget,
     return TwinDispatchDone;
 }
 
+/* The display is destroyed with the window: release the calculator then */
+static twin_dispatch_result_t _apps_calc_display_event(twin_widget_t *widget,
+                                                       twin_event_t *event,
+                                                       void *data)
+{
+    (void) widget;
+    if (event->kind == TwinEventDestroy)
+        free(data);
+    return TwinDispatchContinue;
+}
+
 void apps_calc_start(twin_screen_t *screen,
                      const char *name,
                      int x,
@@ -207,13 +218,16 @@ void apps_calc_start(twin_screen_t *screen,
 
     calc->toplevel = twin_toplevel_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
+    twin_box_t *top = twin_toplevel_box(calc->toplevel);
     calc->display =
-        twin_label_create(&calc->toplevel->box, "0", APPS_CALC_VALUE_FG,
-                          APPS_CALC_VALUE_SIZE, APPS_CALC_VALUE_STYLE);
-    twin_widget_set(&calc->display->widget, APPS_CALC_VALUE_BG);
-    calc->display->align = TwinAlignRight;
-    calc->display->widget.shape = TwinShapeLozenge;
-    calc->keys = twin_box_create(&calc->toplevel->box, TwinBoxHorz);
+        twin_label_create(top, "0", APPS_CALC_VALUE_FG, APPS_CALC_VALUE_SIZE,
+                          APPS_CALC_VALUE_STYLE);
+    twin_widget_t *display = twin_label_widget(calc->display);
+    twin_widget_set(display, APPS_CALC_VALUE_BG);
+    twin_widget_set_callback(display, _apps_calc_display_event, calc);
+    twin_label_set_align(calc->display, TwinAlignRight);
+    twin_widget_set_shape(display, TwinShapeLozenge);
+    calc->keys = twin_box_create(top, TwinBoxHorz);
     for (int i = 0; i < APPS_CALC_COLS; i++) {
         calc->cols[i] = twin_box_create(calc->keys, TwinBoxVert);
         for (int j = 0; j < APPS_CALC_ROWS; j++) {
@@ -221,14 +235,13 @@ void apps_calc_start(twin_screen_t *screen,
             calc->buttons[b] = twin_button_create(
                 calc->cols[i], apps_calc_labels[b], APPS_CALC_BUTTON_FG,
                 APPS_CALC_BUTTON_SIZE, APPS_CALC_BUTTON_STYLE);
-            twin_widget_set(&calc->buttons[b]->label.widget,
-                            APPS_CALC_BUTTON_BG);
-            twin_widget_set_callback(&calc->buttons[b]->label.widget,
-                                     _apps_calc_button_clicked, calc);
-            calc->buttons[b]->label.widget.shape = TwinShapeEllipse;
+            twin_widget_t *key = twin_button_widget(calc->buttons[b]);
+            twin_widget_set(key, APPS_CALC_BUTTON_BG);
+            twin_widget_set_callback(key, _apps_calc_button_clicked, calc);
+            twin_widget_set_shape(key, TwinShapeEllipse);
             if (i || j)
-                calc->buttons[b]->label.widget.copy_geom =
-                    &calc->buttons[calc_layout[0][0]]->label.widget;
+                twin_widget_match_size(
+                    key, twin_button_widget(calc->buttons[calc_layout[0][0]]));
         }
     }
 

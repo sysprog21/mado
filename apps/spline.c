@@ -201,17 +201,23 @@ static twin_dispatch_result_t _apps_spline_dispatch(twin_widget_t *widget,
         spline->which = -1;
         return TwinDispatchDone;
         break;
+    case TwinEventDestroy:
+        free(spline->points);
+        spline->points = NULL;
+        break;
     default:
         break;
     }
     return TwinDispatchContinue;
 }
 
-static twin_custom_widget_t *_apps_spline_init(twin_box_t *parent, int n_points)
+static twin_custom_widget_t *_apps_spline_init(twin_box_t *parent,
+                                               int n_points,
+                                               twin_coord_t height)
 {
     twin_custom_widget_t *custom = twin_custom_widget_create(
-        parent, 0xffffffff, 0, parent->widget.window->screen->height * 2 / 3, 1,
-        1, _apps_spline_dispatch, sizeof(apps_spline_data_t));
+        parent, 0xffffffff, 0, height, 1, 1, _apps_spline_dispatch,
+        sizeof(apps_spline_data_t));
     if (!custom)
         return NULL;
 
@@ -231,18 +237,19 @@ static twin_custom_widget_t *_apps_spline_init(twin_box_t *parent, int n_points)
     twin_button_t *button =
         twin_button_create(parent, "Switch curve", 0xffae0000, D(10),
                            TwinStyleBold | TwinStyleOblique);
-    twin_widget_set(&button->label.widget, 0xc0808080);
-    twin_widget_set_callback(&button->label.widget, _apps_spline_button_clicked,
-                             custom);
-    button->label.widget.shape = TwinShapeRectangle;
+    twin_widget_t *bw = twin_button_widget(button);
+    twin_widget_set(bw, 0xc0808080);
+    twin_widget_set_callback(bw, _apps_spline_button_clicked, custom);
+    twin_widget_set_shape(bw, TwinShapeRectangle);
 
     return custom;
 }
 
 static twin_custom_widget_t *apps_spline_create(twin_box_t *parent,
-                                                int n_points)
+                                                int n_points,
+                                                twin_coord_t height)
 {
-    return _apps_spline_init(parent, n_points);
+    return _apps_spline_init(parent, n_points, height);
 }
 
 void apps_spline_start(twin_screen_t *screen,
@@ -254,7 +261,8 @@ void apps_spline_start(twin_screen_t *screen,
 {
     twin_toplevel_t *toplevel = twin_toplevel_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
-    twin_custom_widget_t *spline = apps_spline_create(&toplevel->box, 4);
+    twin_custom_widget_t *spline = apps_spline_create(
+        twin_toplevel_box(toplevel), 4, twin_screen_height(screen) * 2 / 3);
     (void) spline;
     twin_toplevel_show(toplevel);
 }

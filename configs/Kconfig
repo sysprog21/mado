@@ -225,30 +225,51 @@ config CURSOR
       Enable custom cursor rendering and manipulation.
       Allows application control over cursor appearance.
 
-config WINDOW_MANAGER
-    bool "Enable window manager"
+menu "Window Management"
+
+comment "The 'none' policy is always built: no decorations, no placement"
+
+config WM_DESKTOP
+    bool "Desktop window manager"
     default y
     help
-      Enable the window management subsystem: title bars,
-      decorations, drag-move, click-to-raise, iconify/restore,
-      and resize handles.
+      Overlapping windows with title bars, click-to-raise, drag-to-move,
+      double-click maximize, edge snapping, corner resizing,
+      iconify/restore, close, and a drop shadow under the active window.
+      Selected at run time with twin_screen_set_wm(screen, TwinWmDesktop).
 
-      When disabled, windows are placed at (0,0) and clamped to
-      screen size. No decorations are drawn; the client area
-      covers the full pixmap. Pointer events route directly to
-      the window event handler without WM interpretation. The
-      demo launcher starts only the first enabled demo in this
-      mode to avoid inaccessible overlapping windows.
+      Costs ~3-4 KB .text on ARM Cortex-M class targets.
 
-      Disabling saves ~3-4 KB .text on ARM Cortex-M class targets.
+config WM_MOBILE
+    bool "Mobile window manager"
+    default y
+    help
+      Phone-style shell: application windows stack over the work area
+      between optional system bars (status bar, navigation bar), only the
+      top application is visible, and push/pop/dismiss transitions plus
+      an edge-swipe back gesture animate retained pixels without
+      repainting applications.  Escape also goes back.
+      Selected at run time with twin_screen_set_wm(screen, TwinWmMobile).
+
+config WM_MOBILE_EVICT
+    bool "Release pixels of covered applications"
+    default y
+    depends on WM_MOBILE
+    help
+      Free the pixmap of every application hidden under the top one and
+      repaint it from application state when it is revealed again.
+      Keeps memory at one work-area surface regardless of stack depth.
 
 config DROP_SHADOW
-    bool "Render drop shadow for active window"
+    bool "Window drop shadows"
     default y
-    depends on WINDOW_MANAGER
+    depends on WM_DESKTOP || WM_MOBILE
     help
-      Add drop shadow effect to active window.
-      Provides visual depth and window focus indication.
+      Cast a soft shadow under the active desktop window and under the
+      sliding window of mobile transitions.  The compositor synthesizes
+      it while scanning out, so it needs no extra pixmap memory and no
+      blur pass, but every shadowed span costs blending on scan-out;
+      small targets can turn it off and keep plain slides.
 
 config HORIZONTAL_OFFSET
     int "Horizontal offset"
@@ -276,20 +297,58 @@ config SHADOW_BLUR
     range 1 15
     depends on DROP_SHADOW
     help
-      Shadow blur kernel size (radius).
+      Width in pixels of the shadow's soft edge.
       Default 12 approximates common CSS box-shadow softness.
-      Larger values create softer, more diffuse shadows.
-      Higher values increase rendering cost.
+      Larger values create softer, more diffuse shadows.  The shadow
+      is computed while scanning out, so the radius does not change
+      its cost per pixel.
 
-config SHADOW_FADE_TAIL
-    int "Shadow fade tail"
-    default 2
-    range 0 3
-    depends on DROP_SHADOW
+endmenu
+
+menu "Rendering"
+
+config CACHE_SIZE
+    int "Coverage cache budget (KiB)"
+    default 24
+    range 0 4096
     help
-      Additional zero-alpha pixels appended to the shadow mask.
-      Default adds ~2 px of clear space to match CSS feathering.
-      Higher values slightly enlarge the off-screen buffer usage.
+      Byte budget for cached anti-aliased coverage masks of glyphs and
+      small filled paths.  Repainting a screen of text and rounded
+      shapes then composites cached masks instead of re-rasterizing.
+      0 disables the cache.
+
+config CACHE_MAX_ENTRY
+    int "Largest cached mask (bytes)"
+    default 4096
+    range 256 65536
+    depends on CACHE_SIZE != 0
+    help
+      Masks larger than this are rasterized every time, clipped to the
+      visible region, so one big fill cannot flush the working set.
+
+config WIDGETS
+    bool "Box layout widget toolkit"
+    default y
+    help
+      Boxes, labels, buttons and toplevel windows with automatic layout,
+      used by the desktop demos.  Applications that draw their own UI
+      (such as the cellphone demo) do not need it.
+
+config FONT_MONTSERRAT
+    bool "Montserrat Medium font"
+    default y
+    help
+      TrueType outlines of Montserrat Medium (SIL OFL 1.1), ASCII plus a
+      few typographic marks.  About 7 KB of read-only data.
+
+config FONT_ICONS
+    bool "UI symbol font"
+    default y
+    help
+      Fifty-one Font Awesome 5 Free Solid symbols (CC BY 4.0) for status
+      bars, navigation and app icons, as TWIN_SYM_* UTF-8 strings.
+
+endmenu
 
 endmenu
 
@@ -347,10 +406,53 @@ config DEMO_APPLICATIONS
       Build demonstration applications showcasing Mado features.
       Provides example code and testing targets.
 
+config DEMO_CELLPHONE
+    bool "Build cellphone demo"
+    default y
+    depends on DEMO_APPLICATIONS && FONT_MONTSERRAT && FONT_ICONS
+    depends on WM_MOBILE
+    help
+      Phone user interface: lock screen, home screen, dialer, contacts,
+      messages, calculator, music, photos, camera, settings, call log and
+      games, drawn with vector graphics on the mobile window manager.
+      Settings can switch the running system to the desktop or 'none'
+      window manager.
+
+config DEMO_CELLPHONE_RGB16
+    bool "Use RGB565 surfaces for phone screens"
+    default n
+    depends on DEMO_CELLPHONE
+    help
+      Halve the memory of every phone screen by rendering into 16-bit
+      surfaces.  RGB565 has no alpha channel, so screens are always
+      opaque, at the cost of some banding in gradients.
+
+choice
+    prompt "Demo scene at startup"
+    depends on DEMO_APPLICATIONS
+    default DEMO_SCENE_MOBILE if DEMO_CELLPHONE
+    default DEMO_SCENE_DESKTOP
+    help
+      The demo launcher starts either the phone shell or the desktop
+      demos.  MADO_SCENE=mobile|desktop|none overrides it at run time.
+
+config DEMO_SCENE_MOBILE
+    bool "Mobile (cellphone)"
+    depends on DEMO_CELLPHONE
+
+config DEMO_SCENE_DESKTOP
+    bool "Desktop"
+    depends on WM_DESKTOP
+
+config DEMO_SCENE_NONE
+    bool "No window manager"
+
+endchoice
+
 config DEMO_MULTI
     bool "Build multi demo"
     default y
-    depends on DEMO_APPLICATIONS && WINDOW_MANAGER
+    depends on DEMO_APPLICATIONS && WM_DESKTOP && WIDGETS
     help
       Comprehensive demo with multiple windows and widgets.
       Demonstrates window management and event handling.
@@ -360,7 +462,7 @@ config DEMO_MULTI
 config DEMO_CLOCK
     bool "Build clock demo"
     default y
-    depends on DEMO_APPLICATIONS
+    depends on DEMO_APPLICATIONS && WIDGETS
     help
       Analog clock demonstration with real-time updates.
       Showcases CORDIC trigonometry functions.
@@ -369,7 +471,7 @@ config DEMO_CLOCK
 config DEMO_CALCULATOR
     bool "Build calculator demo"
     default y
-    depends on DEMO_APPLICATIONS
+    depends on DEMO_APPLICATIONS && WIDGETS
     help
       Interactive calculator application.
       Demonstrates button widgets and event handling.
@@ -378,7 +480,7 @@ config DEMO_CALCULATOR
 config DEMO_SPLINE
     bool "Build spline demo"
     default y
-    depends on DEMO_APPLICATIONS
+    depends on DEMO_APPLICATIONS && WIDGETS
     help
       Bezier spline curve demonstration.
       Shows advanced path rendering capabilities.
@@ -387,7 +489,7 @@ config DEMO_SPLINE
 config DEMO_ANIMATION
     bool "Build animation demo"
     default y
-    depends on DEMO_APPLICATIONS
+    depends on DEMO_APPLICATIONS && WIDGETS
     help
       Animation demonstration with moving objects.
       Shows frame-based animation techniques.
@@ -397,7 +499,7 @@ config DEMO_IMAGE
     bool "Build scalable image demo"
     select LOADER_TVG
     default y
-    depends on DEMO_APPLICATIONS
+    depends on DEMO_APPLICATIONS && WIDGETS
     help
       Scalable vector graphics demonstration.
       Shows TinyVG format rendering capabilities.

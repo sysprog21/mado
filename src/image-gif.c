@@ -624,7 +624,7 @@ static twin_animation_t *_twin_animation_from_gif_file(const char *path)
         anim->frame_delays[i] = gif->gce.delay * 10;
         gif_get_frame(gif);
     }
-    anim->iter = twin_animation_iter_init(anim);
+    anim->iter = _twin_animation_iter_init(anim);
     if (!anim->iter) {
         /* Free all allocated pixmaps */
         for (twin_count_t i = 0; i < frame_count; i++)
@@ -655,10 +655,12 @@ twin_pixmap_t *_twin_gif_to_pixmap(const char *filepath, twin_format_t fmt)
     }
     twin_animation_t *gif = _twin_animation_from_gif_file(filepath);
     if (gif) {
-        /* Allocate pixmap */
+        /* The pixmap owns the animation from here on */
         pix = twin_pixmap_create(fmt, gif->width, gif->height);
         if (pix)
             pix->animation = gif;
+        else
+            _twin_animation_destroy(gif);
     }
     fclose(infile);
 

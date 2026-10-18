@@ -11,6 +11,46 @@
 
 #include "twin_private.h"
 
+/* libpng hands out straight alpha; twin composites premultiplied ARGB. */
+static twin_argb32_t _twin_apply_alpha(twin_argb32_t v)
+{
+    uint16_t t1, t2, t3;
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    twin_a8_t alpha = twin_get_8(v, 0);
+#else
+    twin_a8_t alpha = twin_get_8(v, 24);
+#endif
+
+    /* clear RGB data if alpha is zero */
+    if (!alpha)
+        return 0;
+
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    return (uint32_t) alpha << 24 |
+           twin_int_mult(twin_get_8(v, 24), alpha, t1) << 16 |
+           twin_int_mult(twin_get_8(v, 16), alpha, t2) << 8 |
+           twin_int_mult(twin_get_8(v, 8), alpha, t3) << 0;
+#else
+    return (uint32_t) alpha << 24 |
+           twin_int_mult(twin_get_8(v, 0), alpha, t1) << 16 |
+           twin_int_mult(twin_get_8(v, 8), alpha, t2) << 8 |
+           twin_int_mult(twin_get_8(v, 16), alpha, t3) << 0;
+#endif
+}
+
+static void twin_premultiply_alpha(twin_pixmap_t *px)
+{
+    if (px->format != TWIN_ARGB32)
+        return;
+
+    for (twin_coord_t y = 0; y < px->height; y++) {
+        twin_pointer_t p = {.b = px->p.b + y * px->stride};
+
+        for (twin_coord_t x = 0; x < px->width; x++)
+            p.argb32[x] = _twin_apply_alpha(p.argb32[x]);
+    }
+}
+
 typedef struct {
     int fd;
 } twin_png_priv_t;
@@ -45,12 +85,12 @@ static void _convertBGRtoARGB(uint8_t *data, int width, int height)
 twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
 {
     uint8_t signature[8];
-    int rb = 0;
     png_structp png = NULL;
     png_infop info = NULL;
-    twin_pixmap_t *pix = NULL;
+    /* Assigned after setjmp(): volatile so the error path sees them */
+    twin_pixmap_t *volatile pix = NULL;
+    png_bytep *volatile rowp = NULL;
     int depth, ctype, interlace;
-    png_bytep *rowp = NULL;
 
     int fd = open(filepath, O_RDONLY);
     if (fd < 0)
@@ -79,11 +119,15 @@ twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
     png_set_read_fn(png, &priv, _twin_png_read);
 
     png_set_sig_bytes(png, n);
+    /* A pixmap's sides are twin_coord_t: refuse anything larger up front */
+    png_set_user_limits(png, INT16_MAX, INT16_MAX);
 
     png_read_info(png, info);
     png_uint_32 width, height;
     png_get_IHDR(png, info, &width, &height, &depth, &ctype, &interlace, NULL,
                  NULL);
+    if (!width || !height || width > INT16_MAX || height > INT16_MAX)
+        goto bail_free;
 
     if (depth == 16)
         png_set_strip_16(png);
@@ -101,7 +145,6 @@ twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
     case TWIN_A8:
         if (ctype != PNG_COLOR_TYPE_GRAY || depth != 8)
             goto bail_free;
-        rb = width;
         break;
     case TWIN_RGB16:
         /* unsupported for now */
@@ -116,18 +159,19 @@ twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
 
         if (depth != 8)
             goto bail_free;
-        rb = width * 4;
         break;
     }
 
-    rowp = twin_malloc(height * sizeof(png_bytep));
+    rowp = twin_malloc((size_t) height * sizeof(png_bytep));
     if (!rowp)
         goto bail_free;
-    pix = twin_pixmap_create(fmt, width, height);
+    pix = twin_pixmap_create(fmt, (twin_coord_t) width, (twin_coord_t) height);
     if (!pix)
         goto bail_free;
-    for (size_t i = 0; i < height; i++)
-        rowp[i] = pix->p.b + rb * i;
+    /* libpng writes width * twin_bytes_per_pixel(fmt) bytes per row; rows
+     * sit at the pixmap's stride, which is at least that, maybe padded */
+    for (twin_coord_t i = 0; i < pix->height; i++)
+        rowp[i] = pix->p.b + (size_t) pix->stride * i;
 
     png_read_image(png, rowp);
 
@@ -140,6 +184,7 @@ twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
 #endif
         twin_premultiply_alpha(pix);
     }
+    goto bail_free;
 
 bail_free:
     twin_free(rowp);

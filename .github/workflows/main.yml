@@ -16,6 +16,7 @@ jobs:
         with:
           files: |
               .ci/**
+              .github/workflows/**
               mk/**
               include/**
               src/**

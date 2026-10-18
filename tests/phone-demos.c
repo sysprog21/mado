@@ -37,6 +37,17 @@ static void tap_icon(int app)
            GRID_TOP + (k / COLS) * CELL_H + CELL_H / 2 - 8);
 }
 
+/* Not one flat colour: the window was painted at its current size */
+static bool painted(const twin_pixmap_t *p)
+{
+    twin_argb32_t first = th_pixel(phone_th, p->x, p->y);
+    for (twin_coord_t y = p->y; y < p->y + p->height; y++)
+        for (twin_coord_t x = p->x; x < p->x + p->width; x++)
+            if (th_pixel(phone_th, x, y) != first)
+                return true;
+    return false;
+}
+
 static twin_window_t *top_window(void)
 {
     twin_window_t *top = NULL;
@@ -102,6 +113,20 @@ void test_demos(void)
                   "%s fills the work area", name);
             CHECK(nav_crc() != home_nav, "%s: nav bar offers Back", name);
             ph_check(name);
+
+            /* An on-screen keyboard shrinks the work area: the window
+             * follows and repaints at the new size, then grows back */
+            for (int k = 0; k < 2; k++) {
+                twin_coord_t inset = k ? 0 : 96;
+                twin_screen_set_inset(phone_screen(), inset);
+                ph_wait(500);
+                p = w ? w->pixmap : NULL;
+                CHECK(p && p->height == PHONE_CONTENT_H - inset,
+                      "%s: height with inset %d", name, inset);
+                CHECK(p && painted(p), "%s: painted with inset %d", name,
+                      inset);
+                CHECK_EQ(th_damage_check(phone_th), 0, name);
+            }
 
             /* The back gesture closes the window on top ... */
             int depth = phone_depth();

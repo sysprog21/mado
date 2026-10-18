@@ -324,8 +324,10 @@ built-in renderer every frame is bit-exact across hosts.
   including mid-swipe, superseded and out-of-memory requests.
 - `test-lifetime`: callbacks that run while an object is torn down, or
   that act on the object calling them.
-- `test-demos`: every registry app under the built policy and 'none':
-  placement, consistency while it runs, closing window by window, leaks.
+- `test-demos`: every registry app except the phone shell (covered by
+  `test-cellphone`) under the built policy and 'none': placement,
+  consistency while it runs, repainting revealed windows, closing window
+  by window, a start that runs out of memory, leaks.
 - `test-cellphone` (mobile builds): boots the phone with a fixed clock and
   drives the whole user journey through every app, including the registry
   apps opened from the launcher.

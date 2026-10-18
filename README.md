@@ -128,8 +128,9 @@ The default build uses the desktop window manager: overlapping, decorated
 windows running the demo apps.  The window manager is a build-time
 choice, and the desktop and mobile policies are mutually exclusive.  Build
 the phone instead, a lock screen (drag the knob to unlock), a home screen
-and a dozen apps drawn with vector graphics on the mobile window manager;
-the launcher also lists every demo app that is built:
+and a dozen apps with vector-drawn interfaces (Photos shows JPEG
+fixtures) on the mobile window manager; the launcher also lists every demo
+app that is built:
 
 ```shell
 $ make defconfig

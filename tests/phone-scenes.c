@@ -74,7 +74,7 @@ void test_scenes(void)
 {
     for (int i = 0; i < phone_app_count(); i++) {
         if (phone_app_at(i)->demo)
-            continue;
+            continue; /* test_demos() checks them with the inset too */
         const char *name = phone_app_at(i)->name;
         ui_view_t *v = ph_open(name);
         if (!v)

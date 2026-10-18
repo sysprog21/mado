@@ -202,12 +202,16 @@ static bool start_window(twin_screen_t *screen,
                          const char *name,
                          twin_draw_func_t draw,
                          void *data,
-                         twin_destroy_func_t destroy)
+                         twin_destroy_func_t destroy,
+                         bool opaque)
 {
     twin_window_t *window = twin_window_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
     if (!window)
         return false;
+    /* A window that paints every pixel opaque says so: the compositor then
+     * skips what lies under it */
+    twin_window_set_opaque(window, opaque);
     twin_window_set_name(window, name);
     twin_window_set_client_data(window, data);
     twin_window_set_callbacks(window, draw, NULL, destroy);
@@ -219,17 +223,20 @@ static bool start_window(twin_screen_t *screen,
     return true;
 }
 
-/* Paint @path in black over white */
-static void paint_text(twin_pixmap_t *pixmap, twin_path_t *path, int w, int h)
+/* Fill the client white first: these windows are declared opaque, so
+ * every pixel is covered even when the drawing cannot allocate a path */
+static twin_pixmap_t *clear_white(twin_window_t *window, int w, int h)
 {
+    twin_pixmap_t *pixmap = twin_window_pixmap(window);
     twin_fill(pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, w, h);
-    twin_paint_path(pixmap, 0xff000000, path);
+    return pixmap;
 }
 
 static void circletext_draw(twin_window_t *window)
 {
     int w, h;
     client_size(window, &w, &h);
+    twin_pixmap_t *pixmap = clear_white(window, w, h);
     twin_path_t *path = twin_path_create();
     if (!path)
         return;
@@ -246,7 +253,7 @@ static void circletext_draw(twin_window_t *window)
         twin_path_utf8(path, "Hello, world!");
         twin_path_restore(path, &state);
     }
-    paint_text(twin_window_pixmap(window), path, w, h);
+    twin_paint_path(pixmap, 0xff000000, path);
     twin_path_destroy(path);
 }
 
@@ -254,10 +261,7 @@ static void smiley_draw(twin_window_t *window)
 {
     int w, h;
     client_size(window, &w, &h);
-    twin_pixmap_t *pixmap = twin_window_pixmap(window);
-
-    /* Clear background to white */
-    twin_fill(pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, w, h);
+    twin_pixmap_t *pixmap = clear_white(window, w, h);
 
     /* Calculate center and dimensions */
     twin_fixed_t center_x = twin_int_to_fixed(w / 2);
@@ -301,6 +305,7 @@ static void ascii_draw(twin_window_t *window)
 {
     int w, h;
     client_size(window, &w, &h);
+    twin_pixmap_t *pixmap = clear_white(window, w, h);
     twin_path_t *path = twin_path_create();
     if (!path)
         return;
@@ -318,7 +323,7 @@ static void ascii_draw(twin_window_t *window)
         twin_path_utf8(path, "`abcdefghijklmnopqrstuvwxyz{|}~");
         fy += D(s + 2);
     }
-    paint_text(twin_window_pixmap(window), path, w, h);
+    twin_paint_path(pixmap, 0xff000000, path);
     twin_path_destroy(path);
 }
 
@@ -353,12 +358,11 @@ static void flower_draw(twin_window_t *window)
 {
     int w, h;
     client_size(window, &w, &h);
-    twin_pixmap_t *pixmap = twin_window_pixmap(window);
+    twin_pixmap_t *pixmap = clear_white(window, w, h);
     twin_fixed_t scale = fit_400(w, h);
     twin_fixed_t cx = twin_int_to_fixed(w / 2), cy = twin_int_to_fixed(h / 2);
     twin_path_t *stroke = twin_path_create();
     twin_path_t *path = twin_path_create();
-    twin_fill(pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, w, h);
     if (stroke && path) {
         twin_path_translate(path, cx, cy);
         twin_path_scale(path, twin_fixed_mul(scale, D(10)),
@@ -393,18 +397,30 @@ static void box_blur_line(twin_argb32_t *p,
 {
     for (int i = 0; i < n; i++)
         tmp[i] = p[i * step];
+    /* sum / count as (sum * recip[count]) >> 16, exact for every count up to
+     * 16 and sum up to 255 * count (checked exhaustively); wider windows
+     * divide */
+    uint32_t recip[17];
+    bool fast = 2 * r + 1 <= 16;
+    for (int c = 1; fast && c <= 2 * r + 1; c++)
+        recip[c] = 65536 / c + 1;
+    /* Running sums over the window [i - r, i + r], clipped to the line:
+     * one pixel enters and one leaves per step */
+    uint32_t sum[4] = {0, 0, 0, 0};
+    int lo = 0, hi = 0; /* window is tmp[lo, hi) */
     for (int i = 0; i < n; i++) {
-        uint32_t sum[4] = {0, 0, 0, 0}, count = 0;
-        for (int k = i - r; k <= i + r; k++) {
-            if (k < 0 || k >= n)
-                continue;
+        for (; hi < n && hi <= i + r; hi++)
             for (int c = 0; c < 4; c++)
-                sum[c] += (tmp[k] >> (c * 8)) & 0xff;
-            count++;
-        }
+                sum[c] += (tmp[hi] >> (c * 8)) & 0xff;
+        for (; lo < i - r; lo++)
+            for (int c = 0; c < 4; c++)
+                sum[c] -= (tmp[lo] >> (c * 8)) & 0xff;
+        uint32_t count = (uint32_t) (hi - lo);
         twin_argb32_t v = 0;
         for (int c = 0; c < 4; c++)
-            v |= (twin_argb32_t) (sum[c] / count) << (c * 8);
+            v |= (twin_argb32_t) (fast ? (sum[c] * recip[count]) >> 16
+                                       : sum[c] / count)
+                 << (c * 8);
         p[i * step] = v;
     }
 }
@@ -474,8 +490,9 @@ static bool apps_blur(twin_screen_t *screen, int x, int y, int w, int h)
 #endif
     if (!raw_background)
         return false;
+    /* The image may be translucent */
     if (start_window(screen, x, y, w, h, "Blur", blur_draw, raw_background,
-                     blur_destroy))
+                     blur_destroy, false))
         return true;
     twin_pixmap_destroy(raw_background);
     return false;
@@ -491,14 +508,14 @@ bool apps_multi_start(twin_screen_t *screen,
     (void) name;
     /* Started if any of its windows opened */
     bool any = start_window(screen, x, y, w, h, "circletext", circletext_draw,
-                            NULL, NULL);
+                            NULL, NULL, true);
     any |= apps_multiline_start(screen, x += 20, y += 20, w * 2 / 3, h * 2 / 3);
     any |= start_window(screen, x += 20, y += 20, 200, 200, "Smiley",
-                        smiley_draw, NULL, NULL);
+                        smiley_draw, NULL, NULL, true);
     any |= start_window(screen, x += 20, y += 20, w, h, "ASCII", ascii_draw,
-                        NULL, NULL);
+                        NULL, NULL, true);
     any |= start_window(screen, x += 20, y += 20, w, h, "Flower", flower_draw,
-                        NULL, NULL);
+                        NULL, NULL, true);
     any |= apps_blur(screen, x += 20, y += 20, w / 2, h / 2);
     return any;
 }

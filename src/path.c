@@ -702,34 +702,12 @@ static bool _twin_path_mask(twin_pixmap_t *dst,
         memset(pixels, 0, bytes);
         _twin_pixmap_init_a8(&m->hdr, w, h, stride, pixels);
     } else {
-        /* Reuse the screen's mask buffer, growing it to the high-water mark */
-        twin_screen_t *screen = dst->screen;
-        twin_pixmap_t *mask = NULL;
-        if (screen && screen->mask_cache && screen->mask_cache_width >= w &&
-            screen->mask_cache_height >= h) {
-            mask = screen->mask_cache;
-        } else {
-            /* Grow to the larger of old and new in each dimension, so a wide
-             * mask followed by a tall one does not reallocate every time */
-            twin_coord_t cw = w, ch = h;
-            if (screen && screen->mask_cache) {
-                cw = max(cw, screen->mask_cache_width);
-                ch = max(ch, screen->mask_cache_height);
-            }
-            mask =
-                twin_pixmap_create(TWIN_A8, screen ? cw : w, screen ? ch : h);
-            if (!mask)
-                return false;
-            if (screen) {
-                if (screen->mask_cache)
-                    twin_pixmap_destroy(screen->mask_cache);
-                screen->mask_cache = mask;
-                screen->mask_cache_width = cw;
-                screen->mask_cache_height = ch;
-            } else {
-                m->heap = mask;
-            }
-        }
+        /* Larger than the scratch arena: a heap mask for this call only, so
+         * an idle screen holds no mask memory */
+        twin_pixmap_t *mask = twin_pixmap_create(TWIN_A8, w, h);
+        if (!mask)
+            return false;
+        m->heap = mask;
         for (twin_coord_t y = 0; y < h; y++)
             memset(twin_pixmap_pointer(mask, 0, y).v, 0, (size_t) w);
         _twin_pixmap_init_a8(&m->hdr, w, h, mask->stride, mask->p.v);

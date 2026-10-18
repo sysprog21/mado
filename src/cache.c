@@ -30,11 +30,13 @@
 typedef struct {
     twin_cache_entry_t *buckets[TWIN_CACHE_BUCKETS];
     twin_cache_entry_t *head, *tail; /* most / least recently used */
-    size_t bytes, peak_bytes, budget;
+    size_t bytes, peak_bytes;
     uint32_t entries, hits, misses, evictions;
 } twin_cache_t;
 
-static twin_cache_t cache = {.budget = (size_t) CONFIG_CACHE_SIZE * 1024};
+/* The table starts zeroed in .bss; only the budget needs an initial value */
+static twin_cache_t cache;
+static size_t cache_budget = (size_t) CONFIG_CACHE_SIZE * 1024;
 
 static inline unsigned _bucket(uint64_t key)
 {
@@ -103,14 +105,14 @@ twin_cache_entry_t *_twin_cache_entry_alloc(twin_coord_t width,
 
 bool _twin_cache_enabled(void)
 {
-    return cache.budget > 0;
+    return cache_budget > 0;
 }
 
 twin_cache_entry_t *_twin_cache_lookup(uint64_t key)
 {
     /* Disabled: the cache is not consulted, so this is neither a hit nor a
      * miss (path masks skip the lookup outright, see _twin_cache_enabled) */
-    if (!cache.budget)
+    if (!cache_budget)
         return NULL;
     for (twin_cache_entry_t *e = cache.buckets[_bucket(key)]; e; e = e->hnext) {
         if (e->key == key) {
@@ -130,14 +132,14 @@ twin_cache_entry_t *_twin_cache_insert(uint64_t key,
                                        twin_coord_t width,
                                        twin_coord_t height)
 {
-    if (!cache.budget || width < 0 || height < 0)
+    if (!cache_budget || width < 0 || height < 0)
         return NULL;
     size_t data = (size_t) _twin_a8_stride(width) * (size_t) height;
     size_t size = sizeof(twin_cache_entry_t) + data;
-    if (data > CONFIG_CACHE_MAX_ENTRY || size > cache.budget)
+    if (data > CONFIG_CACHE_MAX_ENTRY || size > cache_budget)
         return NULL;
 
-    _cache_shrink(cache.budget - size);
+    _cache_shrink(cache_budget - size);
     twin_cache_entry_t *e = _twin_cache_entry_alloc(width, height);
     if (!e)
         return NULL;
@@ -157,7 +159,7 @@ twin_cache_entry_t *_twin_cache_insert(uint64_t key,
 
 void twin_cache_set_budget(size_t bytes)
 {
-    cache.budget = bytes;
+    cache_budget = bytes;
     _cache_shrink(bytes);
 }
 
@@ -175,5 +177,5 @@ void twin_cache_get_stats(twin_cache_stats_t *stats)
     stats->entries = cache.entries;
     stats->bytes = cache.bytes;
     stats->peak_bytes = cache.peak_bytes;
-    stats->budget = cache.budget;
+    stats->budget = cache_budget;
 }

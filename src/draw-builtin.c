@@ -124,9 +124,6 @@ static inline twin_a8_t argb32_to_a8(twin_argb32_t v)
 
 #define msk_c (argb32_to_a8(msk.c))
 #define msk_argb32 (argb32_to_a8(*msk.p.argb32++))
-#define msk_rgb16 \
-    (0xff);       \
-    (void) msk
 #define msk_a8 (*msk.p.a8++)
 
 #define CAT2(a, b) a##b
@@ -173,7 +170,6 @@ static inline twin_a8_t argb32_to_a8(twin_argb32_t v)
 /* clang-format off */
 #define MAKE_TWIN_in_op_msks(op, dst, src)        \
     CAT2(MAKE_TWIN_in_, op)(dst, src, argb32)     \
-    CAT2(MAKE_TWIN_in_, op)(dst, src, rgb16)      \
     CAT2(MAKE_TWIN_in_, op)(dst, src, a8)         \
     CAT2(MAKE_TWIN_in_, op)(dst, src, c)
 /* clang-format on */
@@ -296,25 +292,23 @@ static const twin_src_op comp2[2][4][3] = {
         },
 };
 
+/* Mask index: RGB16 has no alpha and composites as no mask, so it never
+ * reaches the table */
+enum { MSK_A8, MSK_ARGB32, MSK_C };
+
 /* op, src, msk, dst */
-static const twin_src_msk_op comp3[2][4][4][3] = {
+static const twin_src_msk_op comp3[2][4][3][3] = {
     [TWIN_OVER] =
         {
             [TWIN_A8] =
                 {
-                    [TWIN_A8] =
+                    [MSK_A8] =
                         {
                             _twin_a8_in_a8_over_a8,
                             _twin_a8_in_a8_over_rgb16,
                             _twin_a8_in_a8_over_argb32,
                         },
-                    [TWIN_RGB16] =
-                        {
-                            _twin_a8_in_rgb16_over_a8,
-                            _twin_a8_in_rgb16_over_rgb16,
-                            _twin_a8_in_rgb16_over_argb32,
-                        },
-                    [TWIN_ARGB32] =
+                    [MSK_ARGB32] =
                         {
                             _twin_a8_in_argb32_over_a8,
                             _twin_a8_in_argb32_over_rgb16,
@@ -329,19 +323,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
                 },
             [TWIN_RGB16] =
                 {
-                    [TWIN_A8] =
+                    [MSK_A8] =
                         {
                             _twin_rgb16_in_a8_over_a8,
                             _twin_rgb16_in_a8_over_rgb16,
                             _twin_rgb16_in_a8_over_argb32,
                         },
-                    [TWIN_RGB16] =
-                        {
-                            _twin_rgb16_in_rgb16_over_a8,
-                            _twin_rgb16_in_rgb16_over_rgb16,
-                            _twin_rgb16_in_rgb16_over_argb32,
-                        },
-                    [TWIN_ARGB32] =
+                    [MSK_ARGB32] =
                         {
                             _twin_rgb16_in_argb32_over_a8,
                             _twin_rgb16_in_argb32_over_rgb16,
@@ -356,19 +344,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
                 },
             [TWIN_ARGB32] =
                 {
-                    [TWIN_A8] =
+                    [MSK_A8] =
                         {
                             _twin_argb32_in_a8_over_a8,
                             _twin_argb32_in_a8_over_rgb16,
                             _twin_argb32_in_a8_over_argb32,
                         },
-                    [TWIN_RGB16] =
-                        {
-                            _twin_argb32_in_rgb16_over_a8,
-                            _twin_argb32_in_rgb16_over_rgb16,
-                            _twin_argb32_in_rgb16_over_argb32,
-                        },
-                    [TWIN_ARGB32] =
+                    [MSK_ARGB32] =
                         {
                             _twin_argb32_in_argb32_over_a8,
                             _twin_argb32_in_argb32_over_rgb16,
@@ -383,19 +365,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
                 },
             {
                 /* C */
-                [TWIN_A8] =
+                [MSK_A8] =
                     {
                         _twin_c_in_a8_over_a8,
                         _twin_c_in_a8_over_rgb16,
                         _twin_c_in_a8_over_argb32,
                     },
-                [TWIN_RGB16] =
-                    {
-                        _twin_c_in_rgb16_over_a8,
-                        _twin_c_in_rgb16_over_rgb16,
-                        _twin_c_in_rgb16_over_argb32,
-                    },
-                [TWIN_ARGB32] =
+                [MSK_ARGB32] =
                     {
                         _twin_c_in_argb32_over_a8,
                         _twin_c_in_argb32_over_rgb16,
@@ -413,19 +389,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
         {
             [TWIN_A8] =
                 {
-                    [TWIN_A8] =
+                    [MSK_A8] =
                         {
                             _twin_a8_in_a8_source_a8,
                             _twin_a8_in_a8_source_rgb16,
                             _twin_a8_in_a8_source_argb32,
                         },
-                    [TWIN_RGB16] =
-                        {
-                            _twin_a8_in_rgb16_source_a8,
-                            _twin_a8_in_rgb16_source_rgb16,
-                            _twin_a8_in_rgb16_source_argb32,
-                        },
-                    [TWIN_ARGB32] =
+                    [MSK_ARGB32] =
                         {
                             _twin_a8_in_argb32_source_a8,
                             _twin_a8_in_argb32_source_rgb16,
@@ -440,19 +410,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
                 },
             [TWIN_RGB16] =
                 {
-                    [TWIN_A8] =
+                    [MSK_A8] =
                         {
                             _twin_rgb16_in_a8_source_a8,
                             _twin_rgb16_in_a8_source_rgb16,
                             _twin_rgb16_in_a8_source_argb32,
                         },
-                    [TWIN_RGB16] =
-                        {
-                            _twin_rgb16_in_rgb16_source_a8,
-                            _twin_rgb16_in_rgb16_source_rgb16,
-                            _twin_rgb16_in_rgb16_source_argb32,
-                        },
-                    [TWIN_ARGB32] =
+                    [MSK_ARGB32] =
                         {
                             _twin_rgb16_in_argb32_source_a8,
                             _twin_rgb16_in_argb32_source_rgb16,
@@ -467,19 +431,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
                 },
             [TWIN_ARGB32] =
                 {
-                    [TWIN_A8] =
+                    [MSK_A8] =
                         {
                             _twin_argb32_in_a8_source_a8,
                             _twin_argb32_in_a8_source_rgb16,
                             _twin_argb32_in_a8_source_argb32,
                         },
-                    [TWIN_RGB16] =
-                        {
-                            _twin_argb32_in_rgb16_source_a8,
-                            _twin_argb32_in_rgb16_source_rgb16,
-                            _twin_argb32_in_rgb16_source_argb32,
-                        },
-                    [TWIN_ARGB32] =
+                    [MSK_ARGB32] =
                         {
                             _twin_argb32_in_argb32_source_a8,
                             _twin_argb32_in_argb32_source_rgb16,
@@ -494,19 +452,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
                 },
             {
                 /* C */
-                [TWIN_A8] =
+                [MSK_A8] =
                     {
                         _twin_c_in_a8_source_a8,
                         _twin_c_in_a8_source_rgb16,
                         _twin_c_in_a8_source_argb32,
                     },
-                [TWIN_RGB16] =
-                    {
-                        _twin_c_in_rgb16_source_a8,
-                        _twin_c_in_rgb16_source_rgb16,
-                        _twin_c_in_rgb16_source_argb32,
-                    },
-                [TWIN_ARGB32] =
+                [MSK_ARGB32] =
                     {
                         _twin_c_in_argb32_source_a8,
                         _twin_c_in_argb32_source_rgb16,
@@ -526,6 +478,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
 #define operand_index(o) \
     ((o)->source_kind == TWIN_SOLID ? 3 : o->u.pixmap->format)
 
+static inline int mask_index(const twin_operand_t *o)
+{
+    if (o->source_kind == TWIN_SOLID)
+        return MSK_C;
+    return o->u.pixmap->format == TWIN_A8 ? MSK_A8 : MSK_ARGB32;
+}
+
 static void _twin_composite_simple(twin_pixmap_t *dst,
                                    twin_coord_t dst_x,
                                    twin_coord_t dst_y,
@@ -543,6 +502,11 @@ static void _twin_composite_simple(twin_pixmap_t *dst,
     twin_coord_t left, top, right, bottom;
     twin_coord_t sdx, sdy;
     twin_source_u s;
+
+    /* RGB16 carries no alpha, so as a mask it is fully opaque: no mask */
+    if (msk && msk->source_kind == TWIN_PIXMAP &&
+        msk->u.pixmap->format == TWIN_RGB16)
+        msk = NULL;
 
     dst_x += dst->origin_x;
     dst_y += dst->origin_y;
@@ -599,7 +563,7 @@ static void _twin_composite_simple(twin_pixmap_t *dst,
         mdx = msk_x - left;
         mdy = msk_y - top;
 
-        twin_src_msk_op op = comp3[operator][operand_index(src)][operand_index(msk)][dst->format];
+        twin_src_msk_op op = comp3[operator][operand_index(src)][mask_index(msk)][dst->format];
         for (iy = top; iy < bottom; iy++) {
             if (src->source_kind == TWIN_PIXMAP)
                 s.p = twin_pixmap_pointer(src->u.pixmap, left + sdx, iy + sdy);
@@ -906,7 +870,7 @@ static void _twin_composite_xform(twin_pixmap_t *dst,
             m.c = msk->u.argb;
         }
 
-        twin_src_msk_op op = comp3[operator][operand_xindex(src)][operand_xindex(msk)]
+        twin_src_msk_op op = comp3[operator][operand_xindex(src)][mask_index(msk)]
 		[dst->format];
         for (twin_coord_t iy = top; iy < bottom; iy++) {
             if (src->source_kind == TWIN_PIXMAP)

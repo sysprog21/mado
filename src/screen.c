@@ -58,11 +58,14 @@ twin_screen_t *twin_screen_create(twin_coord_t width,
     screen->put_span = put_span;
     screen->closure = closure;
 
-#ifndef TWIN_SCRATCH_SIZE
-#define TWIN_SCRATCH_SIZE (16 * 1024)
+#ifndef CONFIG_SCRATCH_SIZE
+#define CONFIG_SCRATCH_SIZE 16
 #endif
-    screen->scratch_buf = twin_malloc(TWIN_SCRATCH_SIZE);
-    screen->scratch_size = screen->scratch_buf ? TWIN_SCRATCH_SIZE : 0;
+    if (CONFIG_SCRATCH_SIZE > 0) {
+        screen->scratch_buf = twin_malloc(CONFIG_SCRATCH_SIZE * 1024);
+        if (screen->scratch_buf)
+            screen->scratch_size = CONFIG_SCRATCH_SIZE * 1024;
+    }
 
     _twin_wm_init(screen);
     /* Nothing has been shown yet: the first update paints everything */
@@ -85,8 +88,6 @@ void twin_screen_destroy(twin_screen_t *screen)
         twin_pixmap_destroy(screen->background);
     for (int i = 0; i < screen->path_cache_count; i++)
         twin_path_destroy(screen->path_cache[i]);
-    if (screen->mask_cache)
-        twin_pixmap_destroy(screen->mask_cache);
     twin_free(screen->span_cache);
     twin_free(screen->scratch_buf);
     twin_free(screen);

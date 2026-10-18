@@ -180,6 +180,15 @@ config LOGGING_CALLBACK
       Allow custom callback functions for log handling.
       Enables application-specific log processing.
 
+config OPTIMIZE_SIZE
+    bool "Optimize for size"
+    default n
+    help
+      Build with -Os instead of -O2 and without unwind tables, which a C
+      library does not need.  On RV32IM this shrinks the library by about
+      a fifth; the rendering hot paths run somewhat slower.  Leave it off
+      on hosts, where debuggers and Valgrind use the unwind tables.
+
 config MEMORY_STATS
     bool "Enable memory usage tracking"
     default y
@@ -316,6 +325,16 @@ config SHADOW_BLUR
 endmenu
 
 menu "Rendering"
+
+config SCRATCH_SIZE
+    int "Rasterizer scratch arena (KiB)"
+    default 16
+    range 0 1024
+    help
+      Per-screen arena that holds the coverage mask of each filled path.
+      A path whose mask does not fit takes a heap buffer for that one
+      call instead, so a smaller arena trades speed on large shapes for
+      resident memory.  0 always uses the heap.
 
 config CACHE_SIZE
     int "Coverage cache budget (KiB)"

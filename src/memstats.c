@@ -22,7 +22,7 @@
  * are tracked in the table, so the table storage must not come from the
  * same pool.
  */
-#define MEMTBL_INLINE_CAPACITY 512
+#define MEMTBL_INLINE_CAPACITY 128
 
 typedef struct {
     void *ptr;

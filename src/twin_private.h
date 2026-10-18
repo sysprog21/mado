@@ -253,11 +253,6 @@ struct _twin_screen {
     struct _twin_path *path_cache[TWIN_PATH_CACHE_SIZE];
     int path_cache_count;
 
-    /* Cached A8 mask pixmap for twin_composite_path -- avoids
-     * per-composite malloc for masks larger than the scratch arena. */
-    twin_pixmap_t *mask_cache;
-    twin_coord_t mask_cache_width;
-    twin_coord_t mask_cache_height;
 
     /* Event processing: event filter callback */
     bool (*event_filter)(twin_screen_t *screen, twin_event_t *event);
@@ -1359,10 +1354,10 @@ void _twin_screen_fill(twin_argb32_t *dst, twin_argb32_t color, int width);
  * evict least recently used entries until the budget is honored.
  */
 typedef struct _twin_cache_entry {
+    uint64_t key; /* first, so 32-bit targets need no padding after it */
     struct _twin_cache_entry *hnext;       /* hash chain */
     struct _twin_cache_entry *prev, *next; /* LRU list */
-    uint64_t key;
-    uint32_t size; /* bytes charged to the budget */
+    uint32_t size;                         /* bytes charged to the budget */
     twin_coord_t width, height, stride;
     twin_coord_t left, top; /* placement relative to the key's origin */
     twin_fixed_t advance;   /* glyph advance (glyph entries only) */
@@ -1759,21 +1754,20 @@ static inline bool twin_pointer_valid(const void *ptr)
  * callbacks are still queued.
  */
 
-/* Maximum number of tracked closures */
-#define TWIN_MAX_CLOSURES 128
+/* Closures tracked without touching the heap; beyond this the table grows
+ * on demand and returns to the inline slots once it drains */
+#define TWIN_CLOSURE_INLINE 16
 
-/* Closure tracking entry */
 typedef struct _twin_closure_entry {
-    void *closure;        /* Closure pointer */
-    uint32_t ref_count;   /* Reference count */
-    bool marked_for_free; /* Closure is being freed */
+    void *closure;
+    uint32_t ref_count : 31;
+    uint32_t marked_for_free : 1; /* being freed: no new references */
 } twin_closure_entry_t;
 
-/* Closure tracking table */
 typedef struct _twin_closure_tracker {
-    twin_closure_entry_t entries[TWIN_MAX_CLOSURES];
-    int count;
-    /* Mutex would go here for thread safety if needed */
+    twin_closure_entry_t *entries; /* inline, or heap once grown */
+    int count, capacity;
+    twin_closure_entry_t inline_entries[TWIN_CLOSURE_INLINE];
 } twin_closure_tracker_t;
 
 /* Global closure tracker instance */

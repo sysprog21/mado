@@ -630,7 +630,7 @@ static void test_closure_churn(void)
 {
     th_t *t = th_create(W, H);
     /* Far more distinct closures than the tracker holds at once */
-    for (int i = 0; i < 4 * TWIN_MAX_CLOSURES; i++) {
+    for (int i = 0; i < 4 * TWIN_CLOSURE_INLINE; i++) {
         void *owner = malloc(16);
         twin_timeout_t *to = twin_set_timeout(never, 1000, owner);
         CHECK(to != NULL, "timeout %d scheduled", i);
@@ -641,6 +641,21 @@ static void test_closure_churn(void)
     }
     th_frame(t);
     CHECK_EQ(_twin_closure_tracker.count, 0, "tracker drains with its holders");
+
+    /* Many live closures at once: the table grows rather than refusing */
+    enum { LIVE = 8 * TWIN_CLOSURE_INLINE };
+    static char owners[LIVE];
+    twin_timeout_t *live[LIVE];
+    for (int i = 0; i < LIVE; i++)
+        live[i] = twin_set_timeout(never, 1000, &owners[i]);
+    bool all = true;
+    for (int i = 0; i < LIVE; i++)
+        all = all && live[i] && _twin_closure_is_valid(&owners[i]);
+    CHECK(all, "every live closure tracked past the inline slots");
+    for (int i = 0; i < LIVE; i++)
+        twin_clear_timeout(live[i]);
+    CHECK(_twin_closure_tracker.entries == _twin_closure_tracker.inline_entries,
+          "drained table returns to inline storage");
 
     /* A timeout whose owner went away is dropped, not retried forever */
     int owner;
@@ -810,6 +825,29 @@ static void test_scaled_clip(void)
 
 /* A translated source transform shifts which source pixels land where,
  * with every renderer (pixman used to drop the translation) */
+static void test_rgb16_mask(void)
+{
+    /* RGB16 has no alpha: masking with it equals masking with nothing */
+    twin_pixmap_t *src = twin_pixmap_create(TWIN_ARGB32, 8, 8);
+    twin_pixmap_t *msk = twin_pixmap_create(TWIN_RGB16, 8, 8);
+    twin_pixmap_t *a = twin_pixmap_create(TWIN_ARGB32, 8, 8);
+    twin_pixmap_t *b = twin_pixmap_create(TWIN_ARGB32, 8, 8);
+    twin_fill(src, 0x80ff4020, TWIN_SOURCE, 0, 0, 8, 8);
+    twin_fill(msk, 0xff000000, TWIN_SOURCE, 0, 0, 8, 8);
+    twin_fill(a, 0xff102030, TWIN_SOURCE, 0, 0, 8, 8);
+    twin_fill(b, 0xff102030, TWIN_SOURCE, 0, 0, 8, 8);
+    twin_operand_t sop = {.source_kind = TWIN_PIXMAP, .u.pixmap = src};
+    twin_operand_t mop = {.source_kind = TWIN_PIXMAP, .u.pixmap = msk};
+    twin_composite(a, 0, 0, &sop, 0, 0, &mop, 0, 0, TWIN_OVER, 8, 8);
+    twin_composite(b, 0, 0, &sop, 0, 0, NULL, 0, 0, TWIN_OVER, 8, 8);
+    CHECK_EQ(*twin_pixmap_pointer(a, 3, 3).argb32,
+             *twin_pixmap_pointer(b, 3, 3).argb32, "RGB16 mask is opaque");
+    twin_pixmap_destroy(src);
+    twin_pixmap_destroy(msk);
+    twin_pixmap_destroy(a);
+    twin_pixmap_destroy(b);
+}
+
 static void test_translated_source(void)
 {
     twin_pixmap_t *src = twin_pixmap_create(TWIN_ARGB32, 16, 16);
@@ -1200,6 +1238,7 @@ int main(void)
     test_scroll();
     test_window_damage_rects();
     test_scaled_clip();
+    test_rgb16_mask();
     test_translated_source();
     test_cleared_in_pass();
     test_text_clip_overshoot();

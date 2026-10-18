@@ -357,6 +357,10 @@ endif
 # Build system integration
 
 override CFLAGS += -include config.h
+ifeq ($(CONFIG_OPTIMIZE_SIZE), y)
+# After -O2 in the common flags, so it wins
+override CFLAGS += -Os -fno-asynchronous-unwind-tables -fno-unwind-tables
+endif
 
 # Ensure composite-decls.h exists before including build rules
 # (needed for dependency generation in mk/common.mk)

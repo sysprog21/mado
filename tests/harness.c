@@ -330,10 +330,6 @@ size_t th_heap_net(const th_t *t)
         if (p->sublen != p->inline_sublen)
             retained += (size_t) p->size_sublen * sizeof(int);
     }
-    if (t->screen->mask_cache)
-        retained +=
-            sizeof(twin_pixmap_t) + (size_t) t->screen->mask_cache->stride *
-                                        t->screen->mask_cache->height;
     retained += (size_t) t->screen->span_cache_width * sizeof(twin_argb32_t);
     return th_heap_raw() - retained;
 }

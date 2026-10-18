@@ -129,6 +129,8 @@ jobs:
             options: WM_MOBILE=y RENDERER_PIXMAN=y
           - name: Pixman renderer, desktop
             options: RENDERER_PIXMAN=y
+          - name: size-optimized, heap masks only
+            options: WM_MOBILE=y OPTIMIZE_SIZE=y SCRATCH_SIZE=0
     name: config (${{ matrix.name }})
     steps:
     - uses: actions/checkout@v6

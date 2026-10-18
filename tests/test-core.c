@@ -823,31 +823,73 @@ static void test_scaled_clip(void)
     twin_pixmap_destroy(b);
 }
 
-/* A translated source transform shifts which source pixels land where,
- * with every renderer (pixman used to drop the translation) */
+/* Every pixel of two same-size ARGB32 pixmaps matches */
+static bool same_argb32(twin_pixmap_t *a, twin_pixmap_t *b)
+{
+    for (twin_coord_t y = 0; y < twin_pixmap_height(a); y++)
+        if (memcmp(twin_pixmap_pointer(a, 0, y).v,
+                   twin_pixmap_pointer(b, 0, y).v,
+                   (size_t) twin_pixmap_width(a) * 4))
+            return false;
+    return true;
+}
+
 static void test_rgb16_mask(void)
 {
     /* RGB16 has no alpha: masking with it equals masking with nothing */
-    twin_pixmap_t *src = twin_pixmap_create(TWIN_ARGB32, 8, 8);
-    twin_pixmap_t *msk = twin_pixmap_create(TWIN_RGB16, 8, 8);
-    twin_pixmap_t *a = twin_pixmap_create(TWIN_ARGB32, 8, 8);
-    twin_pixmap_t *b = twin_pixmap_create(TWIN_ARGB32, 8, 8);
-    twin_fill(src, 0x80ff4020, TWIN_SOURCE, 0, 0, 8, 8);
-    twin_fill(msk, 0xff000000, TWIN_SOURCE, 0, 0, 8, 8);
-    twin_fill(a, 0xff102030, TWIN_SOURCE, 0, 0, 8, 8);
-    twin_fill(b, 0xff102030, TWIN_SOURCE, 0, 0, 8, 8);
+    twin_pixmap_t *src = solid(TWIN_ARGB32, 8, 8, 0x80ff4020);
+    twin_pixmap_t *msk = solid(TWIN_RGB16, 8, 8, 0xff000000);
+    twin_pixmap_t *a = solid(TWIN_ARGB32, 8, 8, 0xff102030);
+    twin_pixmap_t *b = solid(TWIN_ARGB32, 8, 8, 0xff102030);
     twin_operand_t sop = {.source_kind = TWIN_PIXMAP, .u.pixmap = src};
     twin_operand_t mop = {.source_kind = TWIN_PIXMAP, .u.pixmap = msk};
     twin_composite(a, 0, 0, &sop, 0, 0, &mop, 0, 0, TWIN_OVER, 8, 8);
     twin_composite(b, 0, 0, &sop, 0, 0, NULL, 0, 0, TWIN_OVER, 8, 8);
-    CHECK_EQ(*twin_pixmap_pointer(a, 3, 3).argb32,
-             *twin_pixmap_pointer(b, 3, 3).argb32, "RGB16 mask is opaque");
+    CHECK(same_argb32(a, b), "RGB16 mask is opaque");
     twin_pixmap_destroy(src);
     twin_pixmap_destroy(msk);
     twin_pixmap_destroy(a);
     twin_pixmap_destroy(b);
 }
 
+/* A transformed RGB16 source reads the same pixels as its ARGB32 copy, and
+ * transparency outside it, all the way down the pixmap */
+static void test_rgb16_xform(void)
+{
+    twin_pixmap_t *s16 = twin_pixmap_create(TWIN_RGB16, 16, 16);
+    twin_pixmap_t *s32 = twin_pixmap_create(TWIN_ARGB32, 16, 16);
+    for (int y = 0; y < 16; y++) {
+        twin_argb32_t c = 0xff000000 | (twin_argb32_t) (y * 16) << 16 |
+                          (twin_argb32_t) (255 - y * 16);
+        twin_fill(s16, c, TWIN_SOURCE, 0, y, 16, y + 1);
+    }
+    /* The ARGB32 copy holds the exact RGB565 values, so only the read path
+     * differs */
+    for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 16; x++)
+            *twin_pixmap_pointer(s32, x, y).argb32 =
+                twin_rgb16_to_argb32(*twin_pixmap_pointer(s16, x, y).rgb16);
+    twin_matrix_t m;
+    twin_matrix_identity(&m);
+    twin_matrix_translate(&m, twin_int_to_fixed(4), twin_int_to_fixed(4));
+    twin_pixmap_set_transform(s16, &m);
+    twin_pixmap_set_transform(s32, &m);
+    twin_operand_t o16 = {.source_kind = TWIN_PIXMAP, .u.pixmap = s16};
+    twin_operand_t o32 = {.source_kind = TWIN_PIXMAP, .u.pixmap = s32};
+    twin_pixmap_t *a = solid(TWIN_ARGB32, 16, 16, 0xff808080);
+    twin_pixmap_t *b = solid(TWIN_ARGB32, 16, 16, 0xff808080);
+    twin_composite(a, 0, 0, &o16, 0, 0, NULL, 0, 0, TWIN_OVER, 16, 16);
+    twin_composite(b, 0, 0, &o32, 0, 0, NULL, 0, 0, TWIN_OVER, 16, 16);
+    CHECK(same_argb32(a, b),
+          "transformed RGB16 source matches its ARGB32 copy");
+    twin_pixmap_destroy(s16);
+    twin_pixmap_destroy(s32);
+    twin_pixmap_destroy(a);
+    twin_pixmap_destroy(b);
+}
+
+/* A translated source transform shifts which source pixels land where,
+ * with every renderer (pixman used to drop the translation) */
 static void test_translated_source(void)
 {
     twin_pixmap_t *src = twin_pixmap_create(TWIN_ARGB32, 16, 16);
@@ -1239,6 +1281,7 @@ int main(void)
     test_window_damage_rects();
     test_scaled_clip();
     test_rgb16_mask();
+    test_rgb16_xform();
     test_translated_source();
     test_cleared_in_pass();
     test_text_clip_overshoot();

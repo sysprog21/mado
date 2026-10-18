@@ -503,11 +503,6 @@ static void _twin_composite_simple(twin_pixmap_t *dst,
     twin_coord_t sdx, sdy;
     twin_source_u s;
 
-    /* RGB16 carries no alpha, so as a mask it is fully opaque: no mask */
-    if (msk && msk->source_kind == TWIN_PIXMAP &&
-        msk->u.pixmap->format == TWIN_RGB16)
-        msk = NULL;
-
     dst_x += dst->origin_x;
     dst_y += dst->origin_y;
     left = dst_x;
@@ -656,13 +651,14 @@ static void twin_pixmap_free_xform(twin_xform_t *xform)
                   : *((pix)->p.a8 + XF(y) * (pix)->stride + XF(x)); \
     } while (0)
 
-#define _get_pix_16(d, pix, x, y)                                            \
-    do {                                                                     \
-        twin_rgb16_t p =                                                     \
-            _pix_clipped(pix, x, y)                                          \
-                ? 0                                                          \
-                : *((pix)->p.argb32 + XF(y) * ((pix)->stride >> 1) + XF(x)); \
-        *((twin_argb32_t *) (char *) (d)) = twin_rgb16_to_argb32(p);         \
+/* Outside the pixmap is transparent, as for the other formats */
+#define _get_pix_16(d, pix, x, y)                                              \
+    do {                                                                       \
+        *((twin_argb32_t *) (char *) (d)) =                                    \
+            _pix_clipped(pix, x, y)                                            \
+                ? 0                                                            \
+                : twin_rgb16_to_argb32(*(                                      \
+                      (pix)->p.rgb16 + XF(y) * ((pix)->stride >> 1) + XF(x))); \
     } while (0)
 
 #define _get_pix_32(d, pix, x, y)                                            \
@@ -906,6 +902,11 @@ void twin_composite(twin_pixmap_t *dst,
                     twin_coord_t width,
                     twin_coord_t height)
 {
+    /* RGB16 carries no alpha, so as a mask it is fully opaque: no mask.
+     * Before the transform test, so neither path samples it. */
+    if (msk && msk->source_kind == TWIN_PIXMAP &&
+        msk->u.pixmap->format == TWIN_RGB16)
+        msk = NULL;
     if ((src->source_kind == TWIN_PIXMAP &&
          !twin_matrix_is_identity(&src->u.pixmap->transform)) ||
         (msk && (msk->source_kind == TWIN_PIXMAP &&

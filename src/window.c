@@ -394,7 +394,9 @@ bool _twin_window_restore(twin_window_t *window)
     _twin_window_reset_clip(window);
     _twin_window_update_opaque(window);
     _twin_window_damage_all(window);
-    twin_window_draw(window);
+    /* Painted before the next redisplay; a window covered and evicted
+     * again first (closing a stack of apps) is never painted at all */
+    twin_window_queue_paint(window);
     return true;
 }
 

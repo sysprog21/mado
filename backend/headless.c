@@ -216,14 +216,14 @@ static void _twin_headless_inject_events(twin_context_t *ctx)
     }
 }
 
-static void twin_headless_update_damage(void *closure)
+static bool twin_headless_update_damage(void *closure)
 {
     twin_context_t *ctx = closure;
     twin_screen_t *screen = ctx->screen;
     twin_headless_t *tx = ctx->priv;
 
     if (!twin_screen_damaged(screen))
-        return;
+        return true;
 
     tx->dirty_top = screen->height;
     tx->dirty_bottom = 0;
@@ -252,6 +252,7 @@ static void twin_headless_update_damage(void *closure)
         tx->last_frame_time = now;
         tx->frame_count = 0;
     }
+    return true;
 }
 
 static bool twin_headless_poll(twin_context_t *ctx)
@@ -267,16 +268,11 @@ static bool twin_headless_poll(twin_context_t *ctx)
     /* Inject events from control tool */
     _twin_headless_inject_events(ctx);
 
-    /* One scan-out per iteration, after timeouts, work and input */
-    if (twin_screen_damaged(ctx->screen))
-        twin_headless_update_damage(ctx);
-    else {
-        /* Idle: sleep until the next timeout, but stay responsive to the
-         * control tool. */
-        twin_time_t wait = _twin_idle_timeout(ctx->screen, 5);
-        if (wait > 0)
-            usleep((useconds_t) wait * 1000);
-    }
+    /* Idle: sleep until the next timeout, but stay responsive to the
+     * control tool.  Damage is scanned out by the redisplay work. */
+    twin_time_t wait = _twin_idle_timeout(ctx->screen, 5);
+    if (wait > 0)
+        usleep((useconds_t) wait * 1000);
 
     /* Update heartbeat timestamp periodically to show backend is alive */
     if (tx->shm) {
@@ -430,7 +426,9 @@ twin_context_t *twin_headless_init(int width, int height)
     if (!ctx->screen)
         goto error;
 
-    /* Updates run once per loop iteration (see poll) so damage coalesces */
+    /* Scan out once per loop iteration, after the paint work, so damage
+     * coalesces and a window is never shown before it is painted */
+    twin_set_work(twin_headless_update_damage, TWIN_WORK_REDISPLAY, ctx);
 
     return ctx;
 

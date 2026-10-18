@@ -1903,10 +1903,12 @@ static inline void *_twin_widget_callback_data(const twin_widget_t *w)
  * use include/twin.h only
  */
 
-/* Work items run once per pass, lowest priority value first */
-#define TWIN_WORK_REDISPLAY 0
+/* Work items run once per pass, lowest priority value first: layout,
+ * then painting, then the backend's redisplay, so a pass shows what it
+ * painted instead of leaving it for the next */
+#define TWIN_WORK_LAYOUT 0
 #define TWIN_WORK_PAINT 1
-#define TWIN_WORK_LAYOUT 2
+#define TWIN_WORK_REDISPLAY 2
 
 twin_work_t *twin_set_work(twin_work_proc_t work_proc,
                            int priority,

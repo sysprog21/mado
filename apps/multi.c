@@ -211,7 +211,10 @@ static bool start_window(twin_screen_t *screen,
     twin_window_set_name(window, name);
     twin_window_set_client_data(window, data);
     twin_window_set_callbacks(window, draw, NULL, destroy);
-    twin_window_draw(window);
+    /* Painted before the next redisplay, and only if still shown: on a
+     * phone each window covers the one opened before it */
+    twin_rect_t c = twin_window_client(window);
+    twin_window_damage(window, c.left, c.top, c.right, c.bottom);
     twin_window_show(window);
     return true;
 }

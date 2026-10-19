@@ -476,6 +476,11 @@ void twin_path_set_cap_style(twin_path_t *path, twin_cap_t cap_style)
     path->state.cap_style = cap_style;
 }
 
+void twin_path_set_fill_rule(twin_path_t *path, twin_fill_rule_t rule)
+{
+    path->state.fill_rule = rule;
+}
+
 void twin_path_empty(twin_path_t *path)
 {
     path->npoints = 0;
@@ -490,6 +495,7 @@ static void _twin_path_reset_state(twin_path_t *path)
     path->state.font_size = TWIN_FIXED_ONE * 15;
     path->state.font_style = TwinStyleRoman;
     path->state.cap_style = TwinCapRound;
+    path->state.fill_rule = TwinFillNonZero;
 }
 
 void twin_path_set_font(twin_path_t *path, twin_font_t *font)

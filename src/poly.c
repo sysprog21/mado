@@ -323,6 +323,7 @@ static void _twin_edge_fill(twin_pixmap_t *pixmap,
                             twin_edge_t **order,
                             twin_edge_t **aet,
                             int nedges,
+                            bool even_odd,
                             _band_state_t *band)
 {
     twin_sfixed_t x0 = 0;
@@ -349,13 +350,14 @@ static void _twin_edge_fill(twin_pixmap_t *pixmap,
             by = y - twin_int_to_sfixed(band->top);
         }
 
-        /* walk this y value marking coverage */
+        /* walk this y value marking coverage: inside while the winding
+         * number is nonzero, or for even-odd while its parity is odd */
         int w = 0;
         for (int i = 0; i < na; i++) {
             twin_edge_t *a = aet[i];
             if (w == 0)
                 x0 = a->x;
-            w += a->winding;
+            w = even_odd ? w ^ 1 : w + a->winding;
             if (w == 0)
                 _span_fill(pixmap, by, x0, a->x);
         }
@@ -439,7 +441,8 @@ static void _twin_fill(twin_pixmap_t *pixmap,
     twin_edge_t **order = (twin_edge_t **) ((uint8_t *) edges + ptr_off);
     for (int i = 0; i < nedges; i++)
         order[i] = &edges[i];
-    _twin_edge_fill(pixmap, order, order + nalloc, nedges, band);
+    _twin_edge_fill(pixmap, order, order + nalloc, nedges,
+                    path->state.fill_rule == TwinFillEvenOdd, band);
     if (!from_scratch)
         twin_free(edges);
 }

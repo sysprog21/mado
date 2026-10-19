@@ -1130,6 +1130,10 @@ static tvg_result_t tvg_render_document(tvg_input_func_t in,
         goto error;
     }
     twin_path_scale(ctx.path, width_scale, height_scale);
+    /* TinyVG fills by the even-odd rule: drawings converted from SVG, such
+     * as comic.tvg and tiger.tvg, cut their holes with nested outlines
+     * wound the same way, which nonzero would fill in */
+    twin_path_set_fill_rule(ctx.path, TwinFillEvenOdd);
     res = tvg_parse_commands(&ctx);
     __goto_if_fail(res, error, "Failed to parse commands");
 error:

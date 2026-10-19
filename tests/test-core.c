@@ -1191,6 +1191,16 @@ static void on_draw(twin_window_t *window)
 
 static void test_accessors(void)
 {
+    /* The fill rule is drawing state: restore brings back the saved one */
+    twin_path_t *fp = twin_path_create();
+    twin_path_set_fill_rule(fp, TwinFillEvenOdd);
+    twin_state_t saved = twin_path_save(fp);
+    twin_path_set_fill_rule(fp, TwinFillNonZero);
+    twin_path_restore(fp, &saved);
+    CHECK(twin_path_save(fp).fill_rule == TwinFillEvenOdd,
+          "restoring a path's state restores its fill rule");
+    twin_path_destroy(fp);
+
     th_t *t = th_create(W, H);
     CHECK(
         twin_screen_width(t->screen) == W && twin_screen_height(t->screen) == H,
@@ -1482,6 +1492,33 @@ static void test_tvg_color_index(void)
         twin_pixmap_destroy(p);
 }
 
+/* TinyVG fills by the even-odd rule: an inner square wound like the outer
+ * one cuts a hole */
+static void test_tvg_even_odd(void)
+{
+    /* clang-format off */
+    const uint8_t doc[] = {
+        0x72, 0x56, 1, 0x44, 2, 2, 1, 0, 0, 0, 255, /* 2x2, one color */
+        0x03, 1, 0, 3, 3, /* fill path: two segments, color 0, 4 cmds each */
+        2, 2, 0, 30, 2, 0, 30, 30, 0, 2, 30, 6,      /* outer, closed */
+        10, 10, 0, 22, 10, 0, 22, 22, 0, 10, 22, 6,  /* inner, same way */
+        0x00,
+    };
+    /* clang-format on */
+    char path[] = "/tmp/mado-tvg-XXXXXX";
+    if (!write_fixture(path, doc, sizeof(doc)))
+        return;
+    twin_pixmap_t *p = twin_tvg_to_pixmap(path, 32, 32);
+    unlink(path);
+    CHECK(p != NULL, "nested TVG squares load");
+    if (!p)
+        return;
+    CHECK((*twin_pixmap_pointer(p, 5, 16).argb32 >> 24) == 0xff,
+          "the ring between the squares is filled");
+    CHECK_EQ(*twin_pixmap_pointer(p, 16, 16).argb32, 0,
+             "the inner square is a hole");
+    twin_pixmap_destroy(p);
+}
 #endif
 
 #if defined(CONFIG_LOADER_GIF) || defined(CONFIG_LOADER_PNG)
@@ -1740,6 +1777,7 @@ int main(void)
 #if defined(CONFIG_LOADER_TVG)
     test_tvg_hairline();
     test_tvg_color_index();
+    test_tvg_even_odd();
 #endif
 #if defined(CONFIG_LOADER_PNG)
     test_png_16bit();

@@ -338,7 +338,8 @@ size_t th_heap_net(const th_t *t)
  * Golden checksums
  *
  * Pixel output depends on build options that change rendering (renderer,
- * shadow geometry, fonts, surface format, the JPEG decoder), so the golden
+ * shadow geometry, fonts, surface format, the JPEG decoder, the arithmetic
+ * backend and its sine/cosine implementation), so the golden
  * file records a fingerprint of those options and comparisons are skipped
  * when it does not match.  Options that must not change pixels, such as the
  * coverage cache, are deliberately left out: those builds have to match.
@@ -347,7 +348,8 @@ static uint32_t config_fingerprint(void)
 {
     char buf[256];
     snprintf(buf, sizeof(buf),
-             "builtin=%d shadow=%d/%d/%d mont=%d icons=%d rgb16=%d jpeg=%d",
+             "builtin=%d shadow=%d/%d/%d mont=%d icons=%d rgb16=%d jpeg=%d "
+             "math=%d",
 #if defined(CONFIG_RENDERER_BUILTIN)
              1,
 #else
@@ -375,6 +377,13 @@ static uint32_t config_fingerprint(void)
              0,
 #endif
 #if defined(CONFIG_LOADER_JPEG)
+             1,
+#else
+             0,
+#endif
+#if defined(CONFIG_MATH_FLOAT) && CONFIG_MATH_FLOAT
+             2
+#elif defined(CONFIG_MATH_TRIG_TABLE) && CONFIG_MATH_TRIG_TABLE
              1
 #else
              0

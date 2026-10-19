@@ -20,6 +20,9 @@ config CC_IS_CLANG
 config CC_IS_GCC
     def_bool $(python,assert run(sys.executable, 'scripts/detect-compiler.py', '--is', 'GCC'))
 
+config CC_IS_RISCV
+    def_bool $(python,assert run(sys.executable, 'scripts/detect-compiler.py', '--target', 'riscv'))
+
 # Cross-compilation support detection
 config CROSS_COMPILE_ENABLED
     def_bool $(python,assert os.environ.get('CROSS_COMPILE'))
@@ -179,6 +182,63 @@ config LOGGING_CALLBACK
     help
       Allow custom callback functions for log handling.
       Enables application-specific log processing.
+
+choice
+    prompt "Math arithmetic backend"
+    default MATH_FIXED
+
+config MATH_FIXED
+    bool "Integer fixed-point arithmetic"
+    help
+      Exact Q16.16 products. Recommended for RV32I and RV32IM.
+
+config MATH_FLOAT
+    bool "Single-precision floating-point arithmetic"
+    help
+      Use binary32 for Q16.16 products, division, sqrt and trigonometry.
+      Coordinate storage and wide geometry predicates remain fixed-point.
+      Results may differ due to binary32 precision. Requires libm.
+      Recommended only with a hardware FPU, such as RV32IMF.
+endchoice
+
+choice
+    prompt "Target ISA profile"
+    default ISA_GENERIC
+    help
+      RISC-V profiles add -march/-mabi flags and appear only when the
+      compiler targets RISC-V, for example CROSS_COMPILE=riscv64-unknown-elf-.
+
+config ISA_GENERIC
+    bool "Compiler default (native or custom cross target)"
+config ISA_RV32I
+    bool "RV32I / ILP32 (software multiply and divide)"
+    depends on CC_IS_RISCV
+config ISA_RV32IM
+    bool "RV32IM / ILP32 (hardware multiply and divide)"
+    depends on CC_IS_RISCV
+config ISA_RV32IMF
+    bool "RV32IMF / ILP32F (single-precision FPU)"
+    depends on CC_IS_RISCV
+endchoice
+
+config ISA_CFLAGS
+    string
+    default "-march=rv32i -mabi=ilp32" if ISA_RV32I
+    default "-march=rv32im -mabi=ilp32" if ISA_RV32IM
+    default "-march=rv32imf -mabi=ilp32f" if ISA_RV32IMF
+    default ""
+
+config MATH_TRIG_TABLE
+    bool "Use generated quarter-wave sine table"
+    depends on MATH_FIXED
+    default y if !OPTIMIZE_SIZE
+    help
+      Standard fixed-point sine/cosine: a generated 4100-byte read-only
+      quarter-wave table, rounded to the nearest Q16 value (at most half
+      an LSB error), with no multiplies and no runtime initialization.
+      Disable it to save the storage; sine/cosine then use a 32-bit
+      polynomial (below six LSBs of error) that needs a few multiplies.
+      Optimizing for size disables it by default.
 
 config OPTIMIZE_SIZE
     bool "Optimize for size"

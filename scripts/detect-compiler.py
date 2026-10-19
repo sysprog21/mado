@@ -56,6 +56,17 @@ def get_compiler_path():
         return 'cc'
 
 
+def get_target_machine(compiler):
+    """Return the compiler's target triple (-dumpmachine), or ''."""
+    try:
+        cmd_argv = shlex.split(compiler)
+        result = subprocess.run(cmd_argv + ['-dumpmachine'], capture_output=True,
+                                text=True, timeout=5)
+        return result.stdout.strip() if result.returncode == 0 else ''
+    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError):
+        return ''
+
+
 def get_compiler_version(compiler):
     """
     Get compiler version string.
@@ -135,6 +146,15 @@ def main():
 
     # Get compiler path
     compiler = get_compiler_path()
+
+    # --target <arch>: succeed when the target triple contains <arch>
+    if '--target' in sys.argv:
+        index = sys.argv.index('--target') + 1
+        if index >= len(sys.argv):
+            print("Error: --target requires an architecture argument", file=sys.stderr)
+            sys.exit(1)
+        arch = sys.argv[index]
+        sys.exit(0 if arch and arch in get_target_machine(compiler) else 1)
 
     # Get version output
     version_output = get_compiler_version(compiler)

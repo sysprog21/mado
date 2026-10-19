@@ -615,6 +615,8 @@ typedef int64_t twin_xfixed_t;
 #define twin_sfixed_mul(a, b) \
     (twin_sfixed_t)((((int32_t) (a)) * ((int32_t) (b))) >> 4)
 
+#define TWIN_XFIXED_ONE (0x100000000)
+
 /* 64-bit fixed-point multiplication and division
  * These require 128-bit intermediate results for full precision.
  *
@@ -627,8 +629,22 @@ typedef int64_t twin_xfixed_t;
 /* Native 128-bit integer support (x86-64, AArch64, etc.) */
 #define twin_xfixed_mul(a, b) \
     (twin_xfixed_t)((((__int128_t) (a)) * ((__int128_t) (b))) >> 32)
-#define twin_xfixed_div(a, b) \
-    (twin_xfixed_t)((((__int128_t) (a)) << 32) / ((__int128_t) (b)))
+static inline twin_xfixed_t twin_xfixed_div(twin_xfixed_t a, twin_xfixed_t b)
+{
+#if defined(__aarch64__)
+    /* Avoid the general 128-bit divide helper for whole Q31.32 divisors and
+     * small raw numerators. Keep -1 out of the whole-number shortcut so
+     * INT64_MIN / -1 cannot invoke signed division overflow.
+     */
+    if (!((uint64_t) b & UINT32_MAX) && b != -TWIN_XFIXED_ONE)
+        return a / (b >> 32);
+    /* |a| < 2^31 keeps a * TWIN_XFIXED_ONE inside int64_t. */
+    if (a >= -INT32_MAX && a <= INT32_MAX)
+        return (a * TWIN_XFIXED_ONE) / b;
+#endif
+    /* Multiplication is defined for negative a; signed left shift is not. */
+    return (twin_xfixed_t) (((__int128_t) a * TWIN_XFIXED_ONE) / b);
+}
 #else
 /* Software implementation for 32-bit platforms
  * Uses 64x64 -> 128 multiplication split into 32x32 -> 64 parts
@@ -725,7 +741,6 @@ static inline twin_xfixed_t _twin_xfixed_div_32bit(twin_xfixed_t a,
 
 #define TWIN_GFIXED_ONE (0x40)
 
-#define TWIN_XFIXED_ONE (0x100000000)
 /*
  * Compositing stuff
  */

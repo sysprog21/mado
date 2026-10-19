@@ -36,6 +36,21 @@ target.a-y :=
 target.a-$(CONFIG_DEMO_APPLICATIONS) += libapps.a
 target.a-y += libtwin.a
 
+# All translation units must share the arithmetic policy and target ABI.
+ifeq ($(CONFIG_MATH_FLOAT),y)
+TARGET_LIBS += -lm
+endif
+ISA_CFLAGS := $(subst ",,$(CONFIG_ISA_CFLAGS))
+override CFLAGS += $(ISA_CFLAGS)
+
+src/math-trig.h: scripts/gen-math.py
+	@echo "  GEN        $@"
+	@python3 $< --trig-table -o $@
+
+src/math-gen.h: scripts/gen-math.py
+	@echo "  GEN        $@"
+	@python3 $< -o $@
+
 # Core library
 
 libtwin.a_cflags-y :=
@@ -308,6 +323,8 @@ font-edit_ldflags-y := \
 target-$(CONFIG_TOOL_HEADLESS_CTL) += headless-ctl
 headless-ctl_files-y = tools/headless-ctl.c
 headless-ctl_includes-y := include
+# Shares the shared-memory layout only; it does not link libtwin.a.
+headless-ctl_cflags-y := -DTWIN_MATH_NO_ABI_CHECK
 headless-ctl_ldflags-y := # -lrt
 endif
 endif
@@ -335,6 +352,22 @@ endef
 $(foreach t,$(TESTS),$(eval $(call test-target,$(t))))
 endif
 endif
+
+# Arithmetic tests use their own main, without the rendering harness.
+ifneq ($(filter check check-update clean distclean,$(MAKECMDGOALS)),)
+ifneq ($(CC_IS_EMCC),1)
+TESTS += test-math
+target-y += test-math
+test-math_depends-y := libtwin.a
+test-math_files-y := tests/test-math.c
+test-math_includes-y := include src
+test-math_ldflags-y := libtwin.a $(TARGET_LIBS) -lm
+endif
+endif
+
+.PHONY: check-math
+check-math:
+	@python3 scripts/check-math.py --cc "$(HOSTCC)" --sanitize
 
 # Goals that build targets, so header dependencies apply to them too
 extra-build-goals := check check-update
@@ -379,6 +412,19 @@ else ifeq ($(check_goal),)
     include mk/common.mk
 endif
 # Otherwise, only config/defconfig targets - skip mk/common.mk
+
+# Kconfig offers RISC-V profiles only for a RISC-V compiler; catch CC changes
+# made after configuration.
+ifneq ($(ISA_CFLAGS),)
+ifeq ($(filter config defconfig clean distclean,$(check_goal)),)
+    ifeq ($(findstring riscv,$(TARGET_MACHINE)),)
+        $(error RISC-V ISA profile selected, but '$(CC)' targets \
+            '$(subst $(empty) $(empty),-,$(TARGET_MACHINE))'. Set CROSS_COMPILE \
+            (or CC) to a RISC-V compiler, or select "Compiler default" in \
+            'make config')
+    endif
+endif
+endif
 
 KCONFIGLIB_REPO := https://github.com/sysprog21/Kconfiglib
 KCONFIGLIB := tools/kconfig/kconfiglib.py

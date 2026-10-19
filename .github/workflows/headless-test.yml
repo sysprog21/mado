@@ -33,6 +33,10 @@ jobs:
         test -x ./headless-ctl || (echo "headless-ctl not built" && exit 1)
         echo "Build outputs verified successfully"
 
+    - name: Run headless test suites
+      run: |
+        make check
+
     - name: Run basic headless test
       run: |
         # Start demo in background, capture stderr for memory stats
@@ -121,6 +125,7 @@ jobs:
 
     - name: Memory leak detection with Valgrind
       run: |
+        export DEBUGINFOD_URLS=
         # Run with Valgrind for leak detection
         timeout 15s valgrind \
           --leak-check=full \
@@ -157,3 +162,53 @@ jobs:
           exit 1
         fi
         echo "No definite memory leaks detected"
+
+    - name: Rebuild with the mobile window manager
+      run: |
+        python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig WM_MOBILE=y
+        python3 tools/kconfig/genconfig.py configs/Kconfig
+        make -j$(nproc)
+        make check
+
+    - name: Phone end-to-end
+      run: |
+        # Boot the phone shell, unlock, open Calculator, type, screenshot
+        timeout 30s ./demo-headless 2>phone_stderr.log &
+        PID=$!
+        sleep 2
+        ./headless-ctl shot phone_lock.png
+        # Slide to unlock: drag the knob along the track
+        ./headless-ctl mouse down 33 295 1
+        for x in 60 100 140 180 220 230; do
+          ./headless-ctl mouse move $x 295 1
+          sleep 0.05
+        done
+        ./headless-ctl mouse up 230 295 1
+        sleep 1
+        ./headless-ctl shot phone_home.png
+        # Calculator icon (second row, first column)
+        ./headless-ctl mouse down 40 128 1
+        ./headless-ctl mouse up 40 128 1
+        sleep 1
+        ./headless-ctl type "12+30="
+        sleep 1
+        ./headless-ctl shot phone_calc.png
+        ./headless-ctl shutdown || true
+        wait $PID || true
+        for f in phone_lock.png phone_home.png phone_calc.png; do
+          identify "$f" > /dev/null || (echo "$f invalid" && exit 1)
+        done
+        # The three screens must differ
+        for a in "phone_lock.png phone_home.png" "phone_home.png phone_calc.png"; do
+          set -- $a
+          DIFF=$(compare -metric AE $1 $2 null: 2>&1 | grep -oE '^[0-9]+' | head -1)
+          echo "$1 vs $2: $DIFF pixels differ"
+          [ "${DIFF:-0}" -gt 1000 ] || (echo "navigation did not change the screen" && exit 1)
+        done
+
+    - name: Upload phone screenshots
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: phone-screenshots
+        path: phone_*.png

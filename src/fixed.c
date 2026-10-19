@@ -55,34 +55,6 @@ twin_fixed_t twin_fixed_sqrt(twin_fixed_t a)
     return (offset >= 0) ? z >> offset : z << (-offset);
 }
 
-twin_sfixed_t _twin_sfixed_sqrt(twin_sfixed_t as)
-{
-    if (as <= 0)
-        return 0;
-    if (CHECK_INTERVAL(as, TWIN_SFIXED_ONE, (1 << (2 - 1))))
-        return TWIN_SFIXED_ONE;
-
-    int offset = 0;
-    for (twin_sfixed_t i = as; !(0x4000 & i); i <<= 1)
-        ++offset;
-
-    offset &= ~1;
-    as <<= offset;
-
-    offset >>= 1;
-    offset -= (4 >> 1);
-
-    twin_sfixed_t z = 0;
-    for (twin_sfixed_t m = 1UL << ((31 - twin_clz(as)) & ~1UL); m; m >>= 2) {
-        int16_t b = z + m;
-        z >>= 1;
-        if (as >= b)
-            as -= b, z += m;
-    }
-
-    return (offset >= 0) ? z >> offset : z << (-offset);
-}
-
 twin_xfixed_t _twin_xfixed_sqrt(twin_xfixed_t a)
 {
     /* Early return for non-positive inputs */
@@ -110,8 +82,7 @@ twin_xfixed_t _twin_xfixed_sqrt(twin_xfixed_t a)
 
     /* Digit-by-digit square root calculation */
     twin_xfixed_t z = 0;
-    for (twin_xfixed_t m = 1ULL << ((63 - __builtin_clzll(a)) & ~1ULL); m;
-         m >>= 2) {
+    for (twin_xfixed_t m = 1ULL << ((63 - twin_clzll(a)) & ~1ULL); m; m >>= 2) {
         twin_xfixed_t b = z + m;
         z >>= 1;
         if (a >= b)

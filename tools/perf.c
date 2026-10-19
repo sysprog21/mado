@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
@@ -25,7 +26,8 @@
 #include <sys/resource.h>
 #endif
 
-#include "twin.h"
+/* White-box benchmark: drives a screen directly, as a backend does */
+#include "twin_private.h"
 
 #define TEST_PIX_WIDTH 1200
 #define TEST_PIX_HEIGHT 800
@@ -302,6 +304,97 @@ static void run_large_tests(void)
     run_test_series("500x500 solid over", test_solid_over_argb32, 500, 500);
 }
 
+/*
+ * Vector UI paths: glyph text and rounded rectangles with the coverage cache
+ * off and on, and a phone-like screen scan-out with occlusion culling off
+ * and on.
+ */
+static twin_path_t *vec_rrect;
+static twin_screen_t *vec_screen;
+static twin_pixmap_t *vec_layers[3];
+
+static void test_text_14(void)
+{
+    twin_font_t *font = NULL;
+#if defined(CONFIG_FONT_MONTSERRAT)
+    font = &twin_font_montserrat;
+#endif
+    twin_text_draw(dst32, font, twin_int_to_fixed(14), twin_int_to_fixed(10),
+                   twin_int_to_fixed(40), 0xff202020, "Messages 12:03 Hello");
+}
+
+static void test_rrect_44(void)
+{
+    twin_paint_path(dst32, 0xff3080c0, vec_rrect);
+}
+
+static void test_scanout(void)
+{
+    twin_screen_damage(vec_screen, 0, 0, 240, 320);
+    twin_screen_update(vec_screen);
+}
+
+static void discard_span(twin_coord_t left,
+                         twin_coord_t top,
+                         twin_coord_t right,
+                         twin_argb32_t *pixels,
+                         void *closure)
+{
+    (void) left;
+    (void) top;
+    (void) right;
+    (void) pixels;
+    (void) closure;
+}
+
+static void run_vector_tests(void)
+{
+    twin_cache_stats_t stats;
+    twin_cache_get_stats(&stats);
+    /* Measure the cached case even when built with CACHE_SIZE=0 */
+    size_t budget = stats.budget ? stats.budget : 24 * 1024;
+
+    vec_rrect = twin_path_create();
+    twin_path_rounded_rectangle(vec_rrect, twin_int_to_fixed(20),
+                                twin_int_to_fixed(20), twin_int_to_fixed(44),
+                                twin_int_to_fixed(44), twin_int_to_fixed(12),
+                                twin_int_to_fixed(12));
+
+    twin_cache_set_budget(0);
+    run_test_series("text 20 glyphs 14px, uncached", test_text_14, 1, 1);
+    run_test_series("rounded rect 44x44, uncached", test_rrect_44, 1, 1);
+    twin_cache_set_budget(budget);
+    test_text_14();
+    test_rrect_44();
+    run_test_series("text 20 glyphs 14px, cached", test_text_14, 1, 1);
+    run_test_series("rounded rect 44x44, cached", test_rrect_44, 1, 1);
+    twin_cache_set_budget(stats.budget);
+
+    /* App over a covered app, plus a status bar: a phone's steady state */
+    vec_screen = twin_screen_create(240, 320, NULL, discard_span, NULL);
+    vec_layers[0] = twin_pixmap_create(TWIN_ARGB32, 240, 258);
+    vec_layers[1] = twin_pixmap_create(TWIN_ARGB32, 240, 258);
+    vec_layers[2] = twin_pixmap_create(TWIN_ARGB32, 240, 20);
+    for (int i = 0; i < 3; i++) {
+        twin_pixmap_t *p = vec_layers[i];
+        twin_fill(p, 0xff406080 + i * 0x101010, TWIN_SOURCE, 0, 0, p->width,
+                  p->height);
+        p->opaque_rect = (twin_rect_t) {0, p->width, 0, p->height};
+        twin_pixmap_move(p, 0, i == 2 ? 0 : 20);
+        twin_pixmap_show(p, vec_screen, vec_screen->top);
+    }
+    _twin_debug |= TWIN_DEBUG_NO_OCCLUSION;
+    run_test_series("scan-out 240x320, 3 layers, no culling", test_scanout, 240,
+                    320);
+    _twin_debug &= ~TWIN_DEBUG_NO_OCCLUSION;
+    run_test_series("scan-out 240x320, 3 layers, culled", test_scanout, 240,
+                    320);
+    for (int i = 0; i < 3; i++)
+        twin_pixmap_destroy(vec_layers[i]);
+    twin_screen_destroy(vec_screen);
+    twin_path_destroy(vec_rrect);
+}
+
 /* Memory profiling mode */
 
 /* Get memory usage statistics
@@ -544,7 +637,7 @@ int main(void)
     printf("Sync time adjustment is %.4f msecs.\n\n", sync_time_adjustment);
 
     /* Create test pixmaps */
-    src32 = twin_pixmap_from_file("assets/tux.png", TWIN_ARGB32);
+    src32 = twin_pixmap_from_file("assets/tux.png");
     if (!src32) {
         /* Fallback: create a simple pixmap if file not found */
         src32 = twin_pixmap_create(TWIN_ARGB32, 256, 256);
@@ -568,11 +661,22 @@ int main(void)
     test_height = 1;
     test_argb32_source_argb32();
 
+    /* MADO_PERF_ONLY=vector runs just the vector UI series */
+    const char *only = getenv("MADO_PERF_ONLY");
+    if (only && !strcmp(only, "vector")) {
+        run_vector_tests();
+        twin_pixmap_destroy(src32);
+        twin_pixmap_destroy(dst32);
+        twin_pixmap_destroy(mask8);
+        return 0;
+    }
+
     /* Run comprehensive performance test series */
     run_basic_tests();
     run_solid_tests();
     run_alpha_tests();
     run_large_tests();
+    run_vector_tests();
 
     /* Run memory profiling tests */
     printf("\n");

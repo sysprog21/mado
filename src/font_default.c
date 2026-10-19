@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include "twin.h"
+#include "twin_private.h"
 
 /* clang-format off */
 static const signed char outlines[] = {

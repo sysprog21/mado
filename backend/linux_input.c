@@ -4,11 +4,14 @@
  * All rights reserved.
  */
 
+/* ppoll() */
+#define _GNU_SOURCE
+#include <errno.h>
 #include <fcntl.h>
 #include <libudev.h>
 #include <linux/input.h>
 #include <poll.h>
-#include <pthread.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,13 +23,6 @@
 
 #define EVDEV_CNT_MAX 32
 #define EVDEV_NAME_SIZE_MAX 50
-#define UDEV_RESERVED_CNT 1
-#define UDEV_EVDEV_FD_CNT (EVDEV_CNT_MAX + UDEV_RESERVED_CNT)
-
-struct evdev_info {
-    int idx;
-    int fd;
-};
 
 /* Coordinate smoothing configuration */
 /* Weight for smoothing (0=off, 1-7=strength) */
@@ -39,13 +35,15 @@ struct evdev_info {
 #error "TWIN_INPUT_SMOOTH_WEIGHT must be in range [0, 7]"
 #endif
 
-typedef struct {
+struct twin_linux_input {
     twin_screen_t *screen;
-    pthread_t evdev_thread;
-    struct evdev_info evdevs[EVDEV_CNT_MAX];
-    size_t evdev_cnt;
-    size_t udev_cnt;
-    int fd;
+    struct udev *udev;
+    struct udev_monitor *mon;
+    /* [0]: the udev monitor (fd -1 without one, which poll() skips), then
+     * one entry per open event device */
+    struct pollfd pfds[1 + EVDEV_CNT_MAX];
+    int evdev_idx[EVDEV_CNT_MAX]; /* /dev/input/eventN of pfds[1 + i] */
+    int evdev_cnt;
     int btns;
     int x, y;
     int abs_x_min, abs_y_min;   /* Minimum value for ABS_X/ABS_Y from device */
@@ -55,7 +53,7 @@ typedef struct {
     int smooth_x, smooth_y;  /* Smoothed coordinates for ABS events */
     bool smooth_initialized; /* Whether smoothing has been initialized */
 #endif
-} twin_linux_input_t;
+};
 
 static void check_mouse_bounds(twin_linux_input_t *tm)
 {
@@ -105,97 +103,79 @@ static inline void smooth_abs_coords(twin_linux_input_t *tm,
 }
 #endif
 
+/* Send the pointer state as an event of @kind */
+static void _pointer(twin_linux_input_t *tm, twin_event_kind_t kind)
+{
+    twin_event_t tev = {.kind = kind};
+    check_mouse_bounds(tm);
+    tev.u.pointer.screen_x = tm->x;
+    tev.u.pointer.screen_y = tm->y;
+    tev.u.pointer.button = tm->btns;
+    twin_screen_dispatch(tm->screen, &tev);
+}
+
+/* Map a device coordinate in [min, max] to [0, size - 1]; false for a
+ * device range that cannot be scaled */
+static bool _scale_abs(int value, int min, int max, int size, int *out)
+{
+    int range = max - min;
+    if (range <= 0)
+        return false;
+    *out = (int) (((int64_t) (value - min) * (size - 1)) / range);
+    return true;
+}
+
 static void twin_linux_input_events(struct input_event *ev,
                                     twin_linux_input_t *tm)
 {
-    /* TODO: twin_screen_dispatch() should be protect by mutex_lock, but the
-     * counterpart piece of code with mutex is not yet sure.
-     */
-
-    twin_event_t tev;
+    int v;
 
     switch (ev->type) {
     case EV_REL:
-        if (ev->code == REL_X) {
+        if (ev->code == REL_X)
             tm->x += ev->value;
-            check_mouse_bounds(tm);
-            tev.kind = TwinEventMotion;
-            tev.u.pointer.screen_x = tm->x;
-            tev.u.pointer.screen_y = tm->y;
-            tev.u.pointer.button = tm->btns;
-            twin_screen_dispatch(tm->screen, &tev);
-        } else if (ev->code == REL_Y) {
+        else if (ev->code == REL_Y)
             tm->y += ev->value;
-            check_mouse_bounds(tm);
-            tev.kind = TwinEventMotion;
-            tev.u.pointer.screen_x = tm->x;
-            tev.u.pointer.screen_y = tm->y;
-            tev.u.pointer.button = tm->btns;
-            twin_screen_dispatch(tm->screen, &tev);
-        }
+        else
+            break;
+        _pointer(tm, TwinEventMotion);
         break;
     case EV_ABS:
-        /* Scale absolute coordinates to screen resolution.
-         * The range is dynamically queried from each device using EVIOCGABS.
-         * Formula: scaled = ((value - min) * (screen_size - 1)) / (max - min)
-         * This correctly maps device coordinates [min, max] to screen [0,
-         * size-1]
-         */
         if (ev->code == ABS_X) {
-            int range = tm->abs_x_max - tm->abs_x_min;
-            if (range > 0) {
-                int raw_x = ((int64_t) (ev->value - tm->abs_x_min) *
-                             (tm->screen->width - 1)) /
-                            range;
-#if TWIN_INPUT_SMOOTH_WEIGHT > 0
-                /* Apply smoothing to X axis, keep Y unchanged */
-                smooth_abs_coords(tm, raw_x, tm->y);
-#else
-                tm->x = raw_x;
-#endif
-                check_mouse_bounds(tm);
-                tev.kind = TwinEventMotion;
-                tev.u.pointer.screen_x = tm->x;
-                tev.u.pointer.screen_y = tm->y;
-                tev.u.pointer.button = tm->btns;
-                twin_screen_dispatch(tm->screen, &tev);
-            } else {
+            if (!_scale_abs(ev->value, tm->abs_x_min, tm->abs_x_max,
+                            tm->screen->width, &v)) {
                 log_warn("Ignoring ABS_X event: invalid range [%d,%d]",
                          tm->abs_x_min, tm->abs_x_max);
+                break;
             }
-        } else if (ev->code == ABS_Y) {
-            int range = tm->abs_y_max - tm->abs_y_min;
-            if (range > 0) {
-                int raw_y = ((int64_t) (ev->value - tm->abs_y_min) *
-                             (tm->screen->height - 1)) /
-                            range;
 #if TWIN_INPUT_SMOOTH_WEIGHT > 0
-                /* Apply smoothing to Y axis, keep X unchanged */
-                smooth_abs_coords(tm, tm->x, raw_y);
+            smooth_abs_coords(tm, v, tm->y);
 #else
-                tm->y = raw_y;
+            tm->x = v;
 #endif
-                check_mouse_bounds(tm);
-                tev.kind = TwinEventMotion;
-                tev.u.pointer.screen_x = tm->x;
-                tev.u.pointer.screen_y = tm->y;
-                tev.u.pointer.button = tm->btns;
-                twin_screen_dispatch(tm->screen, &tev);
-            } else {
+        } else if (ev->code == ABS_Y) {
+            if (!_scale_abs(ev->value, tm->abs_y_min, tm->abs_y_max,
+                            tm->screen->height, &v)) {
                 log_warn("Ignoring ABS_Y event: invalid range [%d,%d]",
                          tm->abs_y_min, tm->abs_y_max);
+                break;
             }
+#if TWIN_INPUT_SMOOTH_WEIGHT > 0
+            smooth_abs_coords(tm, tm->x, v);
+#else
+            tm->y = v;
+#endif
+        } else {
+            break;
         }
+        _pointer(tm, TwinEventMotion);
         break;
     case EV_KEY:
         if (ev->code == BTN_LEFT) {
             tm->btns = ev->value > 0 ? 1 : 0;
-            tev.kind = tm->btns ? TwinEventButtonDown : TwinEventButtonUp;
-            tev.u.pointer.screen_x = tm->x;
-            tev.u.pointer.screen_y = tm->y;
-            tev.u.pointer.button = tm->btns;
-            twin_screen_dispatch(tm->screen, &tev);
+            _pointer(tm, tm->btns ? TwinEventButtonDown : TwinEventButtonUp);
         }
+        break;
     }
 }
 
@@ -310,141 +290,109 @@ static void twin_linux_input_query_abs(int fd, twin_linux_input_t *tm)
     }
 }
 
-static void twin_linux_edev_open(struct pollfd *pfds, twin_linux_input_t *tm)
+/* Open the event devices present now, keeping those already open and
+ * closing those that went away */
+static void twin_linux_edev_open(twin_linux_input_t *tm)
 {
-    /* New event device list */
-    struct evdev_info evdevs[EVDEV_CNT_MAX];
-    int new_evdev_cnt = 0;
-    memset(evdevs, 0, sizeof(evdevs));
+    struct pollfd pfds[EVDEV_CNT_MAX];
+    int idx[EVDEV_CNT_MAX];
+    int cnt = 0;
+    bool changed = false;
 
-    /* Open all event devices */
-    char evdev_name[EVDEV_NAME_SIZE_MAX] = {0};
+    char evdev_name[EVDEV_NAME_SIZE_MAX];
     for (int i = 0; i < EVDEV_CNT_MAX; i++) {
-        /* Check if the file exists */
-        snprintf(evdev_name, EVDEV_NAME_SIZE_MAX, "/dev/input/event%d", i);
+        snprintf(evdev_name, sizeof(evdev_name), "/dev/input/event%d", i);
         if (access(evdev_name, F_OK) != 0)
             continue;
 
-        /* Match device with the old device list  */
-        bool opened = false;
-        for (size_t j = 0; j < tm->evdev_cnt; j++) {
-            /* Copy the fd if the device is already on the list */
-            if (tm->evdevs[j].idx == i) {
-                evdevs[new_evdev_cnt].idx = tm->evdevs[j].idx;
-                evdevs[new_evdev_cnt].fd = tm->evdevs[j].fd;
-                tm->evdevs[j].fd = -1;
-                new_evdev_cnt++;
-                opened = true;
+        /* Keep the descriptor of a device already open */
+        int fd = -1;
+        for (int j = 0; j < tm->evdev_cnt; j++) {
+            if (tm->evdev_idx[j] == i) {
+                fd = tm->pfds[1 + j].fd;
+                tm->pfds[1 + j].fd = -1;
                 break;
             }
         }
-
-        /* Open the file if it is not on the list */
-        int fd = open(evdev_name, O_RDWR | O_NONBLOCK);
-        if (fd >= 0 && !opened) {
-            /* Query absolute axis info for newly opened devices */
+        if (fd < 0) {
+            fd = open(evdev_name, O_RDWR | O_NONBLOCK);
+            if (fd < 0)
+                continue;
             twin_linux_input_query_abs(fd, tm);
-            evdevs[new_evdev_cnt].idx = i;
-            evdevs[new_evdev_cnt].fd = fd;
-            new_evdev_cnt++;
+            changed = true;
+        }
+        pfds[cnt] = (struct pollfd) {.fd = fd, .events = POLLIN};
+        idx[cnt++] = i;
+    }
+
+    /* Whatever is left was disconnected */
+    for (int j = 0; j < tm->evdev_cnt; j++) {
+        if (tm->pfds[1 + j].fd >= 0) {
+            close(tm->pfds[1 + j].fd);
+            changed = true;
         }
     }
 
-    /* Close disconnected devices */
-    bool device_list_changed = false;
-    for (size_t i = 0; i < tm->evdev_cnt; i++) {
-        if (tm->evdevs[i].fd > 0) {
-            close(tm->evdevs[i].fd);
-            device_list_changed = true;
-        }
-    }
-
-    /* Check if new devices were added */
-    if (new_evdev_cnt != tm->evdev_cnt)
-        device_list_changed = true;
-
-    /* Overwrite the evdev list */
-    memcpy(tm->evdevs, evdevs, sizeof(tm->evdevs));
-    tm->evdev_cnt = new_evdev_cnt;
+    memcpy(&tm->pfds[1], pfds, sizeof(pfds[0]) * cnt);
+    memcpy(tm->evdev_idx, idx, sizeof(idx[0]) * cnt);
+    tm->evdev_cnt = cnt;
 
 #if TWIN_INPUT_SMOOTH_WEIGHT > 0
-    /* Reset smoothing state on device reconnection to prevent coordinate jumps
-     */
-    if (device_list_changed && tm->smooth_initialized)
+    /* Reset smoothing on reconnection to prevent coordinate jumps */
+    if (changed)
         tm->smooth_initialized = false;
+#else
+    (void) changed;
 #endif
-
-    /* Initialize evdev poll file descriptors */
-    for (size_t i = tm->udev_cnt; i < tm->evdev_cnt + tm->udev_cnt; i++) {
-        pfds[i].fd = tm->evdevs[i - 1].fd;
-        pfds[i].events = POLLIN;
-    }
 }
 
-static void *twin_linux_evdev_thread(void *arg)
+void twin_linux_input_poll(twin_linux_input_t *tm, int timeout_ms)
 {
-    twin_linux_input_t *tm = arg;
+    /* The VT switch signals stay blocked outside this wait (see
+     * twin_vt_setup_signal_handler()): one sent just before it still ends
+     * it, with no window where the signal is handled and then slept on */
+    sigset_t during;
+    sigprocmask(SIG_BLOCK, NULL, &during);
+    sigdelset(&during, SIGUSR1);
+    sigdelset(&during, SIGUSR2);
+    struct timespec ts = {timeout_ms / 1000, (timeout_ms % 1000) * 1000000L};
+    if (ppoll(tm->pfds, 1 + tm->evdev_cnt, timeout_ms < 0 ? NULL : &ts,
+              &during) <= 0)
+        return; /* timed out, or a signal (a VT switch) woke us */
 
-    struct udev *udev = NULL;
-    struct udev_monitor *mon = NULL;
-
-    /* Open Linux udev (user space device manager) */
-    int udev_fd = twin_linux_udev_init(&udev, &mon);
-    if (udev_fd >= 0)
-        tm->udev_cnt = 1;
-
-    /* Place the udev fd into the poll fds */
-    struct pollfd pfds[UDEV_EVDEV_FD_CNT];
-    pfds[0].fd = udev_fd;
-    pfds[0].events = POLLIN;
-
-    /* Open event devices */
-    twin_linux_edev_open(pfds, tm);
-
-    /* Accessing to input devices is impossible, terminate the thread */
-    if (tm->evdev_cnt == 0 && tm->udev_cnt == 0) {
-        log_error("Failed to open udev and evdev");
-        pthread_exit(NULL);
+    bool rescan = (tm->pfds[0].revents & POLLIN) && tm->mon &&
+                  twin_linux_udev_update(tm->mon);
+    if (tm->pfds[0].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+        /* A broken monitor would wake every poll: carry on without
+         * hotplug */
+        log_warn("udev monitor failed; input hotplug disabled");
+        udev_monitor_unref(tm->mon);
+        udev_unref(tm->udev);
+        tm->mon = NULL;
+        tm->udev = NULL;
+        tm->pfds[0].fd = -1;
     }
 
-    /* Event polling */
-    struct input_event ev;
-    while (1) {
-        /* Wait until any event is available */
-        if (poll(pfds, tm->evdev_cnt + tm->udev_cnt, -1) <= 0)
+    struct input_event ev[64];
+    for (int i = 0; i < tm->evdev_cnt; i++) {
+        short revents = tm->pfds[1 + i].revents;
+        if (revents & (POLLERR | POLLHUP | POLLNVAL))
+            rescan = true;
+        if (!(revents & POLLIN))
             continue;
-
-        /* Iterate through all file descriptors */
-        for (size_t i = 0; i < tm->evdev_cnt + tm->udev_cnt; i++) {
-            if (i < tm->udev_cnt) {
-                /* Check udev event */
-                if (twin_linux_udev_update(mon)) {
-                    /* Re-open event devices */
-                    twin_linux_edev_open(pfds, tm);
-                    break;
-                }
-                continue;
-            }
-            /* Try reading events */
-            ssize_t n = read(pfds[i].fd, &ev, sizeof(ev));
-            if (n == sizeof(ev)) {
-                /* Handle events */
-                twin_linux_input_events(&ev, tm);
-            }
-        }
+        ssize_t n;
+        while ((n = read(tm->pfds[1 + i].fd, ev, sizeof(ev))) > 0)
+            for (size_t k = 0; k < (size_t) n / sizeof(ev[0]); k++)
+                twin_linux_input_events(&ev[k], tm);
     }
 
-    /* Clean up */
-    udev_monitor_unref(mon);
-    udev_unref(udev);
-
-    return NULL;
+    if (rescan)
+        twin_linux_edev_open(tm);
 }
 
-void *twin_linux_input_create(twin_screen_t *screen)
+twin_linux_input_t *twin_linux_input_create(twin_screen_t *screen)
 {
-    /* Create object for handling Linux input system */
-    twin_linux_input_t *tm = calloc(1, sizeof(twin_linux_input_t));
+    twin_linux_input_t *tm = calloc(1, sizeof(*tm));
     if (!tm)
         return NULL;
 
@@ -469,18 +417,36 @@ void *twin_linux_input_create(twin_screen_t *screen)
     tm->smooth_initialized = true;
 #endif
 
-    /* Start event handling thread */
-    if (pthread_create(&tm->evdev_thread, NULL, twin_linux_evdev_thread, tm)) {
-        log_error("Failed to create evdev thread");
-        return NULL;
+    /* Hotplug notifications, when udev is there */
+    int udev_fd = twin_linux_udev_init(&tm->udev, &tm->mon);
+    if (udev_fd < 0) {
+        /* A monitor without a descriptor is no use; earlier failures
+         * already released what they made */
+        if (tm->mon) {
+            udev_monitor_unref(tm->mon);
+            udev_unref(tm->udev);
+        }
+        tm->udev = NULL;
+        tm->mon = NULL;
     }
+    tm->pfds[0] = (struct pollfd) {.fd = udev_fd, .events = POLLIN};
 
+    twin_linux_edev_open(tm);
+    /* The display stays usable without input: poll then only sleeps */
+    if (tm->evdev_cnt == 0 && udev_fd < 0)
+        log_warn("No input devices and no udev: running without input");
     return tm;
 }
 
-void twin_linux_input_destroy(void *_tm)
+void twin_linux_input_destroy(twin_linux_input_t *tm)
 {
-    twin_linux_input_t *tm = _tm;
-    close(tm->fd);
+    if (!tm)
+        return;
+    for (int i = 0; i < tm->evdev_cnt; i++)
+        close(tm->pfds[1 + i].fd);
+    if (tm->mon)
+        udev_monitor_unref(tm->mon);
+    if (tm->udev)
+        udev_unref(tm->udev);
     free(tm);
 }

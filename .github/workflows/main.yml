@@ -16,12 +16,15 @@ jobs:
         with:
           files: |
               .ci/**
+              .github/workflows/**
               mk/**
               include/**
               src/**
               backend/**
               apps/**
               tools/**
+              tests/**
+              configs/**
               .clang-format
               Makefile
       - name: Set has_code_related_changes
@@ -44,10 +47,104 @@ jobs:
             sudo apt-get update -q -y
             sudo apt-get install -y libsdl2-dev libjpeg-dev libpng-dev libcairo2-dev
       shell: bash
-    - name: default build
+    - name: default build (desktop window manager)
       run: |
             make defconfig
             make
+    - name: headless tests
+      run: |
+            make check
+    - name: headless tests under Valgrind
+      run: |
+            sudo apt-get install -y -q valgrind
+            for t in test-core test-wm test-lifetime test-demos; do
+              DEBUGINFOD_URLS= valgrind -q --error-exitcode=1 \
+                --leak-check=full --errors-for-leak-kinds=definite ./$t
+            done
+      shell: bash
+    - name: mobile build (phone and demos)
+      run: |
+            python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig WM_MOBILE=y
+            python3 tools/kconfig/genconfig.py configs/Kconfig
+            make
+    - name: headless tests (mobile)
+      run: |
+            make check
+    - name: headless tests under Valgrind (mobile)
+      run: |
+            for t in test-core test-wm test-lifetime test-demos test-cellphone; do
+              DEBUGINFOD_URLS= valgrind -q --error-exitcode=1 \
+                --leak-check=full --errors-for-leak-kinds=definite ./$t
+            done
+      shell: bash
+
+  sanitizers:
+    needs: [detect-code-related-file-changes]
+    if: needs.detect-code-related-file-changes.outputs.has_code_related_changes == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v6
+    - name: install-dependencies
+      run: |
+            sudo apt-get update -q -y
+            sudo apt-get install -y libsdl2-dev libjpeg-dev libpng-dev
+    - name: AddressSanitizer + UndefinedBehaviorSanitizer
+      run: |
+            for wm in WM_DESKTOP WM_MOBILE WM_NONE; do
+              make defconfig
+              python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig $wm=y
+              python3 tools/kconfig/genconfig.py configs/Kconfig
+              make clean
+              make check \
+                CFLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined" \
+                LDFLAGS="-fsanitize=address,undefined"
+            done
+      shell: bash
+
+  config-matrix:
+    needs: [detect-code-related-file-changes]
+    if: needs.detect-code-related-file-changes.outputs.has_code_related_changes == 'true'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: no window manager
+            options: WM_NONE=y
+          - name: no coverage cache
+            options: WM_MOBILE=y CACHE_SIZE=0
+          - name: no mobile eviction
+            options: WM_MOBILE=y WM_MOBILE_EVICT=n
+          - name: no shadows
+            options: DROP_SHADOW=n
+          - name: no allocator stats
+            options: MEMORY_STATS=n
+          - name: no widget toolkit
+            options: WM_MOBILE=y WIDGETS=n
+          - name: RGB565 phone surfaces
+            options: WM_MOBILE=y DEMO_CELLPHONE_RGB16=y
+          - name: TLSF heap
+            options: WM_MOBILE=y MEM_TLSF=y MEM_TLSF_POOL_SIZE=4194304
+          - name: Pixman renderer
+            options: WM_MOBILE=y RENDERER_PIXMAN=y
+          - name: Pixman renderer, desktop
+            options: RENDERER_PIXMAN=y
+          - name: size-optimized, heap masks only
+            options: WM_MOBILE=y OPTIMIZE_SIZE=y SCRATCH_SIZE=0
+    name: config (${{ matrix.name }})
+    steps:
+    - uses: actions/checkout@v6
+    - name: install-dependencies
+      run: |
+            sudo apt-get update -q -y
+            sudo apt-get install -y libsdl2-dev libjpeg-dev libpng-dev libpixman-1-dev
+    - name: build and test
+      run: |
+            make defconfig
+            python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig ${{ matrix.options }}
+            python3 tools/kconfig/genconfig.py configs/Kconfig
+            make
+            make check
 
   coding-style:
     needs: [detect-code-related-file-changes]

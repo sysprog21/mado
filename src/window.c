@@ -1,30 +1,110 @@
 /*
  * Twin - A Tiny Window System
  * Copyright (c) 2004 Keith Packard <keithp@keithp.com>
- * Copyright (c) 2024-2025 National Cheng Kung University, Taiwan
+ * Copyright (c) 2024-2026 National Cheng Kung University, Taiwan
  * All rights reserved.
  */
 
+/*
+ * Window core
+ *
+ * A window is a pixmap plus client callbacks.  Geometry, decorations,
+ * stacking and pointer policy belong to the active window manager
+ * (screen->wm); this file only keeps the bookkeeping consistent:
+ *
+ *  - screen->windows lists every window bottom-to-top.  Policies treat that
+ *    order as the stacking order and raise a window by moving it to the end.
+ *  - window->request is what the application asked for; window->client is
+ *    where the policy put the client area inside the pixmap.
+ *  - A window whose pixels are not needed (hidden under a full-screen app)
+ *    can be evicted: its pixmap becomes a storage-less stub and is redrawn
+ *    from client state when it is shown again.
+ */
+
 #include <stdlib.h>
+#include <string.h>
 
 #include "twin_private.h"
 
-#if defined(CONFIG_WINDOW_MANAGER)
+static void _twin_window_link(twin_window_t *window)
+{
+    twin_window_t **pp = &window->screen->windows;
+    while (*pp)
+        pp = &(*pp)->wm_next;
+    window->wm_next = NULL;
+    *pp = window;
+}
 
-#define TWIN_ACTIVE_BG 0xd03b80ae
-#define TWIN_INACTIVE_BG 0xffb0b0b0
-#define TWIN_FRAME_TEXT 0xffffffff
-#define TWIN_ACTIVE_BORDER 0xff606060
-#define TWIN_INACTIVE_BORDER 0xff909090
-#define TWIN_BW 0
-#define TWIN_TITLE_HEIGHT 20
-#define TWIN_RESIZE_SIZE ((TWIN_TITLE_HEIGHT + 4) / 5)
-#define TWIN_TITLE_BW ((TWIN_TITLE_HEIGHT + 11) / 12)
+static void _twin_window_unlink(twin_window_t *window)
+{
+    for (twin_window_t **pp = &window->screen->windows; *pp;
+         pp = &(*pp)->wm_next) {
+        if (*pp == window) {
+            /* window->wm_next stays: a walk standing on a window that is
+             * destroyed under it can still step to the rest of the list */
+            *pp = window->wm_next;
+            return;
+        }
+    }
+}
 
-/* Shadow color for CSS-style effect: semi-transparent black (50% opacity). */
-#define SHADOW_COLOR 0x80000000
+#if TWIN_WM_BARS
+bool _twin_window_is_bar(const twin_window_t *window)
+{
+    return window == window->screen->bar_top ||
+           window == window->screen->bar_bottom;
+}
+#endif
 
-#endif /* CONFIG_WINDOW_MANAGER */
+bool _twin_window_shown(const twin_window_t *window)
+{
+    return window->pixmap && window->pixmap->screen &&
+           !_twin_pixmap_is_stub(window->pixmap);
+}
+
+bool _twin_window_managed(const twin_window_t *window)
+{
+    return window->mapped && window->style != TwinWindowPlain &&
+           !_twin_window_is_bar(window);
+}
+
+/* Keep the compositor's notion of opaque pixels in sync with the window */
+static void _twin_window_update_opaque(twin_window_t *window)
+{
+    twin_pixmap_t *pixmap = window->pixmap;
+    if (!pixmap || _twin_pixmap_is_stub(pixmap))
+        return;
+    if (pixmap->format == TWIN_RGB16)
+        pixmap->opaque_rect =
+            (twin_rect_t) {0, pixmap->width, 0, pixmap->height};
+    else if (window->opaque)
+        pixmap->opaque_rect = window->client;
+    else
+        pixmap->opaque_rect = (twin_rect_t) {0, 0, 0, 0};
+}
+
+/* Clip to @r (pixmap coordinates) and put the origin at the client corner */
+static void _twin_window_clip(twin_window_t *window, const twin_rect_t *r)
+{
+    twin_pixmap_t *pixmap = window->pixmap;
+    twin_pixmap_reset_clip(pixmap);
+    pixmap->origin_x = pixmap->origin_y = 0;
+    twin_pixmap_clip(pixmap, r->left, r->top, r->right, r->bottom);
+    pixmap->origin_x = window->client.left;
+    pixmap->origin_y = window->client.top;
+}
+
+static void _twin_window_reset_clip(twin_window_t *window)
+{
+    _twin_window_clip(window, &window->client);
+}
+
+static void _twin_window_damage_all(twin_window_t *window)
+{
+    window->damage[0] = window->client;
+    window->n_damage = 1;
+    window->frame_dirty = true;
+}
 
 twin_window_t *twin_window_create(twin_screen_t *screen,
                                   twin_format_t format,
@@ -34,114 +114,224 @@ twin_window_t *twin_window_create(twin_screen_t *screen,
                                   twin_coord_t width,
                                   twin_coord_t height)
 {
-    twin_window_t *window = twin_malloc(sizeof(twin_window_t));
-    twin_coord_t left, top, right, bottom;
+    twin_window_t *window = twin_calloc(1, sizeof(twin_window_t));
+    twin_rect_t geom, border;
 
     if (!window)
         return NULL;
     window->screen = screen;
     window->style = style;
-    window->active = false;
-    window->iconify = false;
+    window->format = format;
+    window->request = (twin_rect_t) {x, x + width, y, y + height};
+    window->opaque = format == TWIN_RGB16;
 
-#if defined(CONFIG_WINDOW_MANAGER)
-    switch (window->style) {
-    case TwinWindowApplication:
-        left = TWIN_BW;
-        top = TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW;
-        right = TWIN_BW;
-        bottom = TWIN_BW;
-        break;
-    case TwinWindowPlain:
-    default:
-        left = 0;
-        top = 0;
-        right = 0;
-        bottom = 0;
-        break;
-    }
-    width += left + right;
-    height += top + bottom;
-#else
-    /* No-WM: the single window always covers the entire screen
-     * regardless of what the application requested.  The screen
-     * dimensions are authoritative -- they come from the backend
-     * (hardware resolution for fbdev, window size for SDL, etc.).
-     */
-    left = 0;
-    top = 0;
-    right = 0;
-    bottom = 0;
-    x = 0;
-    y = 0;
-    width = screen->width;
-    height = screen->height;
-#endif
-
-    window->client.left = left;
-    window->client.top = top;
-    window->client.right = width - right;
-    window->client.bottom = height - bottom;
-#if defined(CONFIG_DROP_SHADOW)
-    /* Handle drop shadow.
-     *
-     * Allocate extra space in the pixmap for the drop shadow. The dimensions
-     * match the mask footprint generated by twin_shadow_border(): the shadow
-     * offset plus the blur-shaped fade-out region on the right and bottom
-     * edges.
-     */
-    window->shadow_x = TWIN_SHADOW_EXTENT_X;
-    window->shadow_y = TWIN_SHADOW_EXTENT_Y;
-    window->pixmap = twin_pixmap_create(format, width + window->shadow_x,
-                                        height + window->shadow_y);
-#else
-    window->shadow_x = 0;
-    window->shadow_y = 0;
-    window->pixmap = twin_pixmap_create(format, width, height);
-#endif
+    _twin_wm_layout(window, &geom, &border);
+    window->pixmap = twin_pixmap_create(format, geom.right - geom.left,
+                                        geom.bottom - geom.top);
     if (!window->pixmap) {
         twin_free(window);
         return NULL;
     }
-    twin_pixmap_clip(window->pixmap, window->client.left, window->client.top,
-                     window->client.right, window->client.bottom);
-    twin_pixmap_origin_to_clip(window->pixmap);
     window->pixmap->window = window;
-    twin_pixmap_move(window->pixmap, x, y);
-    window->damage = window->client;
-    window->client_grab = false;
-    window->draw_queued = false;
-    window->client_data = 0;
-    window->name = 0;
-
-    window->draw = 0;
-    window->event = 0;
-    window->destroy = 0;
+    window->pixmap->x = geom.left;
+    window->pixmap->y = geom.top;
+    window->client = (twin_rect_t) {
+        border.left,
+        window->pixmap->width - border.right,
+        border.top,
+        window->pixmap->height - border.bottom,
+    };
+    _twin_window_reset_clip(window);
+    _twin_window_update_opaque(window);
+    _twin_window_damage_all(window);
+    _twin_window_link(window);
     return window;
 }
 
 void twin_window_destroy(twin_window_t *window)
 {
-    twin_window_hide(window);
+    twin_screen_t *screen = window->screen;
+
+    /* Stop queued repaints from touching freed memory.  Clearing the work
+     * item matters: a later object at the same address would otherwise
+     * look like a live owner to the closure tracker. */
+    twin_clear_work(window->paint_work);
+    window->paint_work = NULL;
+    /* ...and refuse new ones from the policy or the destroy callback */
+    window->draw_queued = true;
+    _twin_closure_mark_for_free(window);
+    _twin_closure_unregister(window);
+
+    /* A destroyed bar unregisters itself; its rows go back to the work
+     * area once it is gone (below) */
+    bool was_bar = _twin_window_is_bar(window);
+#if TWIN_WM_BARS
+    if (screen->bar_top == window)
+        screen->bar_top = NULL;
+    if (screen->bar_bottom == window)
+        screen->bar_bottom = NULL;
+#endif
+
+    /* Always tell the policy, even for unmapped windows, so it can drop any
+     * reference it still holds (e.g. a window taking part in a transition).
+     * A closing screen's policy has let go of every window already. */
+    window->mapped = false;
+    if (screen->closing)
+        twin_pixmap_hide(window->pixmap);
+    else
+        _twin_wm_unmap(window, true);
 
     /* Call the destroy callback if set to clean up window contents */
     if (window->destroy)
         (*window->destroy)(window);
 
-    twin_pixmap_destroy(window->pixmap);
+    /* The callback may have scheduled work or timeouts on the window; the
+     * unregister above dropped the mark, so drop the entry again now that
+     * nothing legitimate can use it. */
+    twin_clear_work(window->paint_work);
+    window->paint_work = NULL;
+    _twin_closure_unregister(window);
+
+    _twin_window_unlink(window);
+
+    /* The policy may have adopted the pixmap to animate the departure. */
+    if (window->pixmap) {
+        _twin_screen_forget(screen, window->pixmap);
+        twin_pixmap_destroy(window->pixmap);
+    }
+#if defined(CONFIG_WM_DESKTOP)
     twin_free(window->name);
-    twin_free(window);
+    window->name = NULL;
+#endif
+    window->pixmap = NULL;
+    window->event = NULL;
+    window->draw = NULL;
+    window->destroy = NULL;
+    window->dead = true;
+
+    if (was_bar && !screen->closing)
+        _twin_screen_relayout(screen);
+    /* Whoever is running callbacks may still hold the pointer */
+    if (screen->dispatching) {
+        window->zombie_next = screen->zombies;
+        screen->zombies = window;
+    } else {
+        twin_free(window);
+    }
 }
 
 void twin_window_show(twin_window_t *window)
 {
-    if (window->pixmap != window->screen->top)
-        twin_pixmap_show(window->pixmap, window->screen, window->screen->top);
+    window->mapped = true;
+    /* Nothing is shown any more on a closing screen */
+    if (!window->screen->closing)
+        _twin_wm_map(window);
 }
 
 void twin_window_hide(twin_window_t *window)
 {
-    twin_pixmap_hide(window->pixmap);
+    if (!window->mapped)
+        return;
+    window->mapped = false;
+    if (window->screen->closing)
+        twin_pixmap_hide(window->pixmap);
+    else
+        _twin_wm_unmap(window, false);
+}
+
+/*
+ * Swap window->pixmap for @fresh (already positioned) and free the old one.
+ * The compositing attributes, the stacking position and pending update
+ * disables move across.  With @keep_focus the screen's active pixmap and
+ * pointer target follow the window; without it they are dropped, as when
+ * the surface is evicted.
+ */
+static void _twin_window_replace_pixmap(twin_window_t *window,
+                                        twin_pixmap_t *fresh,
+                                        bool keep_focus)
+{
+    twin_pixmap_t *old = window->pixmap;
+    twin_screen_t *screen = window->screen;
+
+    fresh->window = window;
+    fresh->opacity = old->opacity;
+#if defined(CONFIG_DROP_SHADOW)
+    fresh->shadow = old->shadow;
+#endif
+    if (old->scan_height < old->height)
+        fresh->scan_height = min(old->scan_height, fresh->height);
+    if (old->screen)
+        twin_pixmap_show(fresh, old->screen, old);
+    for (int i = 0; i < old->disable; i++)
+        twin_pixmap_disable_update(fresh);
+    if (keep_focus) {
+        if (screen->active == old)
+            screen->active = fresh;
+        if (screen->target == old)
+            screen->target = fresh;
+    } else {
+        _twin_screen_forget(screen, old);
+    }
+    twin_pixmap_destroy(old);
+    window->pixmap = fresh;
+}
+
+void _twin_window_relayout(twin_window_t *window)
+{
+    twin_rect_t geom, border;
+    twin_pixmap_t *pixmap = window->pixmap;
+
+    /* A window being destroyed may have handed its pixmap to the policy;
+     * a closing screen lays nothing out */
+    if (!pixmap || window->screen->closing)
+        return;
+    _twin_wm_layout(window, &geom, &border);
+    twin_coord_t width = geom.right - geom.left;
+    twin_coord_t height = geom.bottom - geom.top;
+    twin_rect_t old_client = window->client;
+    twin_rect_t client = {border.left, width - border.right, border.top,
+                          height - border.bottom};
+
+    /* Same place, same size, same decorations: nothing to repaint */
+    if (width == pixmap->width && height == pixmap->height &&
+        window->format == pixmap->format && geom.left == pixmap->x &&
+        geom.top == pixmap->y && !memcmp(&client, &old_client, sizeof(client)))
+        return;
+
+    if (width != pixmap->width || height != pixmap->height ||
+        window->format != pixmap->format) {
+        twin_pixmap_t *fresh =
+            _twin_pixmap_is_stub(pixmap)
+                ? _twin_pixmap_create_stub(window->format, width, height)
+                : twin_pixmap_create(window->format, width, height);
+        if (!fresh)
+            return;
+        fresh->x = geom.left;
+        fresh->y = geom.top;
+        _twin_window_replace_pixmap(window, fresh, true);
+        pixmap = fresh;
+    }
+
+    window->client = client;
+    _twin_window_reset_clip(window);
+    _twin_window_update_opaque(window);
+    twin_pixmap_move(pixmap, geom.left, geom.top);
+    _twin_window_damage_all(window);
+
+    /* Tell the client its size changed, then repaint everything. */
+    if (window->event && (old_client.right - old_client.left !=
+                              window->client.right - window->client.left ||
+                          old_client.bottom - old_client.top !=
+                              window->client.bottom - window->client.top)) {
+        twin_event_t ev = {.kind = TwinEventConfigure};
+        ev.u.configure.extents =
+            (twin_rect_t) {0, window->client.right - window->client.left, 0,
+                           window->client.bottom - window->client.top};
+        (*window->event)(window, &ev);
+        if (window->dead)
+            return;
+    }
+    twin_window_draw(window);
 }
 
 void twin_window_configure(twin_window_t *window,
@@ -151,139 +341,69 @@ void twin_window_configure(twin_window_t *window,
                            twin_coord_t width,
                            twin_coord_t height)
 {
-    bool need_repaint = false;
-    bool need_layout = false;
-    twin_rect_t border;
-
-#if defined(CONFIG_WINDOW_MANAGER)
-    _twin_window_style_size(style, &border);
-#else
-    /* No-WM: always match the screen provided by the backend. */
-    border.left = border.right = border.top = border.bottom = 0;
-    x = 0;
-    y = 0;
-    width = window->screen->width;
-    height = window->screen->height;
+    twin_screen_t *screen = window->screen;
+    twin_rect_t area = twin_screen_work_area(screen);
+    window->style = style;
+    window->request = (twin_rect_t) {x, x + width, y, y + height};
+#if defined(CONFIG_WM_DESKTOP)
+    window->wm_maximized = false;
 #endif
-
-    twin_pixmap_disable_update(window->pixmap);
-    if (width != window->pixmap->width || height != window->pixmap->height) {
-        twin_pixmap_t *old = window->pixmap;
-        twin_coord_t pix_w = width + window->shadow_x;
-        twin_coord_t pix_h = height + window->shadow_y;
-        twin_pixmap_t *new_pixmap =
-            twin_pixmap_create(old->format, pix_w, pix_h);
-        if (!new_pixmap) {
-            twin_pixmap_enable_update(window->pixmap);
-            return;
-        }
-        int i;
-
-        window->pixmap = new_pixmap;
-        window->pixmap->window = window;
-        twin_pixmap_move(window->pixmap, x, y);
-        if (old->screen)
-            twin_pixmap_show(window->pixmap, window->screen, old);
-        for (i = 0; i < old->disable; i++)
-            twin_pixmap_disable_update(window->pixmap);
-        twin_pixmap_destroy(old);
-        need_layout = true;
-        need_repaint = true;
-    }
-    if (style != window->style) {
-        need_layout = true;
-        window->style = style;
-        need_repaint = true;
-    }
-    if (need_layout) {
-        window->client.left = border.left;
-        window->client.top = border.top;
-        window->client.right = width - border.right;
-        window->client.bottom = height - border.bottom;
-
-        twin_pixmap_reset_clip(window->pixmap);
-        twin_pixmap_clip(window->pixmap, window->client.left,
-                         window->client.top, window->client.right,
-                         window->client.bottom);
-        twin_pixmap_origin_to_clip(window->pixmap);
-    }
-    if (x != window->pixmap->x || y != window->pixmap->y)
-        twin_pixmap_move(window->pixmap, x, y);
-    if (need_repaint)
-        twin_window_draw(window);
-    twin_pixmap_enable_update(window->pixmap);
+    /* The Configure handler may destroy the window: keep it readable */
+    _twin_screen_busy(screen);
+    _twin_window_relayout(window);
+    /* A bar's height is part of everyone's work area */
+    twin_rect_t now = twin_screen_work_area(screen);
+    if (memcmp(&area, &now, sizeof(area)))
+        _twin_screen_relayout(screen);
+    else if (window->mapped && !screen->closing)
+        /* The style may move the window between policy layers */
+        _twin_wm_refresh(screen);
+    _twin_screen_idle(screen);
 }
 
-#if defined(CONFIG_WINDOW_MANAGER)
-
-bool _twin_window_valid_range(twin_window_t *window,
-                              twin_coord_t x,
-                              twin_coord_t y)
+void _twin_window_evict(twin_window_t *window)
 {
-    twin_coord_t offset_x = window->shadow_x;
-    twin_coord_t offset_y = window->shadow_y;
+    twin_pixmap_t *pixmap = window->pixmap;
+    if (!pixmap || _twin_pixmap_is_stub(pixmap))
+        return;
+    /* Without a draw callback the pixels cannot be reconstructed */
+    if (!window->draw)
+        return;
+    twin_pixmap_t *stub =
+        _twin_pixmap_create_stub(pixmap->format, pixmap->width, pixmap->height);
+    if (!stub)
+        return;
+    stub->x = pixmap->x;
+    stub->y = pixmap->y;
+    _twin_window_replace_pixmap(window, stub, false);
+    _twin_window_damage_all(window);
+}
 
-    switch (window->style) {
-    case TwinWindowPlain:
-    default:
-        if (window->pixmap->x <= x &&
-            x < window->pixmap->x + window->pixmap->width - offset_x &&
-            window->pixmap->y <= y &&
-            y < window->pixmap->y + window->pixmap->height - offset_y)
-            return true;
+bool _twin_window_restore(twin_window_t *window)
+{
+    twin_pixmap_t *stub = window->pixmap;
+    if (!_twin_pixmap_is_stub(stub))
+        return true;
+    twin_pixmap_t *pixmap =
+        twin_pixmap_create(stub->format, stub->width, stub->height);
+    if (!pixmap)
         return false;
-    case TwinWindowApplication:
-        if (window->pixmap->x <= x &&
-            x < window->pixmap->x + window->pixmap->width - offset_x &&
-            window->pixmap->y <= y &&
-            y < window->pixmap->y + window->pixmap->height - offset_y) {
-            if (y < window->pixmap->y + (window->client.top))
-                return !twin_pixmap_transparent(window->pixmap, x, y);
-            return !window->iconify;
-        }
-        return false;
-    }
+    pixmap->x = stub->x;
+    pixmap->y = stub->y;
+    _twin_window_replace_pixmap(window, pixmap, true);
+    _twin_window_reset_clip(window);
+    _twin_window_update_opaque(window);
+    _twin_window_damage_all(window);
+    /* Painted before the next redisplay; a window covered and evicted
+     * again first (closing a stack of apps) is never painted at all */
+    twin_window_queue_paint(window);
+    return true;
 }
-
-void _twin_window_style_size(twin_window_style_t style, twin_rect_t *size)
-{
-    switch (style) {
-    case TwinWindowPlain:
-    default:
-        size->left = size->right = size->top = size->bottom = 0;
-        break;
-    case TwinWindowApplication:
-        size->left = TWIN_BW;
-        size->right = TWIN_BW;
-        size->top = TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW;
-        size->bottom = TWIN_BW;
-        break;
-    }
-}
-
-#else /* !CONFIG_WINDOW_MANAGER */
-
-bool _twin_window_valid_range(twin_window_t *window,
-                              twin_coord_t x,
-                              twin_coord_t y)
-{
-    /* Simple bounds check without frame or shadow logic */
-    return window->pixmap->x <= x &&
-           x < window->pixmap->x + window->pixmap->width &&
-           window->pixmap->y <= y &&
-           y < window->pixmap->y + window->pixmap->height;
-}
-
-void _twin_window_style_size(twin_window_style_t style, twin_rect_t *size)
-{
-    (void) style;
-    size->left = size->right = size->top = size->bottom = 0;
-}
-
-#endif /* CONFIG_WINDOW_MANAGER */
 
 void twin_window_set_name(twin_window_t *window, const char *name)
 {
+#if defined(CONFIG_WM_DESKTOP)
+    /* Only title bars show it */
     if (!name)
         return;
     char *new_name = twin_malloc(strlen(name) + 1);
@@ -292,243 +412,60 @@ void twin_window_set_name(twin_window_t *window, const char *name)
     strcpy(new_name, name);
     twin_free(window->name);
     window->name = new_name;
-    twin_window_draw(window);
+    window->frame_dirty = true;
+    twin_window_queue_paint(window);
+#else
+    (void) window;
+    (void) name;
+#endif
 }
 
-#if defined(CONFIG_WINDOW_MANAGER)
-
-static void twin_window_frame(twin_window_t *window)
+void twin_window_set_opaque(twin_window_t *window, bool opaque)
 {
-    twin_fixed_t bw = twin_int_to_fixed(TWIN_TITLE_BW);
-    twin_path_t *path;
-    twin_fixed_t bw_2 = bw / 2;
-    twin_pixmap_t *pixmap = window->pixmap;
-    twin_fixed_t w_top = bw_2;
-    twin_fixed_t c_left = bw_2;
-    twin_fixed_t t_h = twin_int_to_fixed(window->client.top) - bw;
-    twin_fixed_t t_arc_1 = t_h / 3;
-    twin_fixed_t t_arc_2 = t_h * 2 / 3;
-    twin_fixed_t c_right = twin_int_to_fixed(window->client.right) - bw_2;
-    twin_fixed_t c_top = twin_int_to_fixed(window->client.top) - bw_2;
-
-    twin_fixed_t name_height = t_h - bw - bw_2;
-    twin_fixed_t icon_size = name_height * 8 / 10;
-    twin_fixed_t icon_y =
-        (twin_int_to_fixed(window->client.top) - icon_size) / 2;
-    twin_fixed_t menu_x = t_arc_2;
-    twin_fixed_t text_x = menu_x + icon_size + bw;
-    twin_fixed_t text_y = icon_y + icon_size;
-    twin_fixed_t text_width;
-    twin_fixed_t title_right;
-    twin_fixed_t close_x;
-    twin_fixed_t restore_x;
-    twin_fixed_t iconify_x;
-    twin_fixed_t resize_x;
-    twin_fixed_t resize_y;
-    const char *name;
-
-    twin_pixmap_reset_clip(pixmap);
-    twin_pixmap_origin_to_clip(pixmap);
-
-    twin_fill(pixmap, 0x00000000, TWIN_SOURCE, 0, 0, pixmap->width,
-              window->client.top);
-
-    path = twin_path_create();
-
-
-    /* name */
-    name = window->name;
-    if (!name)
-        name = "twin";
-    twin_path_set_font_size(path, name_height);
-    twin_path_set_font_style(path, TwinStyleOblique | TwinStyleUnhinted);
-    text_width = twin_width_utf8(path, name);
-
-    title_right = (text_x + text_width + bw + icon_size + bw + icon_size + bw +
-                   icon_size + t_arc_2);
-
-    if (title_right < c_right)
-        c_right = title_right;
-
-
-    close_x = c_right - t_arc_2 - icon_size;
-    restore_x = close_x - bw - icon_size;
-    iconify_x = restore_x - bw - icon_size;
-    resize_x = twin_int_to_fixed(window->client.right);
-    resize_y = twin_int_to_fixed(window->client.bottom);
-
-    /* border */
-
-    twin_path_move(path, c_left, c_top);
-    twin_path_draw(path, c_right, c_top);
-    twin_path_curve(path, c_right, w_top + t_arc_1, c_right - t_arc_1, w_top,
-                    c_right - t_h, w_top);
-    twin_path_draw(path, c_left + t_h, w_top);
-    twin_path_curve(path, c_left + t_arc_1, w_top, c_left, w_top + t_arc_1,
-                    c_left, c_top);
-    twin_path_close(path);
-
-    if (window->active) {
-        twin_paint_path(pixmap, TWIN_ACTIVE_BG, path);
-        twin_paint_stroke(pixmap, TWIN_ACTIVE_BORDER, path, bw_2 * 2);
-    } else {
-        twin_paint_path(pixmap, TWIN_INACTIVE_BG, path);
-        twin_paint_stroke(pixmap, TWIN_INACTIVE_BORDER, path, bw_2 * 2);
-    }
-
-    twin_path_empty(path);
-
-    twin_pixmap_clip(pixmap, twin_fixed_to_int(twin_fixed_floor(menu_x)), 0,
-                     twin_fixed_to_int(twin_fixed_ceil(c_right - t_arc_2)),
-                     window->client.top);
-    twin_pixmap_origin_to_clip(pixmap);
-
-    twin_path_move(path, text_x - twin_fixed_floor(menu_x), text_y);
-    twin_path_utf8(path, name);
-    twin_paint_path(pixmap, TWIN_FRAME_TEXT, path);
-
-    twin_pixmap_reset_clip(pixmap);
-    twin_pixmap_origin_to_clip(pixmap);
-
-    /* widgets */
-
-    {
-        twin_matrix_t m;
-
-        twin_matrix_identity(&m);
-        twin_matrix_translate(&m, menu_x, icon_y);
-        twin_matrix_scale(&m, icon_size, icon_size);
-        twin_icon_draw(pixmap, TwinIconMenu, m);
-
-        twin_matrix_identity(&m);
-        twin_matrix_translate(&m, iconify_x, icon_y);
-        twin_matrix_scale(&m, icon_size, icon_size);
-        twin_icon_draw(pixmap, TwinIconIconify, m);
-
-        twin_matrix_identity(&m);
-        twin_matrix_translate(&m, restore_x, icon_y);
-        twin_matrix_scale(&m, icon_size, icon_size);
-        twin_icon_draw(pixmap, TwinIconRestore, m);
-
-        twin_matrix_identity(&m);
-        twin_matrix_translate(&m, close_x, icon_y);
-        twin_matrix_scale(&m, icon_size, icon_size);
-        twin_icon_draw(pixmap, TwinIconClose, m);
-
-        twin_matrix_identity(&m);
-        twin_matrix_translate(&m, resize_x, resize_y);
-        twin_matrix_scale(&m, twin_int_to_fixed(TWIN_TITLE_HEIGHT),
-                          twin_int_to_fixed(TWIN_TITLE_HEIGHT));
-        twin_icon_draw(pixmap, TwinIconResize, m);
-    }
-
-    twin_pixmap_clip(pixmap, window->client.left, window->client.top,
-                     window->client.right, window->client.bottom);
-    twin_pixmap_origin_to_clip(pixmap);
-
-    twin_path_destroy(path);
+    window->opaque = opaque || window->format == TWIN_RGB16;
+    _twin_window_update_opaque(window);
+    /* Opacity decides what an opaque full-screen window covers */
+    if (window->mapped && !window->screen->closing)
+        _twin_wm_refresh(window->screen);
 }
-
-#if defined(CONFIG_DROP_SHADOW)
-static void twin_window_drop_shadow(twin_window_t *window)
-{
-    twin_pixmap_t *prev_active_pix = window->screen->top,
-                  *active_pix = window->pixmap;
-    twin_source_u src;
-    twin_coord_t y, shadow_left, shadow_top;
-
-    /* Remove the drop shadow from the previously active pixel map. */
-    if (prev_active_pix) {
-        src.c = 0x00000000;
-        for (y = 0; y < prev_active_pix->height; y++) {
-            if (y < prev_active_pix->height - prev_active_pix->window->shadow_y)
-                twin_cover(
-                    prev_active_pix, src.c,
-                    prev_active_pix->width - prev_active_pix->window->shadow_x,
-                    y, prev_active_pix->window->shadow_x);
-            else
-                twin_cover(prev_active_pix, src.c, 0, y,
-                           prev_active_pix->width);
-        }
-        prev_active_pix->shadow = false;
-    }
-
-    /* Mark the previously active pixel map as damaged to update its changes. */
-    if (prev_active_pix && active_pix != prev_active_pix)
-        twin_pixmap_damage(prev_active_pix, 0, 0, prev_active_pix->width,
-                           prev_active_pix->height);
-
-    /*
-     * The shadow effect of the window only becomes visible when the window is
-     * active.
-     */
-    active_pix->shadow = true;
-    /*
-     * Create a darker border of the active window that gives a more
-     * dimensional appearance.
-     */
-    /* The shift offset and color of the shadow can be selected by the user. */
-    twin_shadow_border(active_pix, SHADOW_COLOR);
-
-    if (CONFIG_SHADOW_BLUR <= 0)
-        return;
-
-    shadow_left = active_pix->width - active_pix->window->shadow_x;
-    shadow_top = active_pix->height - active_pix->window->shadow_y;
-
-    /* Right side of the active window. */
-    twin_stack_blur(active_pix, CONFIG_SHADOW_BLUR, shadow_left,
-                    shadow_left + active_pix->window->shadow_x, 0,
-                    shadow_top + active_pix->window->shadow_y);
-    /* Bottom side of the active window. */
-    twin_stack_blur(active_pix, CONFIG_SHADOW_BLUR, 0,
-                    shadow_left + active_pix->window->shadow_x, shadow_top,
-                    shadow_top + active_pix->window->shadow_y);
-}
-#endif /* CONFIG_DROP_SHADOW */
-
-#endif /* CONFIG_WINDOW_MANAGER */
 
 void twin_window_draw(twin_window_t *window)
 {
     twin_pixmap_t *pixmap = window->pixmap;
 
-#if defined(CONFIG_WINDOW_MANAGER)
-    switch (window->style) {
-    case TwinWindowPlain:
-    default:
-        break;
-    case TwinWindowApplication:
-        twin_window_frame(window);
-        break;
-    }
-#endif
-
-    /* if no draw function or no damage, return */
-    if (window->draw == NULL || (window->damage.left >= window->damage.right ||
-                                 window->damage.top >= window->damage.bottom))
+    /* Evicted: keep the damage, the restore will repaint everything. */
+    if (_twin_pixmap_is_stub(pixmap))
         return;
 
-    /* clip to damaged area and draw */
-    twin_pixmap_reset_clip(pixmap);
-    twin_pixmap_clip(pixmap, window->damage.left, window->damage.top,
-                     window->damage.right, window->damage.bottom);
+    if (window->frame_dirty) {
+        window->frame_dirty = false;
+        if (TWIN_WM_DECORATES) {
+            _twin_wm_decorate(window);
+            _twin_window_reset_clip(window);
+        }
+    }
+
+    /* if no draw function or no damage, return */
+    if (window->draw == NULL || !window->n_damage)
+        return;
+
+    /* Paint each damaged rectangle under its own clip: two small updates
+     * at opposite ends of a window stay two small repaints. */
+    twin_rect_t rects[TWIN_WINDOW_DAMAGE_RECTS];
+    int n = window->n_damage;
+    memcpy(rects, window->damage, sizeof(rects[0]) * n);
+    window->n_damage = 0;
+
     twin_screen_disable_update(window->screen);
-
-    (*window->draw)(window);
-
-    /* damage matching screen area */
-    twin_pixmap_damage(pixmap, window->damage.left, window->damage.top,
-                       window->damage.right, window->damage.bottom);
-
+    for (int i = 0; i < n; i++) {
+        _twin_window_clip(window, &rects[i]);
+        (*window->draw)(window);
+        twin_pixmap_damage(pixmap, rects[i].left, rects[i].top, rects[i].right,
+                           rects[i].bottom);
+    }
     twin_screen_enable_update(window->screen);
 
-    /* clear damage and restore clip */
-    window->damage.left = window->damage.right = 0;
-    window->damage.top = window->damage.bottom = 0;
-    twin_pixmap_reset_clip(pixmap);
-    twin_pixmap_clip(pixmap, window->client.left, window->client.top,
-                     window->client.right, window->client.bottom);
+    _twin_window_reset_clip(window);
 }
 
 /* window keep track of local damage */
@@ -546,22 +483,13 @@ void twin_window_damage(twin_window_t *window,
         right = window->client.right;
     if (bottom > window->client.bottom)
         bottom = window->client.bottom;
+    if (left >= right || top >= bottom)
+        return;
 
-    if (window->damage.left == window->damage.right) {
-        window->damage.left = left;
-        window->damage.right = right;
-        window->damage.top = top;
-        window->damage.bottom = bottom;
-    } else {
-        if (left < window->damage.left)
-            window->damage.left = left;
-        if (top < window->damage.top)
-            window->damage.top = top;
-        if (window->damage.right < right)
-            window->damage.right = right;
-        if (window->damage.bottom < bottom)
-            window->damage.bottom = bottom;
-    }
+    _twin_rect_list_add(window->damage, &window->n_damage,
+                        TWIN_WINDOW_DAMAGE_RECTS,
+                        (twin_rect_t) {left, right, top, bottom});
+    twin_window_queue_paint(window);
 }
 
 static bool _twin_window_repaint(void *closure)
@@ -569,6 +497,7 @@ static bool _twin_window_repaint(void *closure)
     twin_window_t *window = closure;
 
     window->draw_queued = false;
+    window->paint_work = NULL;
     twin_window_draw(window);
 
     return false;
@@ -578,192 +507,197 @@ void twin_window_queue_paint(twin_window_t *window)
 {
     if (!window->draw_queued) {
         window->draw_queued = true;
-        twin_set_work(_twin_window_repaint, TWIN_WORK_PAINT, window);
+        window->paint_work =
+            twin_set_work(_twin_window_repaint, TWIN_WORK_PAINT, window);
+        if (!window->paint_work)
+            window->draw_queued = false;
     }
 }
 
-#if defined(CONFIG_WINDOW_MANAGER)
-
-bool _twin_window_dispatch(twin_window_t *window, twin_event_t *event)
+void twin_window_close(twin_window_t *window)
 {
-    twin_event_t ev = *event;
-    bool delegate = true;
-
-    twin_fixed_t bw = twin_int_to_fixed(TWIN_TITLE_BW);
-    twin_fixed_t t_h = twin_int_to_fixed(window->client.top) - bw;
-    twin_fixed_t t_arc_2 = t_h * 2 / 3;
-    twin_fixed_t c_right = twin_int_to_fixed(window->client.right) - bw / 2;
-    twin_fixed_t name_height = t_h - bw - bw / 2;
-    twin_fixed_t icon_size = name_height * 8 / 10;
-    twin_fixed_t menu_x = t_arc_2;
-    twin_fixed_t text_x = menu_x + icon_size + bw;
-    twin_fixed_t text_width;
-    twin_fixed_t title_right;
-    twin_path_t *path = twin_path_create();
-    const char *name = window->name;
-    if (!name)
-        name = "twin";
-
-    text_width = twin_width_utf8(path, name);
-    twin_path_destroy(path);
-    title_right = (text_x + text_width + bw + icon_size + bw + icon_size + bw +
-                   icon_size + t_arc_2);
-
-    if (title_right < c_right)
-        c_right = title_right;
-
-    twin_fixed_t close_x = c_right - t_arc_2 - icon_size;
-    twin_fixed_t restore_x = close_x - bw - icon_size;
-    twin_fixed_t iconify_x = restore_x - bw - icon_size;
-    int local_x, local_y;
-
-    switch (ev.kind) {
-    case TwinEventActivate:
-        /*
-         * Pure focus transition -- no pointer data in the event union.
-         * Update frame visuals but do not touch pointer coordinates.
-         */
-        if (window->iconify)
-            window->active = false;
-        else
-            window->active = true;
-        twin_window_frame(window);
-        if (window->screen->top && window->screen->top->window &&
-            window != window->screen->top->window) {
-            window->screen->top->window->active = false;
-            twin_window_frame(window->screen->top->window);
-        }
-#if defined(CONFIG_DROP_SHADOW)
-        twin_window_drop_shadow(window);
-#endif
-        delegate = false;
-        break;
-    case TwinEventButtonDown:
-        local_y = ev.u.pointer.screen_y - window->pixmap->y;
-        if (local_y >= 0 && local_y <= TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW) {
-            local_x = ev.u.pointer.screen_x - window->pixmap->x;
-            if (local_x > twin_fixed_to_int(iconify_x) &&
-                local_x < twin_fixed_to_int(restore_x)) {
-                window->iconify = true;
-                twin_pixmap_damage(window->pixmap, 0, 0, window->pixmap->width,
-                                   window->pixmap->height);
-            } else if (local_x > twin_fixed_to_int(restore_x) &&
-                       local_x < twin_fixed_to_int(close_x)) {
-                window->iconify = false;
-                twin_pixmap_damage(window->pixmap, 0, 0, window->pixmap->width,
-                                   window->pixmap->height);
-            }
-        }
-        /* Activate the window on click */
-        if (window->iconify)
-            window->active = false;
-        else
-            window->active = true;
-        twin_window_frame(window);
-        if (window->screen->top && window->screen->top->window &&
-            window != window->screen->top->window) {
-            window->screen->top->window->active = false;
-            twin_window_frame(window->screen->top->window);
-        }
-#if defined(CONFIG_DROP_SHADOW)
-        twin_window_drop_shadow(window);
-#endif
-        if (window->client.left <= ev.u.pointer.x &&
-            ev.u.pointer.x < window->client.right &&
-            window->client.top <= ev.u.pointer.y &&
-            ev.u.pointer.y < window->client.bottom) {
-            delegate = true;
-            window->client_grab = true;
-            ev.u.pointer.x -= window->client.left;
-            ev.u.pointer.y -= window->client.top;
-        } else
-            delegate = false;
-        break;
-    case TwinEventButtonUp:
-        if (window->client_grab) {
-            delegate = true;
-            window->client_grab = false;
-            ev.u.pointer.x -= window->client.left;
-            ev.u.pointer.y -= window->client.top;
-        } else
-            delegate = false;
-        break;
-    case TwinEventMotion:
-        if (window->client_grab || (window->client.left <= ev.u.pointer.x &&
-                                    ev.u.pointer.x < window->client.right &&
-                                    window->client.top <= ev.u.pointer.y &&
-                                    ev.u.pointer.y < window->client.bottom)) {
-            delegate = true;
-            ev.u.pointer.x -= window->client.left;
-            ev.u.pointer.y -= window->client.top;
-        } else
-            delegate = false;
-        break;
-    default:
-        break;
-    }
-    if (!window->event)
-        delegate = false;
-
-    if (delegate && (*window->event)(window, &ev))
-        return true;
-
-    /*
-     * simple window management
-     */
-    switch (event->kind) {
-    case TwinEventButtonDown:
-        twin_window_show(window);
-        window->screen->button_x = event->u.pointer.x;
-        window->screen->button_y = event->u.pointer.y;
-        return true;
-    case TwinEventButtonUp:
-        window->screen->button_x = -1;
-        window->screen->button_y = -1;
-        return true;
-    case TwinEventMotion:
-        if (window->screen->button_x >= 0) {
-            twin_coord_t x, y;
-
-            x = event->u.pointer.screen_x - window->screen->button_x;
-            y = event->u.pointer.screen_y - window->screen->button_y;
-            twin_window_configure(window, window->style, x, y,
-                                  window->pixmap->width,
-                                  window->pixmap->height);
-        }
-        return true;
-    default:
-        break;
-    }
-    return false;
+    twin_screen_t *screen = window->screen;
+    twin_event_t ev = {.kind = TwinEventClose};
+    /* The handler may destroy the window itself: keep it readable */
+    _twin_screen_busy(screen);
+    if (!_twin_window_deliver(window, &ev) && !window->dead)
+        twin_window_destroy(window);
+    _twin_screen_idle(screen);
 }
 
-#else /* !CONFIG_WINDOW_MANAGER */
+void twin_window_scroll(twin_window_t *window,
+                        twin_rect_t area,
+                        twin_coord_t dx,
+                        twin_coord_t dy)
+{
+    twin_pixmap_t *pixmap = window->pixmap;
 
-bool _twin_window_dispatch(twin_window_t *window, twin_event_t *event)
+    /* Client coordinates to pixmap coordinates, clipped to the client */
+    area.left = max((twin_coord_t) (area.left + window->client.left),
+                    window->client.left);
+    area.right = min((twin_coord_t) (area.right + window->client.left),
+                     window->client.right);
+    area.top =
+        max((twin_coord_t) (area.top + window->client.top), window->client.top);
+    area.bottom = min((twin_coord_t) (area.bottom + window->client.top),
+                      window->client.bottom);
+    if (area.left >= area.right || area.top >= area.bottom || (!dx && !dy))
+        return;
+
+    /* Pending damage marks stale pixels.  The blit carries them along, so
+     * the damage has to follow: repaint where they land.  (Painting first
+     * would be wrong: callers update their state, e.g. the scroll offset,
+     * before scrolling.) */
+    int pending = window->n_damage;
+    twin_rect_t moved[TWIN_WINDOW_DAMAGE_RECTS];
+    for (int i = 0; i < pending; i++) {
+        twin_rect_t d = window->damage[i];
+        d.left = max(d.left, area.left) + dx;
+        d.right = min(d.right, area.right) + dx;
+        d.top = max(d.top, area.top) + dy;
+        d.bottom = min(d.bottom, area.bottom) + dy;
+        moved[i] = d;
+    }
+    for (int i = 0; i < pending; i++)
+        twin_window_damage(
+            window, max(moved[i].left, area.left), max(moved[i].top, area.top),
+            min(moved[i].right, area.right), min(moved[i].bottom, area.bottom));
+
+    twin_coord_t w = area.right - area.left, h = area.bottom - area.top;
+    if (_twin_pixmap_is_stub(pixmap) || dx >= w || -dx >= w || dy >= h ||
+        -dy >= h) {
+        twin_window_damage(window, area.left, area.top, area.right,
+                           area.bottom);
+        twin_window_queue_paint(window);
+        return;
+    }
+
+    /* Destination rectangle: the part of @area still covered after moving */
+    twin_rect_t d = {
+        .left = area.left + max(dx, (twin_coord_t) 0),
+        .right = area.right + min(dx, (twin_coord_t) 0),
+        .top = area.top + max(dy, (twin_coord_t) 0),
+        .bottom = area.bottom + min(dy, (twin_coord_t) 0),
+    };
+    int bpp = twin_bytes_per_pixel(pixmap->format);
+    size_t row_bytes = (size_t) (d.right - d.left) * bpp;
+    if (dy > 0) {
+        for (twin_coord_t y = d.bottom - 1; y >= d.top; y--)
+            memmove(twin_pixmap_pointer(pixmap, d.left, y).v,
+                    twin_pixmap_pointer(pixmap, d.left - dx, y - dy).v,
+                    row_bytes);
+    } else {
+        for (twin_coord_t y = d.top; y < d.bottom; y++)
+            memmove(twin_pixmap_pointer(pixmap, d.left, y).v,
+                    twin_pixmap_pointer(pixmap, d.left - dx, y - dy).v,
+                    row_bytes);
+    }
+    twin_pixmap_damage(pixmap, d.left, d.top, d.right, d.bottom);
+
+    /* Exposed bands */
+    if (dy > 0)
+        twin_window_damage(window, area.left, area.top, area.right, d.top);
+    else if (dy < 0)
+        twin_window_damage(window, area.left, d.bottom, area.right,
+                           area.bottom);
+    if (dx > 0)
+        twin_window_damage(window, area.left, area.top, d.left, area.bottom);
+    else if (dx < 0)
+        twin_window_damage(window, d.right, area.top, area.right, area.bottom);
+    twin_window_queue_paint(window);
+}
+
+bool _twin_window_hit(twin_window_t *window, twin_coord_t x, twin_coord_t y)
+{
+#if TWIN_WM_DECORATES
+    return _twin_wm_hit(window, x, y);
+#else
+    twin_pixmap_t *p = window->pixmap;
+    return p->x <= x && x < p->x + p->width && p->y <= y &&
+           y < p->y + p->scan_height;
+#endif
+}
+
+/* Forward an event to the client, in client coordinates */
+bool _twin_window_deliver(twin_window_t *window, twin_event_t *event)
 {
     twin_event_t ev = *event;
 
-    /*
-     * No-WM dispatch: adjust pointer coordinates by client offset (both
-     * zero in No-WM mode, so effectively a no-op) and delegate directly
-     * to window->event. No drag, no iconify, no click-to-raise.
-     */
     switch (ev.kind) {
     case TwinEventButtonDown:
     case TwinEventButtonUp:
     case TwinEventMotion:
+    case TwinEventEnter:
+    case TwinEventLeave:
         ev.u.pointer.x -= window->client.left;
         ev.u.pointer.y -= window->client.top;
         break;
     default:
         break;
     }
-
     if (window->event)
         return (*window->event)(window, &ev);
-
     return false;
 }
 
-#endif /* CONFIG_WINDOW_MANAGER */
+bool _twin_window_dispatch(twin_window_t *window, twin_event_t *event)
+{
+    return _twin_wm_dispatch(window, event);
+}
+
+/* Move @window to the top of the stacking order */
+void _twin_window_raise(twin_window_t *window)
+{
+    _twin_window_unlink(window);
+    _twin_window_link(window);
+}
+
+twin_window_t *twin_screen_first_window(const twin_screen_t *screen)
+{
+    return screen ? screen->windows : NULL;
+}
+
+twin_window_t *twin_window_next(const twin_window_t *window)
+{
+    return window->wm_next;
+}
+
+twin_pixmap_t *twin_window_pixmap(const twin_window_t *window)
+{
+    return window->pixmap;
+}
+
+twin_rect_t twin_window_client(const twin_window_t *window)
+{
+    return window->client;
+}
+
+twin_window_style_t twin_window_style(const twin_window_t *window)
+{
+    return window->style;
+}
+
+bool twin_window_is_mapped(const twin_window_t *window)
+{
+    return window->mapped;
+}
+
+void twin_window_set_callbacks(twin_window_t *window,
+                               twin_draw_func_t draw,
+                               twin_event_func_t event,
+                               twin_destroy_func_t destroy)
+{
+    window->draw = draw;
+    window->event = event;
+    window->destroy = destroy;
+}
+
+void twin_window_set_client_data(twin_window_t *window, void *data)
+{
+    window->client_data = data;
+}
+
+void *twin_window_client_data(const twin_window_t *window)
+{
+    return window->client_data;
+}

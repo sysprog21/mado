@@ -11,7 +11,7 @@
 
 #include <twin.h>
 
-#include "apps_clock.h"
+#include "apps.h"
 
 #define D(x) twin_double_to_fixed(x)
 
@@ -203,20 +203,22 @@ static twin_time_t _apps_clock_timeout(twin_time_t now, void *closure)
     return _apps_clock_interval();
 }
 
-static twin_dispatch_result_t _apps_clock_dispatch(twin_widget_t *widget,
-                                                   twin_event_t *event,
-                                                   void *closure)
+static twin_dispatch_result_t _apps_clock_dispatch(twin_custom_widget_t *custom,
+                                                   twin_event_t *event)
 {
-    (void) closure; /* unused parameter */
-
-    twin_custom_widget_t *custom = twin_widget_get_custom(widget);
-    if (!custom)
-        return TwinDispatchContinue;
-
     switch (event->kind) {
     case TwinEventPaint:
         _apps_clock_paint(custom);
         break;
+    case TwinEventDestroy: {
+        /* The ticking timeout would outlive the clock */
+        apps_clock_data_t *data =
+            (apps_clock_data_t *) twin_custom_widget_data(custom);
+        if (data->timeout)
+            twin_clear_timeout(data->timeout);
+        data->timeout = NULL;
+        break;
+    }
     default:
         break;
     }
@@ -226,7 +228,7 @@ static twin_dispatch_result_t _apps_clock_dispatch(twin_widget_t *widget,
 static twin_custom_widget_t *_apps_clock_init(twin_box_t *parent)
 {
     twin_custom_widget_t *custom = twin_custom_widget_create(
-        parent, 0, 0, 0, 1, 1, _apps_clock_dispatch, sizeof(apps_clock_data_t));
+        parent, 0, 0, 0, _apps_clock_dispatch, sizeof(apps_clock_data_t));
     if (!custom)
         return NULL;
 
@@ -243,16 +245,20 @@ static twin_custom_widget_t *apps_clock_create(twin_box_t *parent)
     return _apps_clock_init(parent);
 }
 
-void apps_clock_start(twin_screen_t *screen,
+bool apps_clock_start(twin_screen_t *screen,
                       const char *name,
                       int x,
                       int y,
                       int w,
                       int h)
 {
-    twin_toplevel_t *toplevel = twin_toplevel_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, name);
-    twin_custom_widget_t *clock = apps_clock_create(&toplevel->box);
-    (void) clock;
+    twin_toplevel_t *toplevel = twin_toplevel_create(screen, x, y, w, h, name);
+    if (!toplevel)
+        return false;
+    if (!apps_clock_create(twin_toplevel_box(toplevel))) {
+        twin_toplevel_destroy(toplevel);
+        return false;
+    }
     twin_toplevel_show(toplevel);
+    return true;
 }

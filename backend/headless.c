@@ -42,6 +42,7 @@ typedef struct {
     int shm_fd;
     size_t shm_size;
     uint32_t last_cmd_seq;
+    twin_coord_t dirty_top, dirty_bottom; /* rows scanned out this update */
     uint64_t last_frame_time;
     uint32_t frame_count;
     bool running;
@@ -88,11 +89,13 @@ static void _twin_headless_put_begin(twin_coord_t left,
                                      twin_coord_t bottom,
                                      void *closure)
 {
+    twin_headless_t *tx = PRIV(closure);
     (void) left;
-    (void) top;
     (void) right;
-    (void) bottom;
-    (void) closure;
+    if (top < tx->dirty_top)
+        tx->dirty_top = top;
+    if (bottom > tx->dirty_bottom)
+        tx->dirty_bottom = bottom;
 }
 
 static void _twin_headless_put_span(twin_coord_t left,
@@ -166,48 +169,73 @@ static void _twin_headless_inject_events(twin_context_t *ctx)
     if (!shm)
         return;
 
-    while (shm->event_read_idx != shm->event_write_idx) {
-        uint32_t idx = shm->event_read_idx % TWIN_HEADLESS_MAX_EVENTS;
-        twin_headless_event_t *evt = &shm->events[idx];
+    /* The queue lives in memory another process writes: never trust its
+     * indices beyond one queue's worth, and copy each event before use. */
+    uint32_t read_idx = shm->event_read_idx;
+    uint32_t pending = shm->event_write_idx - read_idx;
+    if (pending > TWIN_HEADLESS_MAX_EVENTS) {
+        fprintf(stderr,
+                "Headless: event queue out of sync, dropping %u events\n",
+                pending);
+        shm->event_read_idx = read_idx + pending;
+        return;
+    }
+
+    while (pending--) {
+        twin_headless_event_t evt =
+            shm->events[read_idx % TWIN_HEADLESS_MAX_EVENTS];
         twin_event_t twin_evt;
 
         memset(&twin_evt, 0, sizeof(twin_evt));
-        twin_evt.kind = evt->kind;
+        twin_evt.kind = evt.kind;
 
-        switch (evt->kind) {
+        switch (evt.kind) {
         case TwinEventButtonDown:
         case TwinEventButtonUp:
         case TwinEventMotion:
-            twin_evt.u.pointer.screen_x = evt->u.pointer.x;
-            twin_evt.u.pointer.screen_y = evt->u.pointer.y;
-            twin_evt.u.pointer.button = evt->u.pointer.button;
+            twin_evt.u.pointer.screen_x = evt.u.pointer.x;
+            twin_evt.u.pointer.screen_y = evt.u.pointer.y;
+            twin_evt.u.pointer.button = evt.u.pointer.button;
             _twin_headless_track_event(tx, "mouse");
+            twin_screen_dispatch(screen, &twin_evt);
+            break;
+
+        case TwinEventUcs4:
+            twin_evt.u.ucs4.ucs4 = evt.u.ucs4.ucs4;
+            _twin_headless_track_event(tx, "key");
+            twin_screen_dispatch(screen, &twin_evt);
             break;
 
         default:
+            /* Only input may be injected: internal kinds such as Paint,
+             * Configure or Destroy are not the control tool's to send */
             _twin_headless_track_event(tx, "other");
             break;
         }
-
-        twin_screen_dispatch(screen, &twin_evt);
-        shm->event_read_idx++;
+        shm->event_read_idx = ++read_idx;
     }
 }
 
-static void twin_headless_update_damage(void *closure)
+static bool twin_headless_update_damage(void *closure)
 {
     twin_context_t *ctx = closure;
     twin_screen_t *screen = ctx->screen;
     twin_headless_t *tx = ctx->priv;
 
     if (!twin_screen_damaged(screen))
-        return;
+        return true;
 
+    tx->dirty_top = screen->height;
+    tx->dirty_bottom = 0;
     twin_screen_update(screen);
 
-    /* Flip buffers - copy back buffer to front buffer */
-    size_t buffer_size = screen->width * screen->height * sizeof(twin_argb32_t);
-    memcpy(tx->front_buffer, tx->back_buffer, buffer_size);
+    /* Publish only the rows that changed */
+    if (tx->dirty_top < tx->dirty_bottom) {
+        size_t row = (size_t) screen->width * sizeof(twin_argb32_t);
+        memcpy((uint8_t *) tx->front_buffer + tx->dirty_top * row,
+               (uint8_t *) tx->back_buffer + tx->dirty_top * row,
+               (size_t) (tx->dirty_bottom - tx->dirty_top) * row);
+    }
 
     /* Update frame statistics */
     uint64_t now = _twin_headless_get_timestamp();
@@ -224,14 +252,7 @@ static void twin_headless_update_damage(void *closure)
         tx->last_frame_time = now;
         tx->frame_count = 0;
     }
-}
-
-static void twin_headless_configure(twin_context_t *ctx)
-{
-    twin_screen_t *screen = ctx->screen;
-
-    screen->put_begin = _twin_headless_put_begin;
-    screen->put_span = _twin_headless_put_span;
+    return true;
 }
 
 static bool twin_headless_poll(twin_context_t *ctx)
@@ -247,7 +268,11 @@ static bool twin_headless_poll(twin_context_t *ctx)
     /* Inject events from control tool */
     _twin_headless_inject_events(ctx);
 
-    /* Screen update is handled by damage callback, no need to call here */
+    /* Idle: sleep until the next timeout, but stay responsive to the
+     * control tool.  Damage is scanned out by the redisplay work. */
+    twin_time_t wait = _twin_idle_timeout(ctx->screen, 5);
+    if (wait > 0)
+        usleep((useconds_t) wait * 1000);
 
     /* Update heartbeat timestamp periodically to show backend is alive */
     if (tx->shm) {
@@ -280,6 +305,30 @@ static void twin_headless_exit(twin_context_t *ctx)
     free(ctx);
 }
 
+/* Whether the existing shared memory object names a backend still running */
+static bool _twin_headless_shm_live(void)
+{
+    bool live = false;
+    struct stat st;
+    int fd = shm_open(TWIN_HEADLESS_SHM_NAME, O_RDONLY, 0);
+    if (fd < 0)
+        return false;
+    if (fstat(fd, &st) == 0 &&
+        (size_t) st.st_size >= sizeof(twin_headless_shm_t)) {
+        twin_headless_shm_t *shm =
+            mmap(NULL, sizeof(*shm), PROT_READ, MAP_SHARED, fd, 0);
+        if (shm != MAP_FAILED) {
+            pid_t pid = shm->owner_pid;
+            live = shm->magic == TWIN_HEADLESS_MAGIC &&
+                   shm->version == TWIN_HEADLESS_VERSION && pid > 0 &&
+                   (kill(pid, 0) == 0 || errno == EPERM);
+            munmap(shm, sizeof(*shm));
+        }
+    }
+    close(fd);
+    return live;
+}
+
 twin_context_t *twin_headless_init(int width, int height)
 {
     twin_context_t *ctx = calloc(1, sizeof(twin_context_t));
@@ -296,13 +345,28 @@ twin_context_t *twin_headless_init(int width, int height)
     tx->running = true;
     tx->shm_fd = -1;
 
-    /* Calculate shared memory size (header + 2 buffers for double buffering) */
-    size_t header_size = sizeof(twin_headless_shm_t);
-    size_t fb_size = width * height * sizeof(twin_argb32_t);
-    tx->shm_size = header_size + (fb_size * 2); /* Two buffers */
+    /* Header plus two buffers for double buffering */
+    tx->shm_size = twin_headless_shm_bytes(width, height, 2);
+    if (!tx->shm_size)
+        goto error;
 
-    /* Create shared memory */
-    tx->shm_fd = shm_open(TWIN_HEADLESS_SHM_NAME, O_CREAT | O_RDWR, 0666);
+    /* Create shared memory, readable and writable by this user only.
+     * O_EXCL makes sure the backend never adopts an object somebody else
+     * created; one left by a crashed run is removed and created afresh,
+     * but a running backend's is left alone. */
+    tx->shm_fd =
+        shm_open(TWIN_HEADLESS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0600);
+    if (tx->shm_fd < 0 && errno == EEXIST) {
+        if (_twin_headless_shm_live()) {
+            fprintf(stderr,
+                    "Shared memory %s belongs to a running headless backend\n",
+                    TWIN_HEADLESS_SHM_NAME);
+            goto error;
+        }
+        shm_unlink(TWIN_HEADLESS_SHM_NAME);
+        tx->shm_fd =
+            shm_open(TWIN_HEADLESS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0600);
+    }
     if (tx->shm_fd < 0) {
         fprintf(stderr, "Failed to create shared memory: %s\n",
                 strerror(errno));
@@ -331,6 +395,7 @@ twin_context_t *twin_headless_init(int width, int height)
     memset(tx->shm, 0, tx->shm_size);
     tx->shm->magic = TWIN_HEADLESS_MAGIC;
     tx->shm->version = TWIN_HEADLESS_VERSION;
+    tx->shm->owner_pid = getpid();
     tx->shm->width = width;
     tx->shm->height = height;
 
@@ -350,7 +415,8 @@ twin_context_t *twin_headless_init(int width, int height)
     tx->frame_count = 0;
 
     /* Set framebuffer pointers */
-    tx->front_buffer = (twin_argb32_t *) ((char *) tx->shm + header_size);
+    tx->front_buffer =
+        (twin_argb32_t *) ((char *) tx->shm + sizeof(twin_headless_shm_t));
     tx->back_buffer = tx->front_buffer + (width * height);
     tx->framebuffer = tx->back_buffer; /* Start rendering to back buffer */
 
@@ -360,7 +426,9 @@ twin_context_t *twin_headless_init(int width, int height)
     if (!ctx->screen)
         goto error;
 
-    twin_screen_register_damaged(ctx->screen, twin_headless_update_damage, ctx);
+    /* Scan out once per loop iteration, after the paint work, so damage
+     * coalesces and a window is never shown before it is painted */
+    twin_set_work(twin_headless_update_damage, TWIN_WORK_REDISPLAY, ctx);
 
     return ctx;
 
@@ -376,14 +444,7 @@ error:
     return NULL;
 }
 
-#else  /* !HAVE_POSIX_SHM - Bare-metal stub implementation */
-/* Provides minimal no-op backend for embedded systems without POSIX support */
-
-static void twin_headless_config_dummy(twin_context_t *ctx)
-{
-    (void) ctx;
-}
-
+#else /* !HAVE_POSIX_SHM - Bare-metal stub implementation */
 static bool twin_headless_poll_dummy(twin_context_t *ctx)
 {
     (void) ctx;
@@ -402,41 +463,17 @@ static twin_context_t *twin_headless_init_dummy(int width, int height)
     return NULL;
 }
 
-static void twin_headless_start_dummy(twin_context_t *ctx,
-                                      void (*init_callback)(twin_context_t *))
-{
-    (void) ctx;
-    (void) init_callback;
-}
 #endif /* HAVE_POSIX_SHM */
-
-#ifdef HAVE_POSIX_SHM
-/* Start function for headless backend */
-static void twin_headless_start(twin_context_t *ctx,
-                                void (*init_callback)(twin_context_t *))
-{
-    if (init_callback)
-        init_callback(ctx);
-
-    /* Use standard dispatcher to ensure work queue and timeouts run */
-    while (twin_dispatch_once(ctx))
-        ;
-}
-#endif
 
 /* Register the headless backend */
 const twin_backend_t g_twin_backend = {
 #ifdef HAVE_POSIX_SHM
     .init = twin_headless_init,
-    .configure = twin_headless_configure,
     .poll = twin_headless_poll,
-    .start = twin_headless_start,
     .exit = twin_headless_exit,
 #else
     .init = twin_headless_init_dummy,
-    .configure = twin_headless_config_dummy,
     .poll = twin_headless_poll_dummy,
-    .start = twin_headless_start_dummy,
     .exit = twin_headless_exit_dummy,
 #endif
 };

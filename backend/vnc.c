@@ -55,12 +55,10 @@ static void _twin_vnc_put_begin(twin_coord_t left,
                                 twin_coord_t bottom,
                                 void *closure)
 {
-    (void) left;
-    (void) top;
-    (void) right;
-    (void) bottom;
+    /* Only the rectangle being scanned out goes to the clients */
     twin_vnc_t *tx = PRIV(closure);
-    pixman_region_init_rect(&tx->damage_region, 0, 0, tx->width, tx->height);
+    pixman_region_union_rect(&tx->damage_region, &tx->damage_region, left, top,
+                             right - left, bottom - top);
 }
 
 static void _twin_vnc_put_span(twin_coord_t left,
@@ -74,14 +72,6 @@ static void _twin_vnc_put_span(twin_coord_t left,
     size_t span_width = right - left;
 
     memcpy(fb_pixels, pixels, span_width * sizeof(*fb_pixels));
-    pixman_region_union_rect(&tx->damage_region, &tx->damage_region, left, top,
-                             span_width, 1);
-}
-
-static void twin_vnc_get_screen_size(twin_vnc_t *tx, int *width, int *height)
-{
-    *width = nvnc_fb_get_width(tx->current_fb);
-    *height = nvnc_fb_get_height(tx->current_fb);
 }
 
 static bool _twin_vnc_work(void *closure)
@@ -106,7 +96,11 @@ static void _twin_vnc_client_cleanup(struct nvnc_client *client)
 
 static void _twin_vnc_new_client(struct nvnc_client *client)
 {
-    twin_peer_t *peer = malloc(sizeof(twin_peer_t));
+    twin_peer_t *peer = calloc(1, sizeof(twin_peer_t));
+    if (!peer) {
+        nvnc_client_close(client);
+        return;
+    }
     nvnc_set_userdata(client, peer, NULL);
     nvnc_set_client_cleanup_fn(client, _twin_vnc_client_cleanup);
 }
@@ -117,32 +111,29 @@ static void _twin_vnc_pointer_event(struct nvnc_client *client,
                                     enum nvnc_button_mask button)
 {
     twin_peer_t *peer = nvnc_get_userdata(client);
-    twin_event_t tev;
-    if ((button & NVNC_BUTTON_LEFT) &&
-        !(peer->prev_button & NVNC_BUTTON_LEFT)) {
-        tev.u.pointer.screen_x = x;
-        tev.u.pointer.screen_y = y;
-        tev.kind = TwinEventButtonDown;
-        tev.u.pointer.button = 1;
-    } else if (!(button & NVNC_BUTTON_LEFT) &&
-               (peer->prev_button & NVNC_BUTTON_LEFT)) {
-        tev.u.pointer.screen_x = x;
-        tev.u.pointer.screen_y = y;
-        tev.kind = TwinEventButtonUp;
-        tev.u.pointer.button = 1;
-    }
-    if ((peer->px != x || peer->py != y)) {
-        peer->px = x;
-        peer->py = y;
-        tev.u.pointer.screen_x = x;
-        tev.u.pointer.screen_y = y;
-        tev.u.pointer.button = 0;
-        tev.kind = TwinEventMotion;
-    }
-    peer->prev_button = button;
     struct nvnc *server = nvnc_client_get_server(client);
     twin_vnc_t *tx = nvnc_get_userdata(server);
-    twin_screen_dispatch(tx->screen, &tev);
+    bool down = button & NVNC_BUTTON_LEFT;
+    bool was_down = peer->prev_button & NVNC_BUTTON_LEFT;
+    twin_event_t tev = {0};
+    tev.u.pointer.screen_x = x;
+    tev.u.pointer.screen_y = y;
+
+    /* Motion first, then the button change, so a press arriving with a
+     * move lands where the pointer ended up */
+    if (peer->px != x || peer->py != y) {
+        peer->px = x;
+        peer->py = y;
+        tev.kind = TwinEventMotion;
+        tev.u.pointer.button = was_down;
+        twin_screen_dispatch(tx->screen, &tev);
+    }
+    if (down != was_down) {
+        tev.kind = down ? TwinEventButtonDown : TwinEventButtonUp;
+        tev.u.pointer.button = 1;
+        twin_screen_dispatch(tx->screen, &tev);
+    }
+    peer->prev_button = button;
 }
 
 static struct nvnc_fb *_twin_vnc_create_cursor()
@@ -236,6 +227,7 @@ twin_context_t *twin_vnc_init(int width, int height)
         goto bail_framebuffer;
     }
 
+    pixman_region_init(&tx->damage_region);
     twin_set_work(_twin_vnc_work, TWIN_WORK_REDISPLAY, ctx);
     tx->screen = ctx->screen;
 
@@ -260,17 +252,10 @@ bail_priv:
 static bool twin_vnc_poll(twin_context_t *ctx)
 {
     twin_vnc_t *tx = PRIV(ctx);
-    aml_poll(tx->aml, 0);
+    /* Sleep until a client talks or there is something to show */
+    aml_poll(tx->aml, (int) _twin_idle_timeout(SCREEN(ctx), -1));
     aml_dispatch(tx->aml);
     return true;
-}
-
-static void twin_vnc_configure(twin_context_t *ctx)
-{
-    int width, height;
-    twin_vnc_t *tx = ctx->priv;
-    twin_vnc_get_screen_size(tx, &width, &height);
-    twin_screen_resize(ctx->screen, width, height);
 }
 
 static void twin_vnc_exit(twin_context_t *ctx)
@@ -279,6 +264,7 @@ static void twin_vnc_exit(twin_context_t *ctx)
         return;
 
     twin_vnc_t *tx = PRIV(ctx);
+    pixman_region_fini(&tx->damage_region);
     nvnc_fb_unref(tx->current_fb);
     nvnc_display_unref(tx->display);
     nvnc_close(tx->server);
@@ -289,22 +275,8 @@ static void twin_vnc_exit(twin_context_t *ctx)
     free(ctx);
 }
 
-/* Start function for VNC backend */
-static void twin_vnc_start(twin_context_t *ctx,
-                           void (*init_callback)(twin_context_t *))
-{
-    if (init_callback)
-        init_callback(ctx);
-
-    /* Use standard dispatcher to ensure work queue and timeouts run */
-    while (twin_dispatch_once(ctx))
-        ;
-}
-
 const twin_backend_t g_twin_backend = {
     .init = twin_vnc_init,
     .poll = twin_vnc_poll,
-    .configure = twin_vnc_configure,
-    .start = twin_vnc_start,
     .exit = twin_vnc_exit,
 };

@@ -9,11 +9,6 @@
 
 #include "twin_private.h"
 
-#if defined(CONFIG_WINDOW_MANAGER)
-#define TWIN_BW 0
-#define TWIN_TITLE_HEIGHT 20
-#endif
-
 #define IS_ALIGNED(p, alignment) ((p % alignment) == 0)
 #define ALIGN_UP(sz, alignment)                            \
     (((alignment) & ((alignment) - 1)) == 0                \
@@ -45,6 +40,29 @@ static bool twin_pixmap_alloc_size(twin_format_t format,
     return true;
 }
 
+void _twin_pixmap_init(twin_pixmap_t *pixmap,
+                       twin_format_t format,
+                       twin_coord_t width,
+                       twin_coord_t height,
+                       twin_coord_t stride,
+                       void *pixels)
+{
+    memset(pixmap, 0, sizeof(*pixmap));
+    pixmap->format = format;
+    pixmap->width = width;
+    pixmap->height = height;
+    pixmap->stride = stride;
+    twin_matrix_identity(&pixmap->transform);
+    pixmap->clip.right = width;
+    pixmap->clip.bottom = height;
+    pixmap->scan_height = height;
+    pixmap->opacity = 0xff;
+    /* RGB16 has no alpha channel, so every pixel is opaque. */
+    if (format == TWIN_RGB16)
+        pixmap->opaque_rect = (twin_rect_t) {0, width, 0, height};
+    pixmap->p.v = pixels;
+}
+
 twin_pixmap_t *twin_pixmap_create(twin_format_t format,
                                   twin_coord_t width,
                                   twin_coord_t height)
@@ -53,88 +71,38 @@ twin_pixmap_t *twin_pixmap_create(twin_format_t format,
     if (!twin_pixmap_alloc_size(format, width, height, &size))
         return NULL;
 
-    /* Compute stride in size_t to avoid int16_t overflow. */
-    size_t stride_sz =
-        ALIGN_UP((size_t) twin_bytes_per_pixel(format) * (size_t) width, 4);
-    size_t space = stride_sz * (size_t) height;
-
-    /* Stride must fit in twin_coord_t for the pixmap struct field. */
-    if (stride_sz > INT16_MAX)
-        return NULL;
-    twin_coord_t stride = (twin_coord_t) stride_sz;
+    twin_coord_t stride = (twin_coord_t) ALIGN_UP(
+        (size_t) twin_bytes_per_pixel(format) * width, 4);
 
     twin_pixmap_t *pixmap = twin_malloc(size);
     if (!pixmap)
         return NULL;
-
-    pixmap->screen = 0;
-    pixmap->up = 0;
-    pixmap->down = 0;
-    pixmap->x = pixmap->y = 0;
-    pixmap->format = format;
-    pixmap->width = width;
-    pixmap->height = height;
-    twin_matrix_identity(&pixmap->transform);
-    pixmap->clip.left = pixmap->clip.top = 0;
-    pixmap->clip.right = pixmap->width;
-    pixmap->clip.bottom = pixmap->height;
-    pixmap->origin_x = pixmap->origin_y = 0;
-    pixmap->stride = stride;
-    pixmap->disable = 0;
-    pixmap->animation = NULL;
-    pixmap->shadow = false;
-    pixmap->window = NULL; /* Initialize window field */
-    pixmap->xform_cache = NULL;
-    pixmap->xform_cache_size = 0;
-    pixmap->p.v = pixmap + 1;
-    memset(pixmap->p.v, '\0', space);
+    _twin_pixmap_init(pixmap, format, width, height, stride, pixmap + 1);
+    memset(pixmap->p.v, 0, size - sizeof(twin_pixmap_t));
     return pixmap;
 }
 
-twin_pixmap_t *twin_pixmap_create_budget(twin_format_t format,
-                                         twin_coord_t max_width,
-                                         twin_coord_t max_height,
-                                         size_t memory_budget)
+twin_pixmap_t *_twin_pixmap_create_stub(twin_format_t format,
+                                        twin_coord_t width,
+                                        twin_coord_t height)
 {
-    if (max_width <= 0 || max_height <= 0)
+    twin_pixmap_t *pixmap = twin_malloc(sizeof(twin_pixmap_t));
+    if (!pixmap)
         return NULL;
+    _twin_pixmap_init(pixmap, format, width, height, 0, NULL);
+    /* An empty clip turns every drawing operation into a no-op. */
+    pixmap->clip = (twin_rect_t) {0, 0, 0, 0};
+    pixmap->opaque_rect = (twin_rect_t) {0, 0, 0, 0};
+    return pixmap;
+}
 
-    size_t full_size;
-    if (twin_pixmap_alloc_size(format, max_width, max_height, &full_size) &&
-        full_size <= memory_budget)
-        return twin_pixmap_create(format, max_width, max_height);
-
-    if (memory_budget <= sizeof(twin_pixmap_t))
-        return NULL;
-
-    twin_coord_t lo = 1;
-    twin_coord_t hi = max_height;
-    twin_coord_t best_w = 0;
-    twin_coord_t best_h = 0;
-
-    while (lo <= hi) {
-        twin_coord_t mid_h = lo + (hi - lo) / 2;
-        twin_coord_t mid_w =
-            (twin_coord_t) (((int32_t) max_width * mid_h) / max_height);
-        size_t candidate_size;
-
-        if (mid_w < 1)
-            mid_w = 1;
-
-        if (twin_pixmap_alloc_size(format, mid_w, mid_h, &candidate_size) &&
-            candidate_size <= memory_budget) {
-            best_w = mid_w;
-            best_h = mid_h;
-            lo = mid_h + 1;
-        } else {
-            hi = mid_h - 1;
-        }
-    }
-
-    if (best_w == 0 || best_h == 0)
-        return NULL;
-
-    return twin_pixmap_create(format, best_w, best_h);
+void _twin_pixmap_init_a8(twin_pixmap_t *pixmap,
+                          twin_coord_t width,
+                          twin_coord_t height,
+                          twin_coord_t stride,
+                          void *pixels)
+{
+    _twin_pixmap_init(pixmap, TWIN_A8, width, height, stride, pixels);
 }
 
 twin_pixmap_t *twin_pixmap_create_const(twin_format_t format,
@@ -146,25 +114,7 @@ twin_pixmap_t *twin_pixmap_create_const(twin_format_t format,
     twin_pixmap_t *pixmap = twin_malloc(sizeof(twin_pixmap_t));
     if (!pixmap)
         return NULL;
-
-    pixmap->screen = 0;
-    pixmap->up = 0;
-    pixmap->down = 0;
-    pixmap->x = pixmap->y = 0;
-    pixmap->format = format;
-    pixmap->width = width;
-    pixmap->height = height;
-    twin_matrix_identity(&pixmap->transform);
-    pixmap->clip.left = pixmap->clip.top = 0;
-    pixmap->clip.right = pixmap->width;
-    pixmap->clip.bottom = pixmap->height;
-    pixmap->origin_x = pixmap->origin_y = 0;
-    pixmap->stride = stride;
-    pixmap->disable = 0;
-    pixmap->window = NULL; /* Initialize window field */
-    pixmap->xform_cache = NULL;
-    pixmap->xform_cache_size = 0;
-    pixmap->p = pixels;
+    _twin_pixmap_init(pixmap, format, width, height, stride, pixels.v);
     return pixmap;
 }
 
@@ -173,6 +123,7 @@ void twin_pixmap_destroy(twin_pixmap_t *pixmap)
     if (pixmap->screen)
         twin_pixmap_hide(pixmap);
     twin_pixmap_reset_xform_cache(pixmap);
+    _twin_animation_destroy(pixmap->animation);
     twin_free(pixmap);
 }
 
@@ -186,6 +137,14 @@ void twin_pixmap_reset_xform_cache(twin_pixmap_t *pixmap)
     pixmap->xform_cache_size = 0;
 }
 
+void _twin_pixmap_damage_extents(twin_pixmap_t *pixmap)
+{
+    if (!pixmap->screen)
+        return;
+    twin_rect_t e = _twin_pixmap_extents(pixmap);
+    twin_screen_damage(pixmap->screen, e.left, e.top, e.right, e.bottom);
+}
+
 void twin_pixmap_show(twin_pixmap_t *pixmap,
                       twin_screen_t *screen,
                       twin_pixmap_t *lower)
@@ -193,11 +152,15 @@ void twin_pixmap_show(twin_pixmap_t *pixmap,
     if (pixmap->disable)
         twin_screen_disable_update(screen);
 
+    /* Linking above a pixmap shown elsewhere (or nowhere) would corrupt
+     * the display list: stack on top instead. */
+    if (lower && lower->screen != screen)
+        lower = screen->top;
     if (lower == pixmap)
         lower = pixmap->down;
 
     if (pixmap->screen)
-        twin_pixmap_hide(pixmap);
+        _twin_pixmap_unlink(pixmap);
 
     pixmap->screen = screen;
 
@@ -207,18 +170,22 @@ void twin_pixmap_show(twin_pixmap_t *pixmap,
         lower->up = pixmap;
         if (!pixmap->up)
             screen->top = pixmap;
+        else
+            pixmap->up->down = pixmap;
     } else {
         pixmap->down = NULL;
         pixmap->up = screen->bottom;
+        if (screen->bottom)
+            screen->bottom->down = pixmap;
         screen->bottom = pixmap;
         if (!pixmap->up)
             screen->top = pixmap;
     }
 
-    twin_pixmap_damage(pixmap, 0, 0, pixmap->width, pixmap->height);
+    _twin_pixmap_damage_extents(pixmap);
 }
 
-void twin_pixmap_hide(twin_pixmap_t *pixmap)
+void _twin_pixmap_unlink(twin_pixmap_t *pixmap)
 {
     twin_screen_t *screen = pixmap->screen;
     twin_pixmap_t **up, **down;
@@ -226,7 +193,7 @@ void twin_pixmap_hide(twin_pixmap_t *pixmap)
     if (!screen)
         return;
 
-    twin_pixmap_damage(pixmap, 0, 0, pixmap->width, pixmap->height);
+    _twin_pixmap_damage_extents(pixmap);
 
     if (pixmap->up)
         down = &pixmap->up->down;
@@ -248,15 +215,71 @@ void twin_pixmap_hide(twin_pixmap_t *pixmap)
         twin_screen_enable_update(screen);
 }
 
-twin_pointer_t twin_pixmap_pointer(twin_pixmap_t *pixmap,
-                                   twin_coord_t x,
-                                   twin_coord_t y)
+void twin_pixmap_hide(twin_pixmap_t *pixmap)
 {
-    twin_pointer_t p;
+    twin_screen_t *screen = pixmap->screen;
+    if (!screen)
+        return;
+    _twin_pixmap_unlink(pixmap);
+    /* Never leave the screen pointing at a pixmap it no longer shows. */
+    _twin_screen_forget(screen, pixmap);
+}
 
-    p.b = (pixmap->p.b + (int32_t) y * pixmap->stride +
-           (int32_t) x * twin_bytes_per_pixel(pixmap->format));
-    return p;
+void _twin_screen_forget(twin_screen_t *screen, const twin_pixmap_t *pixmap)
+{
+    if (screen->active == pixmap)
+        screen->active = NULL;
+    if (screen->target == pixmap) {
+        screen->target = NULL;
+        screen->clicklock = false;
+    }
+}
+
+void _twin_pixmap_set_scan_height(twin_pixmap_t *pixmap, twin_coord_t rows)
+{
+    if (rows < 0)
+        rows = 0;
+    if (rows > pixmap->height)
+        rows = pixmap->height;
+    if (pixmap->scan_height == rows)
+        return;
+    /* Damage both the old and the new extent */
+    _twin_pixmap_damage_extents(pixmap);
+    pixmap->scan_height = rows;
+    _twin_pixmap_damage_extents(pixmap);
+}
+
+void twin_pixmap_set_opacity(twin_pixmap_t *pixmap, twin_a8_t opacity)
+{
+    if (pixmap->opacity == opacity)
+        return;
+    pixmap->opacity = opacity;
+    _twin_pixmap_damage_extents(pixmap);
+}
+
+void twin_pixmap_set_shadow(twin_pixmap_t *pixmap,
+                            twin_coord_t dx,
+                            twin_coord_t dy,
+                            twin_coord_t blur,
+                            twin_a8_t alpha)
+{
+#if !defined(CONFIG_DROP_SHADOW)
+    /* Built without shadow support */
+    (void) pixmap, (void) dx, (void) dy, (void) blur, (void) alpha;
+#else
+    twin_shadow_t s = {0};
+    if (blur > 0 && alpha) {
+        s.dx = (int8_t) (dx > 127 ? 127 : dx < -127 ? -127 : dx);
+        s.dy = (int8_t) (dy > 127 ? 127 : dy < -127 ? -127 : dy);
+        s.blur = (uint8_t) (blur > 63 ? 63 : blur);
+        s.alpha = alpha;
+    }
+    if (!memcmp(&s, &pixmap->shadow, sizeof(s)))
+        return;
+    _twin_pixmap_damage_extents(pixmap);
+    pixmap->shadow = s;
+    _twin_pixmap_damage_extents(pixmap);
+#endif
 }
 
 void twin_pixmap_enable_update(twin_pixmap_t *pixmap)
@@ -281,14 +304,6 @@ void twin_pixmap_set_origin(twin_pixmap_t *pixmap,
 {
     pixmap->origin_x = ox;
     pixmap->origin_y = oy;
-}
-
-void twin_pixmap_offset(twin_pixmap_t *pixmap,
-                        twin_coord_t offx,
-                        twin_coord_t offy)
-{
-    pixmap->origin_x += offx;
-    pixmap->origin_y += offy;
 }
 
 void twin_pixmap_get_origin(twin_pixmap_t *pixmap,
@@ -365,11 +380,17 @@ twin_rect_t twin_pixmap_save_clip(twin_pixmap_t *pixmap)
 
 void twin_pixmap_restore_clip(twin_pixmap_t *pixmap, twin_rect_t rect)
 {
-    pixmap->clip = rect;
+    pixmap->clip =
+        _twin_pixmap_is_stub(pixmap) ? (twin_rect_t) {0, 0, 0, 0} : rect;
 }
 
 void twin_pixmap_reset_clip(twin_pixmap_t *pixmap)
 {
+    /* A stub has no storage: keep its clip empty so drawing is a no-op. */
+    if (_twin_pixmap_is_stub(pixmap)) {
+        pixmap->clip = (twin_rect_t) {0, 0, 0, 0};
+        return;
+    }
     pixmap->clip.left = 0;
     pixmap->clip.top = 0;
     pixmap->clip.right = pixmap->width;
@@ -387,59 +408,14 @@ void twin_pixmap_damage(twin_pixmap_t *pixmap,
                            right + pixmap->x, bottom + pixmap->y);
 }
 
-static twin_argb32_t _twin_pixmap_fetch(twin_pixmap_t *pixmap,
-                                        twin_coord_t x,
-                                        twin_coord_t y)
-{
-    twin_pointer_t p =
-        twin_pixmap_pointer(pixmap, x - pixmap->x, y - pixmap->y);
-    /* FIXME: for transform */
-
-    if (pixmap->x <= x && x < pixmap->x + pixmap->width && pixmap->y <= y &&
-        y < pixmap->y + pixmap->height) {
-        switch (pixmap->format) {
-        case TWIN_A8:
-            return *p.a8 << 24;
-        case TWIN_RGB16:
-            return twin_rgb16_to_argb32(*p.rgb16);
-        case TWIN_ARGB32:
-            return *p.argb32;
-        }
-    }
-    return 0;
-}
-
-bool twin_pixmap_transparent(twin_pixmap_t *pixmap,
-                             twin_coord_t x,
-                             twin_coord_t y)
-{
-    return (_twin_pixmap_fetch(pixmap, x, y) >> 24) == 0;
-}
-
-bool twin_pixmap_is_iconified(twin_pixmap_t *pixmap, twin_coord_t y)
-{
-#if defined(CONFIG_WINDOW_MANAGER)
-    /*
-     * Check whether the specified area within the pixmap corresponds to an
-     * iconified window.
-     */
-    if (pixmap->window &&
-        (pixmap->window->iconify &&
-         y >= pixmap->y + TWIN_BW + TWIN_TITLE_HEIGHT + TWIN_BW))
-        return true;
-#else
-    (void) y;
-    (void) pixmap;
-#endif
-    return false;
-}
-
 void twin_pixmap_move(twin_pixmap_t *pixmap, twin_coord_t x, twin_coord_t y)
 {
-    twin_pixmap_damage(pixmap, 0, 0, pixmap->width, pixmap->height);
+    if (pixmap->x == x && pixmap->y == y)
+        return;
+    _twin_pixmap_damage_extents(pixmap);
     pixmap->x = x;
     pixmap->y = y;
-    twin_pixmap_damage(pixmap, 0, 0, pixmap->width, pixmap->height);
+    _twin_pixmap_damage_extents(pixmap);
 }
 
 bool twin_pixmap_dispatch(twin_pixmap_t *pixmap, twin_event_t *event)
@@ -447,4 +423,39 @@ bool twin_pixmap_dispatch(twin_pixmap_t *pixmap, twin_event_t *event)
     if (pixmap->window)
         return _twin_window_dispatch(pixmap->window, event);
     return false;
+}
+
+twin_coord_t twin_pixmap_width(const twin_pixmap_t *pixmap)
+{
+    return pixmap->width;
+}
+
+twin_coord_t twin_pixmap_height(const twin_pixmap_t *pixmap)
+{
+    return pixmap->height;
+}
+
+twin_format_t twin_pixmap_format(const twin_pixmap_t *pixmap)
+{
+    return pixmap->format;
+}
+
+void *twin_pixmap_pixels(twin_pixmap_t *pixmap, twin_coord_t *stride)
+{
+    if (stride)
+        *stride = pixmap->stride;
+    return pixmap->p.v;
+}
+
+twin_animation_t *twin_pixmap_animation(const twin_pixmap_t *pixmap)
+{
+    return pixmap->animation;
+}
+
+void twin_pixmap_set_transform(twin_pixmap_t *pixmap, const twin_matrix_t *m)
+{
+    if (m)
+        pixmap->transform = *m;
+    else
+        twin_matrix_identity(&pixmap->transform);
 }

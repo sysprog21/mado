@@ -4,61 +4,33 @@
  * All rights reserved.
  */
 
-#include <assert.h>
 #include <twin.h>
 
 #include "twin_private.h"
 
-extern twin_backend_t g_twin_backend;
-
-/**
- * Create a new Twin context with specified dimensions.
- *
- * Initializes the backend and creates a screen context for rendering.
- *
- * @width  : Screen width in pixels
- * @height : Screen height in pixels
- * @return : Twin context, or NULL on failure
- */
 twin_context_t *twin_create(int width, int height)
 {
     /* Initialize the memory pool before any allocations occur. */
     twin_mem_pool_init();
 
-    /* Runtime check for missing backend */
-    if (!g_twin_backend.init) {
-        log_error("Backend not registered - no init function");
-        return NULL;
-    }
-
-    assert(g_twin_backend.init && "Backend not registered");
-
     twin_context_t *ctx = g_twin_backend.init(width, height);
     if (!ctx) {
         log_error("Backend initialization failed (%dx%d)", width, height);
+        return NULL;
     }
+#if defined(CONFIG_CURSOR)
+    /* Backends that draw no cursor of their own get the arrow */
+    twin_pixmap_t *cursor = _twin_make_cursor();
+    if (cursor)
+        twin_screen_set_cursor(ctx->screen, cursor, 0, 0);
+#endif
     return ctx;
 }
 
-/**
- * Destroy a Twin context and release all resources.
- *
- * Cleans up backend resources, frees memory, and terminates the context.
- *
- * @ctx : Twin context to destroy
- */
 void twin_destroy(twin_context_t *ctx)
 {
     if (!ctx)
         return;
-
-    /* Runtime check for missing backend */
-    if (!g_twin_backend.exit) {
-        log_error("Backend not registered - no exit function");
-        return;
-    }
-
-    assert(g_twin_backend.exit && "Backend not registered");
 
     /* Screen teardown may emit damage callbacks through backend-owned closure.
      */
@@ -69,6 +41,9 @@ void twin_destroy(twin_context_t *ctx)
 
     /* Backend frees its private data and ctx */
     g_twin_backend.exit(ctx);
+
+    /* Cached coverage outlives screens; release it with the system */
+    twin_cache_flush();
 
     /* Report memory statistics after all teardown */
     twin_memory_info_t mem;
@@ -81,34 +56,24 @@ void twin_destroy(twin_context_t *ctx)
             mem.total_frees);
 }
 
-/**
- * Start the Twin application with initialization callback.
- *
- * This function provides a platform-independent way to start Twin applications.
- * It delegates to the backend's start function, which handles platform-specific
- * main loop setup.
- *
- * @ctx           : Twin context to run
- * @init_callback : Application initialization function (called once before
- *                  event loop)
- */
-void twin_run(twin_context_t *ctx, void (*init_callback)(twin_context_t *))
+bool twin_dispatch_once(twin_context_t *ctx)
 {
-    /* Validate context parameter */
-    if (!ctx) {
-        log_error("NULL context passed to twin_run");
+    _twin_run_timeout();
+    _twin_run_work();
+    /* The backend sleeps here until input or the next thing to do */
+    return g_twin_backend.poll(ctx);
+}
+
+void twin_run(twin_context_t *ctx, void (*init_callback)(twin_screen_t *))
+{
+    if (!ctx)
+        return;
+    if (g_twin_backend.start) {
+        g_twin_backend.start(ctx, init_callback);
         return;
     }
-
-    assert(ctx && "NULL context passed to twin_run");
-
-    /* Runtime check for missing start function */
-    if (!g_twin_backend.start) {
-        log_error("Backend has no start function - main loop not running");
-        return;
-    }
-
-    assert(g_twin_backend.start && "Backend start function not registered");
-
-    g_twin_backend.start(ctx, init_callback);
+    if (init_callback)
+        init_callback(ctx->screen);
+    while (twin_dispatch_once(ctx))
+        ;
 }

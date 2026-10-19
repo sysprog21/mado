@@ -48,70 +48,23 @@
  * combinations of source/mask/destination format operations.
  */
 
+/* Two channels per 32-bit multiply (see _twin_mul_lanes); every result is
+ * bit-identical to the per-channel twin_in/twin_over/twin_add forms */
+static inline twin_argb32_t in(twin_argb32_t src, twin_a8_t msk)
+{
+    return _twin_mul_lanes(src & TWIN_LANES, msk) |
+           _twin_mul_lanes((src >> 8) & TWIN_LANES, msk) << 8;
+}
+
 static inline twin_argb32_t in_over(twin_argb32_t dst,
                                     twin_argb32_t src,
                                     twin_a8_t msk)
 {
-    uint16_t t1, t2, t3, t4;
-    twin_a8_t a;
-
-    switch (msk) {
-    case 0:
+    if (!msk)
         return dst;
-    case 0xff:
-        break;
-    default:
-        src = (twin_in(src, 0, msk, t1) | twin_in(src, 8, msk, t2) |
-               twin_in(src, 16, msk, t3) | twin_in(src, 24, msk, t4));
-        break;
-    }
-    if (!src)
-        return dst;
-    a = ~(src >> 24);
-    switch (a) {
-    case 0:
-        return src;
-    case 0xff:
-        dst = (twin_add(src, dst, 0, t1) | twin_add(src, dst, 8, t2) |
-               twin_add(src, dst, 16, t3) | twin_add(src, dst, 24, t4));
-        break;
-    default:
-        dst = (twin_over(src, dst, 0, a, t1) | twin_over(src, dst, 8, a, t2) |
-               twin_over(src, dst, 16, a, t3) | twin_over(src, dst, 24, a, t4));
-        break;
-    }
-    return dst;
-}
-
-static inline twin_argb32_t in(twin_argb32_t src, twin_a8_t msk)
-{
-    uint16_t t1, t2, t3, t4;
-
-    return (twin_in(src, 0, msk, t1) | twin_in(src, 8, msk, t2) |
-            twin_in(src, 16, msk, t3) | twin_in(src, 24, msk, t4));
-}
-
-static inline twin_argb32_t over(twin_argb32_t dst, twin_argb32_t src)
-{
-    uint16_t t1, t2, t3, t4;
-    twin_a8_t a;
-
-    if (!src)
-        return dst;
-    a = ~(src >> 24);
-    switch (a) {
-    case 0:
-        return src;
-    case 0xff:
-        dst = (twin_add(src, dst, 0, t1) | twin_add(src, dst, 8, t2) |
-               twin_add(src, dst, 16, t3) | twin_add(src, dst, 24, t4));
-        break;
-    default:
-        dst = (twin_over(src, dst, 0, a, t1) | twin_over(src, dst, 8, a, t2) |
-               twin_over(src, dst, 16, a, t3) | twin_over(src, dst, 24, a, t4));
-        break;
-    }
-    return dst;
+    if (msk != 0xff)
+        src = in(src, msk);
+    return _twin_over(dst, src);
 }
 
 static inline twin_argb32_t rgb16_to_argb32(twin_rgb16_t v)
@@ -155,9 +108,6 @@ static inline twin_a8_t argb32_to_a8(twin_argb32_t v)
 
 #define msk_c (argb32_to_a8(msk.c))
 #define msk_argb32 (argb32_to_a8(*msk.p.argb32++))
-#define msk_rgb16 \
-    (0xff);       \
-    (void) msk
 #define msk_a8 (*msk.p.a8++)
 
 #define CAT2(a, b) a##b
@@ -204,7 +154,6 @@ static inline twin_a8_t argb32_to_a8(twin_argb32_t v)
 /* clang-format off */
 #define MAKE_TWIN_in_op_msks(op, dst, src)        \
     CAT2(MAKE_TWIN_in_, op)(dst, src, argb32)     \
-    CAT2(MAKE_TWIN_in_, op)(dst, src, rgb16)      \
     CAT2(MAKE_TWIN_in_, op)(dst, src, a8)         \
     CAT2(MAKE_TWIN_in_, op)(dst, src, c)
 /* clang-format on */
@@ -228,7 +177,7 @@ MAKE_TWIN_in_op_dsts_srcs_msks(over) MAKE_TWIN_in_op_dsts_srcs_msks(source)
         while (width--) {                                                  \
             dst32 = CAT3(dst_, __dst, _get);                               \
             src32 = CAT2(src_, __src);                                     \
-            dst32 = over(dst32, src32);                                    \
+            dst32 = _twin_over(dst32, src32);                              \
             CAT3(dst_, __dst, _set)(dst32);                                \
         }                                                                  \
     }
@@ -327,25 +276,23 @@ static const twin_src_op comp2[2][4][3] = {
         },
 };
 
+/* Mask index: RGB16 has no alpha and composites as no mask, so it never
+ * reaches the table */
+enum { MSK_A8, MSK_ARGB32, MSK_C };
+
 /* op, src, msk, dst */
-static const twin_src_msk_op comp3[2][4][4][3] = {
+static const twin_src_msk_op comp3[2][4][3][3] = {
     [TWIN_OVER] =
         {
             [TWIN_A8] =
                 {
-                    [TWIN_A8] =
+                    [MSK_A8] =
                         {
                             _twin_a8_in_a8_over_a8,
                             _twin_a8_in_a8_over_rgb16,
                             _twin_a8_in_a8_over_argb32,
                         },
-                    [TWIN_RGB16] =
-                        {
-                            _twin_a8_in_rgb16_over_a8,
-                            _twin_a8_in_rgb16_over_rgb16,
-                            _twin_a8_in_rgb16_over_argb32,
-                        },
-                    [TWIN_ARGB32] =
+                    [MSK_ARGB32] =
                         {
                             _twin_a8_in_argb32_over_a8,
                             _twin_a8_in_argb32_over_rgb16,
@@ -360,19 +307,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
                 },
             [TWIN_RGB16] =
                 {
-                    [TWIN_A8] =
+                    [MSK_A8] =
                         {
                             _twin_rgb16_in_a8_over_a8,
                             _twin_rgb16_in_a8_over_rgb16,
                             _twin_rgb16_in_a8_over_argb32,
                         },
-                    [TWIN_RGB16] =
-                        {
-                            _twin_rgb16_in_rgb16_over_a8,
-                            _twin_rgb16_in_rgb16_over_rgb16,
-                            _twin_rgb16_in_rgb16_over_argb32,
-                        },
-                    [TWIN_ARGB32] =
+                    [MSK_ARGB32] =
                         {
                             _twin_rgb16_in_argb32_over_a8,
                             _twin_rgb16_in_argb32_over_rgb16,
@@ -387,19 +328,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
                 },
             [TWIN_ARGB32] =
                 {
-                    [TWIN_A8] =
+                    [MSK_A8] =
                         {
                             _twin_argb32_in_a8_over_a8,
                             _twin_argb32_in_a8_over_rgb16,
                             _twin_argb32_in_a8_over_argb32,
                         },
-                    [TWIN_RGB16] =
-                        {
-                            _twin_argb32_in_rgb16_over_a8,
-                            _twin_argb32_in_rgb16_over_rgb16,
-                            _twin_argb32_in_rgb16_over_argb32,
-                        },
-                    [TWIN_ARGB32] =
+                    [MSK_ARGB32] =
                         {
                             _twin_argb32_in_argb32_over_a8,
                             _twin_argb32_in_argb32_over_rgb16,
@@ -414,19 +349,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
                 },
             {
                 /* C */
-                [TWIN_A8] =
+                [MSK_A8] =
                     {
                         _twin_c_in_a8_over_a8,
                         _twin_c_in_a8_over_rgb16,
                         _twin_c_in_a8_over_argb32,
                     },
-                [TWIN_RGB16] =
-                    {
-                        _twin_c_in_rgb16_over_a8,
-                        _twin_c_in_rgb16_over_rgb16,
-                        _twin_c_in_rgb16_over_argb32,
-                    },
-                [TWIN_ARGB32] =
+                [MSK_ARGB32] =
                     {
                         _twin_c_in_argb32_over_a8,
                         _twin_c_in_argb32_over_rgb16,
@@ -444,19 +373,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
         {
             [TWIN_A8] =
                 {
-                    [TWIN_A8] =
+                    [MSK_A8] =
                         {
                             _twin_a8_in_a8_source_a8,
                             _twin_a8_in_a8_source_rgb16,
                             _twin_a8_in_a8_source_argb32,
                         },
-                    [TWIN_RGB16] =
-                        {
-                            _twin_a8_in_rgb16_source_a8,
-                            _twin_a8_in_rgb16_source_rgb16,
-                            _twin_a8_in_rgb16_source_argb32,
-                        },
-                    [TWIN_ARGB32] =
+                    [MSK_ARGB32] =
                         {
                             _twin_a8_in_argb32_source_a8,
                             _twin_a8_in_argb32_source_rgb16,
@@ -471,19 +394,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
                 },
             [TWIN_RGB16] =
                 {
-                    [TWIN_A8] =
+                    [MSK_A8] =
                         {
                             _twin_rgb16_in_a8_source_a8,
                             _twin_rgb16_in_a8_source_rgb16,
                             _twin_rgb16_in_a8_source_argb32,
                         },
-                    [TWIN_RGB16] =
-                        {
-                            _twin_rgb16_in_rgb16_source_a8,
-                            _twin_rgb16_in_rgb16_source_rgb16,
-                            _twin_rgb16_in_rgb16_source_argb32,
-                        },
-                    [TWIN_ARGB32] =
+                    [MSK_ARGB32] =
                         {
                             _twin_rgb16_in_argb32_source_a8,
                             _twin_rgb16_in_argb32_source_rgb16,
@@ -498,19 +415,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
                 },
             [TWIN_ARGB32] =
                 {
-                    [TWIN_A8] =
+                    [MSK_A8] =
                         {
                             _twin_argb32_in_a8_source_a8,
                             _twin_argb32_in_a8_source_rgb16,
                             _twin_argb32_in_a8_source_argb32,
                         },
-                    [TWIN_RGB16] =
-                        {
-                            _twin_argb32_in_rgb16_source_a8,
-                            _twin_argb32_in_rgb16_source_rgb16,
-                            _twin_argb32_in_rgb16_source_argb32,
-                        },
-                    [TWIN_ARGB32] =
+                    [MSK_ARGB32] =
                         {
                             _twin_argb32_in_argb32_source_a8,
                             _twin_argb32_in_argb32_source_rgb16,
@@ -525,19 +436,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
                 },
             {
                 /* C */
-                [TWIN_A8] =
+                [MSK_A8] =
                     {
                         _twin_c_in_a8_source_a8,
                         _twin_c_in_a8_source_rgb16,
                         _twin_c_in_a8_source_argb32,
                     },
-                [TWIN_RGB16] =
-                    {
-                        _twin_c_in_rgb16_source_a8,
-                        _twin_c_in_rgb16_source_rgb16,
-                        _twin_c_in_rgb16_source_argb32,
-                    },
-                [TWIN_ARGB32] =
+                [MSK_ARGB32] =
                     {
                         _twin_c_in_argb32_source_a8,
                         _twin_c_in_argb32_source_rgb16,
@@ -556,6 +461,13 @@ static const twin_src_msk_op comp3[2][4][4][3] = {
 
 #define operand_index(o) \
     ((o)->source_kind == TWIN_SOLID ? 3 : o->u.pixmap->format)
+
+static inline int mask_index(const twin_operand_t *o)
+{
+    if (o->source_kind == TWIN_SOLID)
+        return MSK_C;
+    return o->u.pixmap->format == TWIN_A8 ? MSK_A8 : MSK_ARGB32;
+}
 
 static void _twin_composite_simple(twin_pixmap_t *dst,
                                    twin_coord_t dst_x,
@@ -630,7 +542,7 @@ static void _twin_composite_simple(twin_pixmap_t *dst,
         mdx = msk_x - left;
         mdy = msk_y - top;
 
-        twin_src_msk_op op = comp3[operator][operand_index(src)][operand_index(msk)][dst->format];
+        twin_src_msk_op op = comp3[operator][operand_index(src)][mask_index(msk)][dst->format];
         for (iy = top; iy < bottom; iy++) {
             if (src->source_kind == TWIN_PIXMAP)
                 s.p = twin_pixmap_pointer(src->u.pixmap, left + sdx, iy + sdy);
@@ -691,6 +603,7 @@ static twin_xform_t *twin_pixmap_init_xform(twin_pixmap_t *pixmap,
     xform->width = width;
     xform->src_x = src_x;
     xform->src_y = src_y;
+    xform->off_x = xform->off_y = 0;
 
     return xform;
 }
@@ -722,13 +635,14 @@ static void twin_pixmap_free_xform(twin_xform_t *xform)
                   : *((pix)->p.a8 + XF(y) * (pix)->stride + XF(x)); \
     } while (0)
 
-#define _get_pix_16(d, pix, x, y)                                            \
-    do {                                                                     \
-        twin_rgb16_t p =                                                     \
-            _pix_clipped(pix, x, y)                                          \
-                ? 0                                                          \
-                : *((pix)->p.argb32 + XF(y) * ((pix)->stride >> 1) + XF(x)); \
-        *((twin_argb32_t *) (char *) (d)) = twin_rgb16_to_argb32(p);         \
+/* Outside the pixmap is transparent, as for the other formats */
+#define _get_pix_16(d, pix, x, y)                                              \
+    do {                                                                       \
+        *((twin_argb32_t *) (char *) (d)) =                                    \
+            _pix_clipped(pix, x, y)                                            \
+                ? 0                                                            \
+                : twin_rgb16_to_argb32(*(                                      \
+                      (pix)->p.rgb16 + XF(y) * ((pix)->stride >> 1) + XF(x))); \
     } while (0)
 
 #define _get_pix_32(d, pix, x, y)                                            \
@@ -740,11 +654,16 @@ static void twin_pixmap_free_xform(twin_xform_t *xform)
         *((twin_argb32_t *) (char *) (d)) = p;                               \
     } while (0)
 
-#define _pix_saucemix(tl, tr, bl, br, wx, wy)                     \
-    ((((((br * wx) + (bl * (TWIN_FIXED_ONE - wx))) >> 16) * wy) + \
-      ((((tr * wx) + (tl * (TWIN_FIXED_ONE - wx))) >> 16) *       \
-       (TWIN_FIXED_ONE - wy))) >>                                 \
+/* Linear blend of a and b at w (16.16): a * (1 - w) + b * w rounded down,
+ * written with one multiply */
+#define _pix_lerp(a, b, w)                                \
+    ((((int32_t) (a) << 16) +                             \
+      ((int32_t) (b) - (int32_t) (a)) * (int32_t) (w)) >> \
      16)
+
+/* Bilinear blend of four samples */
+#define _pix_saucemix(tl, tr, bl, br, wx, wy) \
+    _pix_lerp(_pix_lerp(tl, tr, wx), _pix_lerp(bl, br, wx), wy)
 
 static void twin_pixmap_read_xform_8(twin_xform_t *xform, twin_coord_t line)
 {
@@ -756,10 +675,16 @@ static void twin_pixmap_read_xform_8(twin_xform_t *xform, twin_coord_t line)
     twin_matrix_t *tfm = &xform->pixmap->transform;
 
     /* for each row in the dest line */
-    dy = twin_int_to_fixed(line);
-    for (dx = 0; dx < twin_int_to_fixed(xform->width); dx += TWIN_FIXED_ONE) {
-        sx = _twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x);
-        sy = _twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y);
+    dy = twin_int_to_fixed(line + xform->off_y);
+    dx = twin_int_to_fixed(xform->off_x);
+    /* dx moves by whole pixels, so the source moves by exactly the first
+     * matrix column per pixel: no multiplies after the first */
+    uint32_t ux = (uint32_t) (_twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x));
+    uint32_t uy = (uint32_t) (_twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y));
+    for (twin_coord_t i = 0; i < xform->width;
+         i++, ux += (uint32_t) tfm->m[0][0], uy += (uint32_t) tfm->m[0][1]) {
+        sx = (twin_fixed_t) ux;
+        sy = (twin_fixed_t) uy;
         _get_pix_8(pts[0], pix, sx, sy);
         _get_pix_8(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
         _get_pix_8(pts[2], pix, sx, sy + TWIN_FIXED_ONE);
@@ -778,16 +703,31 @@ static void twin_pixmap_read_xform_16(twin_xform_t *xform, twin_coord_t line)
     twin_a8_t *dst = xform->span.a8;
     twin_pixmap_t *pix = xform->pixmap;
     twin_matrix_t *tfm = &xform->pixmap->transform;
+    twin_coord_t last_x = 0, last_y = 0;
+    bool fetched = false;
 
     /* for each row in the dest line */
-    dy = twin_int_to_fixed(line);
-    for (dx = 0; dx < twin_int_to_fixed(xform->width); dx += TWIN_FIXED_ONE) {
-        sx = _twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x);
-        sy = _twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y);
-        _get_pix_16(pts[0], pix, sx, sy);
-        _get_pix_16(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
-        _get_pix_16(pts[2], pix, sx, sy + TWIN_FIXED_ONE);
-        _get_pix_16(pts[3], pix, sx + TWIN_FIXED_ONE, sy + TWIN_FIXED_ONE);
+    dy = twin_int_to_fixed(line + xform->off_y);
+    dx = twin_int_to_fixed(xform->off_x);
+    /* dx moves by whole pixels, so the source moves by exactly the first
+     * matrix column per pixel: no multiplies after the first */
+    uint32_t ux = (uint32_t) (_twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x));
+    uint32_t uy = (uint32_t) (_twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y));
+    for (twin_coord_t i = 0; i < xform->width;
+         i++, ux += (uint32_t) tfm->m[0][0], uy += (uint32_t) tfm->m[0][1]) {
+        sx = (twin_fixed_t) ux;
+        sy = (twin_fixed_t) uy;
+        /* The four texels depend on the integer position only: scaling up
+         * revisits them, so fetch (and convert) them once per texel */
+        if (!fetched || XF(sx) != last_x || XF(sy) != last_y) {
+            fetched = true;
+            last_x = XF(sx);
+            last_y = XF(sy);
+            _get_pix_16(pts[0], pix, sx, sy);
+            _get_pix_16(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
+            _get_pix_16(pts[2], pix, sx, sy + TWIN_FIXED_ONE);
+            _get_pix_16(pts[3], pix, sx + TWIN_FIXED_ONE, sy + TWIN_FIXED_ONE);
+        }
         wx = sx & 0xffff;
         wy = sy & 0xffff;
         *(dst++) =
@@ -809,16 +749,31 @@ static void twin_pixmap_read_xform_32(twin_xform_t *xform, twin_coord_t line)
     twin_a8_t *dst = xform->span.a8;
     twin_pixmap_t *pix = xform->pixmap;
     twin_matrix_t *tfm = &xform->pixmap->transform;
+    twin_coord_t last_x = 0, last_y = 0;
+    bool fetched = false;
 
     /* for each row in the dest line */
-    dy = twin_int_to_fixed(line);
-    for (dx = 0; dx < twin_int_to_fixed(xform->width); dx += TWIN_FIXED_ONE) {
-        sx = _twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x);
-        sy = _twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y);
-        _get_pix_32(pts[0], pix, sx, sy);
-        _get_pix_32(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
-        _get_pix_32(pts[2], pix, sx, sy + TWIN_FIXED_ONE);
-        _get_pix_32(pts[3], pix, sx + TWIN_FIXED_ONE, sy + TWIN_FIXED_ONE);
+    dy = twin_int_to_fixed(line + xform->off_y);
+    dx = twin_int_to_fixed(xform->off_x);
+    /* dx moves by whole pixels, so the source moves by exactly the first
+     * matrix column per pixel: no multiplies after the first */
+    uint32_t ux = (uint32_t) (_twin_matrix_fx(tfm, dx, dy) + FX(xform->src_x));
+    uint32_t uy = (uint32_t) (_twin_matrix_fy(tfm, dx, dy) + FX(xform->src_y));
+    for (twin_coord_t i = 0; i < xform->width;
+         i++, ux += (uint32_t) tfm->m[0][0], uy += (uint32_t) tfm->m[0][1]) {
+        sx = (twin_fixed_t) ux;
+        sy = (twin_fixed_t) uy;
+        /* The four texels depend on the integer position only: scaling up
+         * revisits them, so fetch (and convert) them once per texel */
+        if (!fetched || XF(sx) != last_x || XF(sy) != last_y) {
+            fetched = true;
+            last_x = XF(sx);
+            last_y = XF(sy);
+            _get_pix_32(pts[0], pix, sx, sy);
+            _get_pix_32(pts[1], pix, sx + TWIN_FIXED_ONE, sy);
+            _get_pix_32(pts[2], pix, sx, sy + TWIN_FIXED_ONE);
+            _get_pix_32(pts[3], pix, sx + TWIN_FIXED_ONE, sy + TWIN_FIXED_ONE);
+        }
         wx = sx & 0xffff;
         wy = sy & 0xffff;
         *(dst++) =
@@ -889,6 +844,8 @@ static void _twin_composite_xform(twin_pixmap_t *dst,
             twin_pixmap_init_xform(src->u.pixmap, left, width, src_x, src_y);
         if (!sxform)
             return;
+        sxform->off_x = left - dst_x;
+        sxform->off_y = top - dst_y;
         s.p = sxform->span;
     } else {
         s.c = src->u.argb;
@@ -904,12 +861,14 @@ static void _twin_composite_xform(twin_pixmap_t *dst,
                                             msk_y);
             if (!mxform)
                 return;
+            mxform->off_x = left - dst_x;
+            mxform->off_y = top - dst_y;
             m.p = mxform->span;
         } else {
             m.c = msk->u.argb;
         }
 
-        twin_src_msk_op op = comp3[operator][operand_xindex(src)][operand_xindex(msk)]
+        twin_src_msk_op op = comp3[operator][operand_xindex(src)][mask_index(msk)]
 		[dst->format];
         for (twin_coord_t iy = top; iy < bottom; iy++) {
             if (src->source_kind == TWIN_PIXMAP)
@@ -945,6 +904,11 @@ void twin_composite(twin_pixmap_t *dst,
                     twin_coord_t width,
                     twin_coord_t height)
 {
+    /* RGB16 carries no alpha, so as a mask it is fully opaque: no mask.
+     * Before the transform test, so neither path samples it. */
+    if (msk && msk->source_kind == TWIN_PIXMAP &&
+        msk->u.pixmap->format == TWIN_RGB16)
+        msk = NULL;
     if ((src->source_kind == TWIN_PIXMAP &&
          !twin_matrix_is_identity(&src->u.pixmap->transform)) ||
         (msk && (msk->source_kind == TWIN_PIXMAP &&

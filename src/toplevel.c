@@ -43,6 +43,10 @@ static void _twin_toplevel_draw(twin_window_t *window)
     twin_toplevel_t *toplevel = window->client_data;
     twin_event_t event;
 
+    /* The window asks for its damaged pixels, which may be all of them (a
+     * window manager restoring an evicted window): repaint every widget,
+     * not only those queued since the last paint */
+    _twin_box_mark_paint(&toplevel->box);
     twin_screen_disable_update(window->screen);
     event.kind = TwinEventPaint;
     (*(&toplevel->box.widget)->handler)(&toplevel->box.widget, &event, NULL);
@@ -60,8 +64,22 @@ static void _twin_toplevel_destroy(twin_window_t *window)
     /* Unregister from closure tracking */
     _twin_closure_unregister(toplevel);
 
+    /* Refuse new paint/layout work while the widgets are torn down: the
+     * Destroy event reaches application callbacks, which may touch widgets
+     * and would otherwise queue work on a toplevel about to be freed. */
+    toplevel->box.widget.paint = true;
+    toplevel->box.widget.layout = true;
+
     event.kind = TwinEventDestroy;
     (*(&toplevel->box.widget)->handler)(&toplevel->box.widget, &event, NULL);
+
+    /* Queued work must not outlive the toplevel: its address may be reused
+     * by an object the tracker would then mistake for it */
+    twin_clear_work(toplevel->paint_work);
+    twin_clear_work(toplevel->layout_work);
+    toplevel->paint_work = toplevel->layout_work = NULL;
+    window->client_data = NULL;
+    twin_free(toplevel);
 }
 
 void _twin_toplevel_init(twin_toplevel_t *toplevel,
@@ -81,8 +99,6 @@ void _twin_toplevel_init(twin_toplevel_t *toplevel,
 }
 
 twin_toplevel_t *twin_toplevel_create(twin_screen_t *screen,
-                                      twin_format_t format,
-                                      twin_window_style_t style,
                                       twin_coord_t x,
                                       twin_coord_t y,
                                       twin_coord_t width,
@@ -90,25 +106,29 @@ twin_toplevel_t *twin_toplevel_create(twin_screen_t *screen,
                                       const char *name)
 {
     twin_toplevel_t *toplevel;
-    twin_window_t *window =
-        twin_window_create(screen, format, style, x, y, width, height);
+    twin_window_t *window = twin_window_create(
+        screen, TWIN_ARGB32, TwinWindowApplication, x, y, width, height);
 
     if (!window)
         return NULL;
-    toplevel = twin_malloc(sizeof(twin_toplevel_t) + strlen(name) + 1);
+    toplevel = twin_calloc(1, sizeof(twin_toplevel_t) + strlen(name) + 1);
     if (!toplevel) {
         twin_window_destroy(window);
         return NULL;
     }
     _twin_toplevel_init(toplevel, _twin_toplevel_dispatch, window, name);
+    /* An opaque root: every client pixel is painted (see the box's paint),
+     * so nothing behind shows through */
+    twin_widget_set(&toplevel->box.widget, 0xffffffff);
     return toplevel;
 }
 
 static bool _twin_toplevel_paint(void *closure)
 {
     twin_toplevel_t *toplevel = closure;
-    twin_event_t ev;
+    twin_event_t ev = {0};
 
+    toplevel->paint_work = NULL;
     twin_screen_disable_update(toplevel->box.widget.window->screen);
     ev.kind = TwinEventPaint;
     (*(&toplevel->box.widget)->handler)(&toplevel->box.widget, &ev, NULL);
@@ -122,15 +142,18 @@ void _twin_toplevel_queue_paint(twin_widget_t *widget)
 
     if (!toplevel->box.widget.paint) {
         toplevel->box.widget.paint = true;
-        twin_set_work(_twin_toplevel_paint, TWIN_WORK_PAINT, toplevel);
+        toplevel->paint_work =
+            twin_set_work(_twin_toplevel_paint, TWIN_WORK_PAINT, toplevel);
     }
 }
 
 static bool _twin_toplevel_layout(void *closure)
 {
     twin_toplevel_t *toplevel = closure;
-    twin_event_t ev;
+    twin_event_t ev = {0};
     twin_window_t *window = toplevel->box.widget.window;
+
+    toplevel->layout_work = NULL;
 
     ev.kind = TwinEventQueryGeometry;
     (*(&toplevel->box.widget)->handler)(&toplevel->box.widget, &ev, NULL);
@@ -149,14 +172,32 @@ void _twin_toplevel_queue_layout(twin_widget_t *widget)
 
     if (!toplevel->box.widget.layout) {
         toplevel->box.widget.layout = true;
-        twin_set_work(_twin_toplevel_layout, TWIN_WORK_LAYOUT, toplevel);
+        toplevel->layout_work =
+            twin_set_work(_twin_toplevel_layout, TWIN_WORK_LAYOUT, toplevel);
         _twin_toplevel_queue_paint(widget);
     }
 }
 
 void twin_toplevel_show(twin_toplevel_t *toplevel)
 {
+    twin_window_t *window = toplevel->box.widget.window;
     _twin_toplevel_layout(toplevel);
-    _twin_toplevel_paint(toplevel);
-    twin_window_show(toplevel->box.widget.window);
+    /* Paint every widget through the window, which also settles its damage:
+     * the window manager's first draw then has nothing left to repaint */
+    twin_rect_t c = twin_window_client(window);
+    twin_window_damage(window, c.left, c.top, c.right, c.bottom);
+    twin_window_draw(window);
+    twin_window_show(window);
+}
+
+void twin_toplevel_destroy(twin_toplevel_t *toplevel)
+{
+    /* The window's destroy callback tears down the widgets and frees the
+     * toplevel */
+    twin_window_destroy(toplevel->box.widget.window);
+}
+
+twin_box_t *twin_toplevel_box(twin_toplevel_t *toplevel)
+{
+    return &toplevel->box;
 }

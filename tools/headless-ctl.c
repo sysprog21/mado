@@ -252,6 +252,14 @@ static twin_headless_shm_t *connect_to_backend(int *fd_out, size_t *size_out)
         return NULL;
     }
 
+    /* Never read the header from an object too small to hold it */
+    if (st.st_size < (off_t) sizeof(twin_headless_shm_t)) {
+        fprintf(stderr, "Shared memory too small (%lld bytes)\n",
+                (long long) st.st_size);
+        close(fd);
+        return NULL;
+    }
+
     /* Map shared memory */
     void *addr =
         mmap(NULL, st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -279,6 +287,22 @@ static twin_headless_shm_t *connect_to_backend(int *fd_out, size_t *size_out)
         return NULL;
     }
 
+    /* The backend writes the header; still, every later framebuffer access
+     * trusts width * height, so it must fit what is actually mapped */
+    if (shm->width <= 0 || shm->height <= 0 ||
+        !twin_headless_shm_bytes((size_t) shm->width, (size_t) shm->height,
+                                 1) ||
+        twin_headless_shm_bytes((size_t) shm->width, (size_t) shm->height, 1) >
+            (size_t) st.st_size) {
+        fprintf(stderr,
+                "Invalid screen size %dx%d for %lld bytes of shared "
+                "memory\n",
+                shm->width, shm->height, (long long) st.st_size);
+        munmap(addr, st.st_size);
+        close(fd);
+        return NULL;
+    }
+
     *fd_out = fd;
     *size_out = st.st_size;
     return shm;
@@ -288,7 +312,12 @@ static int send_command(twin_headless_shm_t *shm,
                         twin_headless_cmd_t cmd,
                         const char *data)
 {
-    static uint32_t seq = 0;
+    /* Continue the backend's sequence: every headless-ctl run is a new
+     * process, so a counter of our own would restart at 1 and the backend
+     * would take the command for one it already answered */
+    uint32_t seq = shm->command_seq + 1;
+    if (seq == 0)
+        seq = 1;
 
     shm->command = cmd;
     if (data)
@@ -296,7 +325,7 @@ static int send_command(twin_headless_shm_t *shm,
     else
         shm->command_data[0] = '\0';
 
-    shm->command_seq = ++seq;
+    shm->command_seq = seq;
 
     /* Wait for response (with timeout) */
     int timeout = 30; /* 3 seconds total */
@@ -365,6 +394,89 @@ static int inject_mouse_event(twin_headless_shm_t *shm,
 }
 
 
+/*
+ * Decode one UTF-8 character from @p into @c.  Returns its length, or 0 for
+ * a malformed sequence: bad continuation bytes, overlong forms, UTF-16
+ * surrogates and anything past U+10FFFF are all rejected.
+ */
+static int utf8_decode(const unsigned char *p, twin_ucs4_t *c)
+{
+    static const twin_ucs4_t min[] = {0, 0, 0x80, 0x800, 0x10000};
+    int len;
+    twin_ucs4_t v;
+
+    if (p[0] < 0x80) {
+        *c = p[0];
+        return 1;
+    }
+    if ((p[0] & 0xe0) == 0xc0) {
+        len = 2;
+        v = p[0] & 0x1f;
+    } else if ((p[0] & 0xf0) == 0xe0) {
+        len = 3;
+        v = p[0] & 0x0f;
+    } else if ((p[0] & 0xf8) == 0xf0) {
+        len = 4;
+        v = p[0] & 0x07;
+    } else {
+        return 0;
+    }
+    for (int i = 1; i < len; i++) {
+        if ((p[i] & 0xc0) != 0x80) /* also stops at the terminating NUL */
+            return 0;
+        v = (v << 6) | (p[i] & 0x3f);
+    }
+    if (v < min[len] || v > 0x10ffff || (v >= 0xd800 && v <= 0xdfff))
+        return 0;
+    *c = v;
+    return len;
+}
+
+/*
+ * Queue each UTF-8 character of @text as a UCS-4 key event.  The whole
+ * string is validated first so malformed input delivers nothing; text
+ * longer than the queue waits for the backend to drain it.
+ */
+static int inject_text(twin_headless_shm_t *shm, const char *text)
+{
+    const unsigned char *p = (const unsigned char *) text;
+    size_t total = 0, sent = 0;
+    twin_ucs4_t c;
+
+    while (*p) {
+        int len = utf8_decode(p, &c);
+        if (!len) {
+            fprintf(stderr, "Invalid UTF-8 sequence at byte %td\n",
+                    (const char *) p - text);
+            return -1;
+        }
+        total++;
+        p += len;
+    }
+
+    for (p = (const unsigned char *) text; *p; sent++) {
+        int timeout = 30; /* 3 seconds, as for commands */
+        while (shm->event_write_idx - shm->event_read_idx >=
+                   TWIN_HEADLESS_MAX_EVENTS &&
+               timeout-- > 0)
+            usleep(100000);
+        if (timeout < 0) {
+            fprintf(stderr,
+                    "Event queue full after %zu of %zu characters - backend "
+                    "may be stalled\n",
+                    sent, total);
+            return -1;
+        }
+        p += utf8_decode(p, &c);
+        twin_headless_event_t *evt =
+            &shm->events[shm->event_write_idx % TWIN_HEADLESS_MAX_EVENTS];
+        evt->kind = TwinEventUcs4;
+        evt->u.ucs4.ucs4 = c;
+        shm->event_write_idx++;
+    }
+    return 0;
+}
+
 static void print_usage(const char *prog)
 {
     printf("Usage: %s [options] command\n", prog);
@@ -373,6 +485,7 @@ static void print_usage(const char *prog)
     printf("  shot FILE           Save screenshot to FILE.png\n");
     printf("  shutdown            Shutdown the backend\n");
     printf("  mouse TYPE X Y [B]  Inject mouse event (TYPE: move/down/up)\n");
+    printf("  type TEXT           Inject TEXT as character events\n");
     printf("  monitor             Monitor backend activity\n");
     printf("\nOptions:\n");
     printf("  -h, --help          Show this help\n");
@@ -497,6 +610,15 @@ int main(int argc, char *argv[])
             ret = inject_mouse_event(shm, type, x, y, button);
             if (ret == 0)
                 printf("Mouse event injected\n");
+        }
+    } else if (strcmp(command, "type") == 0) {
+        if (optind + 1 >= argc) {
+            fprintf(stderr, "Usage: type TEXT\n");
+            ret = 1;
+        } else {
+            ret = inject_text(shm, argv[optind + 1]);
+            if (ret == 0)
+                printf("Text injected\n");
         }
     } else if (strcmp(command, "monitor") == 0) {
         printf("Monitoring backend activity (Ctrl+C to stop)...\n");

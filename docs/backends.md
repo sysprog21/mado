@@ -32,7 +32,12 @@ Run:
 ./demo-sdl
 ```
 
-Once the window appears, you can move windows and interact with widgets.
+Once the window appears, move windows and interact with widgets (the default
+desktop build), or use the phone in a `WM_MOBILE` build.  Screens up to
+320x480 open at twice their size so a phone display is readable on a desktop
+monitor; `MADO_SCALE=n` picks another integer factor from 1 through 8.
+When nothing is damaged the backend waits for input or the next timeout,
+waking at least every 100 ms, and presents once per screen update.
 
 Use Cases:
 - Desktop applications
@@ -360,6 +365,7 @@ The `headless-ctl` tool provides command-line access to the headless backend:
   - Supports PNG format with minimal dependencies
   - No external image libraries required
 - `shutdown`: Gracefully shutdown the backend
+- `type TEXT`: Inject TEXT as character (UCS-4) events to the focused window
 - `mouse TYPE X Y [BUTTON]`: Inject mouse events
   - TYPE: move, down, up
   - X, Y: Screen coordinates (validated against screen size)
@@ -392,6 +398,9 @@ Screenshot saved to screenshot.png
 ./headless-ctl mouse move 100 200
 ./headless-ctl mouse down 100 200 1
 ./headless-ctl mouse up 100 200 1
+
+# Type text into the focused window (delivered as UCS-4 key events)
+./headless-ctl type "12+30="
 
 # Monitor backend activity in real-time
 $ ./headless-ctl monitor

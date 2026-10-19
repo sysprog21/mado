@@ -35,22 +35,42 @@
  *   4. Work execution: _twin_closure_is_valid() check prevents use-after-free
  */
 
+#include <limits.h>
 #include <string.h>
 
 #include "twin_private.h"
 
-/* Global closure tracker instance */
-twin_closure_tracker_t _twin_closure_tracker = {0};
-
-/*
- * Initialize the closure tracking system.
- * Called once during screen initialization to set up the tracking table.
+/* Global closure tracker instance, live from program start so timeouts set
+ * before any screen are tracked.
+ * TODO: add a mutex when threading support is added
  */
-void _twin_closure_tracker_init(void)
+twin_closure_tracker_t _twin_closure_tracker = {
+    .entries = _twin_closure_tracker.inline_entries,
+    .capacity = TWIN_CLOSURE_INLINE,
+};
+
+/* Make room for one more entry, spilling to the heap when inline is full */
+static bool _twin_closure_reserve(void)
 {
-    memset(&_twin_closure_tracker, 0, sizeof(_twin_closure_tracker));
-    _twin_closure_tracker.initialized = true;
-    /* TODO: Initialize mutex when threading support is added */
+    twin_closure_tracker_t *t = &_twin_closure_tracker;
+    if (t->count < t->capacity)
+        return true;
+    if ((size_t) t->capacity > INT_MAX / 2 / sizeof(*t->entries))
+        return false;
+    int cap = t->capacity * 2;
+    twin_closure_entry_t *e;
+    if (t->entries == t->inline_entries) {
+        e = twin_malloc(cap * sizeof(*e));
+        if (e)
+            memcpy(e, t->entries, t->count * sizeof(*e));
+    } else {
+        e = twin_realloc(t->entries, cap * sizeof(*e));
+    }
+    if (!e)
+        return false;
+    t->entries = e;
+    t->capacity = cap;
+    return true;
 }
 
 /*
@@ -94,10 +114,6 @@ bool _twin_closure_register(void *closure)
     if (!twin_pointer_valid(closure))
         return false;
 
-    /* If tracker not initialized, skip registration */
-    if (!_twin_closure_tracker.initialized)
-        return true; /* Pretend success if tracking not yet enabled */
-
     /* Check if already registered */
     twin_closure_entry_t *entry = _twin_closure_find_entry(closure);
     if (entry) {
@@ -106,8 +122,7 @@ bool _twin_closure_register(void *closure)
         return true;
     }
 
-    /* Check capacity */
-    if (_twin_closure_tracker.count >= TWIN_MAX_CLOSURES)
+    if (!_twin_closure_reserve())
         return false;
 
     /* Add new entry at the end */
@@ -127,20 +142,22 @@ bool _twin_closure_register(void *closure)
  */
 void _twin_closure_unregister(void *closure)
 {
+    twin_closure_tracker_t *t = &_twin_closure_tracker;
     if (!closure)
         return;
 
-    for (int i = 0; i < _twin_closure_tracker.count; i++) {
-        if (_twin_closure_tracker.entries[i].closure == closure) {
-            /* Swap with last entry and decrement count */
-            if (i < _twin_closure_tracker.count - 1) {
-                _twin_closure_tracker.entries[i] =
-                    _twin_closure_tracker
-                        .entries[_twin_closure_tracker.count - 1];
-            }
-            _twin_closure_tracker.count--;
-            return;
+    for (int i = 0; i < t->count; i++) {
+        if (t->entries[i].closure != closure)
+            continue;
+        /* Fill the hole with the last entry */
+        t->entries[i] = t->entries[--t->count];
+        /* An empty table hands its heap back */
+        if (!t->count && t->entries != t->inline_entries) {
+            twin_free(t->entries);
+            t->entries = t->inline_entries;
+            t->capacity = TWIN_CLOSURE_INLINE;
         }
+        return;
     }
 }
 
@@ -153,10 +170,6 @@ void _twin_closure_unregister(void *closure)
  */
 bool _twin_closure_ref(void *closure)
 {
-    /* Skip if tracker not initialized */
-    if (!_twin_closure_tracker.initialized)
-        return true;
-
     twin_closure_entry_t *entry = _twin_closure_find_entry(closure);
     if (!entry || entry->marked_for_free)
         return false;
@@ -167,23 +180,24 @@ bool _twin_closure_ref(void *closure)
 
 /*
  * Decrement the reference count for a closure.
- * Called when work items complete or timeouts are cleared.
- *
- * Note: We don't auto-unregister at zero refs to maintain explicit
- * ownership semantics. The owner must call unregister during destruction.
+ * Called when work items complete or timeouts are cleared; the entry goes
+ * away with its last reference.
  */
 bool _twin_closure_unref(void *closure)
 {
-    /* Skip if tracker not initialized */
-    if (!_twin_closure_tracker.initialized)
-        return true;
-
     twin_closure_entry_t *entry = _twin_closure_find_entry(closure);
     if (!entry)
         return false;
 
+    /* Drop the entry with its last holder so the table only ever tracks
+     * closures that still have pending timeouts or work.  Otherwise every
+     * distinct closure ever scheduled leaks a slot until the table fills
+     * and scheduling starts failing.
+     */
     if (entry->ref_count > 0)
         entry->ref_count--;
+    if (entry->ref_count == 0)
+        _twin_closure_unregister(closure);
 
     return true;
 }
@@ -209,10 +223,6 @@ bool _twin_closure_is_valid(void *closure)
     /* First-line defense: basic pointer sanity */
     if (!twin_pointer_valid(closure))
         return false;
-
-    /* If tracker not initialized, fall back to basic pointer validation */
-    if (!_twin_closure_tracker.initialized)
-        return true; /* Assume valid if tracking not yet enabled */
 
     /* Must be tracked to be valid */
     twin_closure_entry_t *entry = _twin_closure_find_entry(closure);

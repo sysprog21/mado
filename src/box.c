@@ -19,7 +19,6 @@ void _twin_box_init(twin_box_t *box,
     box->dir = dir;
     box->children = NULL;
     box->button_down = NULL;
-    box->focus = NULL;
 }
 
 static twin_dispatch_result_t _twin_box_query_geometry(twin_box_t *box)
@@ -147,6 +146,31 @@ static twin_widget_t *_twin_box_xy_to_widget(twin_box_t *box,
     return NULL;
 }
 
+void _twin_box_mark_paint(twin_box_t *box)
+{
+    box->widget.paint = true;
+    for (twin_widget_t *child = box->children; child; child = child->next) {
+        child->paint = true;
+        if (child->handler == _twin_box_dispatch)
+            _twin_box_mark_paint((twin_box_t *) child);
+    }
+}
+
+/* Does @widget repaint every pixel it covers?  A box marked only because
+ * a descendant is does not. */
+static bool _twin_widget_repaints_whole(const twin_widget_t *widget)
+{
+    if (!widget->paint)
+        return false;
+    if (widget->handler != _twin_box_dispatch)
+        return true;
+    for (const twin_widget_t *c = ((const twin_box_t *) widget)->children; c;
+         c = c->next)
+        if (!_twin_widget_repaints_whole(c))
+            return false;
+    return true;
+}
+
 twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
                                           twin_event_t *event,
                                           void *closure)
@@ -165,9 +189,11 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
             child = box->children;
             box->children = child->next;
 
-            /* Send destroy event to child */
+            /* Send destroy event to child, then release it: the box owns
+             * the widgets created inside it */
             ev.kind = TwinEventDestroy;
             child->handler(child, &ev, _twin_widget_callback_data(child));
+            twin_free(child);
         }
         break;
     case TwinEventQueryGeometry:
@@ -178,8 +204,6 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
         twin_window_show(widget->window);
         box->button_down =
             _twin_box_xy_to_widget(box, event->u.pointer.x, event->u.pointer.y);
-        if (box->button_down && _twin_widget_want_focus(box->button_down))
-            box->focus = box->button_down;
         fallthrough;
     case TwinEventButtonUp:
     case TwinEventMotion:
@@ -192,14 +216,14 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
                                   _twin_widget_callback_data(child));
         }
         break;
-    case TwinEventKeyDown:
-    case TwinEventKeyUp:
-    case TwinEventUcs4:
-        if (box->focus)
-            return box->focus->handler(box->focus, event,
-                                       _twin_widget_callback_data(box->focus));
-        break;
-    case TwinEventPaint:
+    case TwinEventPaint: {
+        /* When every child repaints whole, so does the box: fill it first,
+         * so the gaps between children show its background */
+        bool whole = true;
+        for (child = box->children; child && whole; child = child->next)
+            whole = _twin_widget_repaints_whole(child);
+        if (whole)
+            _twin_widget_paint(widget);
         box->widget.paint = false;
         for (child = box->children; child; child = child->next)
             if (child->paint) {
@@ -208,11 +232,6 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
                 twin_coord_t ox, oy;
 
                 twin_pixmap_get_origin(pixmap, &ox, &oy);
-                if (child->shape != TwinShapeRectangle)
-                    twin_fill(child->window->pixmap, widget->background,
-                              TWIN_SOURCE, child->extents.left,
-                              child->extents.top, child->extents.right,
-                              child->extents.bottom);
                 twin_pixmap_set_clip(pixmap, child->extents);
                 twin_pixmap_origin_to_clip(pixmap);
                 child->paint = false;
@@ -221,6 +240,7 @@ twin_dispatch_result_t _twin_box_dispatch(twin_widget_t *widget,
                 twin_pixmap_set_origin(pixmap, ox, oy);
             }
         break;
+    }
     default:
         break;
     }
@@ -235,4 +255,9 @@ twin_box_t *twin_box_create(twin_box_t *parent, twin_box_dir_t dir)
 
     _twin_box_init(box, parent, 0, dir, _twin_box_dispatch);
     return box;
+}
+
+twin_widget_t *twin_box_widget(twin_box_t *box)
+{
+    return &box->widget;
 }

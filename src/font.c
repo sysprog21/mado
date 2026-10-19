@@ -25,6 +25,14 @@ typedef struct _twin_text_info {
     twin_fixed_t snap_y[TWIN_GLYPH_MAX_SNAP_Y];
 } twin_text_info_t;
 
+/* 1 / m in 16.16; unscaled text (m = 1) needs no division */
+static twin_fixed_t _twin_reciprocal(twin_fixed_t m)
+{
+    if (m == TWIN_FIXED_ONE || m == -TWIN_FIXED_ONE)
+        return m;
+    return twin_fixed_div(TWIN_FIXED_ONE, m);
+}
+
 static void _twin_text_compute_info(twin_path_t *path,
                                     const twin_font_t *font,
                                     twin_text_info_t *info)
@@ -61,8 +69,7 @@ static void _twin_text_compute_info(twin_path_t *path,
         }
         info->scale.x =
             twin_fixed_mul(path->state.font_size, path->state.matrix.m[0][xi]);
-        info->reverse_scale.x =
-            twin_fixed_div(TWIN_FIXED_ONE, path->state.matrix.m[0][xi]);
+        info->reverse_scale.x = _twin_reciprocal(path->state.matrix.m[0][xi]);
         if (info->scale.x < 0) {
             info->scale.x = -info->scale.x;
             info->reverse_scale.x = -info->reverse_scale.x;
@@ -71,8 +78,7 @@ static void _twin_text_compute_info(twin_path_t *path,
         }
         info->scale.y =
             twin_fixed_mul(path->state.font_size, path->state.matrix.m[1][yi]);
-        info->reverse_scale.y =
-            twin_fixed_div(TWIN_FIXED_ONE, path->state.matrix.m[1][yi]);
+        info->reverse_scale.y = _twin_reciprocal(path->state.matrix.m[1][yi]);
         if (info->scale.y < 0) {
             info->scale.y = -info->scale.y;
             info->reverse_scale.y = -info->reverse_scale.y;
@@ -224,7 +230,12 @@ static bool twin_find_ucs4_page(twin_font_t *font, uint32_t page)
 
 bool twin_has_ucs4(twin_font_t *font, twin_ucs4_t ucs4)
 {
-    return twin_find_ucs4_page(font, twin_ucs_page(ucs4));
+    if (!twin_find_ucs4_page(font, twin_ucs_page(ucs4)))
+        return false;
+    /* Offset 0 marks a code point the font does not cover, except in stroke
+     * fonts, whose U+0000 glyph sits at offset 0; TrueType tables reserve it */
+    return font->cur_page->offsets[twin_ucs_char_in_page(ucs4)] != 0 ||
+           (ucs4 == 0 && font->type == TWIN_FONT_TYPE_STROKE);
 }
 
 #define SNAPX(p) _snap(path, p, snap_x, nsnap_x)
@@ -240,9 +251,26 @@ static const signed char *_twin_g_base(twin_font_t *font, twin_ucs4_t ucs4)
     return font->outlines + font->cur_page->offsets[idx];
 }
 
+/*
+ * Glyph encodings
+ *
+ * Stroke glyphs start with a header (left, right, ascent, descent, snap
+ * counts, snap positions) in 2.6 fixed point, Y pointing down.
+ * TrueType glyphs, as emitted by tools/ttf/twin-ttf, start with a single
+ * advance byte and use Y pointing up; ascent and descent are per font.
+ */
+static inline bool _twin_font_is_ttf(const twin_font_t *font)
+{
+    return font->type == TWIN_FONT_TYPE_TTF;
+}
+
 static twin_fixed_t _twin_glyph_width(twin_text_info_t *info,
+                                      const twin_font_t *font,
                                       const signed char *b)
 {
+    if (_twin_font_is_ttf(font))
+        return FX(b[0], info);
+
     twin_fixed_t right = FX(twin_glyph_right(b), info) + info->pen.x * 2;
     twin_fixed_t right_side_bearing;
     twin_fixed_t width;
@@ -256,11 +284,54 @@ static twin_fixed_t _twin_glyph_width(twin_text_info_t *info,
     return width;
 }
 
-void twin_text_metrics_ucs4(twin_path_t *path,
-                            twin_ucs4_t ucs4,
-                            twin_text_metrics_t *m)
+/*
+ * Horizontal extent of a TrueType glyph's outline in font units.  Control
+ * points are included, so this bounds the ink (TrueType places on-curve
+ * points at the extrema, making it exact in practice).  Returns false for a
+ * glyph without ink, such as a space.
+ */
+static bool _twin_ttf_glyph_x_bounds(const signed char *b,
+                                     signed char *min_x,
+                                     signed char *max_x)
 {
-    twin_font_t *font = g_twin_font;
+    const signed char *g = b + 1; /* skip the advance byte */
+    bool any = false;
+    for (;;) {
+        int points;
+        switch (*g++) {
+        case 'm':
+        case 'l':
+            points = 1;
+            break;
+        case '2':
+            points = 2;
+            break;
+        case 'c':
+            points = 3;
+            break;
+        default:
+            return any;
+        }
+        for (; points; points--, g += 2) {
+            if (!any || g[0] < *min_x)
+                *min_x = g[0];
+            if (!any || g[0] > *max_x)
+                *max_x = g[0];
+            any = true;
+        }
+    }
+}
+
+static inline twin_font_t *_twin_path_font(const twin_path_t *path)
+{
+    return path->state.font ? path->state.font : g_twin_font;
+}
+
+static void twin_text_metrics_ucs4(twin_path_t *path,
+                                   twin_ucs4_t ucs4,
+                                   twin_text_metrics_t *m)
+{
+    twin_font_t *font = _twin_path_font(path);
     const signed char *b = _twin_g_base(font, ucs4);
     twin_text_info_t info;
     twin_fixed_t left, right, ascent, descent;
@@ -270,6 +341,22 @@ void twin_text_metrics_ucs4(twin_path_t *path,
     twin_fixed_t margin_x, margin_y;
 
     _twin_text_compute_info(path, font, &info);
+    if (_twin_font_is_ttf(font)) {
+        /* TrueType: bearings from the outline; vertical metrics from the font
+         */
+        twin_fixed_t adv = FX(b[0], &info);
+        signed char min_x, max_x;
+        if (_twin_ttf_glyph_x_bounds(b, &min_x, &max_x)) {
+            m->left_side_bearing = FX(min_x, &info);
+            m->right_side_bearing = FX(max_x, &info);
+        } else {
+            m->left_side_bearing = m->right_side_bearing = 0; /* no ink */
+        }
+        m->width = adv;
+        m->ascent = m->font_ascent = FY(font->ascender, &info);
+        m->descent = m->font_descent = FY(-font->descender, &info);
+        return;
+    }
     if (info.snap)
         _twin_text_compute_snap(&info, b);
 
@@ -314,12 +401,12 @@ static const signed char *twin_glyph_draw(const twin_font_t *font,
 {
     if (font->type == TWIN_FONT_TYPE_STROKE)
         return twin_glyph_snap_y(b) + twin_glyph_n_snap_y(b);
-    return b + 4;
+    return b + 1; /* TrueType: skip the advance byte */
 }
 
 void twin_path_ucs4(twin_path_t *path, twin_ucs4_t ucs4)
 {
-    twin_font_t *font = g_twin_font;
+    twin_font_t *font = _twin_path_font(path);
     const signed char *b = _twin_g_base(font, ucs4);
     const signed char *g = twin_glyph_draw(font, b);
     twin_spoint_t origin;
@@ -328,6 +415,8 @@ void twin_path_ucs4(twin_path_t *path, twin_ucs4_t ucs4)
     twin_path_t *pen = NULL;
     twin_fixed_t width;
     twin_text_info_t info;
+    /* TrueType outlines are Y-up; flip them into screen space */
+    int ys = _twin_font_is_ttf(font) ? -1 : 1;
 
     _twin_text_compute_info(path, font, &info);
     if (info.snap)
@@ -347,7 +436,7 @@ void twin_path_ucs4(twin_path_t *path, twin_ucs4_t ucs4)
         switch ((op = *g++)) {
         case 'm':
             x1 = FX(*g++, &info);
-            y1 = FY(*g++, &info);
+            y1 = FY(ys * *g++, &info);
             if (info.snap) {
                 x1 = _twin_snap(x1, info.snap_x, info.n_snap_x);
                 y1 = _twin_snap(y1, info.snap_y, info.n_snap_y);
@@ -356,7 +445,7 @@ void twin_path_ucs4(twin_path_t *path, twin_ucs4_t ucs4)
             continue;
         case 'l':
             x1 = FX(*g++, &info);
-            y1 = FY(*g++, &info);
+            y1 = FY(ys * *g++, &info);
             if (info.snap) {
                 x1 = _twin_snap(x1, info.snap_x, info.n_snap_x);
                 y1 = _twin_snap(y1, info.snap_y, info.n_snap_y);
@@ -365,11 +454,11 @@ void twin_path_ucs4(twin_path_t *path, twin_ucs4_t ucs4)
             continue;
         case 'c':
             x3 = FX(*g++, &info);
-            y3 = FY(*g++, &info);
+            y3 = FY(ys * *g++, &info);
             x2 = FX(*g++, &info);
-            y2 = FY(*g++, &info);
+            y2 = FY(ys * *g++, &info);
             x1 = FX(*g++, &info);
-            y1 = FY(*g++, &info);
+            y1 = FY(ys * *g++, &info);
             if (info.snap) {
                 x3 = _twin_snap(x3, info.snap_x, info.n_snap_x);
                 y3 = _twin_snap(y3, info.snap_y, info.n_snap_y);
@@ -382,11 +471,11 @@ void twin_path_ucs4(twin_path_t *path, twin_ucs4_t ucs4)
             continue;
         case '2':
             _x1 = FX(*g++, &info);
-            _y1 = FY(*g++, &info);
+            _y1 = FY(ys * *g++, &info);
             x3 = x1 + 2 * (_x1 - x1) / 3;
             y3 = y1 + 2 * (_y1 - y1) / 3;
             x1 = FX(*g++, &info);
-            y1 = FY(*g++, &info);
+            y1 = FY(ys * *g++, &info);
             x2 = x1 + 2 * (_x1 - x1) / 3;
             y2 = y1 + 2 * (_y1 - y1) / 3;
             twin_path_curve(stroke, x3, y3, x2, y2, x1, y1);
@@ -406,7 +495,7 @@ void twin_path_ucs4(twin_path_t *path, twin_ucs4_t ucs4)
         twin_path_append(path, stroke);
     twin_path_destroy(stroke);
 
-    width = _twin_glyph_width(&info, b);
+    width = _twin_glyph_width(&info, font, b);
 
     _twin_path_smove(path, origin.x + _twin_matrix_dx(&info.matrix, width, 0),
                      origin.y + _twin_matrix_dy(&info.matrix, width, 0));
@@ -420,7 +509,7 @@ twin_fixed_t twin_width_ucs4(twin_path_t *path, twin_ucs4_t ucs4)
     return metrics.width;
 }
 
-static int _twin_utf8_to_ucs4(const char *src_orig, twin_ucs4_t *dst)
+int _twin_utf8_to_ucs4(const char *src_orig, twin_ucs4_t *dst)
 {
     const char *src = src_orig;
     char s;
@@ -486,7 +575,19 @@ twin_fixed_t twin_width_utf8(twin_path_t *path, const char *string)
     int len;
     twin_ucs4_t ucs4;
     twin_fixed_t w = 0;
+    twin_font_t *font = _twin_path_font(path);
 
+    /* Measuring adds no points, so the pen and scale stay put: for TrueType
+     * the advance is just the scaled width byte, set up once per string. */
+    if (_twin_font_is_ttf(font)) {
+        twin_text_info_t info;
+        _twin_text_compute_info(path, font, &info);
+        while ((len = _twin_utf8_to_ucs4(string, &ucs4)) > 0) {
+            w += FX(_twin_g_base(font, ucs4)[0], &info);
+            string += len;
+        }
+        return w;
+    }
     while ((len = _twin_utf8_to_ucs4(string, &ucs4)) > 0) {
         w += twin_width_ucs4(path, ucs4);
         string += len;

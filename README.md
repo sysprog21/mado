@@ -124,7 +124,38 @@ Run the demo program:
 $ ./demo-sdl
 ```
 
-Once the window appears, you can move the windows and interact with the widgets.
+The default build uses the desktop window manager: overlapping, decorated
+windows running the demo apps.  The window manager is a build-time
+choice, and the desktop and mobile policies are mutually exclusive.  Build
+the phone instead, a lock screen (drag the knob to unlock), a home screen
+and a dozen apps with vector-drawn interfaces (Photos shows JPEG
+fixtures) on the mobile window manager; the launcher also lists every demo
+app that is built:
+
+```shell
+$ make defconfig
+$ python3 tools/kconfig/setconfig.py --kconfig configs/Kconfig WM_MOBILE=y
+$ python3 tools/kconfig/genconfig.py configs/Kconfig
+$ make
+$ ./demo-sdl                      # phone; drag from the left edge to go back
+```
+
+`WM_NONE=y` builds with no window manager at all, showing a single app.
+The window manager is fixed for the life of the build: nothing switches
+or checks it at run time.  The demo apps in `apps/apps.c` run under all
+three; the phone shell depends on `WM_MOBILE` and is built only there.  See [docs/phone.md](docs/phone.md) for the design of
+the window manager, compositor and caches.
+
+### Verification
+
+Headless test suites run in-process with a virtual clock.  At checkpoints
+they check the incrementally updated frame against a full recomposite, and
+the core and phone suites also compare golden frame checksums:
+
+```shell
+$ make check          # core, window manager, lifetime (and phone) suites
+$ make check-update   # re-record golden frame checksums
+```
 
 For information about other backends (Linux framebuffer, VNC, headless), see [docs/backends.md](docs/backends.md).
 

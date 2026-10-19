@@ -13,19 +13,12 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "apps_animation.h"
-#include "apps_calc.h"
-#include "apps_clock.h"
-#include "apps_image.h"
-#include "apps_multi.h"
-#include "apps_spline.h"
+#include "apps.h"
 
 #define WIDTH 640
 #define HEIGHT 480
 
-#define ASSET_PATH "assets/"
-
-#if defined(CONFIG_WINDOW_MANAGER)
+#if defined(CONFIG_WM_DESKTOP)
 /*
  * Load the background pixmap from storage.
  * The screen compositor tiles backgrounds smaller than the screen,
@@ -37,42 +30,49 @@
  */
 static twin_pixmap_t *load_background(twin_screen_t *screen, const char *path)
 {
-    twin_pixmap_t *raw_background = twin_pixmap_from_file(path, TWIN_ARGB32);
+    twin_pixmap_t *raw_background = twin_pixmap_from_file(path);
     if (!raw_background)
         return twin_make_pattern();
 
     /* Source fits on screen -- use directly (tiles if smaller) */
-    if (raw_background->width <= screen->width &&
-        raw_background->height <= screen->height)
+    twin_coord_t sw = twin_screen_width(screen),
+                 sh = twin_screen_height(screen);
+    twin_coord_t bw = twin_pixmap_width(raw_background);
+    twin_coord_t bh = twin_pixmap_height(raw_background);
+    if (bw <= sw && bh <= sh)
         return raw_background;
 
     /* Source is larger -- scale down to screen size */
-    twin_pixmap_t *scaled =
-        twin_pixmap_create(TWIN_ARGB32, screen->width, screen->height);
+    twin_pixmap_t *scaled = twin_pixmap_create(TWIN_ARGB32, sw, sh);
     if (!scaled) {
         twin_pixmap_destroy(raw_background);
         return twin_make_pattern();
     }
-    twin_fixed_t sx = twin_fixed_div(twin_int_to_fixed(raw_background->width),
-                                     twin_int_to_fixed(screen->width));
-    twin_fixed_t sy = twin_fixed_div(twin_int_to_fixed(raw_background->height),
-                                     twin_int_to_fixed(screen->height));
-    twin_matrix_scale(&raw_background->transform, sx, sy);
+    twin_matrix_t m;
+    twin_matrix_identity(&m);
+    twin_matrix_scale(
+        &m, twin_fixed_div(twin_int_to_fixed(bw), twin_int_to_fixed(sw)),
+        twin_fixed_div(twin_int_to_fixed(bh), twin_int_to_fixed(sh)));
+    twin_pixmap_set_transform(raw_background, &m);
     twin_operand_t srcop = {
         .source_kind = TWIN_PIXMAP,
         .u.pixmap = raw_background,
     };
-    twin_composite(scaled, 0, 0, &srcop, 0, 0, NULL, 0, 0, TWIN_SOURCE,
-                   screen->width, screen->height);
+    twin_composite(scaled, 0, 0, &srcop, 0, 0, NULL, 0, 0, TWIN_SOURCE, sw, sh);
     twin_pixmap_destroy(raw_background);
     return scaled;
 }
-#endif /* CONFIG_WINDOW_MANAGER */
+#endif /* CONFIG_WM_DESKTOP */
 
 static twin_context_t *tx = NULL;
 
+static const apps_entry_t *shell; /* the running shell, if any */
+
 static void cleanup(void)
 {
+    if (shell && shell->stop)
+        shell->stop();
+    shell = NULL;
     twin_destroy(tx);
     tx = NULL;
 }
@@ -84,55 +84,61 @@ static void sigint_handler(int sig)
     exit(1);
 }
 
-/* Initialize demo applications based on build configuration.
+/* A shell that owns the screen (the phone, in a mobile build) */
+static const apps_entry_t *find_shell(void)
+{
+    for (int i = 0; i < apps_count(); i++)
+        if (apps_at(i)->boot)
+            return apps_at(i);
+    return NULL;
+}
+
+/* Start the shell, or else every app in registry order.  Without a window
+ * manager every window covers the screen, so overlapping apps would hide
+ * each other: start only the first one.
  * Shared by both native and WebAssembly builds.
  */
-static void init_demo_apps(twin_context_t *ctx)
+static void init_demo_apps(twin_screen_t *screen)
 {
-    twin_screen_t *screen = ctx->screen;
-#if defined(CONFIG_WINDOW_MANAGER)
-#if defined(CONFIG_DEMO_MULTI)
-    apps_multi_start(screen, "Demo", 100, 100, 400, 400);
+    const apps_entry_t *sh = find_shell();
+    if (sh) {
+        if (sh->boot(screen)) {
+            shell = sh;
+            return;
+        }
+        fprintf(stderr, "%s: out of memory, starting the apps instead\n",
+                sh->name);
+    }
+#if defined(CONFIG_WM_DESKTOP)
+    twin_screen_set_background(screen,
+                               load_background(screen, ASSET_PATH "tux.png"));
 #endif
-#if defined(CONFIG_DEMO_CLOCK)
-    apps_clock_start(screen, "Clock", 10, 10, 200, 200);
-#endif
-#if defined(CONFIG_DEMO_CALCULATOR)
-    apps_calc_start(screen, "Calculator", 100, 100, 200, 200);
-#endif
-#if defined(CONFIG_DEMO_SPLINE)
-    apps_spline_start(screen, "Spline", 20, 20, 400, 400);
-#endif
-#if defined(CONFIG_DEMO_ANIMATION)
-    apps_animation_start(screen, "Viewer", ASSET_PATH "nyancat.gif", 20, 20);
-#endif
-#if defined(CONFIG_DEMO_IMAGE)
-    apps_image_start(screen, "Viewer", 20, 20);
-#endif
+    for (int i = 0; i < apps_count(); i++) {
+        const apps_entry_t *app = apps_at(i);
+        if (app->boot)
+            continue;
+        bool started =
+            app->start(screen, app->name, app->x, app->y, app->w, app->h);
+#if defined(CONFIG_WM_NONE)
+        if (started)
+            break;
 #else
-    /*
-     * Without the window manager every window is pinned at (0,0), so launching
-     * multiple demos leaves later windows permanently covering earlier ones.
-     * Start a single demo in a deterministic order instead.
-     */
-#if defined(CONFIG_DEMO_CLOCK)
-    apps_clock_start(screen, "Clock", 10, 10, 200, 200);
-#elif defined(CONFIG_DEMO_CALCULATOR)
-    apps_calc_start(screen, "Calculator", 100, 100, 200, 200);
-#elif defined(CONFIG_DEMO_SPLINE)
-    apps_spline_start(screen, "Spline", 20, 20, 400, 400);
-#elif defined(CONFIG_DEMO_ANIMATION)
-    apps_animation_start(screen, "Viewer", ASSET_PATH "nyancat.gif", 20, 20);
-#elif defined(CONFIG_DEMO_IMAGE)
-    apps_image_start(screen, "Viewer", 20, 20);
+        (void) started;
 #endif
-#endif
-    twin_screen_set_active(screen, screen->top);
+    }
 }
 
 int main(void)
 {
-    tx = twin_create(WIDTH, HEIGHT);
+    int width = WIDTH, height = HEIGHT;
+
+    const apps_entry_t *sh = find_shell();
+    if (sh) {
+        width = sh->w;
+        height = sh->h;
+    }
+
+    tx = twin_create(width, height);
     if (!tx)
         return 1;
 
@@ -143,18 +149,6 @@ int main(void)
      */
     atexit(cleanup);
     signal(SIGINT, sigint_handler);
-
-#if defined(CONFIG_CURSOR)
-    int hx, hy;
-    twin_pixmap_t *cursor = twin_make_cursor(&hx, &hy);
-    if (cursor)
-        twin_screen_set_cursor(tx->screen, cursor, hx, hy);
-#endif
-
-#if defined(CONFIG_WINDOW_MANAGER)
-    twin_screen_set_background(
-        tx->screen, load_background(tx->screen, ASSET_PATH "/tux.png"));
-#endif
 
     /* Start application with unified API (handles native and WebAssembly) */
     twin_run(tx, init_demo_apps);

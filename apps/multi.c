@@ -6,10 +6,10 @@
  */
 
 #include <stddef.h>
-#include "apps_multi.h"
+#include <stdlib.h>
+#include "apps.h"
 
 #define D(x) twin_double_to_fixed(x)
-#define ASSET_PATH "assets/"
 
 typedef struct {
     twin_point_t p1, p2;
@@ -86,16 +86,9 @@ static int _multiline_hit_test(multiline_data_t *data,
     return -1;
 }
 
-static twin_dispatch_result_t _multiline_dispatch(twin_widget_t *widget,
-                                                  twin_event_t *event,
-                                                  void *closure)
+static twin_dispatch_result_t _multiline_dispatch(twin_custom_widget_t *custom,
+                                                  twin_event_t *event)
 {
-    (void) closure;
-
-    twin_custom_widget_t *custom = twin_widget_get_custom(widget);
-    if (!custom)
-        return TwinDispatchContinue;
-
     multiline_data_t *data =
         (multiline_data_t *) twin_custom_widget_data(custom);
 
@@ -106,7 +99,7 @@ static twin_dispatch_result_t _multiline_dispatch(twin_widget_t *widget,
     case TwinEventButtonDown: {
         twin_fixed_t x = twin_int_to_fixed(event->u.pointer.x);
         twin_fixed_t y = twin_int_to_fixed(event->u.pointer.y);
-        int point_idx;
+        int point_idx = 0;
         data->active_line = _multiline_hit_test(data, x, y, &point_idx);
         data->active_point = point_idx;
         twin_custom_widget_queue_paint(custom);
@@ -137,95 +130,138 @@ static twin_dispatch_result_t _multiline_dispatch(twin_widget_t *widget,
     return TwinDispatchContinue;
 }
 
-static void apps_multiline_start(twin_screen_t *screen,
+static bool apps_multiline_start(twin_screen_t *screen,
                                  int x,
                                  int y,
                                  int w,
                                  int h)
 {
-    twin_toplevel_t *toplevel = twin_toplevel_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h, "Lines");
+    twin_toplevel_t *toplevel =
+        twin_toplevel_create(screen, x, y, w, h, "Lines");
+    if (!toplevel)
+        return false;
 
     twin_custom_widget_t *custom = twin_custom_widget_create(
-        &toplevel->box, 0xffffffff, 0, 0, 1, 1, _multiline_dispatch,
+        twin_toplevel_box(toplevel), 0xffffffff, 0, 0, _multiline_dispatch,
         sizeof(multiline_data_t));
+    if (!custom) {
+        twin_toplevel_destroy(toplevel);
+        return false;
+    }
 
-    if (custom) {
-        multiline_data_t *data =
-            (multiline_data_t *) twin_custom_widget_data(custom);
-        data->num_lines = 3;
-        data->active_line = -1;
-        data->line_width = D(30);
+    multiline_data_t *data =
+        (multiline_data_t *) twin_custom_widget_data(custom);
+    data->num_lines = 3;
+    data->active_line = -1;
+    data->line_width = D(30);
 
-        /* Initialize 3 lines */
-        twin_fixed_t fy;
-        int i = 0;
-        for (fy = 0; i < 3; fy += 50, i++) {
-            data->lines[i].p1.x = D(30);
-            data->lines[i].p1.y = D(100 - fy);
-            data->lines[i].p2.x = D(220);
-            data->lines[i].p2.y = D(100 + fy);
-        }
+    /* Initialize 3 lines */
+    twin_fixed_t fy;
+    int i = 0;
+    for (fy = 0; i < 3; fy += 50, i++) {
+        data->lines[i].p1.x = D(30);
+        data->lines[i].p1.y = D(100 - fy);
+        data->lines[i].p2.x = D(220);
+        data->lines[i].p2.y = D(100 + fy);
     }
 
     twin_toplevel_show(toplevel);
+    return true;
 }
 
-static void apps_circletext_start(twin_screen_t *screen,
-                                  int x,
-                                  int y,
-                                  int w,
-                                  int h)
+/*
+ * The windows below paint from draw callbacks at whatever size the window
+ * manager gives them: a desktop keeps the requested size, a phone or the
+ * 'none' policy hands out the whole work area, and the mobile policy may
+ * free a covered window's pixels and ask for them again.
+ */
+
+/* Client size of the window being drawn */
+static void client_size(twin_window_t *window, int *w, int *h)
+{
+    twin_rect_t c = twin_window_client(window);
+    *w = c.right - c.left;
+    *h = c.bottom - c.top;
+}
+
+/* Scale for art designed for a 400x400 window, so it fits a smaller one */
+static twin_fixed_t fit_400(int w, int h)
+{
+    int side = w < h ? w : h;
+    return side >= 400 ? TWIN_FIXED_ONE
+                       : twin_fixed_div(twin_int_to_fixed(side), D(400));
+}
+
+/* Open a window painted by @draw; @data and @destroy belong to it.  A new
+ * window is damaged all over, so the first draw paints everything. */
+static bool start_window(twin_screen_t *screen,
+                         int x,
+                         int y,
+                         int w,
+                         int h,
+                         const char *name,
+                         twin_draw_func_t draw,
+                         void *data,
+                         twin_destroy_func_t destroy,
+                         bool opaque)
 {
     twin_window_t *window = twin_window_create(
         screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
-    int wid = window->client.right - window->client.left;
-    int hei = window->client.bottom - window->client.top;
-    twin_pixmap_t *pixmap = window->pixmap;
+    if (!window)
+        return false;
+    /* A window that paints every pixel opaque says so: the compositor then
+     * skips what lies under it */
+    twin_window_set_opaque(window, opaque);
+    twin_window_set_name(window, name);
+    twin_window_set_client_data(window, data);
+    twin_window_set_callbacks(window, draw, NULL, destroy);
+    /* Painted before the next redisplay, and only if still shown: on a
+     * phone each window covers the one opened before it */
+    twin_rect_t c = twin_window_client(window);
+    twin_window_damage(window, c.left, c.top, c.right, c.bottom);
+    twin_window_show(window);
+    return true;
+}
+
+/* Fill the client white first: these windows are declared opaque, so
+ * every pixel is covered even when the drawing cannot allocate a path */
+static twin_pixmap_t *clear_white(twin_window_t *window, int w, int h)
+{
+    twin_pixmap_t *pixmap = twin_window_pixmap(window);
+    twin_fill(pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, w, h);
+    return pixmap;
+}
+
+static void circletext_draw(twin_window_t *window)
+{
+    int w, h;
+    client_size(window, &w, &h);
+    twin_pixmap_t *pixmap = clear_white(window, w, h);
     twin_path_t *path = twin_path_create();
-    twin_path_t *pen = twin_path_create();
-    twin_pixmap_t *alpha = twin_pixmap_create(TWIN_A8, wid, hei);
-    int s;
-    twin_operand_t source, mask;
-
-    twin_fill(pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, wid, hei);
-    twin_window_set_name(window, "circletext");
-
+    if (!path)
+        return;
+    twin_fixed_t scale = fit_400(w, h);
     twin_path_set_font_style(path, TwinStyleUnhinted);
-    twin_path_circle(pen, 0, 0, D(1));
-
-    twin_path_translate(path, D(200), D(200));
+    twin_path_translate(path, twin_int_to_fixed(w / 2),
+                        twin_int_to_fixed(h / 2));
+    twin_path_scale(path, scale, scale);
     twin_path_set_font_size(path, D(15));
-    for (s = 0; s < 41; s++) {
+    for (int s = 0; s < 41; s++) {
         twin_state_t state = twin_path_save(path);
         twin_path_rotate(path, twin_degrees_to_angle(9 * s));
         twin_path_move(path, D(100), D(0));
         twin_path_utf8(path, "Hello, world!");
         twin_path_restore(path, &state);
     }
-    twin_paint_path(alpha, 0xff000000, path);
+    twin_paint_path(pixmap, 0xff000000, path);
     twin_path_destroy(path);
-    twin_path_destroy(pen);
-    source.source_kind = TWIN_SOLID;
-    source.u.argb = 0xff000000;
-    mask.source_kind = TWIN_PIXMAP;
-    mask.u.pixmap = alpha;
-    twin_composite(pixmap, 0, 0, &source, 0, 0, &mask, 0, 0, TWIN_OVER, wid,
-                   hei);
-    twin_pixmap_destroy(alpha);
-    twin_window_show(window);
 }
 
-static void apps_smiley_start(twin_screen_t *screen, int x, int y, int w, int h)
+static void smiley_draw(twin_window_t *window)
 {
-    twin_window_t *window = twin_window_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
-    twin_pixmap_t *pixmap = window->pixmap;
-
-    twin_window_set_name(window, "Smiley");
-
-    /* Clear background to white */
-    twin_fill(pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, w, h);
+    int w, h;
+    client_size(window, &w, &h);
+    twin_pixmap_t *pixmap = clear_white(window, w, h);
 
     /* Calculate center and dimensions */
     twin_fixed_t center_x = twin_int_to_fixed(w / 2);
@@ -263,32 +299,18 @@ static void apps_smiley_start(twin_screen_t *screen, int x, int y, int w, int h)
                   TWIN_ANGLE_0, TWIN_ANGLE_180);
     twin_paint_stroke(pixmap, 0xff000000, smile, D(5)); /* Black line */
     twin_path_destroy(smile);
-
-    twin_window_show(window);
 }
 
-static void apps_ascii_start(twin_screen_t *screen, int x, int y, int w, int h)
+static void ascii_draw(twin_window_t *window)
 {
-    twin_window_t *window = twin_window_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
-    int wid = window->client.right - window->client.left;
-    int hei = window->client.bottom - window->client.top;
-    twin_pixmap_t *pixmap = window->pixmap;
+    int w, h;
+    client_size(window, &w, &h);
+    twin_pixmap_t *pixmap = clear_white(window, w, h);
     twin_path_t *path = twin_path_create();
-    twin_path_t *pen = twin_path_create();
-    twin_pixmap_t *alpha = twin_pixmap_create(TWIN_A8, wid, hei);
-    twin_operand_t source, mask;
-    twin_fixed_t fx, fy;
-    int s;
-
-    twin_window_set_name(window, "ASCII");
-
-    twin_fill(pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, wid, hei);
-    twin_path_circle(pen, 0, 0, D(1));
-
-    fx = D(3);
-    fy = D(8);
-    for (s = 6; s < 36; s += 6) {
+    if (!path)
+        return;
+    twin_fixed_t fx = D(3), fy = D(8);
+    for (int s = 6; s < 36; s += 6) {
         twin_path_set_font_size(path, D(s));
         fy += D(s + 2);
         twin_path_move(path, fx, fy);
@@ -301,18 +323,8 @@ static void apps_ascii_start(twin_screen_t *screen, int x, int y, int w, int h)
         twin_path_utf8(path, "`abcdefghijklmnopqrstuvwxyz{|}~");
         fy += D(s + 2);
     }
-
-    twin_paint_path(alpha, 0xff000000, path);
+    twin_paint_path(pixmap, 0xff000000, path);
     twin_path_destroy(path);
-    twin_path_destroy(pen);
-    source.source_kind = TWIN_SOLID;
-    source.u.argb = 0xff000000;
-    mask.source_kind = TWIN_PIXMAP;
-    mask.u.pixmap = alpha;
-    twin_composite(pixmap, 0, 0, &source, 0, 0, &mask, 0, 0, TWIN_OVER, wid,
-                   hei);
-    twin_pixmap_destroy(alpha);
-    twin_window_show(window);
 }
 
 static void draw_flower(twin_path_t *path,
@@ -342,80 +354,151 @@ static void draw_flower(twin_path_t *path,
     twin_path_close(path);
 }
 
-static void apps_flower_start(twin_screen_t *screen, int x, int y, int w, int h)
+static void flower_draw(twin_window_t *window)
 {
-    twin_window_t *window = twin_window_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
-    twin_pixmap_t *pixmap = window->pixmap;
+    int w, h;
+    client_size(window, &w, &h);
+    twin_pixmap_t *pixmap = clear_white(window, w, h);
+    twin_fixed_t scale = fit_400(w, h);
+    twin_fixed_t cx = twin_int_to_fixed(w / 2), cy = twin_int_to_fixed(h / 2);
     twin_path_t *stroke = twin_path_create();
     twin_path_t *path = twin_path_create();
-    twin_path_translate(path, D(200), D(200));
-    twin_path_scale(path, D(10), D(10));
-    twin_path_translate(stroke, D(200), D(200));
-    twin_fill(pixmap, 0xffffffff, TWIN_SOURCE, 0, 0, w, h);
-    twin_window_set_name(window, "Flower");
-    twin_path_move(stroke, D(-200), D(0));
-    twin_path_draw(stroke, D(200), D(0));
-    twin_path_move(stroke, D(0), D(200));
-    twin_path_draw(stroke, D(0), D(-200));
-    twin_path_set_cap_style(stroke, TwinCapProjecting);
-    twin_paint_stroke(pixmap, 0xffcc9999, stroke, D(10));
-    draw_flower(path, D(3), 5);
-    twin_paint_path(pixmap, 0xffe2d2d2, path);
-    twin_path_destroy(stroke);
-    twin_path_destroy(path);
-    twin_window_show(window);
+    if (stroke && path) {
+        twin_path_translate(path, cx, cy);
+        twin_path_scale(path, twin_fixed_mul(scale, D(10)),
+                        twin_fixed_mul(scale, D(10)));
+        twin_path_translate(stroke, cx, cy);
+        twin_path_scale(stroke, scale, scale);
+        twin_path_move(stroke, D(-200), D(0));
+        twin_path_draw(stroke, D(200), D(0));
+        twin_path_move(stroke, D(0), D(200));
+        twin_path_draw(stroke, D(0), D(-200));
+        twin_path_set_cap_style(stroke, TwinCapProjecting);
+        twin_paint_stroke(pixmap, 0xffcc9999, stroke,
+                          twin_fixed_mul(scale, D(10)));
+        draw_flower(path, D(3), 5);
+        twin_paint_path(pixmap, 0xffe2d2d2, path);
+    }
+    if (stroke)
+        twin_path_destroy(stroke);
+    if (path)
+        twin_path_destroy(path);
 }
 
-static void apps_blur(twin_screen_t *screen, int x, int y, int w, int h)
+/*
+ * Separable box blur, three passes approximating a Gaussian.  Demo-only:
+ * the window system itself never blurs (shadows are synthesized).
+ */
+static void box_blur_line(twin_argb32_t *p,
+                          int n,
+                          int step,
+                          int r,
+                          twin_argb32_t *tmp)
 {
-    twin_pixmap_t *raw_background = NULL;
-#if defined(CONFIG_LOADER_PNG)
-    raw_background = twin_pixmap_from_file(ASSET_PATH "tux.png", TWIN_ARGB32);
-#endif
-    if (!raw_background)
-        return;
-    twin_window_t *window = twin_window_create(
-        screen, TWIN_ARGB32, TwinWindowApplication, x, y, w, h);
-    twin_window_set_name(window, "Blur");
-    int client_width = window->client.right - window->client.left;
-    int client_height = window->client.bottom - window->client.top;
-    twin_pixmap_t *scaled_background =
-        twin_pixmap_create(TWIN_ARGB32, client_width, client_height);
-    twin_fixed_t sx, sy;
-    sx = twin_fixed_div(twin_int_to_fixed(raw_background->width),
-                        twin_int_to_fixed(client_width));
-    sy = twin_fixed_div(twin_int_to_fixed(raw_background->height),
-                        twin_int_to_fixed(client_height));
+    for (int i = 0; i < n; i++)
+        tmp[i] = p[i * step];
+    /* sum / count as (sum * recip[count]) >> 16, exact for every count up to
+     * 16 and sum up to 255 * count (checked exhaustively); wider windows
+     * divide */
+    uint32_t recip[17];
+    bool fast = 2 * r + 1 <= 16;
+    for (int c = 1; fast && c <= 2 * r + 1; c++)
+        recip[c] = 65536 / c + 1;
+    /* Running sums over the window [i - r, i + r], clipped to the line:
+     * one pixel enters and one leaves per step */
+    uint32_t sum[4] = {0, 0, 0, 0};
+    int lo = 0, hi = 0; /* window is tmp[lo, hi) */
+    for (int i = 0; i < n; i++) {
+        for (; hi < n && hi <= i + r; hi++)
+            for (int c = 0; c < 4; c++)
+                sum[c] += (tmp[hi] >> (c * 8)) & 0xff;
+        for (; lo < i - r; lo++)
+            for (int c = 0; c < 4; c++)
+                sum[c] -= (tmp[lo] >> (c * 8)) & 0xff;
+        uint32_t count = (uint32_t) (hi - lo);
+        twin_argb32_t v = 0;
+        for (int c = 0; c < 4; c++)
+            v |= (twin_argb32_t) (fast ? (sum[c] * recip[count]) >> 16
+                                       : sum[c] / count)
+                 << (c * 8);
+        p[i * step] = v;
+    }
+}
 
-    twin_matrix_scale(&raw_background->transform, sx, sy);
+static void box_blur(twin_pixmap_t *px, int r)
+{
+    int w = twin_pixmap_width(px), h = twin_pixmap_height(px);
+    twin_coord_t stride_bytes;
+    twin_argb32_t *pixels = twin_pixmap_pixels(px, &stride_bytes);
+    int stride = stride_bytes / 4;
+    if (!pixels)
+        return;
+    twin_argb32_t *tmp = malloc(sizeof(*tmp) * (w > h ? w : h));
+    if (!tmp)
+        return;
+    for (int pass = 0; pass < 3; pass++) {
+        for (int y = 0; y < h; y++)
+            box_blur_line(pixels + y * stride, w, 1, r / 3 + 1, tmp);
+        for (int x = 0; x < w; x++)
+            box_blur_line(pixels + x, h, stride, r / 3 + 1, tmp);
+    }
+    free(tmp);
+}
+
+/* The window keeps the source image and blurs it at the window's size */
+static void blur_draw(twin_window_t *window)
+{
+    twin_pixmap_t *raw_background = twin_window_client_data(window);
+    int w, h;
+    client_size(window, &w, &h);
+    twin_pixmap_t *scaled = twin_pixmap_create(TWIN_ARGB32, w, h);
+    if (!scaled)
+        return;
+    twin_matrix_t m;
+    twin_matrix_identity(&m);
+    twin_matrix_scale(
+        &m,
+        twin_fixed_div(twin_int_to_fixed(twin_pixmap_width(raw_background)),
+                       twin_int_to_fixed(w)),
+        twin_fixed_div(twin_int_to_fixed(twin_pixmap_height(raw_background)),
+                       twin_int_to_fixed(h)));
+    twin_pixmap_set_transform(raw_background, &m);
     twin_operand_t srcop = {
         .source_kind = TWIN_PIXMAP,
         .u.pixmap = raw_background,
     };
-
-    twin_composite(scaled_background, 0, 0, &srcop, 0, 0, 0, 0, 0, TWIN_SOURCE,
-                   scaled_background->width, scaled_background->height);
-
-    /*
-     * Apply blur effect to the scaled background. The valid kernel size range
-     * is from 1 to 15.
-     */
-    twin_stack_blur(scaled_background, 15, 0, scaled_background->width - 1, 0,
-                    scaled_background->height - 1);
+    twin_composite(scaled, 0, 0, &srcop, 0, 0, NULL, 0, 0, TWIN_SOURCE, w, h);
+    box_blur(scaled, 8);
 
     /* Copy the blurred background to the window */
-    srcop.u.pixmap = scaled_background;
-    twin_composite(window->pixmap, 0, 0, &srcop, 0, 0, NULL, 0, 0, TWIN_SOURCE,
-                   client_width, client_height);
-
-    twin_pixmap_destroy(scaled_background);
-    twin_pixmap_destroy(raw_background);
-    twin_window_show(window);
-    return;
+    srcop.u.pixmap = scaled;
+    twin_composite(twin_window_pixmap(window), 0, 0, &srcop, 0, 0, NULL, 0, 0,
+                   TWIN_SOURCE, w, h);
+    twin_pixmap_destroy(scaled);
 }
 
-void apps_multi_start(twin_screen_t *screen,
+static void blur_destroy(twin_window_t *window)
+{
+    twin_pixmap_destroy(twin_window_client_data(window));
+}
+
+static bool apps_blur(twin_screen_t *screen, int x, int y, int w, int h)
+{
+    twin_pixmap_t *raw_background = NULL;
+#if defined(CONFIG_LOADER_PNG)
+    raw_background = twin_pixmap_from_file(ASSET_PATH "tux.png");
+#endif
+    if (!raw_background)
+        return false;
+    /* The image may be translucent */
+    if (start_window(screen, x, y, w, h, "Blur", blur_draw, raw_background,
+                     blur_destroy, false))
+        return true;
+    twin_pixmap_destroy(raw_background);
+    return false;
+}
+
+bool apps_multi_start(twin_screen_t *screen,
                       const char *name,
                       int x,
                       int y,
@@ -423,10 +506,16 @@ void apps_multi_start(twin_screen_t *screen,
                       int h)
 {
     (void) name;
-    apps_circletext_start(screen, x, y, w, h);
-    apps_multiline_start(screen, x += 20, y += 20, w * 2 / 3, h * 2 / 3);
-    apps_smiley_start(screen, x += 20, y += 20, 200, 200);
-    apps_ascii_start(screen, x += 20, y += 20, w, h);
-    apps_flower_start(screen, x += 20, y += 20, w, h);
-    apps_blur(screen, x += 20, y += 20, w / 2, h / 2);
+    /* Started if any of its windows opened */
+    bool any = start_window(screen, x, y, w, h, "circletext", circletext_draw,
+                            NULL, NULL, true);
+    any |= apps_multiline_start(screen, x += 20, y += 20, w * 2 / 3, h * 2 / 3);
+    any |= start_window(screen, x += 20, y += 20, 200, 200, "Smiley",
+                        smiley_draw, NULL, NULL, true);
+    any |= start_window(screen, x += 20, y += 20, w, h, "ASCII", ascii_draw,
+                        NULL, NULL, true);
+    any |= start_window(screen, x += 20, y += 20, w, h, "Flower", flower_draw,
+                        NULL, NULL, true);
+    any |= apps_blur(screen, x += 20, y += 20, w / 2, h / 2);
+    return any;
 }

@@ -1,0 +1,2841 @@
+{
+  "schema_version": 1,
+  "collected_at_utc": "2026-10-19T11:20:22.267468+00:00",
+  "host_access": "ssh mag",
+  "remote_directory": "/tmp/mado-arm64.qRnJcv",
+  "baseline": "Workspace snapshot before the Arm64 optimization pass; includes the earlier RISC-V optimization work.",
+  "method": {
+    "cpu": 2,
+    "process_runs_per_mode": 3,
+    "timed_batches_per_kernel_per_run": 7,
+    "minimum_calibrated_batch_ns": 20000000,
+    "summary": "Median of per-process median nanoseconds per independent operation",
+    "auto_vectorization": false,
+    "explicit_neon_in_float": true,
+    "integer_modes": "Math objects and timing driver use -mgeneral-regs-only; assembly inspected for FP/SIMD registers.",
+    "governor": "ondemand; unchanged; calibration warms CPU and caches",
+    "helper_audit": "__divti3: 224 instructions; no FP/SIMD instructions or operands (branch target addresses excluded)"
+  },
+  "summary": [
+    {
+      "kernel": "mul",
+      "median_ns_per_op": {
+        "fixed": 1.1546777486801147,
+        "table": 1.1554317772388458,
+        "float": 2.909521222114563
+      },
+      "float_before_ns_per_op": 13.4314284324646,
+      "float_speedup": 4.616370669639933
+    },
+    {
+      "kernel": "div",
+      "median_ns_per_op": {
+        "fixed": 12.726922035217285,
+        "table": 12.730545997619629,
+        "float": 6.725178956985474
+      },
+      "float_before_ns_per_op": 7.608333587646484,
+      "float_speedup": 1.1313206141144652
+    },
+    {
+      "kernel": "div_small",
+      "median_ns_per_op": {
+        "fixed": 10.355805397033691,
+        "table": 10.358094215393066,
+        "float": 6.726239919662476
+      },
+      "float_before_ns_per_op": 7.601097345352173,
+      "float_speedup": 1.1300663425835096
+    },
+    {
+      "kernel": "div_whole",
+      "median_ns_per_op": {
+        "fixed": 6.824856281280518,
+        "table": 6.821685314178467,
+        "float": 6.7244040966033936
+      },
+      "float_before_ns_per_op": 7.605877637863159,
+      "float_speedup": 1.1310857480598187
+    },
+    {
+      "kernel": "sqrt",
+      "median_ns_per_op": {
+        "fixed": 77.126953125,
+        "table": 77.17855072021484,
+        "float": 17.693305492401123
+      },
+      "float_before_ns_per_op": 18.001693725585938,
+      "float_speedup": 1.0174296562797303
+    },
+    {
+      "kernel": "sincos",
+      "median_ns_per_op": {
+        "fixed": 22.277716636657715,
+        "table": 6.120076656341553,
+        "float": 23.112518310546875
+      },
+      "float_before_ns_per_op": 45.432430267333984,
+      "float_speedup": 1.965706620840271
+    },
+    {
+      "kernel": "acos",
+      "median_ns_per_op": {
+        "fixed": 146.35164260864258,
+        "table": 146.45263671875,
+        "float": 50.06912040710449
+      },
+      "float_before_ns_per_op": 50.08099365234375,
+      "float_speedup": 1.0002371370845486
+    },
+    {
+      "kernel": "wmul",
+      "median_ns_per_op": {
+        "fixed": 1.638225793838501,
+        "table": 1.6384433507919312,
+        "float": 1.6376520991325378
+      },
+      "float_before_ns_per_op": 1.637544870376587,
+      "float_speedup": 0.9999345228720998
+    },
+    {
+      "kernel": "wdiv",
+      "median_ns_per_op": {
+        "fixed": 40.14009666442871,
+        "table": 40.169137954711914,
+        "float": 40.08407020568848
+      },
+      "float_before_ns_per_op": 39.87334442138672,
+      "float_speedup": 0.9947429045199144
+    },
+    {
+      "kernel": "wdiv_whole",
+      "median_ns_per_op": {
+        "fixed": 12.709255695343018,
+        "table": 12.709768295288086,
+        "float": 12.70428466796875
+      },
+      "float_before_ns_per_op": 34.25419902801514,
+      "float_speedup": 2.6962713701134295
+    },
+    {
+      "kernel": "wsqrt",
+      "median_ns_per_op": {
+        "fixed": 143.90879821777344,
+        "table": 143.9345474243164,
+        "float": 26.847692489624023
+      },
+      "float_before_ns_per_op": 148.35002517700195,
+      "float_speedup": 5.525615478288707
+    },
+    {
+      "kernel": "compose",
+      "median_ns_per_op": {
+        "fixed": 11.632994651794434,
+        "table": 11.634806632995605,
+        "float": 10.38496446609497
+      },
+      "float_before_ns_per_op": 189.88137817382812,
+      "float_speedup": 18.28425882377898
+    },
+    {
+      "kernel": "translate",
+      "median_ns_per_op": {
+        "fixed": 5.308163404464722,
+        "table": 5.308115482330322,
+        "float": 11.65455961227417
+      },
+      "float_before_ns_per_op": 68.31880569458008,
+      "float_speedup": 5.8619808870881
+    },
+    {
+      "kernel": "scale",
+      "median_ns_per_op": {
+        "fixed": 4.723225235939026,
+        "table": 4.722629189491272,
+        "float": 10.499083995819092
+      },
+      "float_before_ns_per_op": 68.01138687133789,
+      "float_speedup": 6.4778400571346175
+    },
+    {
+      "kernel": "rotate",
+      "median_ns_per_op": {
+        "fixed": 31.45655345916748,
+        "table": 15.989953994750977,
+        "float": 35.50987434387207
+      },
+      "float_before_ns_per_op": 155.6244888305664,
+      "float_speedup": 4.3825694037529725
+    },
+    {
+      "kernel": "transform",
+      "median_ns_per_op": {
+        "fixed": 5.2087602615356445,
+        "table": 5.20927882194519,
+        "float": 13.77879285812378
+      },
+      "float_before_ns_per_op": 73.7855281829834,
+      "float_speedup": 5.355006707970104
+    }
+  ],
+  "assembly_instruction_counts": {
+    "before": {
+      "math_product": 22,
+      "math_quotient": 17,
+      "math_compose": 266,
+      "math_translate": 97,
+      "math_scale": 93,
+      "math_rotate": 175
+    },
+    "after": {
+      "math_product": 6,
+      "math_quotient": 6,
+      "math_compose": 28,
+      "math_translate": 16,
+      "math_scale": 13,
+      "math_rotate": 20
+    }
+  },
+  "validation": {
+    "gcc_arm64": {
+      "command": "python3 scripts/check-math.py --sanitize --arm64",
+      "exit_code": 0,
+      "output": [
+        "fixed: Arm64 codegen and FP/SIMD policy passed",
+        "fixed: numeric, exhaustive trigonometry and matrix tests passed",
+        "table: Arm64 codegen and FP/SIMD policy passed",
+        "table: numeric, exhaustive trigonometry and matrix tests passed",
+        "float: Arm64 codegen and FP/SIMD policy passed",
+        "float: numeric, exhaustive trigonometry and matrix tests passed"
+      ],
+      "log_sha256": "df6e065e199227582e53dd4471002cab226d081220a7d567a992fef7f517bdf2"
+    },
+    "clang_arm64": {
+      "command": "python3 scripts/check-math.py --cc clang --sanitize --arm64",
+      "exit_code": 0,
+      "output": [
+        "fixed: Arm64 codegen and FP/SIMD policy passed",
+        "fixed: numeric, exhaustive trigonometry and matrix tests passed",
+        "table: Arm64 codegen and FP/SIMD policy passed",
+        "table: numeric, exhaustive trigonometry and matrix tests passed",
+        "float: Arm64 codegen and FP/SIMD policy passed",
+        "float: numeric, exhaustive trigonometry and matrix tests passed"
+      ],
+      "log_sha256": "df6e065e199227582e53dd4471002cab226d081220a7d567a992fef7f517bdf2"
+    },
+    "gcc_no_fma_contract": {
+      "command": "python3 scripts/check-math.py --cc \"gcc -ffp-contract=off\" --sanitize --arm64",
+      "exit_code": 0,
+      "output": [
+        "fixed: Arm64 codegen and FP/SIMD policy passed",
+        "fixed: numeric, exhaustive trigonometry and matrix tests passed",
+        "table: Arm64 codegen and FP/SIMD policy passed",
+        "table: numeric, exhaustive trigonometry and matrix tests passed",
+        "float: Arm64 codegen and FP/SIMD policy passed",
+        "float: numeric, exhaustive trigonometry and matrix tests passed"
+      ],
+      "log_sha256": "df6e065e199227582e53dd4471002cab226d081220a7d567a992fef7f517bdf2"
+    },
+    "make_check_math": {
+      "command": "make check-math CONFIG_TOOLS=n",
+      "exit_code": 0,
+      "output": [
+        "fixed: Arm64 codegen and FP/SIMD policy passed",
+        "fixed: numeric, exhaustive trigonometry and matrix tests passed",
+        "table: Arm64 codegen and FP/SIMD policy passed",
+        "table: numeric, exhaustive trigonometry and matrix tests passed",
+        "float: Arm64 codegen and FP/SIMD policy passed",
+        "float: numeric, exhaustive trigonometry and matrix tests passed"
+      ],
+      "log_sha256": "df6e065e199227582e53dd4471002cab226d081220a7d567a992fef7f517bdf2"
+    },
+    "riscv_regression": {
+      "command": "python3 scripts/check-math.py --sanitize --riscv-cc riscv64-linux-gnu-gcc --qemu qemu-riscv32 --kernels --kernel-cflags=-I/tmp/mado-arm64.SRdsux/rv-headers",
+      "exit_code": 0,
+      "note": "Temporary empty ILP32 glibc stubs permit declaration-only compilation with the installed RV64 headers. Executables link without libc.",
+      "output": [
+        "fixed: Arm64 codegen and FP/SIMD policy passed",
+        "fixed: numeric, exhaustive trigonometry and matrix tests passed",
+        "table: Arm64 codegen and FP/SIMD policy passed",
+        "table: numeric, exhaustive trigonometry and matrix tests passed",
+        "float: Arm64 codegen and FP/SIMD policy passed",
+        "float: numeric, exhaustive trigonometry and matrix tests passed",
+        "rv32i: codegen passed; product/quotient/compose assembly instructions = [12, 35, 178]",
+        "rv32i: sincos/sqrt kernels contain no helper/libm calls",
+        "rv32i: QEMU arithmetic and aliasing tests passed",
+        "rv32im: codegen passed; product/quotient/compose assembly instructions = [6, 30, 91]",
+        "rv32im: sincos/sqrt kernels contain no helper/libm calls",
+        "rv32im: QEMU arithmetic and aliasing tests passed",
+        "rv32imf: codegen passed; product/quotient/compose assembly instructions = [8, 8, 67]",
+        "rv32imf: sincos/sqrt kernels contain no helper/libm calls",
+        "rv32imf: QEMU arithmetic and aliasing tests passed"
+      ],
+      "log_sha256": "87107d8325d8a24374ea47017d56152c03b000889b765f2d8b3fae457b3094b7"
+    },
+    "clang_no_fma_contract": {
+      "command": "python3 scripts/check-math.py --cc \"clang -ffp-contract=off\" --sanitize --arm64",
+      "exit_code": 0,
+      "output": [
+        "fixed: Arm64 codegen and FP/SIMD policy passed",
+        "fixed: numeric, exhaustive trigonometry and matrix tests passed",
+        "table: Arm64 codegen and FP/SIMD policy passed",
+        "table: numeric, exhaustive trigonometry and matrix tests passed",
+        "float: Arm64 codegen and FP/SIMD policy passed",
+        "float: numeric, exhaustive trigonometry and matrix tests passed"
+      ],
+      "log_sha256": "df6e065e199227582e53dd4471002cab226d081220a7d567a992fef7f517bdf2"
+    },
+    "table_renderer": {
+      "command": "make defconfig && make -j8 check CONFIG_TOOLS=n CFLAGS=\"-mcpu=emag\"",
+      "config_h": "#define CONFIG_MATH_FIXED 1 #define CONFIG_MATH_TRIG_TABLE 1",
+      "exit_code": 0,
+      "checks": 516,
+      "failures": 0,
+      "summaries": [
+        "core: 300 checks, 0 failed",
+        "wm: 73 checks, 0 failed",
+        "lifetime: 21 checks, 0 failed",
+        "demos: 122 checks, 0 failed"
+      ],
+      "log_sha256": "96e952990c64840c199b9f7339fb5c9cd2dfbde5741326aa62551e01d8842268"
+    },
+    "polynomial_renderer": {
+      "command": "make defconfig && tools/kconfig/setconfig.py --kconfig configs/Kconfig MATH_TRIG_TABLE=n && tools/kconfig/genconfig.py configs/Kconfig && make -j8 check CONFIG_TOOLS=n CFLAGS=\"-mcpu=emag\"",
+      "config_h": "#define CONFIG_MATH_FIXED 1",
+      "exit_code": 0,
+      "checks": 515,
+      "failures": 0,
+      "summaries": [
+        "core: 299 checks, 0 failed",
+        "wm: 73 checks, 0 failed",
+        "lifetime: 21 checks, 0 failed",
+        "demos: 122 checks, 0 failed"
+      ],
+      "log_sha256": "9dd808d2184e129849443bcc9dc0bae1e8abd6f39581c8c763d40d53dfecb953"
+    },
+    "float_renderer": {
+      "command": "make defconfig && tools/kconfig/setconfig.py --kconfig configs/Kconfig MATH_FLOAT=y && tools/kconfig/genconfig.py configs/Kconfig && make -j8 check CONFIG_TOOLS=n CFLAGS=\"-mcpu=emag\"",
+      "config_h": "#define CONFIG_MATH_FLOAT 1",
+      "exit_code": 0,
+      "checks": 515,
+      "failures": 0,
+      "summaries": [
+        "core: 299 checks, 0 failed",
+        "wm: 73 checks, 0 failed",
+        "lifetime: 21 checks, 0 failed",
+        "demos: 122 checks, 0 failed"
+      ],
+      "log_sha256": "468e6744ca4e53a753804147f6bb38a4ac750c96f21b753fd16e5932fb1dd024"
+    }
+  },
+  "before": {
+    "machine": {
+      "system": "Linux",
+      "node": "emag-server",
+      "release": "6.8.0-136-generic",
+      "version": "#136-Ubuntu SMP PREEMPT_DYNAMIC Wed Jul  1 21:33:11 UTC 2026",
+      "machine": "aarch64",
+      "processor": "aarch64"
+    },
+    "compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "target": "aarch64-linux-gnu",
+    "cpu": 2,
+    "common_flags": [
+      "-O2",
+      "-mcpu=emag",
+      "-fno-tree-vectorize",
+      "-fno-tree-slp-vectorize",
+      "-DCONFIG_WM_NONE=1"
+    ],
+    "source_sha256": {
+      "include/twin.h": "7889792ec28698b546596dc70489f0e5fc074b4c49c596b3935a0cb394ba9742",
+      "include/twin_math.h": "928eeed7ab0cbacddb577e41ca2655fba0527089fedb4e4b4391bf4381c12eb6",
+      "src/twin_private.h": "82893e5dc14a7d45374cbc7cb7092f4b7673bcea362d33e8fdd8df92c5f6e0a6",
+      "src/fixed.c": "65716bea644a786825e83182bfafc2301286d1808818be32dd908117a36c9090",
+      "src/trig.c": "d486da45a47d2729ee879a9bdf75acf8e5be7d6458cbb252e8986944dc911a3d",
+      "src/matrix.c": "4b61b725925b78872dfc30c83b76a2eb37a471d49a24ada6c5a39bbf6203b483",
+      "src/math-gen.h": "939b7c4225897155f6b61426c99a7cd0c64f11666703072eefab683cdf93580e",
+      "src/math-trig.h": "ec55acd2e5ae2d33a77344e241b0dcb6b4c0431f3927168e1731972f6aac0061",
+      "tests/math-bench.c": "1d3fcac4a4d0908bce32ef206ce97e79bf76d6a51218afc3ba04f0ec6db77550",
+      "tests/math-bench-kernels.c": "2b73048bd975237a2dc0eef9f01c83f82ba2d602d5e8c10eb8748cebf19d02e8"
+    },
+    "modes": {
+      "fixed": {
+        "flags": [
+          "-O2",
+          "-mcpu=emag",
+          "-fno-tree-vectorize",
+          "-fno-tree-slp-vectorize",
+          "-DCONFIG_WM_NONE=1",
+          "-mgeneral-regs-only"
+        ],
+        "fp_simd_forbidden": true,
+        "measurements": [
+          [
+            {
+              "kernel": "mul",
+              "operations": 33554432,
+              "min_ns": 38728592,
+              "median_ns": 38735442,
+              "max_ns": 38744517,
+              "ns_per_op": 1.1544061303138733
+            },
+            {
+              "kernel": "div",
+              "operations": 2097152,
+              "min_ns": 26679640,
+              "median_ns": 26683565,
+              "max_ns": 26691740,
+              "ns_per_op": 12.72371530532837
+            },
+            {
+              "kernel": "div_small",
+              "operations": 2097152,
+              "min_ns": 21698169,
+              "median_ns": 21708018,
+              "max_ns": 21722969,
+              "ns_per_op": 10.351189613342285
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28598098,
+              "median_ns": 28603573,
+              "max_ns": 28612849,
+              "ns_per_op": 6.819623231887817
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 262144,
+              "min_ns": 20244912,
+              "median_ns": 20253887,
+              "max_ns": 20277688,
+              "ns_per_op": 77.26244735717773
+            },
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23347226,
+              "median_ns": 23354951,
+              "max_ns": 23357126,
+              "ns_per_op": 22.273016929626465
+            },
+            {
+              "kernel": "acos",
+              "operations": 262144,
+              "min_ns": 38187940,
+              "median_ns": 38206165,
+              "max_ns": 38215965,
+              "ns_per_op": 145.74495315551758
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27463168,
+              "median_ns": 27468094,
+              "max_ns": 27480343,
+              "ns_per_op": 1.6372259855270386
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 20963391,
+              "median_ns": 20966341,
+              "max_ns": 20984291,
+              "ns_per_op": 39.990121841430664
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 1048576,
+              "min_ns": 35900055,
+              "median_ns": 35917805,
+              "max_ns": 35929105,
+              "ns_per_op": 34.25388813018799
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 37445461,
+              "median_ns": 37451787,
+              "max_ns": 37478487,
+              "ns_per_op": 142.86722946166992
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 24378430,
+              "median_ns": 24380555,
+              "max_ns": 24393455,
+              "ns_per_op": 11.62555456161499
+            },
+            {
+              "kernel": "translate",
+              "operations": 4194304,
+              "min_ns": 22239671,
+              "median_ns": 22251346,
+              "max_ns": 22269896,
+              "ns_per_op": 5.305134296417236
+            },
+            {
+              "kernel": "scale",
+              "operations": 8388608,
+              "min_ns": 39564421,
+              "median_ns": 39572396,
+              "max_ns": 39605746,
+              "ns_per_op": 4.717397212982178
+            },
+            {
+              "kernel": "rotate",
+              "operations": 1048576,
+              "min_ns": 32966117,
+              "median_ns": 32973092,
+              "max_ns": 32985043,
+              "ns_per_op": 31.44559097290039
+            },
+            {
+              "kernel": "transform",
+              "operations": 4194304,
+              "min_ns": 21830169,
+              "median_ns": 21838869,
+              "max_ns": 21848719,
+              "ns_per_op": 5.206792116165161
+            }
+          ],
+          [
+            {
+              "kernel": "mul",
+              "operations": 33554432,
+              "min_ns": 38752793,
+              "median_ns": 38764342,
+              "max_ns": 38792093,
+              "ns_per_op": 1.1552674174308777
+            },
+            {
+              "kernel": "div",
+              "operations": 2097152,
+              "min_ns": 26682290,
+              "median_ns": 26692166,
+              "max_ns": 26708291,
+              "ns_per_op": 12.727816581726074
+            },
+            {
+              "kernel": "div_small",
+              "operations": 2097152,
+              "min_ns": 21710218,
+              "median_ns": 21712844,
+              "max_ns": 21760319,
+              "ns_per_op": 10.353490829467773
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28596549,
+              "median_ns": 28607724,
+              "max_ns": 28648474,
+              "ns_per_op": 6.820612907409668
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 262144,
+              "min_ns": 20256838,
+              "median_ns": 20268462,
+              "max_ns": 20281337,
+              "ns_per_op": 77.31804656982422
+            },
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23346201,
+              "median_ns": 23352901,
+              "max_ns": 23380976,
+              "ns_per_op": 22.271061897277832
+            },
+            {
+              "kernel": "acos",
+              "operations": 262144,
+              "min_ns": 38196015,
+              "median_ns": 38208240,
+              "max_ns": 38229165,
+              "ns_per_op": 145.75286865234375
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27462019,
+              "median_ns": 27476518,
+              "max_ns": 27495893,
+              "ns_per_op": 1.6377280950546265
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 20958490,
+              "median_ns": 20971141,
+              "max_ns": 21000616,
+              "ns_per_op": 39.999277114868164
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 1048576,
+              "min_ns": 35907580,
+              "median_ns": 35915630,
+              "max_ns": 35937205,
+              "ns_per_op": 34.251813888549805
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 37443612,
+              "median_ns": 37448037,
+              "max_ns": 37506112,
+              "ns_per_op": 142.85292434692383
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 24369805,
+              "median_ns": 24380381,
+              "max_ns": 24388580,
+              "ns_per_op": 11.625471591949463
+            },
+            {
+              "kernel": "translate",
+              "operations": 4194304,
+              "min_ns": 22249171,
+              "median_ns": 22251221,
+              "max_ns": 22259146,
+              "ns_per_op": 5.305104494094849
+            },
+            {
+              "kernel": "scale",
+              "operations": 8388608,
+              "min_ns": 39539521,
+              "median_ns": 39576121,
+              "max_ns": 39653846,
+              "ns_per_op": 4.717841267585754
+            },
+            {
+              "kernel": "rotate",
+              "operations": 1048576,
+              "min_ns": 32951992,
+              "median_ns": 32963418,
+              "max_ns": 32998592,
+              "ns_per_op": 31.436365127563477
+            },
+            {
+              "kernel": "transform",
+              "operations": 4194304,
+              "min_ns": 21836220,
+              "median_ns": 21840044,
+              "max_ns": 21857469,
+              "ns_per_op": 5.2070722579956055
+            }
+          ],
+          [
+            {
+              "kernel": "mul",
+              "operations": 33554432,
+              "min_ns": 38726092,
+              "median_ns": 38738768,
+              "max_ns": 38743792,
+              "ns_per_op": 1.1545052528381348
+            },
+            {
+              "kernel": "div",
+              "operations": 2097152,
+              "min_ns": 26684116,
+              "median_ns": 26691390,
+              "max_ns": 26712265,
+              "ns_per_op": 12.727446556091309
+            },
+            {
+              "kernel": "div_small",
+              "operations": 2097152,
+              "min_ns": 21700269,
+              "median_ns": 21709494,
+              "max_ns": 21722419,
+              "ns_per_op": 10.351893424987793
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28589648,
+              "median_ns": 28598873,
+              "max_ns": 28622423,
+              "ns_per_op": 6.81850266456604
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 262144,
+              "min_ns": 20238787,
+              "median_ns": 20258463,
+              "max_ns": 20277863,
+              "ns_per_op": 77.27990341186523
+            },
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23347351,
+              "median_ns": 23362226,
+              "max_ns": 23388051,
+              "ns_per_op": 22.27995491027832
+            },
+            {
+              "kernel": "acos",
+              "operations": 262144,
+              "min_ns": 38197415,
+              "median_ns": 38200790,
+              "max_ns": 38228765,
+              "ns_per_op": 145.72444915771484
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27462319,
+              "median_ns": 27467444,
+              "max_ns": 27475444,
+              "ns_per_op": 1.6371872425079346
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 20958891,
+              "median_ns": 20968716,
+              "max_ns": 20974241,
+              "ns_per_op": 39.994651794433594
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 1048576,
+              "min_ns": 35910580,
+              "median_ns": 35932630,
+              "max_ns": 35943330,
+              "ns_per_op": 34.26802635192871
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 37443337,
+              "median_ns": 37453086,
+              "max_ns": 37457437,
+              "ns_per_op": 142.87218475341797
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 24372755,
+              "median_ns": 24388506,
+              "max_ns": 24408530,
+              "ns_per_op": 11.629345893859863
+            },
+            {
+              "kernel": "translate",
+              "operations": 4194304,
+              "min_ns": 22247546,
+              "median_ns": 22253796,
+              "max_ns": 22304421,
+              "ns_per_op": 5.305718421936035
+            },
+            {
+              "kernel": "scale",
+              "operations": 8388608,
+              "min_ns": 39536696,
+              "median_ns": 39563596,
+              "max_ns": 39593971,
+              "ns_per_op": 4.716348171234131
+            },
+            {
+              "kernel": "rotate",
+              "operations": 1048576,
+              "min_ns": 32952067,
+              "median_ns": 32962667,
+              "max_ns": 32984993,
+              "ns_per_op": 31.435648918151855
+            },
+            {
+              "kernel": "transform",
+              "operations": 4194304,
+              "min_ns": 21826594,
+              "median_ns": 21833820,
+              "max_ns": 21842069,
+              "ns_per_op": 5.205588340759277
+            }
+          ]
+        ]
+      },
+      "table": {
+        "flags": [
+          "-O2",
+          "-mcpu=emag",
+          "-fno-tree-vectorize",
+          "-fno-tree-slp-vectorize",
+          "-DCONFIG_WM_NONE=1",
+          "-DCONFIG_MATH_TRIG_TABLE=1",
+          "-mgeneral-regs-only"
+        ],
+        "fp_simd_forbidden": true,
+        "measurements": [
+          [
+            {
+              "kernel": "mul",
+              "operations": 33554432,
+              "min_ns": 38751243,
+              "median_ns": 38755267,
+              "max_ns": 38794293,
+              "ns_per_op": 1.1549969613552094
+            },
+            {
+              "kernel": "div",
+              "operations": 2097152,
+              "min_ns": 26670390,
+              "median_ns": 26675565,
+              "max_ns": 26690391,
+              "ns_per_op": 12.719900608062744
+            },
+            {
+              "kernel": "div_small",
+              "operations": 2097152,
+              "min_ns": 21702019,
+              "median_ns": 21717894,
+              "max_ns": 21730569,
+              "ns_per_op": 10.3558988571167
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28608574,
+              "median_ns": 28634373,
+              "max_ns": 28653899,
+              "ns_per_op": 6.8269665241241455
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 262144,
+              "min_ns": 20265162,
+              "median_ns": 20271013,
+              "max_ns": 20283288,
+              "ns_per_op": 77.32777786254883
+            },
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25642686,
+              "median_ns": 25651561,
+              "max_ns": 25655886,
+              "ns_per_op": 6.115808725357056
+            },
+            {
+              "kernel": "acos",
+              "operations": 262144,
+              "min_ns": 38206790,
+              "median_ns": 38224065,
+              "max_ns": 38232090,
+              "ns_per_op": 145.81323623657227
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27460869,
+              "median_ns": 27468068,
+              "max_ns": 27487719,
+              "ns_per_op": 1.6372244358062744
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 20958641,
+              "median_ns": 20968391,
+              "max_ns": 20994491,
+              "ns_per_op": 39.99403190612793
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 1048576,
+              "min_ns": 35909530,
+              "median_ns": 35915981,
+              "max_ns": 35951431,
+              "ns_per_op": 34.25214862823486
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 37442962,
+              "median_ns": 37460087,
+              "max_ns": 37506312,
+              "ns_per_op": 142.8988914489746
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 24369255,
+              "median_ns": 24398006,
+              "max_ns": 24417956,
+              "ns_per_op": 11.633875846862793
+            },
+            {
+              "kernel": "translate",
+              "operations": 4194304,
+              "min_ns": 22247771,
+              "median_ns": 22259747,
+              "max_ns": 22293171,
+              "ns_per_op": 5.3071372509002686
+            },
+            {
+              "kernel": "scale",
+              "operations": 8388608,
+              "min_ns": 39524996,
+              "median_ns": 39575921,
+              "max_ns": 39596521,
+              "ns_per_op": 4.717817425727844
+            },
+            {
+              "kernel": "rotate",
+              "operations": 2097152,
+              "min_ns": 33506444,
+              "median_ns": 33524645,
+              "max_ns": 33542145,
+              "ns_per_op": 15.985796451568604
+            },
+            {
+              "kernel": "transform",
+              "operations": 4194304,
+              "min_ns": 21825895,
+              "median_ns": 21841844,
+              "max_ns": 21852444,
+              "ns_per_op": 5.207501411437988
+            }
+          ],
+          [
+            {
+              "kernel": "mul",
+              "operations": 33554432,
+              "min_ns": 38731293,
+              "median_ns": 38738442,
+              "max_ns": 38761468,
+              "ns_per_op": 1.1544955372810364
+            },
+            {
+              "kernel": "div",
+              "operations": 2097152,
+              "min_ns": 26671315,
+              "median_ns": 26678965,
+              "max_ns": 26691140,
+              "ns_per_op": 12.721521854400635
+            },
+            {
+              "kernel": "div_small",
+              "operations": 2097152,
+              "min_ns": 21701544,
+              "median_ns": 21709344,
+              "max_ns": 21727293,
+              "ns_per_op": 10.351821899414062
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28608149,
+              "median_ns": 28625274,
+              "max_ns": 28641974,
+              "ns_per_op": 6.8247971534729
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 262144,
+              "min_ns": 20257363,
+              "median_ns": 20268688,
+              "max_ns": 20283338,
+              "ns_per_op": 77.31890869140625
+            },
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25641061,
+              "median_ns": 25647786,
+              "max_ns": 25684236,
+              "ns_per_op": 6.114908695220947
+            },
+            {
+              "kernel": "acos",
+              "operations": 262144,
+              "min_ns": 38258940,
+              "median_ns": 38300240,
+              "max_ns": 38317566,
+              "ns_per_op": 146.10382080078125
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27471869,
+              "median_ns": 27509269,
+              "max_ns": 27551094,
+              "ns_per_op": 1.6396802067756653
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 20976166,
+              "median_ns": 20992590,
+              "max_ns": 21041641,
+              "ns_per_op": 40.04018783569336
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 1048576,
+              "min_ns": 35922130,
+              "median_ns": 35935256,
+              "max_ns": 35951980,
+              "ns_per_op": 34.270530700683594
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 37464637,
+              "median_ns": 37475162,
+              "max_ns": 37636213,
+              "ns_per_op": 142.9563980102539
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 24387406,
+              "median_ns": 24397705,
+              "max_ns": 24498281,
+              "ns_per_op": 11.633732318878174
+            },
+            {
+              "kernel": "translate",
+              "operations": 4194304,
+              "min_ns": 22253646,
+              "median_ns": 22265071,
+              "max_ns": 22325372,
+              "ns_per_op": 5.308406591415405
+            },
+            {
+              "kernel": "scale",
+              "operations": 8388608,
+              "min_ns": 39541696,
+              "median_ns": 39598046,
+              "max_ns": 39644722,
+              "ns_per_op": 4.720454931259155
+            },
+            {
+              "kernel": "rotate",
+              "operations": 2097152,
+              "min_ns": 33522245,
+              "median_ns": 33530470,
+              "max_ns": 33548821,
+              "ns_per_op": 15.988574028015137
+            },
+            {
+              "kernel": "transform",
+              "operations": 4194304,
+              "min_ns": 21844169,
+              "median_ns": 21851520,
+              "max_ns": 21866295,
+              "ns_per_op": 5.209808349609375
+            }
+          ],
+          [
+            {
+              "kernel": "mul",
+              "operations": 33554432,
+              "min_ns": 38757518,
+              "median_ns": 38772943,
+              "max_ns": 38784642,
+              "ns_per_op": 1.1555237472057343
+            },
+            {
+              "kernel": "div",
+              "operations": 2097152,
+              "min_ns": 26689540,
+              "median_ns": 26696491,
+              "max_ns": 26703066,
+              "ns_per_op": 12.729878902435303
+            },
+            {
+              "kernel": "div_small",
+              "operations": 2097152,
+              "min_ns": 21713369,
+              "median_ns": 21726519,
+              "max_ns": 21741869,
+              "ns_per_op": 10.360011577606201
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28626249,
+              "median_ns": 28636599,
+              "max_ns": 28658274,
+              "ns_per_op": 6.827497243881226
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 262144,
+              "min_ns": 20237962,
+              "median_ns": 20252262,
+              "max_ns": 20270838,
+              "ns_per_op": 77.2562484741211
+            },
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25663861,
+              "median_ns": 25676111,
+              "max_ns": 25687187,
+              "ns_per_op": 6.121661901473999
+            },
+            {
+              "kernel": "acos",
+              "operations": 262144,
+              "min_ns": 38235665,
+              "median_ns": 38240841,
+              "max_ns": 38251891,
+              "ns_per_op": 145.8772315979004
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27477419,
+              "median_ns": 27488719,
+              "max_ns": 27502919,
+              "ns_per_op": 1.638455331325531
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 20966391,
+              "median_ns": 20983015,
+              "max_ns": 20990916,
+              "ns_per_op": 40.02192497253418
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 1048576,
+              "min_ns": 35925130,
+              "median_ns": 35936706,
+              "max_ns": 35957906,
+              "ns_per_op": 34.27191352844238
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 37465062,
+              "median_ns": 37486213,
+              "max_ns": 37501537,
+              "ns_per_op": 142.99855422973633
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 24393681,
+              "median_ns": 24401281,
+              "max_ns": 24411530,
+              "ns_per_op": 11.635437488555908
+            },
+            {
+              "kernel": "translate",
+              "operations": 4194304,
+              "min_ns": 22259646,
+              "median_ns": 22263571,
+              "max_ns": 22281347,
+              "ns_per_op": 5.308048963546753
+            },
+            {
+              "kernel": "scale",
+              "operations": 8388608,
+              "min_ns": 39585097,
+              "median_ns": 39597096,
+              "max_ns": 39629322,
+              "ns_per_op": 4.720341682434082
+            },
+            {
+              "kernel": "rotate",
+              "operations": 2097152,
+              "min_ns": 33518595,
+              "median_ns": 33530820,
+              "max_ns": 33554121,
+              "ns_per_op": 15.988740921020508
+            },
+            {
+              "kernel": "transform",
+              "operations": 4194304,
+              "min_ns": 21841945,
+              "median_ns": 21855995,
+              "max_ns": 21871370,
+              "ns_per_op": 5.2108752727508545
+            }
+          ]
+        ]
+      },
+      "float": {
+        "flags": [
+          "-O2",
+          "-mcpu=emag",
+          "-fno-tree-vectorize",
+          "-fno-tree-slp-vectorize",
+          "-DCONFIG_WM_NONE=1",
+          "-DCONFIG_MATH_FLOAT=1"
+        ],
+        "fp_simd_forbidden": false,
+        "measurements": [
+          [
+            {
+              "kernel": "mul",
+              "operations": 2097152,
+              "min_ns": 28160222,
+              "median_ns": 28167747,
+              "max_ns": 28205397,
+              "ns_per_op": 13.4314284324646
+            },
+            {
+              "kernel": "div",
+              "operations": 4194304,
+              "min_ns": 31789987,
+              "median_ns": 31911664,
+              "max_ns": 31956163,
+              "ns_per_op": 7.608333587646484
+            },
+            {
+              "kernel": "div_small",
+              "operations": 4194304,
+              "min_ns": 31862063,
+              "median_ns": 31881313,
+              "max_ns": 31945388,
+              "ns_per_op": 7.601097345352173
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 31805563,
+              "median_ns": 31865138,
+              "max_ns": 31961714,
+              "ns_per_op": 7.597240924835205
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 2097152,
+              "min_ns": 37744163,
+              "median_ns": 37752288,
+              "max_ns": 37776039,
+              "ns_per_op": 18.001693725585938
+            },
+            {
+              "kernel": "sincos",
+              "operations": 524288,
+              "min_ns": 23806153,
+              "median_ns": 23831478,
+              "max_ns": 23842903,
+              "ns_per_op": 45.45493698120117
+            },
+            {
+              "kernel": "acos",
+              "operations": 524288,
+              "min_ns": 26253764,
+              "median_ns": 26262013,
+              "max_ns": 26267464,
+              "ns_per_op": 50.0908145904541
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27473769,
+              "median_ns": 27483619,
+              "max_ns": 27499519,
+              "ns_per_op": 1.6381513476371765
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 20893316,
+              "median_ns": 20903540,
+              "max_ns": 20913090,
+              "ns_per_op": 39.870338439941406
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 1048576,
+              "min_ns": 35914230,
+              "median_ns": 35918131,
+              "max_ns": 35926656,
+              "ns_per_op": 34.25419902801514
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 38872944,
+              "median_ns": 38882543,
+              "max_ns": 38900719,
+              "ns_per_op": 148.32513046264648
+            },
+            {
+              "kernel": "compose",
+              "operations": 131072,
+              "min_ns": 24874333,
+              "median_ns": 24888132,
+              "max_ns": 24909557,
+              "ns_per_op": 189.88137817382812
+            },
+            {
+              "kernel": "translate",
+              "operations": 524288,
+              "min_ns": 35811055,
+              "median_ns": 35818730,
+              "max_ns": 35831130,
+              "ns_per_op": 68.31880569458008
+            },
+            {
+              "kernel": "scale",
+              "operations": 524288,
+              "min_ns": 35643954,
+              "median_ns": 35671079,
+              "max_ns": 35681480,
+              "ns_per_op": 68.03718376159668
+            },
+            {
+              "kernel": "rotate",
+              "operations": 131072,
+              "min_ns": 20388663,
+              "median_ns": 20398013,
+              "max_ns": 20432463,
+              "ns_per_op": 155.6244888305664
+            },
+            {
+              "kernel": "transform",
+              "operations": 524288,
+              "min_ns": 38671042,
+              "median_ns": 38684367,
+              "max_ns": 38696518,
+              "ns_per_op": 73.78457450866699
+            }
+          ],
+          [
+            {
+              "kernel": "mul",
+              "operations": 2097152,
+              "min_ns": 28160697,
+              "median_ns": 28169472,
+              "max_ns": 28178472,
+              "ns_per_op": 13.4322509765625
+            },
+            {
+              "kernel": "div",
+              "operations": 4194304,
+              "min_ns": 31819738,
+              "median_ns": 31915789,
+              "max_ns": 31998464,
+              "ns_per_op": 7.609317064285278
+            },
+            {
+              "kernel": "div_small",
+              "operations": 4194304,
+              "min_ns": 31836938,
+              "median_ns": 31870063,
+              "max_ns": 31911138,
+              "ns_per_op": 7.59841513633728
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 31810188,
+              "median_ns": 31901363,
+              "max_ns": 31976989,
+              "ns_per_op": 7.605877637863159
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 2097152,
+              "min_ns": 37742464,
+              "median_ns": 37745063,
+              "max_ns": 37753963,
+              "ns_per_op": 17.99824857711792
+            },
+            {
+              "kernel": "sincos",
+              "operations": 524288,
+              "min_ns": 23812528,
+              "median_ns": 23819678,
+              "max_ns": 23826854,
+              "ns_per_op": 45.432430267333984
+            },
+            {
+              "kernel": "acos",
+              "operations": 524288,
+              "min_ns": 26236439,
+              "median_ns": 26254389,
+              "max_ns": 26263139,
+              "ns_per_op": 50.07627296447754
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27457369,
+              "median_ns": 27470269,
+              "max_ns": 27475469,
+              "ns_per_op": 1.637355625629425
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 20893765,
+              "median_ns": 20906690,
+              "max_ns": 20918841,
+              "ns_per_op": 39.876346588134766
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 1048576,
+              "min_ns": 35910105,
+              "median_ns": 35925631,
+              "max_ns": 35953780,
+              "ns_per_op": 34.261351585388184
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 38870769,
+              "median_ns": 38889069,
+              "max_ns": 38914769,
+              "ns_per_op": 148.35002517700195
+            },
+            {
+              "kernel": "compose",
+              "operations": 131072,
+              "min_ns": 24875683,
+              "median_ns": 24881882,
+              "max_ns": 24925508,
+              "ns_per_op": 189.8336944580078
+            },
+            {
+              "kernel": "translate",
+              "operations": 524288,
+              "min_ns": 35800630,
+              "median_ns": 35810480,
+              "max_ns": 35843580,
+              "ns_per_op": 68.30307006835938
+            },
+            {
+              "kernel": "scale",
+              "operations": 524288,
+              "min_ns": 35646880,
+              "median_ns": 35657554,
+              "max_ns": 35701879,
+              "ns_per_op": 68.01138687133789
+            },
+            {
+              "kernel": "rotate",
+              "operations": 131072,
+              "min_ns": 20387363,
+              "median_ns": 20400989,
+              "max_ns": 20424788,
+              "ns_per_op": 155.6471939086914
+            },
+            {
+              "kernel": "transform",
+              "operations": 524288,
+              "min_ns": 38673743,
+              "median_ns": 38684867,
+              "max_ns": 38749743,
+              "ns_per_op": 73.7855281829834
+            }
+          ],
+          [
+            {
+              "kernel": "mul",
+              "operations": 2097152,
+              "min_ns": 28159722,
+              "median_ns": 28167697,
+              "max_ns": 28176847,
+              "ns_per_op": 13.43140459060669
+            },
+            {
+              "kernel": "div",
+              "operations": 4194304,
+              "min_ns": 31835388,
+              "median_ns": 31877338,
+              "max_ns": 31936114,
+              "ns_per_op": 7.600149631500244
+            },
+            {
+              "kernel": "div_small",
+              "operations": 4194304,
+              "min_ns": 31826413,
+              "median_ns": 31885063,
+              "max_ns": 31951164,
+              "ns_per_op": 7.601991415023804
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 31852388,
+              "median_ns": 31930189,
+              "max_ns": 31981038,
+              "ns_per_op": 7.612750291824341
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 2097152,
+              "min_ns": 37742713,
+              "median_ns": 37752414,
+              "max_ns": 37789313,
+              "ns_per_op": 18.00175380706787
+            },
+            {
+              "kernel": "sincos",
+              "operations": 524288,
+              "min_ns": 23809403,
+              "median_ns": 23816603,
+              "max_ns": 23834303,
+              "ns_per_op": 45.426565170288086
+            },
+            {
+              "kernel": "acos",
+              "operations": 524288,
+              "min_ns": 26255539,
+              "median_ns": 26256864,
+              "max_ns": 26374790,
+              "ns_per_op": 50.08099365234375
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27458444,
+              "median_ns": 27473444,
+              "max_ns": 27509144,
+              "ns_per_op": 1.637544870376587
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 20885865,
+              "median_ns": 20905116,
+              "max_ns": 20914491,
+              "ns_per_op": 39.87334442138672
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 1048576,
+              "min_ns": 35907156,
+              "median_ns": 35913931,
+              "max_ns": 35917981,
+              "ns_per_op": 34.25019359588623
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 38887769,
+              "median_ns": 38891844,
+              "max_ns": 38914668,
+              "ns_per_op": 148.36061096191406
+            },
+            {
+              "kernel": "compose",
+              "operations": 131072,
+              "min_ns": 24874383,
+              "median_ns": 24892933,
+              "max_ns": 24897733,
+              "ns_per_op": 189.91800689697266
+            },
+            {
+              "kernel": "translate",
+              "operations": 524288,
+              "min_ns": 35806930,
+              "median_ns": 35826080,
+              "max_ns": 35846755,
+              "ns_per_op": 68.33282470703125
+            },
+            {
+              "kernel": "scale",
+              "operations": 524288,
+              "min_ns": 35644429,
+              "median_ns": 35653980,
+              "max_ns": 35666354,
+              "ns_per_op": 68.00457000732422
+            },
+            {
+              "kernel": "rotate",
+              "operations": 131072,
+              "min_ns": 20388464,
+              "median_ns": 20392238,
+              "max_ns": 20431463,
+              "ns_per_op": 155.58042907714844
+            },
+            {
+              "kernel": "transform",
+              "operations": 524288,
+              "min_ns": 38675668,
+              "median_ns": 38685217,
+              "max_ns": 38700593,
+              "ns_per_op": 73.78619575500488
+            }
+          ]
+        ]
+      }
+    },
+    "cpuinfo": "processor\t: 0\nBogoMIPS\t: 80.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid\nCPU implementer\t: 0x50\nCPU architecture: 8\nCPU variant\t: 0x3\nCPU part\t: 0x000\nCPU revision\t: 2",
+    "scaling_governor": "ondemand",
+    "scaling_min_freq": "375000",
+    "scaling_max_freq": "3000000"
+  },
+  "after": {
+    "machine": {
+      "system": "Linux",
+      "node": "emag-server",
+      "release": "6.8.0-136-generic",
+      "version": "#136-Ubuntu SMP PREEMPT_DYNAMIC Wed Jul  1 21:33:11 UTC 2026",
+      "machine": "aarch64",
+      "processor": "aarch64"
+    },
+    "compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "target": "aarch64-linux-gnu",
+    "cpu": 2,
+    "common_flags": [
+      "-O2",
+      "-mcpu=emag",
+      "-fno-tree-vectorize",
+      "-fno-tree-slp-vectorize",
+      "-DCONFIG_WM_NONE=1"
+    ],
+    "source_sha256": {
+      "include/twin.h": "7889792ec28698b546596dc70489f0e5fc074b4c49c596b3935a0cb394ba9742",
+      "include/twin_math.h": "8667fbca2e4329f11cafa90f63f46c18668c84f6c3dd13505519031a921bc6bc",
+      "src/twin_private.h": "6599418169b1689e5375705f6bf048450eb3e37059525071fc4a255959a0d7ba",
+      "src/fixed.c": "76cb72d0da3491e96a111b93bb3e8817cb58ab8c887bd1da204a17fc655f7c90",
+      "src/trig.c": "ef1e4de8b36f96e97b153c9dfe493b401a317a458c46db15b663a8be32b7f220",
+      "src/matrix.c": "01dfa343fe0204b5d83dcebc5e1a8e51ea4bb28036114f7b05a1bf525bc30fbb",
+      "src/math-gen.h": "d7f2b0d875f35e63c77d8740fce8f20fada8a0dc1596b8fdb4091bbda8e848b7",
+      "src/math-trig.h": "c75d30fdd10857c79b89c25b5a5354065eade798003a30e14d0676c01275c24a",
+      "tests/math-bench.c": "3526934db9d14b91d4e3867f55ba868ba5e53f977903bcb7fe80c846bad9f1a3",
+      "tests/math-bench-kernels.c": "2b73048bd975237a2dc0eef9f01c83f82ba2d602d5e8c10eb8748cebf19d02e8",
+      "tests/math-codegen.c": "1e3dc4ac1e4da2e2f5cfb0c6e297b00d7e550934a43d98c9afe7aab0bd43eea6",
+      "scripts/gen-composite-decls.py": "d77b354da8f4289964ba5d22c69865b4e458825c49c6db6c49100e2ba654c9af"
+    },
+    "modes": {
+      "fixed": {
+        "flags": [
+          "-O2",
+          "-mcpu=emag",
+          "-fno-tree-vectorize",
+          "-fno-tree-slp-vectorize",
+          "-DCONFIG_WM_NONE=1",
+          "-mgeneral-regs-only"
+        ],
+        "fp_simd_forbidden": true,
+        "measurements": [
+          [
+            {
+              "kernel": "mul",
+              "operations": 33554432,
+              "min_ns": 38735881,
+              "median_ns": 38744556,
+              "max_ns": 38778182,
+              "ns_per_op": 1.1546777486801147
+            },
+            {
+              "kernel": "div",
+              "operations": 2097152,
+              "min_ns": 26677765,
+              "median_ns": 26690290,
+              "max_ns": 26705390,
+              "ns_per_op": 12.726922035217285
+            },
+            {
+              "kernel": "div_small",
+              "operations": 2097152,
+              "min_ns": 21701374,
+              "median_ns": 21717698,
+              "max_ns": 21723773,
+              "ns_per_op": 10.355805397033691
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28619897,
+              "median_ns": 28631422,
+              "max_ns": 28644847,
+              "ns_per_op": 6.826262950897217
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 262144,
+              "min_ns": 20204968,
+              "median_ns": 20210169,
+              "max_ns": 20221719,
+              "ns_per_op": 77.09567642211914
+            },
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23350254,
+              "median_ns": 23357554,
+              "max_ns": 23388355,
+              "ns_per_op": 22.27549934387207
+            },
+            {
+              "kernel": "acos",
+              "operations": 262144,
+              "min_ns": 38348779,
+              "median_ns": 38362405,
+              "max_ns": 38369105,
+              "ns_per_op": 146.34096145629883
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27464668,
+              "median_ns": 27471393,
+              "max_ns": 27491843,
+              "ns_per_op": 1.6374226212501526
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 21027121,
+              "median_ns": 21036072,
+              "max_ns": 21048071,
+              "ns_per_op": 40.12312316894531
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 2097152,
+              "min_ns": 26631090,
+              "median_ns": 26637665,
+              "max_ns": 26649340,
+              "ns_per_op": 12.701828479766846
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 37691628,
+              "median_ns": 37704153,
+              "max_ns": 37728553,
+              "ns_per_op": 143.82992935180664
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 24376707,
+              "median_ns": 24380658,
+              "max_ns": 24402608,
+              "ns_per_op": 11.625603675842285
+            },
+            {
+              "kernel": "translate",
+              "operations": 4194304,
+              "min_ns": 22239701,
+              "median_ns": 22254076,
+              "max_ns": 22261876,
+              "ns_per_op": 5.305785179138184
+            },
+            {
+              "kernel": "scale",
+              "operations": 8388608,
+              "min_ns": 39539809,
+              "median_ns": 39588759,
+              "max_ns": 39630559,
+              "ns_per_op": 4.719347834587097
+            },
+            {
+              "kernel": "rotate",
+              "operations": 1048576,
+              "min_ns": 32959987,
+              "median_ns": 32984587,
+              "max_ns": 32997112,
+              "ns_per_op": 31.45655345916748
+            },
+            {
+              "kernel": "transform",
+              "operations": 4194304,
+              "min_ns": 21830674,
+              "median_ns": 21839699,
+              "max_ns": 21854124,
+              "ns_per_op": 5.206990003585815
+            }
+          ],
+          [
+            {
+              "kernel": "mul",
+              "operations": 33554432,
+              "min_ns": 38728381,
+              "median_ns": 38743207,
+              "max_ns": 38783381,
+              "ns_per_op": 1.1546375453472137
+            },
+            {
+              "kernel": "div",
+              "operations": 2097152,
+              "min_ns": 26667090,
+              "median_ns": 26676991,
+              "max_ns": 26686640,
+              "ns_per_op": 12.720580577850342
+            },
+            {
+              "kernel": "div_small",
+              "operations": 2097152,
+              "min_ns": 21696974,
+              "median_ns": 21708924,
+              "max_ns": 21711599,
+              "ns_per_op": 10.351621627807617
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28596147,
+              "median_ns": 28611072,
+              "max_ns": 28621122,
+              "ns_per_op": 6.8214111328125
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 262144,
+              "min_ns": 20212969,
+              "median_ns": 20218368,
+              "max_ns": 20243818,
+              "ns_per_op": 77.126953125
+            },
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23344830,
+              "median_ns": 23359879,
+              "max_ns": 23381529,
+              "ns_per_op": 22.277716636657715
+            },
+            {
+              "kernel": "acos",
+              "operations": 262144,
+              "min_ns": 38341130,
+              "median_ns": 38365205,
+              "max_ns": 38384981,
+              "ns_per_op": 146.35164260864258
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27473893,
+              "median_ns": 27485418,
+              "max_ns": 27497568,
+              "ns_per_op": 1.6382585763931274
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 21035671,
+              "median_ns": 21044971,
+              "max_ns": 21090797,
+              "ns_per_op": 40.14009666442871
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 2097152,
+              "min_ns": 26650815,
+              "median_ns": 26653690,
+              "max_ns": 26661016,
+              "ns_per_op": 12.70946979522705
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 37714503,
+              "median_ns": 37724828,
+              "max_ns": 37735853,
+              "ns_per_op": 143.90879821777344
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 24389857,
+              "median_ns": 24396158,
+              "max_ns": 24422433,
+              "ns_per_op": 11.632994651794434
+            },
+            {
+              "kernel": "translate",
+              "operations": 4194304,
+              "min_ns": 22260675,
+              "median_ns": 22269001,
+              "max_ns": 22279351,
+              "ns_per_op": 5.309343576431274
+            },
+            {
+              "kernel": "scale",
+              "operations": 8388608,
+              "min_ns": 39601434,
+              "median_ns": 39649209,
+              "max_ns": 39672185,
+              "ns_per_op": 4.726554036140442
+            },
+            {
+              "kernel": "rotate",
+              "operations": 1048576,
+              "min_ns": 32979361,
+              "median_ns": 32987837,
+              "max_ns": 33019462,
+              "ns_per_op": 31.4596529006958
+            },
+            {
+              "kernel": "transform",
+              "operations": 4194304,
+              "min_ns": 21844499,
+              "median_ns": 21852700,
+              "max_ns": 21864149,
+              "ns_per_op": 5.210089683532715
+            }
+          ],
+          [
+            {
+              "kernel": "mul",
+              "operations": 33554432,
+              "min_ns": 38746781,
+              "median_ns": 38778757,
+              "max_ns": 38791806,
+              "ns_per_op": 1.1556970179080963
+            },
+            {
+              "kernel": "div",
+              "operations": 2097152,
+              "min_ns": 26701991,
+              "median_ns": 26713740,
+              "max_ns": 26724441,
+              "ns_per_op": 12.738103866577148
+            },
+            {
+              "kernel": "div_small",
+              "operations": 2097152,
+              "min_ns": 21717424,
+              "median_ns": 21730823,
+              "max_ns": 21747248,
+              "ns_per_op": 10.362063884735107
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28618122,
+              "median_ns": 28625522,
+              "max_ns": 28641372,
+              "ns_per_op": 6.824856281280518
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 262144,
+              "min_ns": 20219043,
+              "median_ns": 20232669,
+              "max_ns": 20260144,
+              "ns_per_op": 77.1815071105957
+            },
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23358104,
+              "median_ns": 23371404,
+              "max_ns": 23396129,
+              "ns_per_op": 22.288707733154297
+            },
+            {
+              "kernel": "acos",
+              "operations": 262144,
+              "min_ns": 38380680,
+              "median_ns": 38401055,
+              "max_ns": 38436906,
+              "ns_per_op": 146.48839950561523
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27478143,
+              "median_ns": 27484868,
+              "max_ns": 27506018,
+              "ns_per_op": 1.638225793838501
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 21041372,
+              "median_ns": 21046871,
+              "max_ns": 21056421,
+              "ns_per_op": 40.143720626831055
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 2097152,
+              "min_ns": 26641590,
+              "median_ns": 26653241,
+              "max_ns": 26664066,
+              "ns_per_op": 12.709255695343018
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 37718128,
+              "median_ns": 37736403,
+              "max_ns": 37747953,
+              "ns_per_op": 143.95295333862305
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 24391632,
+              "median_ns": 24398108,
+              "max_ns": 24418408,
+              "ns_per_op": 11.63392448425293
+            },
+            {
+              "kernel": "translate",
+              "operations": 4194304,
+              "min_ns": 22260826,
+              "median_ns": 22264051,
+              "max_ns": 22274175,
+              "ns_per_op": 5.308163404464722
+            },
+            {
+              "kernel": "scale",
+              "operations": 8388608,
+              "min_ns": 39593660,
+              "median_ns": 39621285,
+              "max_ns": 39638034,
+              "ns_per_op": 4.723225235939026
+            },
+            {
+              "kernel": "rotate",
+              "operations": 1048576,
+              "min_ns": 32979137,
+              "median_ns": 32983861,
+              "max_ns": 32993837,
+              "ns_per_op": 31.45586109161377
+            },
+            {
+              "kernel": "transform",
+              "operations": 4194304,
+              "min_ns": 21839174,
+              "median_ns": 21847124,
+              "max_ns": 21875875,
+              "ns_per_op": 5.2087602615356445
+            }
+          ]
+        ]
+      },
+      "table": {
+        "flags": [
+          "-O2",
+          "-mcpu=emag",
+          "-fno-tree-vectorize",
+          "-fno-tree-slp-vectorize",
+          "-DCONFIG_WM_NONE=1",
+          "-DCONFIG_MATH_TRIG_TABLE=1",
+          "-mgeneral-regs-only"
+        ],
+        "fp_simd_forbidden": true,
+        "measurements": [
+          [
+            {
+              "kernel": "mul",
+              "operations": 33554432,
+              "min_ns": 38750556,
+              "median_ns": 38773831,
+              "max_ns": 38845181,
+              "ns_per_op": 1.1555502116680145
+            },
+            {
+              "kernel": "div",
+              "operations": 2097152,
+              "min_ns": 26678290,
+              "median_ns": 26687765,
+              "max_ns": 26725816,
+              "ns_per_op": 12.725718021392822
+            },
+            {
+              "kernel": "div_small",
+              "operations": 2097152,
+              "min_ns": 21699398,
+              "median_ns": 21715348,
+              "max_ns": 21750049,
+              "ns_per_op": 10.354684829711914
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28605822,
+              "median_ns": 28647647,
+              "max_ns": 28661247,
+              "ns_per_op": 6.83013129234314
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 262144,
+              "min_ns": 20232244,
+              "median_ns": 20241993,
+              "max_ns": 20337369,
+              "ns_per_op": 77.21707534790039
+            },
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25652412,
+              "median_ns": 25669462,
+              "max_ns": 25749663,
+              "ns_per_op": 6.120076656341553
+            },
+            {
+              "kernel": "acos",
+              "operations": 262144,
+              "min_ns": 38371905,
+              "median_ns": 38386655,
+              "max_ns": 38401880,
+              "ns_per_op": 146.43346786499023
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27475468,
+              "median_ns": 27490843,
+              "max_ns": 27498018,
+              "ns_per_op": 1.638581931591034
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 21052621,
+              "median_ns": 21059447,
+              "max_ns": 21068372,
+              "ns_per_op": 40.167707443237305
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 2097152,
+              "min_ns": 26633340,
+              "median_ns": 26642490,
+              "max_ns": 26668616,
+              "ns_per_op": 12.704129219055176
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 37714878,
+              "median_ns": 37733603,
+              "max_ns": 37746378,
+              "ns_per_op": 143.9422721862793
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 24393007,
+              "median_ns": 24403583,
+              "max_ns": 24424783,
+              "ns_per_op": 11.636535167694092
+            },
+            {
+              "kernel": "translate",
+              "operations": 4194304,
+              "min_ns": 22257426,
+              "median_ns": 22264726,
+              "max_ns": 22289301,
+              "ns_per_op": 5.308324337005615
+            },
+            {
+              "kernel": "scale",
+              "operations": 8388608,
+              "min_ns": 39591760,
+              "median_ns": 39606834,
+              "max_ns": 39630634,
+              "ns_per_op": 4.7215025424957275
+            },
+            {
+              "kernel": "rotate",
+              "operations": 2097152,
+              "min_ns": 33528188,
+              "median_ns": 33533089,
+              "max_ns": 33536238,
+              "ns_per_op": 15.98982286453247
+            },
+            {
+              "kernel": "transform",
+              "operations": 4194304,
+              "min_ns": 21835624,
+              "median_ns": 21849299,
+              "max_ns": 21865875,
+              "ns_per_op": 5.20927882194519
+            }
+          ],
+          [
+            {
+              "kernel": "mul",
+              "operations": 33554432,
+              "min_ns": 38757956,
+              "median_ns": 38769857,
+              "max_ns": 38800007,
+              "ns_per_op": 1.1554317772388458
+            },
+            {
+              "kernel": "div",
+              "operations": 2097152,
+              "min_ns": 26686190,
+              "median_ns": 26698690,
+              "max_ns": 26715790,
+              "ns_per_op": 12.730927467346191
+            },
+            {
+              "kernel": "div_small",
+              "operations": 2097152,
+              "min_ns": 21709974,
+              "median_ns": 21722498,
+              "max_ns": 21752524,
+              "ns_per_op": 10.358094215393066
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28601122,
+              "median_ns": 28612222,
+              "max_ns": 28626722,
+              "ns_per_op": 6.821685314178467
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 262144,
+              "min_ns": 20216719,
+              "median_ns": 20227594,
+              "max_ns": 20243993,
+              "ns_per_op": 77.16214752197266
+            },
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25660562,
+              "median_ns": 25670812,
+              "max_ns": 25685412,
+              "ns_per_op": 6.12039852142334
+            },
+            {
+              "kernel": "acos",
+              "operations": 262144,
+              "min_ns": 38383580,
+              "median_ns": 38394731,
+              "max_ns": 38425955,
+              "ns_per_op": 146.46427536010742
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27477093,
+              "median_ns": 27485093,
+              "max_ns": 27514993,
+              "ns_per_op": 1.6382392048835754
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 21049521,
+              "median_ns": 21065247,
+              "max_ns": 21106097,
+              "ns_per_op": 40.17877006530762
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 2097152,
+              "min_ns": 26653191,
+              "median_ns": 26654865,
+              "max_ns": 26662840,
+              "ns_per_op": 12.71003007888794
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 37711853,
+              "median_ns": 37720003,
+              "max_ns": 37745453,
+              "ns_per_op": 143.8903923034668
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 24394333,
+              "median_ns": 24395558,
+              "max_ns": 24455308,
+              "ns_per_op": 11.632708549499512
+            },
+            {
+              "kernel": "translate",
+              "operations": 4194304,
+              "min_ns": 22253176,
+              "median_ns": 22263850,
+              "max_ns": 22276650,
+              "ns_per_op": 5.308115482330322
+            },
+            {
+              "kernel": "scale",
+              "operations": 8388608,
+              "min_ns": 39603384,
+              "median_ns": 39625960,
+              "max_ns": 39650609,
+              "ns_per_op": 4.723782539367676
+            },
+            {
+              "kernel": "rotate",
+              "operations": 2097152,
+              "min_ns": 33531364,
+              "median_ns": 33551164,
+              "max_ns": 33561689,
+              "ns_per_op": 15.998441696166992
+            },
+            {
+              "kernel": "transform",
+              "operations": 4194304,
+              "min_ns": 21843599,
+              "median_ns": 21847149,
+              "max_ns": 21872625,
+              "ns_per_op": 5.208766222000122
+            }
+          ],
+          [
+            {
+              "kernel": "mul",
+              "operations": 33554432,
+              "min_ns": 38753357,
+              "median_ns": 38760107,
+              "max_ns": 38780756,
+              "ns_per_op": 1.1551412045955658
+            },
+            {
+              "kernel": "div",
+              "operations": 2097152,
+              "min_ns": 26691790,
+              "median_ns": 26697890,
+              "max_ns": 26717816,
+              "ns_per_op": 12.730545997619629
+            },
+            {
+              "kernel": "div_small",
+              "operations": 2097152,
+              "min_ns": 21709949,
+              "median_ns": 21723024,
+              "max_ns": 21766874,
+              "ns_per_op": 10.358345031738281
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28601197,
+              "median_ns": 28609672,
+              "max_ns": 28621997,
+              "ns_per_op": 6.821077346801758
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 262144,
+              "min_ns": 20216744,
+              "median_ns": 20231894,
+              "max_ns": 20252419,
+              "ns_per_op": 77.17855072021484
+            },
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25658962,
+              "median_ns": 25663062,
+              "max_ns": 25674863,
+              "ns_per_op": 6.118550777435303
+            },
+            {
+              "kernel": "acos",
+              "operations": 262144,
+              "min_ns": 38367555,
+              "median_ns": 38391680,
+              "max_ns": 38401381,
+              "ns_per_op": 146.45263671875
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27479594,
+              "median_ns": 27488518,
+              "max_ns": 27497668,
+              "ns_per_op": 1.6384433507919312
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 21052221,
+              "median_ns": 21060197,
+              "max_ns": 21079447,
+              "ns_per_op": 40.169137954711914
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 2097152,
+              "min_ns": 26653266,
+              "median_ns": 26654316,
+              "max_ns": 26667590,
+              "ns_per_op": 12.709768295288086
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 262144,
+              "min_ns": 37723903,
+              "median_ns": 37731578,
+              "max_ns": 37760904,
+              "ns_per_op": 143.9345474243164
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 24386983,
+              "median_ns": 24399958,
+              "max_ns": 24418532,
+              "ns_per_op": 11.634806632995605
+            },
+            {
+              "kernel": "translate",
+              "operations": 4194304,
+              "min_ns": 22257076,
+              "median_ns": 22262725,
+              "max_ns": 22279726,
+              "ns_per_op": 5.307847261428833
+            },
+            {
+              "kernel": "scale",
+              "operations": 8388608,
+              "min_ns": 39600209,
+              "median_ns": 39616285,
+              "max_ns": 39661284,
+              "ns_per_op": 4.722629189491272
+            },
+            {
+              "kernel": "rotate",
+              "operations": 2097152,
+              "min_ns": 33524813,
+              "median_ns": 33533364,
+              "max_ns": 33563814,
+              "ns_per_op": 15.989953994750977
+            },
+            {
+              "kernel": "transform",
+              "operations": 4194304,
+              "min_ns": 21843300,
+              "median_ns": 21850724,
+              "max_ns": 21891674,
+              "ns_per_op": 5.20961856842041
+            }
+          ]
+        ]
+      },
+      "float": {
+        "flags": [
+          "-O2",
+          "-mcpu=emag",
+          "-fno-tree-vectorize",
+          "-fno-tree-slp-vectorize",
+          "-DCONFIG_WM_NONE=1",
+          "-DCONFIG_MATH_FLOAT=1"
+        ],
+        "fp_simd_forbidden": false,
+        "measurements": [
+          [
+            {
+              "kernel": "mul",
+              "operations": 8388608,
+              "min_ns": 24406908,
+              "median_ns": 24413758,
+              "max_ns": 24427832,
+              "ns_per_op": 2.910346746444702
+            },
+            {
+              "kernel": "div",
+              "operations": 4194304,
+              "min_ns": 28197995,
+              "median_ns": 28207445,
+              "max_ns": 28215546,
+              "ns_per_op": 6.725178956985474
+            },
+            {
+              "kernel": "div_small",
+              "operations": 4194304,
+              "min_ns": 28199246,
+              "median_ns": 28210471,
+              "max_ns": 28222071,
+              "ns_per_op": 6.725900411605835
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28197570,
+              "median_ns": 28207896,
+              "max_ns": 28210446,
+              "ns_per_op": 6.725286483764648
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 2097152,
+              "min_ns": 37102851,
+              "median_ns": 37105551,
+              "max_ns": 37122301,
+              "ns_per_op": 17.693305492401123
+            },
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 24233333,
+              "median_ns": 24236357,
+              "max_ns": 24250782,
+              "ns_per_op": 23.113591194152832
+            },
+            {
+              "kernel": "acos",
+              "operations": 524288,
+              "min_ns": 26241989,
+              "median_ns": 26250639,
+              "max_ns": 26288315,
+              "ns_per_op": 50.06912040710449
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27464718,
+              "median_ns": 27465943,
+              "max_ns": 27478119,
+              "ns_per_op": 1.6370977759361267
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 21007271,
+              "median_ns": 21012546,
+              "max_ns": 21021946,
+              "ns_per_op": 40.078250885009766
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 2097152,
+              "min_ns": 26627915,
+              "median_ns": 26641566,
+              "max_ns": 26645715,
+              "ns_per_op": 12.703688621520996
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 1048576,
+              "min_ns": 28151620,
+              "median_ns": 28160621,
+              "max_ns": 28163021,
+              "ns_per_op": 26.85606098175049
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 21768824,
+              "median_ns": 21777324,
+              "max_ns": 21814050,
+              "ns_per_op": 10.384237289428711
+            },
+            {
+              "kernel": "translate",
+              "operations": 2097152,
+              "min_ns": 24435158,
+              "median_ns": 24441158,
+              "max_ns": 24456658,
+              "ns_per_op": 11.654452323913574
+            },
+            {
+              "kernel": "scale",
+              "operations": 2097152,
+              "min_ns": 22006649,
+              "median_ns": 22026975,
+              "max_ns": 22057424,
+              "ns_per_op": 10.50328016281128
+            },
+            {
+              "kernel": "rotate",
+              "operations": 1048576,
+              "min_ns": 37225701,
+              "median_ns": 37244177,
+              "max_ns": 37284602,
+              "ns_per_op": 35.51881504058838
+            },
+            {
+              "kernel": "transform",
+              "operations": 2097152,
+              "min_ns": 28882773,
+              "median_ns": 28890423,
+              "max_ns": 28930898,
+              "ns_per_op": 13.776027202606201
+            }
+          ],
+          [
+            {
+              "kernel": "mul",
+              "operations": 8388608,
+              "min_ns": 24393257,
+              "median_ns": 24403833,
+              "max_ns": 24412233,
+              "ns_per_op": 2.9091635942459106
+            },
+            {
+              "kernel": "div",
+              "operations": 4194304,
+              "min_ns": 28196171,
+              "median_ns": 28199621,
+              "max_ns": 28212771,
+              "ns_per_op": 6.723313570022583
+            },
+            {
+              "kernel": "div_small",
+              "operations": 4194304,
+              "min_ns": 28206770,
+              "median_ns": 28211895,
+              "max_ns": 28239996,
+              "ns_per_op": 6.726239919662476
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28197196,
+              "median_ns": 28204195,
+              "max_ns": 28211546,
+              "ns_per_op": 6.7244040966033936
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 2097152,
+              "min_ns": 37106601,
+              "median_ns": 37112651,
+              "max_ns": 37140426,
+              "ns_per_op": 17.696691036224365
+            },
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 24226233,
+              "median_ns": 24235232,
+              "max_ns": 24262482,
+              "ns_per_op": 23.112518310546875
+            },
+            {
+              "kernel": "acos",
+              "operations": 524288,
+              "min_ns": 26232739,
+              "median_ns": 26247739,
+              "max_ns": 26257964,
+              "ns_per_op": 50.063589096069336
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27453643,
+              "median_ns": 27475243,
+              "max_ns": 27523493,
+              "ns_per_op": 1.6376520991325378
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 21004546,
+              "median_ns": 21015597,
+              "max_ns": 21020497,
+              "ns_per_op": 40.08407020568848
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 2097152,
+              "min_ns": 26632090,
+              "median_ns": 26642816,
+              "max_ns": 26648991,
+              "ns_per_op": 12.70428466796875
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 1048576,
+              "min_ns": 28143721,
+              "median_ns": 28149995,
+              "max_ns": 28161971,
+              "ns_per_op": 26.845927238464355
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 21774524,
+              "median_ns": 21783849,
+              "max_ns": 21820174,
+              "ns_per_op": 10.387348651885986
+            },
+            {
+              "kernel": "translate",
+              "operations": 2097152,
+              "min_ns": 24435382,
+              "median_ns": 24441383,
+              "max_ns": 24445858,
+              "ns_per_op": 11.65455961227417
+            },
+            {
+              "kernel": "scale",
+              "operations": 2097152,
+              "min_ns": 22003174,
+              "median_ns": 22018175,
+              "max_ns": 22038750,
+              "ns_per_op": 10.499083995819092
+            },
+            {
+              "kernel": "rotate",
+              "operations": 1048576,
+              "min_ns": 37218976,
+              "median_ns": 37224176,
+              "max_ns": 37239776,
+              "ns_per_op": 35.49974060058594
+            },
+            {
+              "kernel": "transform",
+              "operations": 2097152,
+              "min_ns": 28889948,
+              "median_ns": 28899798,
+              "max_ns": 28930223,
+              "ns_per_op": 13.780497550964355
+            }
+          ],
+          [
+            {
+              "kernel": "mul",
+              "operations": 8388608,
+              "min_ns": 24394433,
+              "median_ns": 24406833,
+              "max_ns": 24410233,
+              "ns_per_op": 2.909521222114563
+            },
+            {
+              "kernel": "div",
+              "operations": 4194304,
+              "min_ns": 28200046,
+              "median_ns": 28210871,
+              "max_ns": 28230846,
+              "ns_per_op": 6.725995779037476
+            },
+            {
+              "kernel": "div_small",
+              "operations": 4194304,
+              "min_ns": 28202746,
+              "median_ns": 28219896,
+              "max_ns": 28241696,
+              "ns_per_op": 6.728147506713867
+            },
+            {
+              "kernel": "div_whole",
+              "operations": 4194304,
+              "min_ns": 28200070,
+              "median_ns": 28203221,
+              "max_ns": 28241970,
+              "ns_per_op": 6.724171876907349
+            },
+            {
+              "kernel": "sqrt",
+              "operations": 2097152,
+              "min_ns": 37099526,
+              "median_ns": 37104876,
+              "max_ns": 37122951,
+              "ns_per_op": 17.692983627319336
+            },
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 24219683,
+              "median_ns": 24234058,
+              "max_ns": 24266932,
+              "ns_per_op": 23.111398696899414
+            },
+            {
+              "kernel": "acos",
+              "operations": 524288,
+              "min_ns": 26244964,
+              "median_ns": 26260539,
+              "max_ns": 26277664,
+              "ns_per_op": 50.088003158569336
+            },
+            {
+              "kernel": "wmul",
+              "operations": 16777216,
+              "min_ns": 27461419,
+              "median_ns": 27477118,
+              "max_ns": 27514343,
+              "ns_per_op": 1.6377638578414917
+            },
+            {
+              "kernel": "wdiv",
+              "operations": 524288,
+              "min_ns": 21005446,
+              "median_ns": 21026646,
+              "max_ns": 21033296,
+              "ns_per_op": 40.10514450073242
+            },
+            {
+              "kernel": "wdiv_whole",
+              "operations": 2097152,
+              "min_ns": 26629640,
+              "median_ns": 26643040,
+              "max_ns": 26647091,
+              "ns_per_op": 12.704391479492188
+            },
+            {
+              "kernel": "wsqrt",
+              "operations": 1048576,
+              "min_ns": 28141920,
+              "median_ns": 28151846,
+              "max_ns": 28177795,
+              "ns_per_op": 26.847692489624023
+            },
+            {
+              "kernel": "compose",
+              "operations": 2097152,
+              "min_ns": 21775424,
+              "median_ns": 21778849,
+              "max_ns": 21785949,
+              "ns_per_op": 10.38496446609497
+            },
+            {
+              "kernel": "translate",
+              "operations": 2097152,
+              "min_ns": 24435133,
+              "median_ns": 24445833,
+              "max_ns": 24450058,
+              "ns_per_op": 11.656681537628174
+            },
+            {
+              "kernel": "scale",
+              "operations": 2097152,
+              "min_ns": 22010250,
+              "median_ns": 22017125,
+              "max_ns": 22037600,
+              "ns_per_op": 10.498583316802979
+            },
+            {
+              "kernel": "rotate",
+              "operations": 1048576,
+              "min_ns": 37218626,
+              "median_ns": 37234802,
+              "max_ns": 37242726,
+              "ns_per_op": 35.50987434387207
+            },
+            {
+              "kernel": "transform",
+              "operations": 2097152,
+              "min_ns": 28889348,
+              "median_ns": 28896223,
+              "max_ns": 28909023,
+              "ns_per_op": 13.77879285812378
+            }
+          ]
+        ]
+      }
+    },
+    "cpuinfo": "processor\t: 0\nBogoMIPS\t: 80.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid\nCPU implementer\t: 0x50\nCPU architecture: 8\nCPU variant\t: 0x3\nCPU part\t: 0x000\nCPU revision\t: 2",
+    "scaling_governor": "ondemand",
+    "scaling_min_freq": "375000",
+    "scaling_max_freq": "3000000"
+  },
+  "verification_source_sha256": {
+    "tests/test-math.c": "0cbe2fdea513b1baff0c796c52d8f5d162703c164dd3cd776b5c23f2cd158d02",
+    "tests/math-codegen.c": "1e3dc4ac1e4da2e2f5cfb0c6e297b00d7e550934a43d98c9afe7aab0bd43eea6",
+    "scripts/gen-math.py": "18e6a744f107965172d8acaaae3b3ec5595c23e2a20f5ba41536847ca7903087",
+    "scripts/check-math.py": "c05a78ade8915394bb7500afc22534813af658fb3051b531b84352dc903a0780",
+    "scripts/bench-math.py": "dd734cfcd8ff8d10dcb16840a41a1ef102ad602eff8bd01e03152044827a63e2",
+    "Makefile": "d4fb57329cc352cfc90a1618bb2bb00bc966a72869050262a3088ca29c116c76",
+    "configs/Kconfig": "daadd508c54226198438848a69c245dc71199f6f1f47eeeac891637d504052e7",
+    "scripts/mathcommon.py": "f9e6f98718014b412e07cdb4593c893876318e57a7a902061e060395be61e41a",
+    "scripts/detect-compiler.py": "5763197d423b12e82bccab845de3c4e84f98916b72982f0a44a61bedd6dba043",
+    "tests/harness.c": "0c52ba1729fa5aad42ea4a6a2f397a96a48d86293009580943f51146e9c5f862"
+  }
+}

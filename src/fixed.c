@@ -7,35 +7,24 @@
 
 #include "twin_private.h"
 
-#define uint32_lo(i) ((i) & 0xffff)
-#define uint32_hi(i) ((i) >> 16)
-#define uint32_carry16 ((1) << 16)
+/* Backend tag referenced by every unit including twin.h; see twin_math.h. */
+const char TWIN_MATH_ABI = 0;
 
-/* Check interval
- * For any variable interval checking:
- *     if (x > minx - epsilon && x < minx + epsilon) ...
- * it is faster to use bit operation:
- *     if ((signed)((x - (minx - epsilon)) | ((minx + epsilon) - x)) > 0) ...
+/* Normalization puts the leading bit in the upper pair of square-root digits.
+ * The near-one shortcut is retained for compatibility with existing paths.
  */
-#define CHECK_INTERVAL(x, minx, epsilon) \
-    ((int32_t) ((x - (minx - epsilon)) | (minx + epsilon - x)) > 0)
-#define CHECK_INTERVAL_64(x, minx, epsilon) \
-    ((int64_t) ((x - (minx - epsilon)) | (minx + epsilon - x)) > 0)
-
 twin_fixed_t twin_fixed_sqrt(twin_fixed_t a)
 {
     if (a <= 0)
         return 0;
-    if (CHECK_INTERVAL(a, TWIN_FIXED_ONE, (1 << (8 - 1))))
+#if TWIN_MATH_FLOAT
+    return (twin_fixed_t) (twin_math_sqrt_positive((float) a) * 256.0f);
+#else
+    if ((uint32_t) a - (TWIN_FIXED_ONE - 128u) <= 256u)
         return TWIN_FIXED_ONE;
 
-    /* Count leading zero */
-    int offset = 0;
-    for (twin_fixed_t i = a; !(0x40000000 & i); i <<= 1)
-        ++offset;
-
+    int offset = (twin_clz((uint32_t) a) - 1) & ~1;
     /* Shift left 'a' to expand more digit for sqrt precision */
-    offset &= ~1;
     a <<= offset;
 
     /* Calculate the digits need to shift back */
@@ -44,7 +33,8 @@ twin_fixed_t twin_fixed_sqrt(twin_fixed_t a)
 
     /* Use digit-by-digit calculation to compute square root */
     twin_fixed_t z = 0;
-    for (twin_fixed_t m = 1UL << ((31 - twin_clz(a)) & ~1UL); m; m >>= 2) {
+    twin_fixed_t m = (a & 0x40000000) ? (1u << 30) : (1u << 28);
+    for (; m; m >>= 2) {
         int b = z + m;
         z >>= 1;
         if (a >= b)
@@ -53,6 +43,7 @@ twin_fixed_t twin_fixed_sqrt(twin_fixed_t a)
 
     /* Shift back the expanded digits */
     return (offset >= 0) ? z >> offset : z << (-offset);
+#endif
 }
 
 twin_xfixed_t _twin_xfixed_sqrt(twin_xfixed_t a)
@@ -62,16 +53,10 @@ twin_xfixed_t _twin_xfixed_sqrt(twin_xfixed_t a)
         return 0;
 
     /* Special case for values very close to 1 */
-    if (CHECK_INTERVAL_64(a, TWIN_XFIXED_ONE, (1ULL << (16 - 1))))
+    if ((uint64_t) a - (TWIN_XFIXED_ONE - 32768u) <= 65536u)
         return TWIN_XFIXED_ONE;
 
-    /* Count leading zero bits to normalize the input */
-    int64_t offset = 0;
-    for (twin_xfixed_t i = a; !(UINT64_C(0x4000000000000000) & i); i <<= 1)
-        ++offset;
-
-    /* Ensure even offset for precision */
-    offset &= ~1;
+    int offset = (twin_clzll((uint64_t) a) - 1) & ~1;
 
     /* Shift left to expand precision */
     a <<= offset;
@@ -80,15 +65,29 @@ twin_xfixed_t _twin_xfixed_sqrt(twin_xfixed_t a)
     offset >>= 1;
     offset -= (32 >> 1);
 
+#if TWIN_MATH_A64_FP
+    /* Binary64 gives a seed within one integer of the exact normalized root.
+     * Correct with integer squares to preserve every legacy Q31.32 result,
+     * even when converting a near-perfect 63-bit square rounded its input.
+     */
+    uint64_t z = (uint64_t) twin_math_sqrt_positive64((double) a);
+    if (z * z > (uint64_t) a)
+        --z;
+    else if ((z + 1) * (z + 1) <= (uint64_t) a)
+        ++z;
+#else
     /* Digit-by-digit square root calculation */
     twin_xfixed_t z = 0;
-    for (twin_xfixed_t m = 1ULL << ((63 - twin_clzll(a)) & ~1ULL); m; m >>= 2) {
+    twin_xfixed_t m =
+        (a & (INT64_C(1) << 62)) ? (INT64_C(1) << 62) : (INT64_C(1) << 60);
+    for (; m; m >>= 2) {
         twin_xfixed_t b = z + m;
         z >>= 1;
         if (a >= b)
             a -= b, z += m;
     }
 
+#endif
     /* Shift back the expanded digits */
     return (offset >= 0) ? z >> offset : z << (-offset);
 }

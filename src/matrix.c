@@ -5,28 +5,14 @@
  * All rights reserved.
  */
 
+#include "math-gen.h"
 #include "twin_private.h"
 
 void twin_matrix_multiply(twin_matrix_t *result,
                           const twin_matrix_t *a,
                           const twin_matrix_t *b)
 {
-    twin_matrix_t r;
-
-    for (int row = 0; row < 3; row++) {
-        twin_fixed_t t;
-        for (int col = 0; col < 2; col++) {
-            if (row == 2)
-                t = b->m[2][col];
-            else
-                t = 0;
-            for (int n = 0; n < 2; n++)
-                t += twin_fixed_mul(a->m[row][n], b->m[n][col]);
-            r.m[row][col] = t;
-        }
-    }
-
-    *result = r;
+    twin_math_compose(result, a, b);
 }
 
 void twin_matrix_identity(twin_matrix_t *m)
@@ -47,28 +33,12 @@ bool twin_matrix_is_identity(twin_matrix_t *m)
 
 void twin_matrix_translate(twin_matrix_t *m, twin_fixed_t tx, twin_fixed_t ty)
 {
-    twin_matrix_t t;
-
-    t.m[0][0] = TWIN_FIXED_ONE;
-    t.m[0][1] = 0;
-    t.m[1][0] = 0;
-    t.m[1][1] = TWIN_FIXED_ONE;
-    t.m[2][0] = tx;
-    t.m[2][1] = ty;
-    twin_matrix_multiply(m, &t, m);
+    twin_math_translate(m, tx, ty);
 }
 
 void twin_matrix_scale(twin_matrix_t *m, twin_fixed_t sx, twin_fixed_t sy)
 {
-    twin_matrix_t t;
-
-    t.m[0][0] = sx;
-    t.m[0][1] = 0;
-    t.m[1][0] = 0;
-    t.m[1][1] = sy;
-    t.m[2][0] = 0;
-    t.m[2][1] = 0;
-    twin_matrix_multiply(m, &t, m);
+    twin_math_scale(m, sx, sy);
 }
 
 void twin_matrix_rotate(twin_matrix_t *m, twin_angle_t a)
@@ -76,15 +46,7 @@ void twin_matrix_rotate(twin_matrix_t *m, twin_angle_t a)
     twin_fixed_t c, s;
     twin_sincos(a, &s, &c);
 
-    twin_matrix_t t = {
-        .m[0][0] = c,
-        .m[0][1] = s,
-        .m[1][0] = -s,
-        .m[1][1] = c,
-        .m[2][0] = 0,
-        .m[2][1] = 0,
-    };
-    twin_matrix_multiply(m, &t, m);
+    twin_math_rotate(m, c, s);
 }
 
 twin_sfixed_t _twin_matrix_x(twin_matrix_t *m, twin_fixed_t x, twin_fixed_t y)
@@ -133,6 +95,17 @@ void twin_matrix_transform(const twin_matrix_t *m,
                            twin_fixed_t *ox,
                            twin_fixed_t *oy)
 {
+#if TWIN_MATH_A64_NEON
+    /* The scalar API writes x before reading m for y. Preserve that behavior
+     * if the caller aliases the x output with any matrix coefficient.
+     */
+    if ((uintptr_t) ox - (uintptr_t) m >= sizeof(*m)) {
+        int32x2_t p = twin_math_transform_pair(m, x, y);
+        *ox = vget_lane_s32(p, 0);
+        *oy = vget_lane_s32(p, 1);
+        return;
+    }
+#endif
     *ox = _twin_matrix_fx((twin_matrix_t *) m, x, y);
     *oy = _twin_matrix_fy((twin_matrix_t *) m, x, y);
 }

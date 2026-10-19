@@ -1,0 +1,659 @@
+{
+  "collected_utc": "2026-10-19T09:16:36.381629+00:00",
+  "description": "Improve both fixed sincos kernels by changing constants only; compare against previous optimized implementation on the same eMag host. No target FP instructions or added runtime operations.",
+  "remote_directory": "/tmp/mado-sincos.UO1VpE",
+  "protocol": {
+    "command": "python3 scripts/bench-math.py --cflags=-mcpu=emag --cpu 2 --runs 7 --modes fixed table --kernel sincos --output RESULTS",
+    "runs": 7,
+    "samples_per_run": 7,
+    "summary": "Median of seven per-run median times",
+    "operations_per_call": "Compute both Q16 sine and cosine",
+    "table_bytes": 4100,
+    "no_fpu": "Both core objects and timing driver compiled -mgeneral-regs-only; generated assembly scanned for FP/SIMD registers",
+    "limitation": "Measured timing is subject to hardware noise. Instruction sequences establish no added arithmetic/load/branch operations for the audited compiler/targets. Input angle quantization is excluded from accuracy bounds."
+  },
+  "source_sha256": {
+    "src/trig.c": "ef1e4de8b36f96e97b153c9dfe493b401a317a458c46db15b663a8be32b7f220",
+    "src/math-trig.h": "c75d30fdd10857c79b89c25b5a5354065eade798003a30e14d0676c01275c24a",
+    "scripts/gen-math.py": "18e6a744f107965172d8acaaae3b3ec5595c23e2a20f5ba41536847ca7903087",
+    "tests/test-math.c": "0cbe2fdea513b1baff0c796c52d8f5d162703c164dd3cd776b5c23f2cd158d02",
+    "tests/math-codegen.c": "1e3dc4ac1e4da2e2f5cfb0c6e297b00d7e550934a43d98c9afe7aab0bd43eea6",
+    "scripts/check-math.py": "c05a78ade8915394bb7500afc22534813af658fb3051b531b84352dc903a0780",
+    "scripts/bench-math.py": "dd734cfcd8ff8d10dcb16840a41a1ef102ad602eff8bd01e03152044827a63e2"
+  },
+  "accuracy": {
+    "before": {
+      "fixed": {
+        "max_absolute_error_q16_lsb": 13.021417591735371,
+        "worst_quarter_angle_index": 762,
+        "reference": "Host binary64 sine, independently checked by native exhaustive C tests",
+        "quarter_samples": 1025,
+        "monotonic": true,
+        "endpoints": [
+          0,
+          65536
+        ]
+      },
+      "table": {
+        "max_absolute_error_q16_lsb": 13.021417591735371,
+        "worst_quarter_angle_index": 762,
+        "reference": "Host binary64 sine, independently checked by native exhaustive C tests",
+        "quarter_samples": 1025,
+        "monotonic": true,
+        "endpoints": [
+          0,
+          65536
+        ]
+      }
+    },
+    "after": {
+      "fixed": {
+        "max_absolute_error_q16_lsb": 5.643622827625222,
+        "worst_quarter_angle_index": 248,
+        "reference": "Host binary64 sine, independently checked by native exhaustive C tests",
+        "quarter_samples": 1025,
+        "monotonic": true,
+        "endpoints": [
+          0,
+          65536
+        ]
+      },
+      "table": {
+        "max_absolute_error_q16_lsb": 0.49944877781308605,
+        "worst_quarter_angle_index": 195,
+        "reference": "Host binary64 sine, independently checked by native exhaustive C tests",
+        "quarter_samples": 1025,
+        "monotonic": true,
+        "endpoints": [
+          0,
+          65536
+        ]
+      }
+    }
+  },
+  "timing_summary": {
+    "fixed": {
+      "before_median_ns_per_call": 22.288761138916016,
+      "after_median_ns_per_call": 22.275117874145508,
+      "change_percent": -0.061211409128913985
+    },
+    "table": {
+      "before_median_ns_per_call": 6.116335391998291,
+      "after_median_ns_per_call": 6.119683265686035,
+      "change_percent": 0.05473659427055466
+    }
+  },
+  "arm64_codegen": {
+    "fixed": {
+      "before_instructions": 70,
+      "after_instructions": 70,
+      "identical_opcodes": true,
+      "differing_instructions": [
+        [
+          "mov\tw3, 45609",
+          "mov\tw3, 40282"
+        ],
+        [
+          "mov\tw5, 10540",
+          "mov\tw5, 12184"
+        ],
+        [
+          "movk\tw3, 0x23, lsl 16",
+          "movk\tw3, 0x24, lsl 16"
+        ],
+        [
+          "movk\tw5, 0xa3b2, lsl 16",
+          "movk\tw5, 0xa44a, lsl 16"
+        ],
+        [
+          "mov\tw4, 35403",
+          "mov\tw4, 65201"
+        ],
+        [
+          "movk\tw4, 0xc8ec, lsl 16",
+          "movk\tw4, 0xc8fd, lsl 16"
+        ],
+        [
+          "mov\tw5, 45609",
+          "mov\tw5, 40282"
+        ],
+        [
+          "movk\tw5, 0x23, lsl 16",
+          "movk\tw5, 0x24, lsl 16"
+        ],
+        [
+          "mov\tw8, 10540",
+          "mov\tw8, 12184"
+        ],
+        [
+          "movk\tw8, 0xa3b2, lsl 16",
+          "movk\tw8, 0xa44a, lsl 16"
+        ],
+        [
+          "mov\tw7, 35403",
+          "mov\tw7, 65201"
+        ],
+        [
+          "movk\tw7, 0xc8ec, lsl 16",
+          "movk\tw7, 0xc8fd, lsl 16"
+        ]
+      ]
+    },
+    "table": {
+      "before_instructions": 41,
+      "after_instructions": 41,
+      "identical_opcodes": true,
+      "differing_instructions": []
+    }
+  },
+  "riscv_codegen": {
+    "rv32i": {
+      "before_instructions": 52,
+      "after_instructions": 52,
+      "identical_opcodes": true,
+      "differing_instructions": []
+    },
+    "rv32im": {
+      "before_instructions": 81,
+      "after_instructions": 81,
+      "identical_opcodes": true,
+      "differing_instructions": [
+        [
+          "li\ta5,2338816",
+          "li\ta5,2400256"
+        ],
+        [
+          "addi\ta5,a5,553",
+          "addi\ta5,a5,-678"
+        ],
+        [
+          "li\ta5,-1548603392",
+          "li\ta5,-1538641920"
+        ],
+        [
+          "addi\ta5,a5,-1748",
+          "addi\ta5,a5,-104"
+        ],
+        [
+          "li\ta4,-924020736",
+          "li\ta4,-922877952"
+        ],
+        [
+          "addi\ta4,a4,-1461",
+          "addi\ta4,a4,-335"
+        ],
+        [
+          "li\ta0,2338816",
+          "li\ta0,2400256"
+        ],
+        [
+          "addi\ta0,a0,553",
+          "addi\ta0,a0,-678"
+        ],
+        [
+          "li\ta0,-1548603392",
+          "li\ta0,-1538641920"
+        ],
+        [
+          "addi\ta0,a0,-1748",
+          "addi\ta0,a0,-104"
+        ],
+        [
+          "li\tt1,-924020736",
+          "li\tt1,-922877952"
+        ],
+        [
+          "addi\tt1,t1,-1461",
+          "addi\tt1,t1,-335"
+        ]
+      ]
+    }
+  },
+  "validation": {
+    "commands": [
+      "python3 scripts/check-math.py --sanitize",
+      "python3 scripts/check-math.py --sanitize --arm64",
+      "python3 scripts/check-math.py --cc clang --sanitize --arm64",
+      "python3 scripts/check-math.py --sanitize --riscv-cc riscv64-linux-gnu-gcc --qemu qemu-riscv32 --kernels --kernel-cflags=-I/tmp/mado-rv-headers",
+      "make -j8 check CONFIG_TOOLS=n"
+    ],
+    "cross_header_note": "Temporary empty gnu/stubs-ilp32.h and stubs-ilp32f.h allow declaration parsing with installed RV64 headers; freestanding QEMU executables link without libc.",
+    "logs": {
+      "local-check": {
+        "sha256": "500d83f52058bce1db35e60360d8debdd6aa322b69d8118ba041d827c9899245",
+        "output": "fixed: numeric, exhaustive trigonometry and matrix tests passed\ntable: numeric, exhaustive trigonometry and matrix tests passed\nfloat: numeric, exhaustive trigonometry and matrix tests passed\n"
+      },
+      "riscv-check": {
+        "sha256": "281a094d901be9bac47c2d7c5a0be1de120314cb400fc1364dcf12e5de5a570c",
+        "output": "fixed: numeric, exhaustive trigonometry and matrix tests passed\ntable: numeric, exhaustive trigonometry and matrix tests passed\nfloat: numeric, exhaustive trigonometry and matrix tests passed\nrv32i: codegen passed; product/quotient/compose assembly instructions = [12, 35, 178]\nrv32i: sincos/sqrt kernels contain no helper/libm calls\nrv32i: QEMU arithmetic and aliasing tests passed\nrv32im: codegen passed; product/quotient/compose assembly instructions = [6, 30, 91]\nrv32im: sincos/sqrt kernels contain no helper/libm calls\nrv32im: QEMU arithmetic and aliasing tests passed\nrv32imf: codegen passed; product/quotient/compose assembly instructions = [8, 8, 67]\nrv32imf: sincos/sqrt kernels contain no helper/libm calls\nrv32imf: QEMU arithmetic and aliasing tests passed\n"
+      },
+      "gcc-check": {
+        "sha256": "df6e065e199227582e53dd4471002cab226d081220a7d567a992fef7f517bdf2",
+        "output": "fixed: Arm64 codegen and FP/SIMD policy passed\nfixed: numeric, exhaustive trigonometry and matrix tests passed\ntable: Arm64 codegen and FP/SIMD policy passed\ntable: numeric, exhaustive trigonometry and matrix tests passed\nfloat: Arm64 codegen and FP/SIMD policy passed\nfloat: numeric, exhaustive trigonometry and matrix tests passed\n"
+      },
+      "clang-check": {
+        "sha256": "df6e065e199227582e53dd4471002cab226d081220a7d567a992fef7f517bdf2",
+        "output": "fixed: Arm64 codegen and FP/SIMD policy passed\nfixed: numeric, exhaustive trigonometry and matrix tests passed\ntable: Arm64 codegen and FP/SIMD policy passed\ntable: numeric, exhaustive trigonometry and matrix tests passed\nfloat: Arm64 codegen and FP/SIMD policy passed\nfloat: numeric, exhaustive trigonometry and matrix tests passed\n"
+      },
+      "full-check": {
+        "sha256": "4e89fb5e0f568d10a6984bbff3c5f6cfe5721fe6e65a0d912b9e3842699ce489",
+        "output": "core: 300 checks, 0 failed\nwm: 73 checks, 0 failed\nlifetime: 21 checks, 0 failed\ndemos: 122 checks, 0 failed"
+      }
+    }
+  },
+  "before": {
+    "machine": {
+      "system": "Linux",
+      "node": "emag-server",
+      "release": "6.8.0-136-generic",
+      "version": "#136-Ubuntu SMP PREEMPT_DYNAMIC Wed Jul  1 21:33:11 UTC 2026",
+      "machine": "aarch64",
+      "processor": "aarch64"
+    },
+    "compiler": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "target": "aarch64-linux-gnu",
+    "cpu": 2,
+    "common_flags": [
+      "-O2",
+      "-mcpu=emag",
+      "-fno-tree-vectorize",
+      "-fno-tree-slp-vectorize",
+      "-DCONFIG_WM_NONE=1"
+    ],
+    "source_sha256": {
+      "include/twin.h": "7889792ec28698b546596dc70489f0e5fc074b4c49c596b3935a0cb394ba9742",
+      "include/twin_math.h": "23ba1ba47863166b8fe04a09e822119cd74c4db35b68cd97f5dea00068ca8afa",
+      "src/twin_private.h": "9f05709280e216e6b4b7ba7396f5f394cc0ae1ca9d04de66e01a9f49609f537c",
+      "src/fixed.c": "fcf63b7a0161f14805a01c11bcaf733b759065a82c76d5321d0990700f00b4a6",
+      "src/trig.c": "2573994ab53c1376da0bce07ffcfd28d24930b4afa36845c0e803bede18140cf",
+      "src/matrix.c": "10d7820f5349db5280df1ddfce0bf2f36c38fc6d0daae1810d20a7aa0f2b472f",
+      "src/math-gen.h": "b083c1f84e7ebe19ae37c7c9b7b1afdb060bbccb3bff555a589e53c44b5be2b2",
+      "src/math-trig.h": "ec55acd2e5ae2d33a77344e241b0dcb6b4c0431f3927168e1731972f6aac0061",
+      "tests/math-bench.c": "3526934db9d14b91d4e3867f55ba868ba5e53f977903bcb7fe80c846bad9f1a3",
+      "tests/math-bench-kernels.c": "2b73048bd975237a2dc0eef9f01c83f82ba2d602d5e8c10eb8748cebf19d02e8"
+    },
+    "modes": {
+      "fixed": {
+        "flags": [
+          "-O2",
+          "-mcpu=emag",
+          "-fno-tree-vectorize",
+          "-fno-tree-slp-vectorize",
+          "-DCONFIG_WM_NONE=1",
+          "-mgeneral-regs-only"
+        ],
+        "fp_simd_forbidden": true,
+        "measurements": [
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23316610,
+              "median_ns": 23370359,
+              "max_ns": 23381935,
+              "ns_per_op": 22.287711143493652
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23367910,
+              "median_ns": 23379035,
+              "max_ns": 23423010,
+              "ns_per_op": 22.295985221862793
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23365384,
+              "median_ns": 23370585,
+              "max_ns": 23389385,
+              "ns_per_op": 22.28792667388916
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23357884,
+              "median_ns": 23371460,
+              "max_ns": 23375910,
+              "ns_per_op": 22.288761138916016
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23359535,
+              "median_ns": 23376810,
+              "max_ns": 23420135,
+              "ns_per_op": 22.29386329650879
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23359260,
+              "median_ns": 23367985,
+              "max_ns": 23433335,
+              "ns_per_op": 22.285447120666504
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23358635,
+              "median_ns": 23379160,
+              "max_ns": 23390160,
+              "ns_per_op": 22.296104431152344
+            }
+          ]
+        ]
+      },
+      "table": {
+        "flags": [
+          "-O2",
+          "-mcpu=emag",
+          "-fno-tree-vectorize",
+          "-fno-tree-slp-vectorize",
+          "-DCONFIG_WM_NONE=1",
+          "-DCONFIG_MATH_TRIG_TABLE=1",
+          "-mgeneral-regs-only"
+        ],
+        "fp_simd_forbidden": true,
+        "measurements": [
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25644521,
+              "median_ns": 25650371,
+              "max_ns": 25665746,
+              "ns_per_op": 6.115525007247925
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25640295,
+              "median_ns": 25648320,
+              "max_ns": 25664146,
+              "ns_per_op": 6.1150360107421875
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25636946,
+              "median_ns": 25653770,
+              "max_ns": 25668471,
+              "ns_per_op": 6.116335391998291
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25640221,
+              "median_ns": 25654296,
+              "max_ns": 25664596,
+              "ns_per_op": 6.116460800170898
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25650021,
+              "median_ns": 25659795,
+              "max_ns": 25663621,
+              "ns_per_op": 6.117771863937378
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25643446,
+              "median_ns": 25657745,
+              "max_ns": 25665646,
+              "ns_per_op": 6.11728310585022
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25642371,
+              "median_ns": 25653670,
+              "max_ns": 25670496,
+              "ns_per_op": 6.116311550140381
+            }
+          ]
+        ]
+      }
+    },
+    "cpuinfo": "processor\t: 0\nBogoMIPS\t: 80.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid\nCPU implementer\t: 0x50\nCPU architecture: 8\nCPU variant\t: 0x3\nCPU part\t: 0x000\nCPU revision\t: 2",
+    "scaling_governor": "ondemand",
+    "scaling_min_freq": "375000",
+    "scaling_max_freq": "3000000"
+  },
+  "after": {
+    "machine": {
+      "system": "Linux",
+      "node": "emag-server",
+      "release": "6.8.0-136-generic",
+      "version": "#136-Ubuntu SMP PREEMPT_DYNAMIC Wed Jul  1 21:33:11 UTC 2026",
+      "machine": "aarch64",
+      "processor": "aarch64"
+    },
+    "compiler": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "target": "aarch64-linux-gnu",
+    "cpu": 2,
+    "common_flags": [
+      "-O2",
+      "-mcpu=emag",
+      "-fno-tree-vectorize",
+      "-fno-tree-slp-vectorize",
+      "-DCONFIG_WM_NONE=1"
+    ],
+    "source_sha256": {
+      "include/twin.h": "7889792ec28698b546596dc70489f0e5fc074b4c49c596b3935a0cb394ba9742",
+      "include/twin_math.h": "8667fbca2e4329f11cafa90f63f46c18668c84f6c3dd13505519031a921bc6bc",
+      "src/twin_private.h": "6599418169b1689e5375705f6bf048450eb3e37059525071fc4a255959a0d7ba",
+      "src/fixed.c": "76cb72d0da3491e96a111b93bb3e8817cb58ab8c887bd1da204a17fc655f7c90",
+      "src/trig.c": "ef1e4de8b36f96e97b153c9dfe493b401a317a458c46db15b663a8be32b7f220",
+      "src/matrix.c": "01dfa343fe0204b5d83dcebc5e1a8e51ea4bb28036114f7b05a1bf525bc30fbb",
+      "src/math-gen.h": "d7f2b0d875f35e63c77d8740fce8f20fada8a0dc1596b8fdb4091bbda8e848b7",
+      "src/math-trig.h": "c75d30fdd10857c79b89c25b5a5354065eade798003a30e14d0676c01275c24a",
+      "tests/math-bench.c": "3526934db9d14b91d4e3867f55ba868ba5e53f977903bcb7fe80c846bad9f1a3",
+      "tests/math-bench-kernels.c": "2b73048bd975237a2dc0eef9f01c83f82ba2d602d5e8c10eb8748cebf19d02e8",
+      "tests/math-codegen.c": "1e3dc4ac1e4da2e2f5cfb0c6e297b00d7e550934a43d98c9afe7aab0bd43eea6",
+      "scripts/gen-composite-decls.py": "d77b354da8f4289964ba5d22c69865b4e458825c49c6db6c49100e2ba654c9af"
+    },
+    "modes": {
+      "fixed": {
+        "flags": [
+          "-O2",
+          "-mcpu=emag",
+          "-fno-tree-vectorize",
+          "-fno-tree-slp-vectorize",
+          "-DCONFIG_WM_NONE=1",
+          "-mgeneral-regs-only"
+        ],
+        "fp_simd_forbidden": true,
+        "measurements": [
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23350030,
+              "median_ns": 23354080,
+              "max_ns": 23397180,
+              "ns_per_op": 22.272186279296875
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23349554,
+              "median_ns": 23351955,
+              "max_ns": 23365805,
+              "ns_per_op": 22.27015972137451
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23350204,
+              "median_ns": 23357030,
+              "max_ns": 23360579,
+              "ns_per_op": 22.274999618530273
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23350505,
+              "median_ns": 23358680,
+              "max_ns": 23440330,
+              "ns_per_op": 22.276573181152344
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23351979,
+              "median_ns": 23363305,
+              "max_ns": 23381405,
+              "ns_per_op": 22.280983924865723
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23348654,
+              "median_ns": 23357154,
+              "max_ns": 23359404,
+              "ns_per_op": 22.275117874145508
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 1048576,
+              "min_ns": 23346404,
+              "median_ns": 23363604,
+              "max_ns": 23368954,
+              "ns_per_op": 22.281269073486328
+            }
+          ]
+        ]
+      },
+      "table": {
+        "flags": [
+          "-O2",
+          "-mcpu=emag",
+          "-fno-tree-vectorize",
+          "-fno-tree-slp-vectorize",
+          "-DCONFIG_WM_NONE=1",
+          "-DCONFIG_MATH_TRIG_TABLE=1",
+          "-mgeneral-regs-only"
+        ],
+        "fp_simd_forbidden": true,
+        "measurements": [
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25647163,
+              "median_ns": 25658837,
+              "max_ns": 25698438,
+              "ns_per_op": 6.117543458938599
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25650662,
+              "median_ns": 25672612,
+              "max_ns": 25734088,
+              "ns_per_op": 6.120827674865723
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25647963,
+              "median_ns": 25659062,
+              "max_ns": 25695162,
+              "ns_per_op": 6.1175971031188965
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25654113,
+              "median_ns": 25667812,
+              "max_ns": 25706938,
+              "ns_per_op": 6.119683265686035
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25654838,
+              "median_ns": 25674087,
+              "max_ns": 25715063,
+              "ns_per_op": 6.1211793422698975
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25661513,
+              "median_ns": 25677463,
+              "max_ns": 25712638,
+              "ns_per_op": 6.121984243392944
+            }
+          ],
+          [
+            {
+              "kernel": "sincos",
+              "operations": 4194304,
+              "min_ns": 25654637,
+              "median_ns": 25660937,
+              "max_ns": 25677012,
+              "ns_per_op": 6.118044137954712
+            }
+          ]
+        ]
+      }
+    },
+    "cpuinfo": "processor\t: 0\nBogoMIPS\t: 80.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid\nCPU implementer\t: 0x50\nCPU architecture: 8\nCPU variant\t: 0x3\nCPU part\t: 0x000\nCPU revision\t: 2",
+    "scaling_governor": "ondemand",
+    "scaling_min_freq": "375000",
+    "scaling_max_freq": "3000000"
+  },
+  "remeasured_utc": "2026-10-19T11:20:22.336951+00:00",
+  "remeasured_directory": "/tmp/mado-arm64.qRnJcv",
+  "revision_note": "After timings re-measured with the protocol command on the current sources. Later changes refactored build conditionals and shared the float sine coefficients; the fixed polynomial and table kernels, src/math-trig.h and their accuracy bounds are unchanged. Current validation logs are in emag-math.json. The before table entry is an unreleased table that reproduced the previous polynomial samples; the committed baseline has no table."
+}

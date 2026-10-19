@@ -22,6 +22,7 @@
     (((uint32_t) (a) << 24) | ((uint32_t) (r) << 16) | ((uint32_t) (g) << 8) | \
      (b))
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
 
 enum {
     /* end of document This command determines the end of file. */
@@ -1185,8 +1186,9 @@ static bool tvg_fit_budget(twin_format_t fmt,
     return best_w && best_h;
 }
 
-/* Render @filepath into a @w x @h pixmap, the drawing scaled to fit (0 x 0:
- * the document's own size), shrunk further to CONFIG_TVG_MEMORY_BUDGET */
+/* Render @filepath scaled to fit @w x @h (0 x 0: the document's own size)
+ * into a pixmap of the drawing's aspect, shrunk further to
+ * CONFIG_TVG_MEMORY_BUDGET */
 static twin_pixmap_t *tvg_load(const char *filepath,
                                twin_format_t fmt,
                                uint32_t w,
@@ -1215,6 +1217,11 @@ static twin_pixmap_t *tvg_load(const char *filepath,
     /* Pixmaps are indexed with twin_coord_t */
     w = MIN(w, INT16_MAX);
     h = MIN(h, INT16_MAX);
+    /* Take the drawing's aspect, so no margin is stored around it */
+    if ((uint64_t) w * height <= (uint64_t) h * width)
+        h = MAX((uint32_t) ((uint64_t) height * w / width), 1);
+    else
+        w = MAX((uint32_t) ((uint64_t) width * h / height), 1);
 #if defined(CONFIG_TVG_MEMORY_BUDGET) && CONFIG_TVG_MEMORY_BUDGET > 0
     if (!tvg_fit_budget(fmt, &w, &h, (size_t) CONFIG_TVG_MEMORY_BUDGET * 1024))
         goto bail;

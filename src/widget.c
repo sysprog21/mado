@@ -112,6 +112,7 @@ void _twin_widget_init(twin_widget_t *widget,
     widget->copy_geom = NULL;
     widget->paint = true;
     widget->layout = true;
+    widget->fixed_stretch = false;
     widget->background = 0x00000000;
     widget->extents.left = widget->extents.top = 0;
     widget->extents.right = widget->extents.bottom = 0;
@@ -231,6 +232,16 @@ void twin_widget_set_shape(twin_widget_t *widget, twin_shape_t shape)
 void twin_widget_match_size(twin_widget_t *widget, twin_widget_t *source)
 {
     widget->copy_geom = source;
+    _twin_widget_queue_layout(widget);
+}
+
+void twin_widget_set_stretch(twin_widget_t *widget,
+                             twin_stretch_t width,
+                             twin_stretch_t height)
+{
+    widget->preferred.stretch_width = width;
+    widget->preferred.stretch_height = height;
+    widget->fixed_stretch = true;
     _twin_widget_queue_layout(widget);
 }
 

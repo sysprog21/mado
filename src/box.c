@@ -58,6 +58,11 @@ static twin_dispatch_result_t _twin_box_query_geometry(twin_box_t *box)
                 preferred.stretch_width = child->preferred.stretch_width;
         }
     }
+    /* A stretch set explicitly outlasts what the children add up to */
+    if (box->widget.fixed_stretch) {
+        preferred.stretch_width = box->widget.preferred.stretch_width;
+        preferred.stretch_height = box->widget.preferred.stretch_height;
+    }
     box->widget.preferred = preferred;
     return TwinDispatchContinue;
 }
@@ -75,14 +80,17 @@ static twin_dispatch_result_t _twin_box_configure(twin_box_t *box)
     twin_widget_t *child;
 
     if (box->dir == TwinBoxHorz) {
-        stretch = box->widget.preferred.stretch_width;
         actual = width;
         pref = box->widget.preferred.width;
     } else {
-        stretch = box->widget.preferred.stretch_height;
         actual = height;
         pref = box->widget.preferred.height;
     }
+    /* The children share the room by their own stretches: a stretch set on
+     * the box itself is for its parent */
+    for (child = box->children; child; child = child->next)
+        stretch += box->dir == TwinBoxHorz ? child->preferred.stretch_width
+                                           : child->preferred.stretch_height;
     if (!stretch)
         stretch = 1;
     delta = delta_remain = actual - pref;

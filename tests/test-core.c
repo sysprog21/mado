@@ -1347,6 +1347,44 @@ static void test_toplevel_background(void)
 /* Boxes paint their own background in the gaps their children leave, a
  * background or shape change repaints everything over it, and a shaped
  * root leaves the rest of the window transparent */
+/* A stretch set on a box outlasts the next layout: a nested box held at
+ * stretch 0 keeps its children's height while a flexible sibling takes the
+ * rest of the window */
+static void test_box_stretch(void)
+{
+    th_t *t = th_create(W, H);
+    twin_toplevel_t *top = twin_toplevel_create(t->screen, 0, 0, W, H, "t");
+    twin_box_t *row = twin_box_create(twin_toplevel_box(top), TwinBoxHorz);
+    twin_custom_widget_t *cell =
+        twin_custom_widget_create(row, 0, 0, 10, NULL, 0);
+    twin_custom_widget_t *rest =
+        twin_custom_widget_create(twin_toplevel_box(top), 0, 0, 0, NULL, 0);
+    twin_widget_set_stretch(twin_box_widget(row), 1, 0);
+    twin_toplevel_show(top);
+    th_frame(t);
+    CHECK_EQ(twin_custom_widget_height(cell), 10,
+             "a box held at stretch 0 keeps its height");
+    CHECK(twin_custom_widget_height(rest) > 10,
+          "the flexible sibling takes the room (%d)",
+          twin_custom_widget_height(rest));
+    twin_toplevel_destroy(top);
+
+    /* Inside a box, its children share the room by their own stretches,
+     * whatever stretch the box shows its parent */
+    top = twin_toplevel_create(t->screen, 0, 0, W, H, "t");
+    twin_box_t *col = twin_box_create(twin_toplevel_box(top), TwinBoxVert);
+    twin_custom_widget_t *a = twin_custom_widget_create(col, 0, 0, 0, NULL, 0);
+    twin_custom_widget_t *b = twin_custom_widget_create(col, 0, 0, 0, NULL, 0);
+    twin_widget_set_stretch(twin_box_widget(col), 1, 1);
+    twin_toplevel_show(top);
+    th_frame(t);
+    int ha = twin_custom_widget_height(a), hb = twin_custom_widget_height(b);
+    CHECK(ha > 0 && hb > 0 && ha - hb <= 1 && hb - ha <= 1,
+          "two equal children split a stretched box evenly (%d, %d)", ha, hb);
+    twin_toplevel_destroy(top);
+    th_destroy(t);
+}
+
 static void test_box_background(void)
 {
     th_t *t = th_create(W, H);
@@ -1518,6 +1556,18 @@ static void test_tvg_even_odd(void)
     CHECK_EQ(*twin_pixmap_pointer(p, 16, 16).argb32, 0,
              "the inner square is a hole");
     twin_pixmap_destroy(p);
+
+    /* The pixmap takes the drawing's aspect: a square asked for 64x32
+     * comes back 32x32, with no margin stored beside it */
+    char wide_path[] = "/tmp/mado-tvg-XXXXXX";
+    if (!write_fixture(wide_path, doc, sizeof(doc)))
+        return;
+    p = twin_tvg_to_pixmap(wide_path, 64, 32);
+    unlink(wide_path);
+    CHECK(p && twin_pixmap_width(p) == 32 && twin_pixmap_height(p) == 32,
+          "TVG pixmap keeps the drawing's aspect");
+    if (p)
+        twin_pixmap_destroy(p);
 }
 #endif
 
@@ -1769,6 +1819,7 @@ int main(void)
     test_widget_teardown();
     test_toplevel_background();
     test_box_background();
+    test_box_stretch();
 #endif
 #if defined(CONFIG_LOADER_GIF)
     test_gif_malformed();

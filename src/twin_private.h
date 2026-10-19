@@ -360,8 +360,9 @@ struct _twin_widget {
     twin_widget_t *copy_geom;   /**< Geometry source widget (optional) */
 
     /* Widget state */
-    bool paint;  /**< Needs painting */
-    bool layout; /**< Needs layout */
+    bool paint;         /**< Needs painting */
+    bool layout;        /**< Needs layout */
+    bool fixed_stretch; /**< Stretch set explicitly: a box keeps it */
 
     /* Widget appearance */
     twin_argb32_t background;       /**< Background color */

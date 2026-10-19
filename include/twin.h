@@ -839,6 +839,19 @@ void twin_widget_set_shape(twin_widget_t *widget, twin_shape_t shape);
 /** Make @widget request the same preferred size as @source */
 void twin_widget_match_size(twin_widget_t *widget, twin_widget_t *source);
 
+/**
+ * How much of its box's spare room @widget takes in each direction
+ *
+ * A box divides the room by the sum of its children's stretches, so 0 keeps
+ * @widget at its preferred size (widgets start at 1).  The last widget in a
+ * box also takes what rounding leaves, and all of the room when no sibling
+ * stretches.  On a box, this replaces the stretch it adds up from its
+ * children.
+ */
+void twin_widget_set_stretch(twin_widget_t *widget,
+                             twin_stretch_t width,
+                             twin_stretch_t height);
+
 /*
  * Custom widget support - allows creating widgets without accessing internals
  *
@@ -1231,10 +1244,12 @@ twin_time_t twin_now(void);
 /**
  * Render a TinyVG file (CONFIG_LOADER_TVG)
  * @filepath : File to load
- * @w, @h    : Pixmap size, the drawing scaled to fit; 0: the document's own
+ * @w, @h    : Largest pixmap size, the drawing scaled to fit; 0: the
+ *             document's own
  *
- * The pixmap shrinks further, keeping its aspect, to fit
- * CONFIG_TVG_MEMORY_BUDGET when that is set.
+ * The pixmap takes the drawing's aspect, so one side may come out shorter
+ * than asked, and shrinks further to fit CONFIG_TVG_MEMORY_BUDGET when that
+ * is set: read its size rather than assume @w x @h.
  */
 twin_pixmap_t *twin_tvg_to_pixmap(const char *filepath,
                                   twin_coord_t w,

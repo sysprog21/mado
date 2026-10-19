@@ -15,28 +15,21 @@
          ? (((sz) + (alignment) - 1) & ~((alignment) - 1)) \
          : ((((sz) + (alignment) - 1) / (alignment)) * (alignment)))
 
-static bool twin_pixmap_alloc_size(twin_format_t format,
-                                   twin_coord_t width,
-                                   twin_coord_t height,
-                                   size_t *size_out)
+/* Bytes for a pixmap of @width x @height: false if it is empty, or a side
+ * or the stride overflows twin_coord_t.  Sides are uint32_t so callers can
+ * pass sizes before narrowing them; a negative twin_coord_t converts past
+ * INT16_MAX.  With every term that small, the size_t sums cannot wrap. */
+bool _twin_pixmap_alloc_size(twin_format_t format,
+                             uint32_t width,
+                             uint32_t height,
+                             size_t *size_out)
 {
-    if (width <= 0 || height <= 0)
+    if (!width || !height || width > INT16_MAX || height > INT16_MAX)
         return false;
-
-    size_t bpp = (size_t) twin_bytes_per_pixel(format);
-    if (bpp == 0 || (size_t) width > SIZE_MAX / bpp)
-        return false;
-    size_t stride = bpp * (size_t) width;
-    if (stride > SIZE_MAX - 3)
-        return false;
-    stride = ALIGN_UP(stride, 4);
-    /* Stride must fit in twin_coord_t (int16_t) for the pixmap struct. */
+    size_t stride = ALIGN_UP((size_t) twin_bytes_per_pixel(format) * width, 4);
     if (stride > INT16_MAX)
         return false;
-    if ((size_t) height > (SIZE_MAX - sizeof(twin_pixmap_t)) / stride)
-        return false;
-
-    *size_out = sizeof(twin_pixmap_t) + stride * (size_t) height;
+    *size_out = sizeof(twin_pixmap_t) + stride * height;
     return true;
 }
 
@@ -63,23 +56,31 @@ void _twin_pixmap_init(twin_pixmap_t *pixmap,
     pixmap->p.v = pixels;
 }
 
-twin_pixmap_t *twin_pixmap_create(twin_format_t format,
-                                  twin_coord_t width,
-                                  twin_coord_t height)
+twin_pixmap_t *_twin_pixmap_create_sized(twin_format_t format,
+                                         uint32_t width,
+                                         uint32_t height)
 {
     size_t size;
-    if (!twin_pixmap_alloc_size(format, width, height, &size))
+    if (!_twin_pixmap_alloc_size(format, width, height, &size))
         return NULL;
 
-    twin_coord_t stride = (twin_coord_t) ALIGN_UP(
-        (size_t) twin_bytes_per_pixel(format) * width, 4);
+    twin_coord_t stride =
+        (twin_coord_t) ((size - sizeof(twin_pixmap_t)) / height);
 
     twin_pixmap_t *pixmap = twin_malloc(size);
     if (!pixmap)
         return NULL;
-    _twin_pixmap_init(pixmap, format, width, height, stride, pixmap + 1);
+    _twin_pixmap_init(pixmap, format, (twin_coord_t) width,
+                      (twin_coord_t) height, stride, pixmap + 1);
     memset(pixmap->p.v, 0, size - sizeof(twin_pixmap_t));
     return pixmap;
+}
+
+twin_pixmap_t *twin_pixmap_create(twin_format_t format,
+                                  twin_coord_t width,
+                                  twin_coord_t height)
+{
+    return _twin_pixmap_create_sized(format, width, height);
 }
 
 twin_pixmap_t *_twin_pixmap_create_stub(twin_format_t format,

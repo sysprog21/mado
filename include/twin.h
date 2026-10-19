@@ -553,8 +553,8 @@ twin_pixmap_t *twin_pixmap_from_file(const char *path);
 
 /*
  * Frame-based animations, as loaded from an animated GIF.  The animation
- * belongs to its pixmap (pixmap->animation): twin_pixmap_destroy() frees it
- * along with every frame.
+ * belongs to its pixmap (pixmap->animation) and redraws that pixmap in place:
+ * the current frame is the pixmap itself.  twin_pixmap_destroy() frees it.
  */
 
 /* Get the number of milliseconds the current frame should be displayed. */

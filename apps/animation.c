@@ -25,12 +25,10 @@ static void _apps_animation_paint(twin_custom_widget_t *custom)
 {
     apps_animation_data_t *anim =
         (apps_animation_data_t *) twin_custom_widget_data(custom);
-    twin_pixmap_t *current_frame = NULL;
-
-    /* Paint the current frame; only the timer advances it, so repainting
-     * (exposure, a restore after eviction) does not skip frames */
-    twin_animation_t *a = twin_pixmap_animation(anim->pix);
-    current_frame = a ? twin_animation_get_current_frame(a) : anim->pix;
+    /* Paint the current frame: an animation redraws its pixmap in place,
+     * and only the timer advances it, so repainting (exposure, a restore
+     * after eviction) does not skip frames */
+    twin_pixmap_t *current_frame = anim->pix;
 
     /* A policy may give the window more room than the image (a phone's
      * work area, the whole screen without a window manager): center it on
@@ -47,7 +45,8 @@ static void _apps_animation_paint(twin_custom_widget_t *custom)
         .source_kind = TWIN_PIXMAP,
         .u.pixmap = current_frame,
     };
-    twin_composite(dst, x, y, &srcop, 0, 0, NULL, 0, 0, TWIN_SOURCE, fw, fh);
+    /* Over the background: a GIF's transparent pixels show it */
+    twin_composite(dst, x, y, &srcop, 0, 0, NULL, 0, 0, TWIN_OVER, fw, fh);
 }
 
 static twin_time_t _apps_animation_timeout(twin_time_t now, void *closure)
@@ -71,7 +70,7 @@ static twin_dispatch_result_t _apps_animation_dispatch(
         _apps_animation_paint(custom);
         break;
     case TwinEventDestroy: {
-        /* The pixmap owns the animation, so this frees every frame too */
+        /* The pixmap owns the animation, so this frees the decoder too */
         apps_animation_data_t *anim =
             (apps_animation_data_t *) twin_custom_widget_data(custom);
         twin_clear_timeout(anim->timeout);

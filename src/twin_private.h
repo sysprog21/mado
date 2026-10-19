@@ -60,31 +60,17 @@ typedef union _twin_pointer {
 } twin_pointer_t;
 
 /**
- * Animation iterator for frame-by-frame playback
+ * Animation that redraws its pixmap in place
  *
- * Iterator state for stepping through animation frames.
- * Maintains current position and timing information.
- */
-typedef struct _twin_animation_iter {
-    twin_animation_t *anim;       /**< Animation being iterated */
-    twin_count_t current_index;   /**< Current frame index */
-    twin_pixmap_t *current_frame; /**< Current frame pixmap */
-    twin_time_t current_delay;    /**< Current frame delay time */
-} twin_animation_iter_t;
-
-/**
- * Animation structure for frame-based animations
- *
- * Contains all data needed for frame-based animations including
- * timing, frame data, and playback state.
+ * The decoder embeds this as its first member: @advance draws the next frame
+ * into @pixmap and sets @delay, @close frees the decoder (not the pixmap,
+ * which owns the animation).
  */
 struct _twin_animation {
-    twin_pixmap_t **frames;      /**< Array of frame pixmaps */
-    twin_count_t n_frames;       /**< Number of frames */
-    twin_time_t *frame_delays;   /**< Per-frame timing in milliseconds */
-    bool loop;                   /**< Loop animation flag */
-    twin_animation_iter_t *iter; /**< Playback iterator */
-    twin_coord_t width, height;  /**< Animation dimensions in pixels */
+    twin_pixmap_t *pixmap; /**< Pixmap showing the current frame */
+    twin_time_t delay;     /**< Current frame's display time in ms */
+    bool (*advance)(twin_animation_t *anim); /* false: nothing changed */
+    void (*close)(twin_animation_t *anim);
 };
 
 /**
@@ -1320,6 +1306,18 @@ void _twin_pixmap_unlink(twin_pixmap_t *pixmap);
 /* Drop the screen's focus and pointer references to @pixmap */
 void _twin_screen_forget(twin_screen_t *screen, const twin_pixmap_t *pixmap);
 
+/* Bytes a @width x @height pixmap of @format needs; false if it cannot exist */
+bool _twin_pixmap_alloc_size(twin_format_t format,
+                             uint32_t width,
+                             uint32_t height,
+                             size_t *size_out);
+
+/* twin_pixmap_create() for sizes read from a file: anything that does not
+ * fit a pixmap, negative or past INT16_MAX, is refused, never narrowed */
+twin_pixmap_t *_twin_pixmap_create_sized(twin_format_t format,
+                                         uint32_t width,
+                                         uint32_t height);
+
 /* Pixmap header with no pixel storage; every drawing operation clips out */
 twin_pixmap_t *_twin_pixmap_create_stub(twin_format_t format,
                                         twin_coord_t width,
@@ -1544,7 +1542,6 @@ static inline int twin_ucs_char_in_page(uint32_t ucs4)
 
 /* Animations belong to their pixmap: twin_pixmap_destroy() frees them */
 void _twin_animation_destroy(twin_animation_t *anim);
-twin_animation_iter_t *_twin_animation_iter_init(twin_animation_t *anim);
 
 /* Title-bar icons of the desktop policy (built with CONFIG_WM_DESKTOP) */
 typedef enum _twin_icon {

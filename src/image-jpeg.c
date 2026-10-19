@@ -43,7 +43,8 @@ static void twin_jpeg_error_exit(j_common_ptr cinfo)
 
 twin_pixmap_t *_twin_jpeg_to_pixmap(const char *filepath, twin_format_t fmt)
 {
-    twin_pixmap_t *pix = NULL;
+    /* Assigned after setjmp(): volatile so the error path sees it */
+    twin_pixmap_t *volatile pix = NULL;
 
     /* Current implementation only produces TWIN_ARGB32 and TWIN_A8 */
     if (fmt != TWIN_ARGB32 && fmt != TWIN_A8)
@@ -75,23 +76,20 @@ twin_pixmap_t *_twin_jpeg_to_pixmap(const char *filepath, twin_format_t fmt)
     (void) jpeg_read_header(&cinfo, true);
 
     /* Configure */
-    twin_coord_t width = cinfo.image_width, height = cinfo.image_height;
     if (fmt == TWIN_ARGB32)
         cinfo.out_color_space = JCS_RGB;
     else
         cinfo.out_color_space = JCS_GRAYSCALE;
 
     /* Allocate pixmap */
-    pix = twin_pixmap_create(fmt, width, height);
+    pix = _twin_pixmap_create_sized(fmt, cinfo.image_width, cinfo.image_height);
     if (!pix)
         longjmp(jerr.jbuf, 1);
 
     /* Start decompressing */
     (void) jpeg_start_decompress(&cinfo);
 
-    if ((fmt == TWIN_A8 && cinfo.output_components != 1) ||
-        (fmt == TWIN_ARGB32 &&
-         (cinfo.output_components != 3 && cinfo.output_components != 4)))
+    if (cinfo.output_components != (fmt == TWIN_A8 ? 1 : 3))
         longjmp(jerr.jbuf, 1);
 
     int rowstride = cinfo.output_width * cinfo.output_components;
@@ -103,11 +101,11 @@ twin_pixmap_t *_twin_jpeg_to_pixmap(const char *filepath, twin_format_t fmt)
     while (cinfo.output_scanline < cinfo.output_height) {
         twin_pointer_t p = twin_pixmap_pointer(pix, 0, cinfo.output_scanline);
         (void) jpeg_read_scanlines(&cinfo, rowbuf, 1);
-        if (fmt == TWIN_A8 || cinfo.output_components == 4)
-            memcpy(p.a8, rowbuf, rowstride);
+        JSAMPLE *s = rowbuf[0];
+        if (fmt == TWIN_A8)
+            memcpy(p.a8, s, rowstride);
         else {
-            JSAMPLE *s = *rowbuf;
-            for (int i = 0; i < width; i++) {
+            for (JDIMENSION i = 0; i < cinfo.output_width; i++) {
                 uint32_t r = *(s++);
                 uint32_t g = *(s++);
                 uint32_t b = *(s++);

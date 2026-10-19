@@ -29,6 +29,64 @@ static twin_pixmap_t *solid(twin_format_t fmt,
     return p;
 }
 
+#if defined(CONFIG_DROP_SHADOW)
+/* The shadow shows only outside its window: the shape picks what casts it,
+ * the window's alpha masks it (opacity included, RGB16 too), and narrow
+ * damage leaves pieces wholly beside the window that must stay in bounds */
+static void test_shadow_mask(void)
+{
+    th_t *t = th_create(W, H);
+    t->screen->background_color = 0xffffffff;
+    twin_screen_damage(t->screen, 0, 0, W, H);
+
+    /* Left half solid, right half clear; only the solid half casts */
+    twin_pixmap_t *glass = solid(TWIN_ARGB32, 40, 40, 0x00000000);
+    twin_fill(glass, 0xff000080, TWIN_SOURCE, 0, 0, 20, 40);
+    twin_pixmap_move(glass, 40, 40);
+    twin_pixmap_set_shadow(glass, 0, 4, 6, 0xc0);
+    twin_pixmap_set_shadow_cast(glass, 0, (twin_rect_t) {0, 20, 0, 40});
+    twin_pixmap_show(glass, t->screen, NULL);
+    th_frame(t);
+    CHECK_EQ(th_pixel(t, 50, 60), 0xff000080, "no shadow over the window");
+    CHECK((th_pixel(t, 62, 60) & 0xff) < 0xff,
+          "shadow shows through the clear half beside the caster");
+    CHECK_EQ(th_pixel(t, 75, 60), 0xffffffff,
+             "clear half past the blur: no shadow from the bounding box");
+
+    /* Faded RGB16 is not opaque: part of its own shadow shows through */
+    twin_pixmap_t *rgb = solid(TWIN_RGB16, 30, 30, 0xff808080);
+    twin_pixmap_move(rgb, 120, 40);
+    twin_pixmap_set_opacity(rgb, 0x80);
+    twin_pixmap_show(rgb, t->screen, NULL);
+    th_frame(t);
+    twin_argb32_t plain = th_pixel(t, 135, 55);
+    twin_pixmap_set_shadow(rgb, 0, 0, 6, 0xc0);
+    th_frame(t);
+    CHECK((th_pixel(t, 135, 55) & 0xff) < (plain & 0xff),
+          "half-faded RGB16 lets its shadow through: %08x vs %08x",
+          th_pixel(t, 135, 55), plain);
+
+    /* An A8 pixmap masks by its bytes */
+    twin_pixmap_t *a8 = solid(TWIN_A8, 8, 8, 0x80000000);
+    twin_pixmap_move(a8, 60, 110);
+    twin_pixmap_set_shadow(a8, 2, 2, 4, 0xc0);
+    twin_pixmap_show(a8, t->screen, NULL);
+    th_frame(t);
+    CHECK_EQ(th_damage_check(t), 0, "A8 shadow consistent");
+
+    /* Narrow strips: pieces left or right of a pixmap, never past them */
+    for (twin_coord_t x = 0; x < W; x += 3) {
+        twin_screen_damage(t->screen, x, 0, x + 2, H);
+        th_frame(t);
+    }
+    CHECK_EQ(th_damage_check(t), 0, "strip damage matches a full repaint");
+
+    twin_pixmap_destroy(a8);
+    twin_pixmap_destroy(rgb);
+    twin_pixmap_destroy(glass);
+    th_destroy(t);
+}
+#endif
 
 static void test_damage_merge(void)
 {
@@ -1650,6 +1708,7 @@ int main(void)
     test_row_fallback();
 #if defined(CONFIG_DROP_SHADOW)
     test_shadow();
+    test_shadow_mask();
 #endif
     test_rgb16_and_opacity();
     test_stub();

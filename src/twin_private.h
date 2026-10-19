@@ -73,18 +73,26 @@ struct _twin_animation {
     void (*close)(twin_animation_t *anim);
 };
 
+/* Rectangles that can cast one pixmap's shadow */
+#define TWIN_SHADOW_CASTS 2
+
 /**
  * Procedural drop shadow attached to a pixmap
  *
  * The compositor synthesizes the shadow while scanning out: each edge fades
  * along a smoothstep ramp 2 * blur + 1 pixels wide, a close match to a
- * blurred rectangle.  No pixels are stored: a shadow costs four bytes per
- * pixmap and no blur pass.
+ * Gaussian-blurred rectangle.  No pixels are stored and there is no blur
+ * pass.  Rectangles cast it: the whole pixmap by default; for a window, its
+ * client while solid (kept by the window) and its title tab (set by the
+ * window manager).  The pixmap's alpha masks it, so it only shows outside.
+ * It costs 20 bytes per pixmap: 4 for the shadow, 8 for each rectangle.
  */
 typedef struct _twin_shadow {
-    int8_t dx, dy;   /**< Offset of the shadow rectangle */
+    int8_t dx, dy;   /**< Offset of the shadow */
     uint8_t blur;    /**< Blur radius in pixels (0 disables the shadow) */
     twin_a8_t alpha; /**< Peak shadow opacity */
+    twin_rect_t cast[TWIN_SHADOW_CASTS]; /**< Pixmap coordinates; an empty
+                                              rectangle casts nothing */
 } twin_shadow_t;
 
 /* The pixmap casts a shadow (only with CONFIG_DROP_SHADOW) */
@@ -1972,6 +1980,14 @@ void twin_pixmap_set_shadow(twin_pixmap_t *pixmap,
                             twin_coord_t dy,
                             twin_coord_t blur,
                             twin_a8_t alpha);
+
+/**
+ * Set one rectangle casting a pixmap's shadow
+ * @pixmap : Pixmap casting the shadow
+ * @k      : Which one, below TWIN_SHADOW_CASTS; 0 starts as the whole pixmap
+ * @r      : Pixmap coordinates; empty casts nothing
+ */
+void twin_pixmap_set_shadow_cast(twin_pixmap_t *pixmap, int k, twin_rect_t r);
 
 void twin_pixmap_enable_update(twin_pixmap_t *pixmap);
 

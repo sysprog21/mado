@@ -1,4 +1,4 @@
 # Golden frame checksums for the core suite.
 # Regenerate with: make check-update
-# config 6969dfe0
+# config b0fec876
 scene 373a3045

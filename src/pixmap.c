@@ -50,6 +50,10 @@ void _twin_pixmap_init(twin_pixmap_t *pixmap,
     pixmap->clip.bottom = height;
     pixmap->scan_height = height;
     pixmap->opacity = 0xff;
+#if defined(CONFIG_DROP_SHADOW)
+    /* The whole pixmap casts its shadow until told otherwise */
+    pixmap->shadow.cast[0] = (twin_rect_t) {0, width, 0, height};
+#endif
     /* RGB16 has no alpha channel, so every pixel is opaque. */
     if (format == TWIN_RGB16)
         pixmap->opaque_rect = (twin_rect_t) {0, width, 0, height};
@@ -258,6 +262,18 @@ void twin_pixmap_set_opacity(twin_pixmap_t *pixmap, twin_a8_t opacity)
     _twin_pixmap_damage_extents(pixmap);
 }
 
+#if defined(CONFIG_DROP_SHADOW)
+/* Change @pixmap's shadow to @s, damaging where it was and where it goes */
+static void _shadow_assign(twin_pixmap_t *pixmap, const twin_shadow_t *s)
+{
+    if (!memcmp(s, &pixmap->shadow, sizeof(*s)))
+        return;
+    _twin_pixmap_damage_extents(pixmap);
+    pixmap->shadow = *s;
+    _twin_pixmap_damage_extents(pixmap);
+}
+#endif
+
 void twin_pixmap_set_shadow(twin_pixmap_t *pixmap,
                             twin_coord_t dx,
                             twin_coord_t dy,
@@ -268,18 +284,28 @@ void twin_pixmap_set_shadow(twin_pixmap_t *pixmap,
     /* Built without shadow support */
     (void) pixmap, (void) dx, (void) dy, (void) blur, (void) alpha;
 #else
-    twin_shadow_t s = {0};
+    twin_shadow_t s = pixmap->shadow;
+    s.dx = s.dy = s.blur = s.alpha = 0;
     if (blur > 0 && alpha) {
         s.dx = (int8_t) (dx > 127 ? 127 : dx < -127 ? -127 : dx);
         s.dy = (int8_t) (dy > 127 ? 127 : dy < -127 ? -127 : dy);
         s.blur = (uint8_t) (blur > 63 ? 63 : blur);
         s.alpha = alpha;
     }
-    if (!memcmp(&s, &pixmap->shadow, sizeof(s)))
+    _shadow_assign(pixmap, &s);
+#endif
+}
+
+void twin_pixmap_set_shadow_cast(twin_pixmap_t *pixmap, int k, twin_rect_t r)
+{
+#if !defined(CONFIG_DROP_SHADOW)
+    (void) pixmap, (void) k, (void) r;
+#else
+    if (k < 0 || k >= TWIN_SHADOW_CASTS)
         return;
-    _twin_pixmap_damage_extents(pixmap);
-    pixmap->shadow = s;
-    _twin_pixmap_damage_extents(pixmap);
+    twin_shadow_t s = pixmap->shadow;
+    s.cast[k] = r;
+    _shadow_assign(pixmap, &s);
 #endif
 }
 

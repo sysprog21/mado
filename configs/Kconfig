@@ -352,33 +352,32 @@ config DROP_SHADOW
 
 config HORIZONTAL_OFFSET
     int "Horizontal offset"
-    default 6
-    range 1 10
-    depends on DROP_SHADOW
+    default 0
+    range 0 10
+    depends on DROP_SHADOW && WM_DESKTOP
     help
-      Horizontal shadow offset in pixels.
-      Default matches a CSS-style soft shadow (≈6 px offset).
-      Larger values push shadow further right.
+      Horizontal shadow offset of the active window, in pixels.  Modern
+      desktops light windows from above, so the default is 0: the shadow
+      shows evenly left and right.  Inactive windows use half.
 
 config VERTICAL_OFFSET
     int "Vertical offset"
-    default 6
-    range 1 10
-    depends on DROP_SHADOW
+    default 4
+    range 0 10
+    depends on DROP_SHADOW && WM_DESKTOP
     help
-      Vertical shadow offset in pixels.
-      Default matches a CSS-style soft shadow (≈6 px offset).
-      Larger values push shadow further down.
+      Vertical shadow offset of the active window, in pixels.  A small
+      downward offset under a wide blur gives a halo all around that is
+      heavier below the window.  Inactive windows use half.
 
 config SHADOW_BLUR
     int "Shadow blur radius"
-    default 12
+    default 14
     range 1 15
-    depends on DROP_SHADOW
+    depends on DROP_SHADOW && WM_DESKTOP
     help
-      Width in pixels of the shadow's soft edge.
-      Default 12 approximates common CSS box-shadow softness.
-      Larger values create softer, more diffuse shadows.  The shadow
+      Width in pixels of the active window's shadow edge; inactive windows
+      use half, so the active one appears to float higher.  The shadow
       is computed while scanning out, so the radius does not change
       its cost per pixel.
 

@@ -26,8 +26,10 @@
  *
  *  - Shadows are synthesized during scan-out from a separable smoothstep
  *    profile, as a pseudo-layer directly under the casting pixmap.  They
- *    need no pixel storage and no blur pass, and the opaque pixmap above
- *    culls the shadow's interior automatically.
+ *    need no pixel storage and no blur pass.  A window manager may give
+ *    the shape casting it (a window's client and title tab, not the empty
+ *    corner beside the tab), and the pixmap's own alpha masks it, so it
+ *    only shows outside the window.
  */
 
 #include <stdlib.h>
@@ -285,28 +287,38 @@ static int _span_set_subtract(const twin_span_set_t *set,
 #if defined(CONFIG_DROP_SHADOW)
 /*
  * Shadow profile: smoothstep ramp across 2 * blur + 1 pixels, in 1/256
- * units.  One entry is cached; radii rarely change between rows.
+ * units.  The active and inactive windows' radii interleave on the same
+ * rows, and rebuilding the ramp whenever the radius changed cost more than
+ * the shadow pixels themselves, so two are kept.
  */
-static uint16_t shadow_ramp[2 * TWIN_SHADOW_MAX_BLUR + 1];
-/* Widest shadow piece whose alphas are kept between rows */
+#define SHADOW_RAMPS 2
+static struct {
+    int blur; /* 0: unused, as a shadow's blur is at least 1 */
+    uint16_t v[2 * TWIN_SHADOW_MAX_BLUR + 1];
+} shadow_ramps[SHADOW_RAMPS];
+static int shadow_ramp_next;
+/* Widest shadow piece whose alphas are kept between rows, and how many */
 #define SHADOW_ROW_CACHE 64
-static int shadow_ramp_blur = -1;
+#define SHADOW_ROWS 8
 
 static const uint16_t *_shadow_ramp(int blur)
 {
-    if (blur != shadow_ramp_blur) {
-        int n = 2 * blur;
-        for (int i = 0; i <= n; i++) {
-            /* t in 16.16, smoothstep 3t^2 - 2t^3 */
-            int64_t t = twin_fixed_div(i, n ? n : 1);
-            int64_t t2 = (t * t) >> 16;
-            int64_t t3 = (t2 * t) >> 16;
-            int64_t v = 3 * t2 - 2 * t3;
-            shadow_ramp[i] = (uint16_t) ((v * 256 + 0x8000) >> 16);
-        }
-        shadow_ramp_blur = blur;
+    for (int k = 0; k < SHADOW_RAMPS; k++)
+        if (shadow_ramps[k].blur == blur)
+            return shadow_ramps[k].v;
+    int k = shadow_ramp_next;
+    shadow_ramp_next = (k + 1) % SHADOW_RAMPS;
+    int n = 2 * blur;
+    for (int i = 0; i <= n; i++) {
+        /* t in 16.16, smoothstep 3t^2 - 2t^3 */
+        int64_t t = twin_fixed_div(i, n);
+        int64_t t2 = (t * t) >> 16;
+        int64_t t3 = (t2 * t) >> 16;
+        int64_t v = 3 * t2 - 2 * t3;
+        shadow_ramps[k].v[i] = (uint16_t) ((v * 256 + 0x8000) >> 16);
     }
-    return shadow_ramp;
+    shadow_ramps[k].blur = blur;
+    return shadow_ramps[k].v;
 }
 
 /* Coverage of a blurred box edge pair at position @v, 0..256 */
@@ -325,15 +337,46 @@ static inline int _shadow_cover(const uint16_t *ramp,
     return c < 0 ? 0 : c;
 }
 
-static inline twin_rect_t _shadow_rect(const twin_pixmap_t *p)
+/* Where _shadow_cover is exactly 256 across @s, and where it can be
+ * nonzero at all */
+static inline bool _shadow_flat(const twin_rect_t *s, int blur, twin_coord_t x)
 {
-    twin_rect_t r = {
-        .left = p->x + p->shadow.dx,
-        .right = p->x + p->width + p->shadow.dx,
-        .top = p->y + p->shadow.dy,
-        .bottom = p->y + p->scan_height + p->shadow.dy,
-    };
-    return r;
+    return x >= s->left + blur + 1 && x < s->right - blur - 1;
+}
+
+static inline bool _shadow_reach(const twin_rect_t *s, int blur, twin_coord_t x)
+{
+    return x >= s->left - blur && x < s->right + blur;
+}
+
+static inline bool _rect_empty(const twin_rect_t *r)
+{
+    return r->left >= r->right || r->top >= r->bottom;
+}
+
+/* The rectangles casting @p's shadow, on screen and offset, clipped to the
+ * pixmap's shown rows (an iconified window's title alone).  Returns how
+ * many. */
+static int _shadow_rects(const twin_pixmap_t *p,
+                         twin_rect_t out[TWIN_SHADOW_CASTS])
+{
+    int n = 0;
+    for (int k = 0; k < TWIN_SHADOW_CASTS; k++) {
+        twin_rect_t r = p->shadow.cast[k];
+        r.left = max(r.left, (twin_coord_t) 0);
+        r.right = min(r.right, p->width);
+        r.top = max(r.top, (twin_coord_t) 0);
+        r.bottom = min(r.bottom, p->scan_height);
+        if (_rect_empty(&r))
+            continue;
+        out[n++] = (twin_rect_t) {
+            .left = p->x + r.left + p->shadow.dx,
+            .right = p->x + r.right + p->shadow.dx,
+            .top = p->y + r.top + p->shadow.dy,
+            .bottom = p->y + r.bottom + p->shadow.dy,
+        };
+    }
+    return n;
 }
 
 #endif /* CONFIG_DROP_SHADOW */
@@ -344,12 +387,15 @@ twin_rect_t _twin_pixmap_extents(const twin_pixmap_t *p)
 #if defined(CONFIG_DROP_SHADOW)
     if (p->shadow.blur) {
         int b = min((int) p->shadow.blur, TWIN_SHADOW_MAX_BLUR);
-        twin_rect_t s = _shadow_rect(p);
-        s.left -= b;
-        s.right += b;
-        s.top -= b;
-        s.bottom += b;
-        r = _rect_union(&r, &s);
+        twin_rect_t s[TWIN_SHADOW_CASTS];
+        int n = _shadow_rects(p, s);
+        for (int k = 0; k < n; k++) {
+            s[k].left -= b;
+            s[k].right += b;
+            s[k].top -= b;
+            s[k].bottom += b;
+            r = _rect_union(&r, &s[k]);
+        }
     }
 #endif
     return r;
@@ -367,85 +413,284 @@ static inline twin_argb32_t _shadow_over(twin_argb32_t v, uint32_t a)
     return (rb | ag << 8) + (a << 24);
 }
 
+/* What a row of @p's shadow needs, worked out once for all its pieces */
+typedef struct {
+    const twin_pixmap_t *p;
+    const uint16_t *ramp;
+    int blur, m;
+    twin_rect_t s[TWIN_SHADOW_CASTS];      /* the rectangles reaching the row */
+    uint32_t row_alpha[TWIN_SHADOW_CASTS]; /* peak alpha times coverage */
+} shadow_row_t;
+
+/* False when no rectangle's shadow reaches row @y */
+static bool _shadow_row(shadow_row_t *sr,
+                        const twin_pixmap_t *p,
+                        twin_coord_t y)
+{
+    twin_rect_t c[TWIN_SHADOW_CASTS];
+    int n = _shadow_rects(p, c);
+    sr->p = p;
+    sr->blur = min((int) p->shadow.blur, TWIN_SHADOW_MAX_BLUR);
+    sr->ramp = _shadow_ramp(sr->blur);
+    sr->m = 0;
+    for (int k = 0; k < n; k++) {
+        int fy = _shadow_cover(sr->ramp, sr->blur, y, c[k].top, c[k].bottom);
+        if (fy) {
+            sr->s[sr->m] = c[k];
+            sr->row_alpha[sr->m++] = (uint32_t) p->shadow.alpha * (uint32_t) fy;
+        }
+    }
+    /* A rectangle whose columns lie within the other's, no stronger on this
+     * row, never wins: blurring a narrower span never covers more.  That
+     * leaves one rectangle, and its fast paths, on all but the title rows. */
+    if (sr->m == 2) {
+        for (int k = 0; k < 2; k++) {
+            const twin_rect_t *a = &sr->s[k], *b = &sr->s[1 - k];
+            if (a->left >= b->left && a->right <= b->right &&
+                sr->row_alpha[k] <= sr->row_alpha[1 - k]) {
+                sr->s[0] = *b;
+                sr->row_alpha[0] = sr->row_alpha[1 - k];
+                sr->m = 1;
+                break;
+            }
+        }
+    }
+    return sr->m > 0;
+}
+
+/* Shadow alpha at column @x: the largest of the rectangles' coverage */
+static inline uint32_t _shadow_alpha(const shadow_row_t *sr, twin_coord_t x)
+{
+    uint32_t a = 0;
+    for (int k = 0; k < sr->m; k++) {
+        const twin_rect_t *s = &sr->s[k];
+        int fx = _shadow_flat(s, sr->blur, x)
+                     ? 256
+                     : _shadow_cover(sr->ramp, sr->blur, x, s->left, s->right);
+        a = max(a, (sr->row_alpha[k] * (uint32_t) fx) >> 16);
+    }
+    return a;
+}
+
+/* A row of the casting pixmap, whose alpha masks its own shadow */
+typedef struct {
+    const uint8_t *row;
+    twin_format_t format;
+    twin_coord_t x; /* the pixmap's screen column */
+    twin_a8_t opacity;
+} shadow_mask_t;
+
+/* The pixmap's alpha at screen column @x, faded by its opacity */
+static inline uint32_t _mask_alpha(const shadow_mask_t *mask, twin_coord_t x)
+{
+    int i = x - mask->x;
+    uint32_t wa = mask->format == TWIN_ARGB32
+                      ? ((const twin_argb32_t *) mask->row)[i] >> 24
+                  : mask->format == TWIN_A8 ? mask->row[i]
+                                            : 0xff; /* RGB16 */
+    if (mask->opacity != 0xff) {
+        uint16_t t;
+        wa = twin_int_mult(wa, mask->opacity, t);
+    }
+    return wa;
+}
+
+/*
+ * Shadow over [@l, @r) of a row, @d at column @l, masked by the
+ * casting window's row unless @mask is NULL.  A rectangle's coverage
+ * changes only at four columns (see _shadow_flat and _shadow_reach), so the
+ * span splits there into segments where every rectangle is either on its
+ * plateau or out of reach: the alpha is constant across them, and a pixel
+ * costs a mask test and a blend.  Only ramp segments look it up.
+ */
+static void _shadow_blend(const shadow_row_t *sr,
+                          twin_argb32_t *d,
+                          twin_coord_t l,
+                          twin_coord_t r,
+                          const shadow_mask_t *mask)
+{
+    int blur = sr->blur;
+    twin_coord_t cut[4 * TWIN_SHADOW_CASTS + 1];
+    int nc = 0;
+    for (int k = 0; k < sr->m; k++) {
+        const twin_rect_t *s = &sr->s[k];
+        twin_coord_t edge[4] = {
+            s->left - blur,
+            s->left + blur + 1,
+            s->right - blur - 1,
+            s->right + blur,
+        };
+        for (int e = 0; e < 4; e++) {
+            if (edge[e] <= l || edge[e] >= r)
+                continue;
+            int i = nc++;
+            for (; i > 0 && cut[i - 1] > edge[e]; i--)
+                cut[i] = cut[i - 1];
+            cut[i] = edge[e];
+        }
+    }
+    cut[nc++] = r;
+
+    for (int c = 0, x0 = l; c < nc; x0 = cut[c++]) {
+        twin_coord_t x1 = cut[c];
+        /* The segment's alpha, if no rectangle ramps across it */
+        bool flat = true;
+        uint32_t a = 0;
+        for (int k = 0; k < sr->m && flat; k++) {
+            if (_shadow_flat(&sr->s[k], blur, x0))
+                a = max(a, sr->row_alpha[k] >> 8);
+            else if (_shadow_reach(&sr->s[k], blur, x0))
+                flat = false;
+        }
+        if (flat && !a)
+            continue;
+        /* The plain plateau, most of a shadow, gets a loop of its own */
+        if (flat && !mask) {
+            for (twin_coord_t x = x0; x < x1; x++)
+                d[x - l] = _shadow_over(d[x - l], a);
+            continue;
+        }
+        for (twin_coord_t x = x0; x < x1; x++) {
+            uint32_t wa = mask ? _mask_alpha(mask, x) : 0;
+            /* Opaque window pixels, most of a title bar, hide it */
+            if (wa == 0xff)
+                continue;
+            uint32_t v = flat ? a : _shadow_alpha(sr, x);
+            uint16_t t;
+            if (wa)
+                v = twin_int_mult(v, 255 - wa, t);
+            if (v)
+                d[x - l] = _shadow_over(d[x - l], v);
+        }
+    }
+}
+
+/* A lone rectangle's shadow over [@l, @r), @d at column @l.  A narrow piece (a
+ * window's left or right fringe) recurs with the same geometry on every row
+ * whose vertical coverage saturates: its alphas are kept, which skips the
+ * ramp lookups on those rows.  Every shadowed window has two such pieces
+ * per row, so several are kept. */
+static void _shadow_run(const shadow_row_t *sr,
+                        twin_argb32_t *d,
+                        twin_coord_t l,
+                        twin_coord_t r)
+{
+    if (r - l > SHADOW_ROW_CACHE) {
+        _shadow_blend(sr, d, l, r, NULL);
+        return;
+    }
+    const twin_rect_t *s = &sr->s[0];
+    /* Packed without padding, so a whole key compares with memcmp; an
+     * unused slot (zero alpha) never matches */
+    typedef struct {
+        uint32_t row_alpha;
+        int32_t blur;
+        twin_coord_t sl, sr, l, r;
+    } shadow_key_t;
+    static struct {
+        shadow_key_t key;
+        uint8_t a[SHADOW_ROW_CACHE];
+    } rows[SHADOW_ROWS];
+    static int next_row;
+    shadow_key_t key = {sr->row_alpha[0], sr->blur, s->left, s->right, l, r};
+    int k = 0;
+    while (k < SHADOW_ROWS && memcmp(&rows[k].key, &key, sizeof(key)))
+        k++;
+    if (k == SHADOW_ROWS) {
+        k = next_row;
+        next_row = (k + 1) % SHADOW_ROWS;
+        for (twin_coord_t x = l; x < r; x++) {
+            int fx = _shadow_cover(sr->ramp, sr->blur, x, s->left, s->right);
+            rows[k].a[x - l] =
+                (uint8_t) ((sr->row_alpha[0] * (uint32_t) fx) >> 16);
+        }
+        rows[k].key = key;
+    }
+    const uint8_t *a = rows[k].a;
+    for (twin_coord_t i = 0; i < r - l; i++)
+        if (a[i])
+            d[i] = _shadow_over(d[i], a[i]);
+}
+
+/*
+ * One piece [@l, @r) of a row set up by _shadow_row.  Within @p's own
+ * columns its alpha masks the shadow, as a modern compositor clips a shadow
+ * to outside the window: nothing shows through an opaque pixel, the
+ * translucent title shows the desktop, not its own shadow, and a rounded
+ * corner gets shadow right up to its curve.  The opaque part is culled
+ * before this runs, so the mask costs a lookup only on pixels where the
+ * window is not opaque.
+ */
+static void _shadow_piece(const shadow_row_t *sr,
+                          twin_argb32_t *span,
+                          twin_coord_t span_left,
+                          twin_coord_t y,
+                          twin_coord_t l,
+                          twin_coord_t r)
+{
+    const twin_pixmap_t *p = sr->p;
+
+    /* The columns @p covers on this row, masked; none off its rows */
+    twin_coord_t ml = r, mr = r;
+    if (y >= p->y && y < p->y + p->scan_height) {
+        twin_coord_t right = p->x + p->width;
+        ml = l > p->x ? l : p->x;
+        if (ml > r)
+            ml = r;
+        mr = r < right ? r : right;
+        if (mr < ml)
+            mr = ml;
+    }
+
+    /* Unmasked: a lone rectangle keeps its row cache */
+    for (int side = 0; side < 2; side++) {
+        twin_coord_t pl = side ? mr : l, pr = side ? r : ml;
+        if (pl >= pr)
+            continue;
+        if (sr->m == 1)
+            _shadow_run(sr, span + (pl - span_left), pl, pr);
+        else
+            _shadow_blend(sr, span + (pl - span_left), pl, pr, NULL);
+    }
+
+    /* Masked by @p's own alpha, faded by its opacity.  An unfaded RGB16
+     * pixmap is opaque throughout, and an evicted stub has no pixels. */
+    if (ml >= mr || _twin_pixmap_is_stub(p) ||
+        (p->format == TWIN_RGB16 && p->opacity == 0xff))
+        return;
+    shadow_mask_t mask = {
+        .row = p->p.b + (size_t) (y - p->y) * p->stride,
+        .format = p->format,
+        .x = p->x,
+        .opacity = p->opacity,
+    };
+    _shadow_blend(sr, span + (ml - span_left), ml, mr, &mask);
+}
+
+/* @p's shadow on row @y over its @count visible pieces */
 static void _shadow_span(twin_argb32_t *span,
                          twin_coord_t span_left,
                          const twin_pixmap_t *p,
                          twin_coord_t y,
-                         twin_coord_t l,
-                         twin_coord_t r)
+                         const twin_span_t *pieces,
+                         int count)
 {
-    int blur = min((int) p->shadow.blur, TWIN_SHADOW_MAX_BLUR);
-    const uint16_t *ramp = _shadow_ramp(blur);
-    twin_rect_t s = _shadow_rect(p);
-    int fy = _shadow_cover(ramp, blur, y, s.top, s.bottom);
-    if (!fy)
+    shadow_row_t sr;
+    if (!_shadow_row(&sr, p, y))
         return;
-    uint32_t row_alpha = (uint32_t) p->shadow.alpha * (uint32_t) fy;
-    twin_argb32_t *d = span + (l - span_left);
-
-    /* A narrow piece (the fringe beside a sliding window) recurs with the
-     * same geometry on every row whose vertical coverage saturates: keep
-     * its alphas and skip the ramp lookups on those rows */
-    static struct {
-        uint32_t row_alpha;
-        int blur;
-        twin_coord_t sl, sr, l, r;
-        uint8_t a[SHADOW_ROW_CACHE];
-    } row;
-    if (r - l <= SHADOW_ROW_CACHE) {
-        if (row.r <= row.l || row.row_alpha != row_alpha || row.blur != blur ||
-            row.sl != s.left || row.sr != s.right || row.l != l || row.r != r) {
-            for (twin_coord_t x = l; x < r; x++) {
-                int fx = _shadow_cover(ramp, blur, x, s.left, s.right);
-                row.a[x - l] = (uint8_t) ((row_alpha * (uint32_t) fx) >> 16);
-            }
-            row.row_alpha = row_alpha;
-            row.blur = blur;
-            row.sl = s.left;
-            row.sr = s.right;
-            row.l = l;
-            row.r = r;
-        }
-        for (twin_coord_t i = 0; i < r - l; i++)
-            if (row.a[i])
-                d[i] = _shadow_over(d[i], row.a[i]);
-        return;
-    }
-
-    /* Between the two edge ramps both saturate and the horizontal coverage
-     * is exactly 256 (see _shadow_cover), so the alpha is constant there */
-    twin_coord_t flat_l = s.left + blur + 1, flat_r = s.right - blur - 1;
-    uint32_t flat_a = (row_alpha * 256) >> 16;
-
-    for (twin_coord_t x = l; x < r;) {
-        if (x >= flat_l && x < flat_r) {
-            twin_coord_t end = min(r, flat_r);
-            if (flat_a) {
-                for (; x < end; x++, d++)
-                    *d = _shadow_over(*d, flat_a);
-            } else {
-                d += end - x;
-                x = end;
-            }
-            continue;
-        }
-        int fx = _shadow_cover(ramp, blur, x, s.left, s.right);
-        uint32_t a = (row_alpha * (uint32_t) fx) >> 16;
-        if (a)
-            *d = _shadow_over(*d, a);
-        x++;
-        d++;
-    }
+    for (int k = 0; k < count; k++)
+        _shadow_piece(&sr, span, span_left, y, pieces[k].l, pieces[k].r);
 }
 #else
 static inline void _shadow_span(twin_argb32_t *span,
                                 twin_coord_t span_left,
                                 const twin_pixmap_t *p,
                                 twin_coord_t y,
-                                twin_coord_t l,
-                                twin_coord_t r)
+                                const twin_span_t *pieces,
+                                int count)
 {
-    (void) span, (void) span_left, (void) p, (void) y, (void) l, (void) r;
+    (void) span, (void) span_left, (void) p, (void) y, (void) pieces,
+        (void) count;
 }
 #endif
 
@@ -607,6 +852,14 @@ static void _composite_row(twin_screen_t *screen,
             } else {
                 if (!_twin_pixmap_shadowed(p))
                     break;
+#if defined(CONFIG_DROP_SHADOW)
+                /* The casters lie within the pixmap's shown rows: skip
+                 * rows the blurred shadow cannot reach before building
+                 * its extents */
+                int b = p->shadow.blur, dy = p->shadow.dy;
+                if (y < p->y + dy - b || y >= p->y + p->scan_height + dy + b)
+                    break;
+#endif
                 twin_rect_t e = _twin_pixmap_extents(p);
                 if (y < e.top || y >= e.bottom)
                     break;
@@ -664,9 +917,9 @@ static void _composite_row(twin_screen_t *screen,
                 continue;
             if (_twin_pixmap_shadowed(p)) {
                 twin_rect_t e = _twin_pixmap_extents(p);
+                twin_span_t piece = {max(e.left, left), min(e.right, right)};
                 if (y >= e.top && y < e.bottom)
-                    _shadow_span(span, left, p, y, max(e.left, left),
-                                 min(e.right, right));
+                    _shadow_span(span, left, p, y, &piece, 1);
             }
             if (y < p->y || y >= p->y + p->scan_height)
                 continue;
@@ -729,13 +982,16 @@ static void _composite_row(twin_screen_t *screen,
     for (int i = n_layers - 1; i >= 0; i--) {
         twin_row_layer_t *ly = &layers[i];
         twin_coord_t visible = 0;
+        for (int k = 0; k < ly->count; k++)
+            visible += pieces[ly->first + k].r - pieces[ly->first + k].l;
+        if (ly->shadow) {
+            _shadow_span(span, left, ly->p, y, &pieces[ly->first], ly->count);
+            screen->stats.shadow_pixels += visible;
+            continue;
+        }
         for (int k = 0; k < ly->count; k++) {
             twin_span_t *pc = &pieces[ly->first + k];
-            visible += pc->r - pc->l;
-            if (ly->shadow) {
-                _shadow_span(span, left, ly->p, y, pc->l, pc->r);
-                screen->stats.shadow_pixels += pc->r - pc->l;
-            } else if (onto & ((uint64_t) 1 << (ly->first + k))) {
+            if (onto & ((uint64_t) 1 << (ly->first + k))) {
                 twin_pixmap_t *p = ly->p;
                 twin_pointer_t src =
                     twin_pixmap_pointer(p, pc->l - p->x, y - p->y);
@@ -752,10 +1008,8 @@ static void _composite_row(twin_screen_t *screen,
                 _composite_layer(span, left, ly, y, pc->l, pc->r);
             }
         }
-        if (!ly->shadow) {
-            screen->stats.layer_pixels += visible;
-            screen->stats.occluded_pixels += (ly->r - ly->l) - visible;
-        }
+        screen->stats.layer_pixels += visible;
+        screen->stats.occluded_pixels += (ly->r - ly->l) - visible;
     }
 }
 

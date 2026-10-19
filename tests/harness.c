@@ -355,9 +355,11 @@ static uint32_t config_fingerprint(void)
 #else
              0,
 #endif
-#if defined(CONFIG_DROP_SHADOW)
+#if defined(CONFIG_SHADOW_BLUR) /* the desktop's shadow geometry */
              CONFIG_HORIZONTAL_OFFSET, CONFIG_VERTICAL_OFFSET,
              CONFIG_SHADOW_BLUR,
+#elif defined(CONFIG_DROP_SHADOW) /* fixed geometry, as mobile slides */
+             -1, -1, -1,
 #else
              0, 0, 0,
 #endif

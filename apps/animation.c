@@ -31,8 +31,7 @@ static void _apps_animation_paint(twin_custom_widget_t *custom)
     twin_pixmap_t *current_frame = anim->pix;
 
     /* A policy may give the window more room than the image (a phone's
-     * work area, the whole screen without a window manager): center it on
-     * the widget's black background */
+     * work area, the whole screen without a window manager): center it */
     twin_pixmap_t *dst = _apps_animation_pixmap(custom);
     twin_coord_t w = twin_custom_widget_width(custom);
     twin_coord_t h = twin_custom_widget_height(custom);
@@ -45,7 +44,8 @@ static void _apps_animation_paint(twin_custom_widget_t *custom)
         .source_kind = TWIN_PIXMAP,
         .u.pixmap = current_frame,
     };
-    /* Over the background: a GIF's transparent pixels show it */
+    /* Over the cleared widget: a GIF's transparent pixels stay clear, and
+     * whatever is behind the window shows through them */
     twin_composite(dst, x, y, &srcop, 0, 0, NULL, 0, 0, TWIN_OVER, fw, fh);
 }
 
@@ -89,7 +89,7 @@ static twin_custom_widget_t *_apps_animation_init(twin_box_t *parent,
                                                   twin_pixmap_t *pix)
 {
     twin_custom_widget_t *custom = twin_custom_widget_create(
-        parent, 0xff000000, 0, 0, _apps_animation_dispatch,
+        parent, 0x00000000, 0, 0, _apps_animation_dispatch,
         sizeof(apps_animation_data_t));
     if (!custom)
         return NULL;
@@ -134,6 +134,9 @@ bool apps_animation_start(twin_screen_t *screen,
         twin_pixmap_destroy(pix);
         return false;
     }
+    /* See-through: a clear box makes the window translucent, so the GIF's
+     * transparency reaches the screen instead of a solid fill */
+    twin_widget_set(twin_box_widget(twin_toplevel_box(toplevel)), 0x00000000);
     /* The widget owns the image from here on */
     if (!apps_animation_create(twin_toplevel_box(toplevel), pix)) {
         twin_toplevel_destroy(toplevel);

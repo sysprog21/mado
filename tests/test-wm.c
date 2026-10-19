@@ -151,8 +151,13 @@ static void test_desktop(void)
     CHECK(wa->pixmap->height == 100 + wa->client.top, "title bar added");
     CHECK(wb->active && !wa->active, "last shown window is active");
 #if defined(CONFIG_DROP_SHADOW)
-    CHECK(wb->pixmap->shadow.blur && !wa->pixmap->shadow.blur,
-          "only the active window casts a shadow");
+    CHECK(wa->pixmap->shadow.blur &&
+              wb->pixmap->shadow.blur >= wa->pixmap->shadow.blur &&
+              wb->pixmap->shadow.alpha > wa->pixmap->shadow.alpha,
+          "the active window floats higher: a wider, darker shadow");
+    CHECK(wb->pixmap->shadow.cast[0].top == wb->client.top &&
+              wb->pixmap->shadow.cast[1].bottom == wb->client.top,
+          "the client and the title tab cast it, not the bounding box");
 #endif
     CONSISTENT(t, "desktop: initial");
 

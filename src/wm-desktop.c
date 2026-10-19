@@ -32,7 +32,8 @@
 #define TWIN_TITLE_BW ((TWIN_TITLE_HEIGHT + 11) / 12)
 
 #if defined(CONFIG_DROP_SHADOW)
-#define SHADOW_ALPHA 0x80
+#define SHADOW_ALPHA 0x80          /* the active window */
+#define SHADOW_ALPHA_INACTIVE 0x48 /* the rest, closer to the desktop */
 #endif
 
 #define DOUBLE_CLICK_MS 300
@@ -150,14 +151,49 @@ static void _draw_icon(twin_pixmap_t *pixmap,
     twin_icon_draw(pixmap, icon, m);
 }
 
+#if defined(CONFIG_DROP_SHADOW)
+/* Lit from above, as modern desktops are: the shadow falls mostly downward
+ * but shows all around, and the active window floats higher (a wider,
+ * darker shadow) than the rest instead of being the only one with any */
+static void _set_shadow(twin_window_t *window)
+{
+    int k = window->active ? 1 : 2; /* inactive: half the depth */
+    twin_pixmap_set_shadow(
+        window->pixmap, CONFIG_HORIZONTAL_OFFSET / k,
+        CONFIG_VERTICAL_OFFSET / k, (CONFIG_SHADOW_BLUR + k - 1) / k,
+        window->active ? SHADOW_ALPHA : SHADOW_ALPHA_INACTIVE);
+}
+
+/* The frame casts the shadow, not its bounding box: besides the client
+ * (the window's own concern), the title tab, inset from its rounded
+ * corners so they get a rounded shadow */
+static void _set_shadow_tab(twin_window_t *window, const twin_title_t *t)
+{
+    twin_coord_t inset = twin_fixed_to_int(t->t_arc_1);
+    twin_pixmap_set_shadow_cast(
+        window->pixmap, 1,
+        (twin_rect_t) {inset,
+                       twin_fixed_to_int(twin_fixed_ceil(t->c_right)) - inset,
+                       inset, window->client.top});
+}
+#endif
+
 void _twin_wm_decorate(twin_window_t *window)
 {
     twin_pixmap_t *pixmap = window->pixmap;
     twin_title_t t;
 
-    if (window->style != TwinWindowApplication)
+    if (window->style != TwinWindowApplication) {
+#if defined(CONFIG_DROP_SHADOW)
+        /* No title tab: drop one an earlier style left casting */
+        twin_pixmap_set_shadow_cast(pixmap, 1, (twin_rect_t) {0});
+#endif
         return;
+    }
     _title_metrics(window, &t);
+#if defined(CONFIG_DROP_SHADOW)
+    _set_shadow_tab(window, &t);
+#endif
 
     twin_pixmap_reset_clip(pixmap);
     pixmap->origin_x = pixmap->origin_y = 0;
@@ -218,12 +254,7 @@ static void _set_active(twin_window_t *window, bool active)
         return;
     window->active = active;
 #if defined(CONFIG_DROP_SHADOW)
-    if (active)
-        twin_pixmap_set_shadow(window->pixmap, CONFIG_HORIZONTAL_OFFSET,
-                               CONFIG_VERTICAL_OFFSET, CONFIG_SHADOW_BLUR,
-                               SHADOW_ALPHA);
-    else
-        twin_pixmap_set_shadow(window->pixmap, 0, 0, 0, 0);
+    _set_shadow(window);
 #endif
     if (window->style == TwinWindowApplication) {
         window->frame_dirty = true;
@@ -314,6 +345,10 @@ void _twin_wm_map(twin_window_t *window)
     if (!window->wm_placed) {
         _place_new(window);
         _twin_window_relayout(window); /* no-op unless it moved */
+#if defined(CONFIG_DROP_SHADOW)
+        if (window->style != TwinWindowPlain)
+            _set_shadow(window); /* inactive until activated, but floating */
+#endif
     }
     _twin_window_restore(window);
     _twin_window_raise(window);

@@ -1,9 +1,9 @@
 # Golden frame checksums for the cellphone suite.
 # Regenerate with: make check-update
-# config 6969dfe0
+# config 1cdbad9f
 lock 4c07fb5b
 home c7c79dd3
-calculator de05315a
+calculator 61636526
 dialer-empty 05eab18b
 dialer-number a5813994
 dialer-long 511ed576
@@ -51,10 +51,10 @@ settings-display-dark a9e82e99
 settings-home-dark fa8cca66
 settings-sound-changed b5a3df17
 settings-wallpaper-dusk f9b149d2
-games-paused 71d75a7d
+games-paused a0b87d1e
 games-snake 8dfbdbe9
 games-pong 117eba72
 games-tetris c8e30d17
 games-tetris-late 0e8303fa
 games-tetris-revealed b458380d
-home-demos 93c579a9
+home-demos 8ee55c71

@@ -29,6 +29,7 @@ static void fixed_clock(phone_clock_t *c)
 }
 
 const char *app_calc_eval(const char *typed);
+bool app_home_icon_rect(int app, ui_rect_t *out);
 
 th_t *phone_th;
 static th_t *t;
@@ -141,9 +142,13 @@ static void test_wrap(void)
 #if defined(CONFIG_DEMO_CALCULATOR)
 static void test_calculator(void)
 {
-    /* Calculator is the fourth icon: row 1, column 0 */
-    th_tap(t, 40, PHONE_STATUS_H + 6 + 74 + 28);
-    th_settle(t, 2000);
+    /* Opened from its icon, wherever the apps built put it */
+    ui_rect_t r;
+    bool shown = app_home_icon_rect(phone_app_find("Calculator"), &r);
+    CHECK(shown, "calculator icon on the first page");
+    if (!shown)
+        return;
+    ph_tap((r.left + r.right) / 2, (r.top + r.bottom) / 2);
     CHECK_EQ(phone_depth(), 1, "calculator opened");
     ph_shot("calculator");
 
@@ -262,6 +267,13 @@ int main(void)
     t = phone_th = th_create(PHONE_W, PHONE_H);
     phone_boot(t->screen);
     th_settle(t, 2000);
+    /* The frames show whichever apps the launcher lists */
+    char apps[512] = "";
+    for (int i = 0; i < phone_app_count(); i++) {
+        size_t n = strlen(apps);
+        snprintf(apps + n, sizeof(apps) - n, "%s,", phone_app_at(i)->name);
+    }
+    th_golden_salt(apps);
 
     test_boot_and_unlock();
     test_wrap();

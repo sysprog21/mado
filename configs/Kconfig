@@ -502,11 +502,12 @@ config DEMO_CELLPHONE
     depends on DEMO_APPLICATIONS && FONT_MONTSERRAT && FONT_ICONS
     depends on WM_MOBILE
     help
-      Phone user interface: lock screen, home screen, dialer, contacts,
-      messages, calculator, music, photos, camera, settings, call log and
-      games on the mobile window manager, which it needs.  The other demos
-      selected below get launcher icons too and run as stacked apps; Back
-      closes their windows one at a time.
+      Phone user interface on the mobile window manager, which it needs:
+      lock screen, home screen and settings, plus the phone apps picked
+      below.  The other demos selected in this menu get launcher icons
+      too and run as stacked apps; Back closes their windows one at a
+      time.  A demo the phone also offers natively, such as the
+      calculator, appears once, drawn in the phone theme.
 
 config DEMO_CELLPHONE_RGB16
     bool "Use RGB565 surfaces for phone screens"
@@ -516,6 +517,56 @@ config DEMO_CELLPHONE_RGB16
       Halve the memory of every phone screen by rendering into 16-bit
       surfaces.  RGB565 has no alpha channel, so screens are always
       opaque, at the cost of some banding in gradients.
+
+menu "Phone apps"
+    depends on DEMO_CELLPHONE
+
+config DEMO_PHONE_DIALER
+    bool "Phone"
+    default y
+    help
+      Dialer keypad and the in-call screen.
+
+config DEMO_PHONE_CALLLOG
+    bool "Call log"
+    default y
+    depends on DEMO_PHONE_DIALER
+    help
+      Recent calls; tapping one calls it back through the dialer.
+
+config DEMO_PHONE_MESSAGES
+    bool "Messages"
+    default y
+    help
+      Text message conversation with an on-screen keyboard.
+
+config DEMO_PHONE_CONTACTS
+    bool "Contacts"
+    default y
+    depends on DEMO_PHONE_DIALER && DEMO_PHONE_MESSAGES
+    help
+      Contact list, details and an add form.  A contact can be called or
+      messaged, so this needs the dialer and messages.
+
+config DEMO_PHONE_MUSIC
+    bool "Music"
+    default y
+    help
+      Track list and a now-playing screen.
+
+config DEMO_PHONE_PHOTOS
+    bool "Photos"
+    default y
+    help
+      Thumbnail grid and a swipeable photo viewer.
+
+config DEMO_PHONE_CAMERA
+    bool "Camera"
+    default y
+    help
+      Viewfinder with shutter, flash and mode controls.
+
+endmenu
 
 config DEMO_MULTI
     bool "Build multi demo"

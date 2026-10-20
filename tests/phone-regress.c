@@ -8,6 +8,7 @@
  * Kit regressions that need no app on screen.
  */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "phone-test.h"
@@ -88,7 +89,29 @@ static void test_text_fit_utf8(void)
                   w, "every width");
 }
 
+static int color_distance(twin_argb32_t a, twin_argb32_t b)
+{
+    int d = 0;
+    for (int shift = 0; shift < 24; shift += 8)
+        d += abs((int) ((a >> shift) & 0xff) - (int) ((b >> shift) & 0xff));
+    return d;
+}
+
+/* At home the Home tab is the current one, whichever apps are built: a
+ * view without a launcher slot must not light the Dialer tab */
+static void test_nav_at_home(void)
+{
+    CHECK_EQ(phone_depth(), 0, "at home");
+    twin_argb32_t accent = phone_theme()->primary;
+    twin_coord_t y = PHONE_H - PHONE_NAV_H + PHONE_NAV_H / 2;
+    twin_argb32_t dialer = th_pixel(phone_th, 9, y);
+    twin_argb32_t home = th_pixel(phone_th, PHONE_W / 3 + 9, y);
+    CHECK(color_distance(home, accent) < color_distance(dialer, accent),
+          "home tab lit at home (home %08x, dialer %08x)", home, dialer);
+}
+
 void test_regress(void)
 {
     test_text_fit_utf8();
+    test_nav_at_home();
 }

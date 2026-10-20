@@ -134,4 +134,9 @@ void th_golden(const char *suite,
                uint32_t crc,
                const th_t *t);
 
+/* Mix @salt into the build fingerprint the golden file records, for state
+ * a suite's frames depend on beyond the build options (the phone's
+ * launcher list).  Comparisons are skipped when it differs. */
+void th_golden_salt(const char *salt);
+
 #endif /* _TWIN_TEST_HARNESS_H_ */

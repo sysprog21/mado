@@ -13,6 +13,8 @@
 #include "data.h"
 #include "phone-test.h"
 
+#if defined(CONFIG_DEMO_PHONE_MESSAGES)
+
 int app_sms_test_offset(void);
 int app_sms_test_max_offset(void);
 int app_sms_test_messages(void);
@@ -124,3 +126,6 @@ void test_sms(void)
 
     ph_home();
 }
+#else
+void test_sms(void) {}
+#endif

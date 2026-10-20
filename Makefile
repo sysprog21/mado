@@ -182,18 +182,18 @@ libapps.a_files-$(CONFIG_DEMO_CELLPHONE) += \
 	apps/cellphone/home.c \
 	apps/cellphone/lock.c \
 	apps/cellphone/data.c \
-	apps/cellphone/dialer.c \
-	apps/cellphone/contacts.c \
-	apps/cellphone/sms.c \
-	apps/cellphone/music.c \
-	apps/cellphone/photos.c \
-	apps/cellphone/camera.c \
 	apps/cellphone/settings.c \
-	apps/cellphone/calllog.c \
 	apps/cellphone/games.c \
 	apps/cellphone/snake.c \
 	apps/cellphone/pong.c \
 	apps/cellphone/tetris.c
+libapps.a_files-$(CONFIG_DEMO_PHONE_DIALER) += apps/cellphone/dialer.c
+libapps.a_files-$(CONFIG_DEMO_PHONE_CALLLOG) += apps/cellphone/calllog.c
+libapps.a_files-$(CONFIG_DEMO_PHONE_MESSAGES) += apps/cellphone/sms.c
+libapps.a_files-$(CONFIG_DEMO_PHONE_CONTACTS) += apps/cellphone/contacts.c
+libapps.a_files-$(CONFIG_DEMO_PHONE_MUSIC) += apps/cellphone/music.c
+libapps.a_files-$(CONFIG_DEMO_PHONE_PHOTOS) += apps/cellphone/photos.c
+libapps.a_files-$(CONFIG_DEMO_PHONE_CAMERA) += apps/cellphone/camera.c
 
 libapps.a_includes-y := include apps apps/cellphone
 # Emscripten size optimization

@@ -283,27 +283,42 @@ static void glyph_snake(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
 static void glyph_pong(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
 static void glyph_tetris(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
 
+/* The apps picked in Kconfig, in launcher order */
 static const phone_app_t apps[] = {
+#if defined(CONFIG_DEMO_PHONE_DIALER)
     {"Phone", TWIN_SYM_PHONE, NULL, UI_RGB(0x5b8c45), app_dialer_open, NULL,
      NULL},
+#endif
+#if defined(CONFIG_DEMO_PHONE_CONTACTS)
     {"Contacts", TWIN_SYM_CONTACTS, NULL, UI_RGB(0x5a7896), app_contacts_open,
      NULL, NULL},
+#endif
+#if defined(CONFIG_DEMO_PHONE_MESSAGES)
     {"Messages", TWIN_SYM_MESSAGE, NULL, UI_RGB(0x4f8c7c), app_sms_open, NULL,
      NULL},
+#endif
 #if defined(CONFIG_DEMO_CALCULATOR) /* the shared calculator, phone themed */
     {"Calculator", TWIN_SYM_CALCULATOR, NULL, UI_RGB(0xc08a3e), app_calc_open,
      NULL, apps_calc_start},
 #endif
+#if defined(CONFIG_DEMO_PHONE_MUSIC)
     {"Music", TWIN_SYM_MUSIC, NULL, UI_RGB(0xa95c72), app_music_open, NULL,
      NULL},
+#endif
+#if defined(CONFIG_DEMO_PHONE_PHOTOS)
     {"Photos", TWIN_SYM_IMAGE, NULL, UI_RGB(0xbb6e3e), app_photos_open, NULL,
      NULL},
+#endif
+#if defined(CONFIG_DEMO_PHONE_CAMERA)
     {"Camera", TWIN_SYM_CAMERA, NULL, UI_RGB(0x6c7064), app_camera_open, NULL,
      NULL},
+#endif
     {"Settings", TWIN_SYM_SETTINGS, NULL, UI_RGB(0x767b6c), app_settings_open,
      NULL, NULL},
+#if defined(CONFIG_DEMO_PHONE_CALLLOG)
     {"Call Log", TWIN_SYM_HISTORY, NULL, UI_RGB(0x7a6a96), app_calllog_open,
      NULL, NULL},
+#endif
     {"Snake", NULL, glyph_snake, UI_RGB(0x4d8f86), app_snake_open, NULL, NULL},
     {"Pong", NULL, glyph_pong, UI_RGB(0x646c9a), app_pong_open, NULL, NULL},
     {"Tetris", NULL, glyph_tetris, UI_RGB(0xad5348), app_tetris_open, NULL,
@@ -485,9 +500,12 @@ static twin_time_t status_tick(twin_time_t now, void *closure)
 static int nav_active(void)
 {
     ui_view_t *top = phone_top();
-    if (top && top->app == phone_app_find("Phone"))
+    /* An app left out of the build finds no slot (-1), which views opened
+     * outside the launcher carry too: only a real slot may match */
+    int app = top ? top->app : -1;
+    if (app >= 0 && app == phone_app_find("Phone"))
         return 0;
-    if (top && top->app == phone_app_find("Contacts"))
+    if (app >= 0 && app == phone_app_find("Contacts"))
         return 2;
     return phone_depth() > 0 ? -1 : 1;
 }
@@ -571,8 +589,8 @@ static void nav_go_root(const char *name)
 {
     int app = phone_app_find(name);
     ui_view_t *top = phone_top();
-    if (top && top->app == app)
-        return;
+    if (app < 0 || (top && top->app == app))
+        return; /* not built, or already there */
     /* Tabs are destinations, not history: reset to home, then open */
     _drop_apps(NULL);
     phone_open(app);

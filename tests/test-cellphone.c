@@ -139,7 +139,7 @@ static void test_wrap(void)
           "overlong word still terminates");
 }
 
-#if defined(CONFIG_DEMO_CALCULATOR)
+#if defined(CONFIG_APP_CALCULATOR)
 static void test_calculator(void)
 {
     /* Opened from its icon, wherever the apps built put it */

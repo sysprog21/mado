@@ -14,7 +14,7 @@
 
 #include "phone-test.h"
 
-#if defined(CONFIG_DEMO_GAMES)
+#if defined(CONFIG_APP_GAMES)
 
 int app_games_test_steps(void);
 int app_games_test_score(void);

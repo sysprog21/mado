@@ -10,7 +10,7 @@
 
 #include "phone-test.h"
 
-#if defined(CONFIG_DEMO_PHONE_DIALER)
+#if defined(CONFIG_APP_PHONE_DIALER)
 
 const char *app_dialer_test_number(void);
 const char *app_dialer_test_name(void);
@@ -139,7 +139,7 @@ void test_dialer(void)
     ph_home();
 }
 
-#if defined(CONFIG_DEMO_PHONE_CALLLOG)
+#if defined(CONFIG_APP_PHONE_CALLLOG)
 void test_calllog(void)
 {
     ph_open("Call Log");

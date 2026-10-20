@@ -19,7 +19,7 @@
 
 #include "apps.h"
 
-#if defined(CONFIG_DEMO_CELLPHONE)
+#if defined(CONFIG_APP_CELLPHONE)
 #include "phone.h"
 #endif
 
@@ -671,7 +671,7 @@ bool apps_calc_start(twin_screen_t *screen,
  * Phone view: the same calculator in the UI kit's theme
  */
 
-#if defined(CONFIG_DEMO_CELLPHONE)
+#if defined(CONFIG_APP_CELLPHONE)
 typedef struct {
     ui_view_t view;
     calc_t calc;

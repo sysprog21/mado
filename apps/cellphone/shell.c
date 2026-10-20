@@ -172,49 +172,49 @@ void phone_format_date(char *buf, size_t len)
 
 /* The apps picked in Kconfig, in launcher order */
 static const phone_app_t apps[] = {
-#if defined(CONFIG_DEMO_PHONE_DIALER)
+#if defined(CONFIG_APP_PHONE_DIALER)
     {"Phone", TWIN_SYM_PHONE, NULL, UI_RGB(0x5b8c45), app_dialer_open, NULL,
      NULL},
 #endif
-#if defined(CONFIG_DEMO_PHONE_CONTACTS)
+#if defined(CONFIG_APP_PHONE_CONTACTS)
     {"Contacts", TWIN_SYM_CONTACTS, NULL, UI_RGB(0x5a7896), app_contacts_open,
      NULL, NULL},
 #endif
-#if defined(CONFIG_DEMO_PHONE_MESSAGES)
+#if defined(CONFIG_APP_PHONE_MESSAGES)
     {"Messages", TWIN_SYM_MESSAGE, NULL, UI_RGB(0x4f8c7c), app_sms_open, NULL,
      NULL},
 #endif
-#if defined(CONFIG_DEMO_CALCULATOR) /* the shared calculator, phone themed */
+#if defined(CONFIG_APP_CALCULATOR) /* the shared calculator, phone themed */
     {"Calculator", TWIN_SYM_CALCULATOR, NULL, UI_RGB(0xc08a3e), app_calc_open,
      NULL, apps_calc_start},
 #endif
-#if defined(CONFIG_DEMO_PHONE_MUSIC)
+#if defined(CONFIG_APP_PHONE_MUSIC)
     {"Music", TWIN_SYM_MUSIC, NULL, UI_RGB(0xa95c72), app_music_open, NULL,
      NULL},
 #endif
-#if defined(CONFIG_DEMO_PHONE_PHOTOS)
+#if defined(CONFIG_APP_PHONE_PHOTOS)
     {"Photos", TWIN_SYM_IMAGE, NULL, UI_RGB(0xbb6e3e), app_photos_open, NULL,
      NULL},
 #endif
-#if defined(CONFIG_DEMO_PHONE_CAMERA)
+#if defined(CONFIG_APP_PHONE_CAMERA)
     {"Camera", TWIN_SYM_CAMERA, NULL, UI_RGB(0x6c7064), app_camera_open, NULL,
      NULL},
 #endif
     {"Settings", TWIN_SYM_SETTINGS, NULL, UI_RGB(0x767b6c), app_settings_open,
      NULL, NULL},
-#if defined(CONFIG_DEMO_PHONE_CALLLOG)
+#if defined(CONFIG_APP_PHONE_CALLLOG)
     {"Call Log", TWIN_SYM_HISTORY, NULL, UI_RGB(0x7a6a96), app_calllog_open,
      NULL, NULL},
 #endif
-#if defined(CONFIG_DEMO_SNAKE)
+#if defined(CONFIG_APP_SNAKE)
     {"Snake", NULL, app_snake_glyph, UI_RGB(0x4d8f86), app_snake_open, NULL,
      apps_snake_start},
 #endif
-#if defined(CONFIG_DEMO_PONG)
+#if defined(CONFIG_APP_PONG)
     {"Pong", NULL, app_pong_glyph, UI_RGB(0x646c9a), app_pong_open, NULL,
      apps_pong_start},
 #endif
-#if defined(CONFIG_DEMO_TETRIS)
+#if defined(CONFIG_APP_TETRIS)
     {"Tetris", NULL, app_tetris_glyph, UI_RGB(0xad5348), app_tetris_open, NULL,
      apps_tetris_start},
 #endif

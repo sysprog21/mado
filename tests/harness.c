@@ -380,7 +380,7 @@ static uint32_t config_fingerprint(void)
 #else
              0,
 #endif
-#if defined(CONFIG_DEMO_CELLPHONE_RGB16)
+#if defined(CONFIG_APP_CELLPHONE_RGB16)
              1,
 #else
              0,

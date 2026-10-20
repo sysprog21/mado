@@ -23,7 +23,7 @@ int app_camera_test_flash(void);
 #define THUMB_X(i) (5 + ((i) % 3) * 78 + 37)
 #define THUMB_Y(i) (56 + ((i) / 3) * 78 + 30)
 
-#if defined(CONFIG_DEMO_PHONE_PHOTOS)
+#if defined(CONFIG_APP_PHONE_PHOTOS)
 void test_photos(void)
 {
     ph_open("Photos");
@@ -117,7 +117,7 @@ void test_photos(void)
 void test_photos(void) {}
 #endif
 
-#if defined(CONFIG_DEMO_PHONE_CAMERA)
+#if defined(CONFIG_APP_PHONE_CAMERA)
 void test_camera(void)
 {
     ph_open("Camera");

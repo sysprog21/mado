@@ -21,7 +21,7 @@ jobs:
           BACKEND_HEADLESS=y \
           TOOLS=y \
           TOOL_HEADLESS_CTL=y \
-          DEMO_MULTI=y
+          APP_MULTI=y
 
     - name: Build with headless backend
       run: |

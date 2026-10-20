@@ -122,7 +122,7 @@ jobs:
           - name: no widget toolkit
             options: WM_MOBILE=y WIDGETS=n
           - name: RGB565 phone surfaces
-            options: WM_MOBILE=y DEMO_CELLPHONE_RGB16=y
+            options: WM_MOBILE=y APP_CELLPHONE_RGB16=y
           - name: TLSF heap
             options: WM_MOBILE=y MEM_TLSF=y MEM_TLSF_POOL_SIZE=4194304
           - name: Pixman renderer

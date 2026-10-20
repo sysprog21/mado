@@ -14,7 +14,7 @@
 #include "data.h"
 #include "phone-test.h"
 
-#if defined(CONFIG_DEMO_PHONE_MUSIC)
+#if defined(CONFIG_APP_PHONE_MUSIC)
 
 int app_music_test_elapsed(void);
 int app_music_test_track(void);

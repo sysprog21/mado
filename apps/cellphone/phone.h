@@ -69,7 +69,7 @@
  */
 
 /* Pixel format of every phone surface */
-#if defined(CONFIG_DEMO_CELLPHONE_RGB16)
+#if defined(CONFIG_APP_CELLPHONE_RGB16)
 #define PHONE_FORMAT TWIN_RGB16
 #else
 #define PHONE_FORMAT TWIN_ARGB32

@@ -188,7 +188,7 @@ config WM_NONE
     help
       Minimal, no window manager: no decorations, every application window covers
       the screen, and the keyboard goes to the newest or the last pressed
-      window.  The demo launcher starts only the first demo.
+      window.  The launcher starts only the first application.
 
 endchoice
 
@@ -367,7 +367,7 @@ config MEM_TLSF_POOL_SIZE
       Size of the static memory pool backing the TLSF allocator.
       Must be large enough for all runtime allocations including
       pixmap buffers. A 640x480 ARGB32 screen pixmap alone needs
-      ~1.2 MB; the SDL demo with multiple windows peaks at ~8 MB.
+      ~1.2 MB; the SDL build running every application peaks at ~8 MB.
       Embedded targets with small displays need far less (e.g.
       320x240 RGB565 = ~150 KB framebuffer + widget overhead).
       Requests exceeding pool capacity return NULL.
@@ -421,8 +421,8 @@ config WIDGETS
     default y
     help
       Boxes, labels, buttons and toplevel windows with automatic layout,
-      used by the desktop demos.  Applications that draw their own UI
-      (such as the cellphone demo) do not need it.
+      used by most desktop applications.  Applications that draw their
+      own UI (the calculator, the games and the phone) do not need it.
 
 config FONT_MONTSERRAT
     bool "Montserrat Medium font"
@@ -487,176 +487,170 @@ config TVG_MEMORY_BUDGET
 
 endmenu
 
-menu "Demo Applications"
+menu "Applications"
 
-config DEMO_APPLICATIONS
-    bool "Build demo applications"
+comment "Pick any set: the launcher is built when at least one is chosen"
+
+config APP_CALCULATOR
+    bool "Calculator"
     default y
     help
-      Build demonstration applications showcasing Mado features.
-      Provides example code and testing targets.
+      Four-function calculator with decimal fixed-point arithmetic and an
+      erase key, driven by mouse, touch or keyboard.  One source serves
+      a desktop window and, with the phone, its Calculator app drawn in
+      the phone theme.
 
-config DEMO_CELLPHONE
-    bool "Build cellphone demo"
+config APP_CLOCK
+    bool "Clock"
     default y
-    depends on DEMO_APPLICATIONS && FONT_MONTSERRAT && FONT_ICONS
-    depends on WM_MOBILE
+    depends on WIDGETS
+    help
+      Analog clock that redraws once a second, its hands placed with
+      fixed-point trigonometry.
+
+config APP_SPLINE
+    bool "Spline editor"
+    default y
+    depends on WIDGETS
+    help
+      Bezier curve with draggable control points, cubic or quadratic at
+      the press of a button, stroked by the path renderer as it moves.
+
+config APP_ANIMATION
+    bool "Animation player"
+    default y
+    depends on WIDGETS
+    help
+      Plays an animated GIF, decoding each frame on demand and advancing
+      on timeouts.
+
+config APP_IMAGE
+    bool "Vector image viewer"
+    default y
+    depends on WIDGETS
+    select LOADER_TVG
+    help
+      TinyVG drawings rendered to fit the window at any size; a button
+      steps through them.  Selects the TinyVG loader.
+
+config APP_MULTI
+    bool "Window showcase"
+    default y
+    depends on WIDGETS && WM_DESKTOP
+    help
+      Six overlapping windows on the desktop window manager: text on a
+      circle, draggable thick lines, a smiley, the glyph table, a flower
+      of elliptical arcs and a blurred picture.
+
+comment "Games"
+
+config APP_SNAKE
+    bool "Snake"
+    default y
+    depends on FONT_MONTSERRAT && FONT_ICONS
+    help
+      Self-playing Snake.  Snake, Pong and Tetris share one arcade view
+      from the phone's UI kit: on the phone they are launcher apps in the
+      phone theme; under any other window manager each opens a window,
+      paused until tapped.
+
+config APP_PONG
+    bool "Pong"
+    default y
+    depends on FONT_MONTSERRAT && FONT_ICONS
+    help
+      Self-playing Pong, in the same arcade view as Snake.
+
+config APP_TETRIS
+    bool "Tetris"
+    default y
+    depends on FONT_MONTSERRAT && FONT_ICONS
+    help
+      Self-playing Tetris, in the same arcade view as Snake.
+
+comment "Phone"
+
+menuconfig APP_CELLPHONE
+    bool "Phone shell"
+    default y
+    depends on WM_MOBILE && FONT_MONTSERRAT && FONT_ICONS
     help
       Phone user interface on the mobile window manager, which it needs:
       lock screen, home screen and settings, plus the phone apps picked
-      below.  The other demos selected in this menu get launcher icons
-      too and run as stacked apps; Back closes their windows one at a
-      time.  A demo the phone also offers natively, such as the
-      calculator, appears once, drawn in the phone theme.
+      in this submenu.  The other applications selected above get
+      launcher icons too and run as stacked windows; Back closes them one
+      at a time.  An application the phone also offers natively, such as
+      the calculator, appears once, drawn in the phone theme.
 
-config DEMO_CELLPHONE_RGB16
+if APP_CELLPHONE
+
+config APP_CELLPHONE_RGB16
     bool "Use RGB565 surfaces for phone screens"
     default n
-    depends on DEMO_CELLPHONE
     help
       Halve the memory of every phone screen by rendering into 16-bit
       surfaces.  RGB565 has no alpha channel, so screens are always
       opaque, at the cost of some banding in gradients.
 
-menu "Phone apps"
-    depends on DEMO_CELLPHONE
-
-config DEMO_PHONE_DIALER
+config APP_PHONE_DIALER
     bool "Phone"
     default y
     help
       Dialer keypad and the in-call screen.
 
-config DEMO_PHONE_CALLLOG
+config APP_PHONE_CALLLOG
     bool "Call log"
     default y
-    depends on DEMO_PHONE_DIALER
+    depends on APP_PHONE_DIALER
     help
       Recent calls; tapping one calls it back through the dialer.
 
-config DEMO_PHONE_MESSAGES
+config APP_PHONE_MESSAGES
     bool "Messages"
     default y
     help
       Text message conversation with an on-screen keyboard.
 
-config DEMO_PHONE_CONTACTS
+config APP_PHONE_CONTACTS
     bool "Contacts"
     default y
-    depends on DEMO_PHONE_DIALER && DEMO_PHONE_MESSAGES
+    depends on APP_PHONE_DIALER && APP_PHONE_MESSAGES
     help
       Contact list, details and an add form.  A contact can be called or
       messaged, so this needs the dialer and messages.
 
-config DEMO_PHONE_MUSIC
+config APP_PHONE_MUSIC
     bool "Music"
     default y
     help
       Track list and a now-playing screen.
 
-config DEMO_PHONE_PHOTOS
+config APP_PHONE_PHOTOS
     bool "Photos"
     default y
     help
       Thumbnail grid and a swipeable photo viewer.
 
-config DEMO_PHONE_CAMERA
+config APP_PHONE_CAMERA
     bool "Camera"
     default y
     help
       Viewfinder with shutter, flash and mode controls.
 
-endmenu
-
-config DEMO_MULTI
-    bool "Build multi demo"
-    default y
-    depends on DEMO_APPLICATIONS && WIDGETS && WM_DESKTOP
-    help
-      Comprehensive demo with multiple windows and widgets.
-      Demonstrates window management and event handling on the desktop
-      policy, which staggers its overlapping windows.
-
-config DEMO_CLOCK
-    bool "Build clock demo"
-    default y
-    depends on DEMO_APPLICATIONS && WIDGETS
-    help
-      Analog clock demonstration with real-time updates.
-      Showcases CORDIC trigonometry functions.
-      Demonstrates timeout callbacks and redraw logic.
-
-config DEMO_CALCULATOR
-    bool "Build calculator demo"
-    default y
-    depends on DEMO_APPLICATIONS
-    help
-      Four-function calculator with decimal fixed-point arithmetic.
-      One source serves the desktop window and, with the cellphone demo,
-      the phone's Calculator app in the current phone theme.
-      Demonstrates a window drawn with paths and text, and mouse, touch
-      and keyboard input.
-
-config DEMO_SNAKE
-    bool "Build Snake demo"
-    default y
-    depends on DEMO_APPLICATIONS && FONT_MONTSERRAT && FONT_ICONS
-    help
-      Self-playing Snake.  Snake, Pong and Tetris share one arcade view
-      from the phone's UI kit: on the phone they are launcher apps in the
-      phone theme, under any other window manager each opens a window,
-      paused until tapped.
-
-config DEMO_PONG
-    bool "Build Pong demo"
-    default y
-    depends on DEMO_APPLICATIONS && FONT_MONTSERRAT && FONT_ICONS
-    help
-      Self-playing Pong, in the same arcade view as Snake.
-
-config DEMO_TETRIS
-    bool "Build Tetris demo"
-    default y
-    depends on DEMO_APPLICATIONS && FONT_MONTSERRAT && FONT_ICONS
-    help
-      Self-playing Tetris, in the same arcade view as Snake.
+endif
 
 # Built when any game is: the arcade view they share
-config DEMO_GAMES
-    def_bool DEMO_SNAKE || DEMO_PONG || DEMO_TETRIS
+config APP_GAMES
+    def_bool APP_SNAKE || APP_PONG || APP_TETRIS
 
 # The UI kit the phone and the games draw with
-config DEMO_UIKIT
-    def_bool DEMO_CELLPHONE || DEMO_GAMES
+config APP_UIKIT
+    def_bool APP_CELLPHONE || APP_GAMES
 
-config DEMO_SPLINE
-    bool "Build spline demo"
-    default y
-    depends on DEMO_APPLICATIONS && WIDGETS
-    help
-      Bezier spline curve demonstration.
-      Shows advanced path rendering capabilities.
-      Demonstrates curve smoothing algorithms.
-
-config DEMO_ANIMATION
-    bool "Build animation demo"
-    default y
-    depends on DEMO_APPLICATIONS && WIDGETS
-    help
-      Animation demonstration with moving objects.
-      Shows frame-based animation techniques.
-      Demonstrates work queue and timeout systems.
-
-config DEMO_IMAGE
-    bool "Build scalable image demo"
-    select LOADER_TVG
-    default y
-    depends on DEMO_APPLICATIONS && WIDGETS
-    help
-      Scalable vector graphics demonstration.
-      Shows TinyVG format rendering capabilities.
-      Automatically enables TVG loader.
-      Demonstrates resolution-independent graphics.
+# The launcher and the application library, when anything is picked
+config APPS
+    def_bool APP_CALCULATOR || APP_CLOCK || APP_SPLINE || APP_ANIMATION || \
+             APP_IMAGE || APP_MULTI || APP_GAMES || APP_CELLPHONE
 
 endmenu
 

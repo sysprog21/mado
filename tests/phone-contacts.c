@@ -14,7 +14,7 @@
 #include "data.h"
 #include "phone-test.h"
 
-#if defined(CONFIG_DEMO_PHONE_CONTACTS)
+#if defined(CONFIG_APP_PHONE_CONTACTS)
 
 int app_contacts_test_offset(void);
 const char *app_contacts_test_detail(void);

@@ -329,8 +329,22 @@ static bool _twin_headless_shm_live(void)
     return live;
 }
 
+/* MADO_FROZEN_TIME=1 stops twin's clock at startup: no timeout comes due,
+ * so every animation keeps its first frame and screenshots repeat exactly.
+ * The control tool still gets served, as polling does not use timeouts.
+ * Anything timed reads the same instant, so two clicks always count as a
+ * double-click (a title bar maximizes): meant for screenshots, not input. */
+static twin_time_t _twin_headless_frozen_now(void)
+{
+    return 0;
+}
+
 twin_context_t *twin_headless_init(int width, int height)
 {
+    const char *frozen = getenv("MADO_FROZEN_TIME");
+    if (frozen && !strcmp(frozen, "1"))
+        _twin_set_time_source(_twin_headless_frozen_now);
+
     twin_context_t *ctx = calloc(1, sizeof(twin_context_t));
     if (!ctx)
         return NULL;

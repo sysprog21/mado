@@ -170,10 +170,9 @@ static bool apps_multiline_start(twin_screen_t *screen,
 }
 
 /*
- * The windows below paint from draw callbacks at whatever size the window
- * manager gives them: a desktop keeps the requested size, a phone or the
- * 'none' policy hands out the whole work area, and the mobile policy may
- * free a covered window's pixels and ask for them again.
+ * The windows below paint from draw callbacks at whatever size their
+ * client area has, so a resize repaints them to fit.  Desktop only: the
+ * demo is about overlapping windows.
  */
 
 /* Client size of the window being drawn */
@@ -215,8 +214,7 @@ static bool start_window(twin_screen_t *screen,
     twin_window_set_name(window, name);
     twin_window_set_client_data(window, data);
     twin_window_set_callbacks(window, draw, NULL, destroy);
-    /* Painted before the next redisplay, and only if still shown: on a
-     * phone each window covers the one opened before it */
+    /* Painted before the next redisplay, and only if still shown */
     twin_rect_t c = twin_window_client(window);
     twin_window_damage(window, c.left, c.top, c.right, c.bottom);
     twin_window_show(window);

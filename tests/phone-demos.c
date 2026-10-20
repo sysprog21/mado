@@ -74,7 +74,7 @@ void test_demos(void)
      * default set */
 #if defined(CONFIG_DEMO_CLOCK) && defined(CONFIG_DEMO_CALCULATOR) && \
     defined(CONFIG_DEMO_SPLINE) && defined(CONFIG_DEMO_ANIMATION) && \
-    defined(CONFIG_DEMO_IMAGE) && defined(CONFIG_DEMO_MULTI)
+    defined(CONFIG_DEMO_IMAGE)
     ph_shot("home-demos");
 #else
     ph_check("home-demos");

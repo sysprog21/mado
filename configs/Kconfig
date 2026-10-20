@@ -520,12 +520,11 @@ config DEMO_CELLPHONE_RGB16
 config DEMO_MULTI
     bool "Build multi demo"
     default y
-    depends on DEMO_APPLICATIONS && WIDGETS
+    depends on DEMO_APPLICATIONS && WIDGETS && WM_DESKTOP
     help
       Comprehensive demo with multiple windows and widgets.
-      Demonstrates window management and event handling: the desktop
-      policy staggers its windows, the mobile one stacks them and Back
-      closes one at a time.
+      Demonstrates window management and event handling on the desktop
+      policy, which staggers its overlapping windows.
 
 config DEMO_CLOCK
     bool "Build clock demo"

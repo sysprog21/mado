@@ -33,12 +33,18 @@ typedef struct _twin_edge {
 #define TWIN_POLY_CEIL(c) (((c) + (TWIN_POLY_STEP - 1)) & ~(TWIN_POLY_STEP - 1))
 #define TWIN_POLY_COL(x) (((x) >> TWIN_POLY_FIXED_SHIFT) & TWIN_POLY_MASK)
 
+/* By top, then by place in the edge array: qsort need not be stable, and
+ * the order of edges starting on one row decides coincident spans, so ties
+ * keep their original order as the insertion sort below does.  Without it
+ * glibc and BSD libc rasterize some glyphs differently. */
 static int _edge_compare_y(const void *a, const void *b)
 {
     const twin_edge_t *ae = *(twin_edge_t *const *) a;
     const twin_edge_t *be = *(twin_edge_t *const *) b;
 
-    return (int) (ae->top - be->top);
+    if (ae->top != be->top)
+        return ae->top < be->top ? -1 : 1;
+    return (ae > be) - (ae < be);
 }
 
 /* Order @order (pointers into the edge array) by top.  Outlines arrive in

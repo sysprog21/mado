@@ -182,7 +182,6 @@ libapps.a_files-$(CONFIG_DEMO_CELLPHONE) += \
 	apps/cellphone/home.c \
 	apps/cellphone/lock.c \
 	apps/cellphone/data.c \
-	apps/cellphone/calc.c \
 	apps/cellphone/dialer.c \
 	apps/cellphone/contacts.c \
 	apps/cellphone/sms.c \

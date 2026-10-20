@@ -284,30 +284,48 @@ static void glyph_pong(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
 static void glyph_tetris(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
 
 static const phone_app_t apps[] = {
-    {"Phone", TWIN_SYM_PHONE, NULL, UI_RGB(0x5b8c45), app_dialer_open, NULL},
+    {"Phone", TWIN_SYM_PHONE, NULL, UI_RGB(0x5b8c45), app_dialer_open, NULL,
+     NULL},
     {"Contacts", TWIN_SYM_CONTACTS, NULL, UI_RGB(0x5a7896), app_contacts_open,
+     NULL, NULL},
+    {"Messages", TWIN_SYM_MESSAGE, NULL, UI_RGB(0x4f8c7c), app_sms_open, NULL,
      NULL},
-    {"Messages", TWIN_SYM_MESSAGE, NULL, UI_RGB(0x4f8c7c), app_sms_open, NULL},
+#if defined(CONFIG_DEMO_CALCULATOR) /* the shared calculator, phone themed */
     {"Calculator", TWIN_SYM_CALCULATOR, NULL, UI_RGB(0xc08a3e), app_calc_open,
+     NULL, apps_calc_start},
+#endif
+    {"Music", TWIN_SYM_MUSIC, NULL, UI_RGB(0xa95c72), app_music_open, NULL,
      NULL},
-    {"Music", TWIN_SYM_MUSIC, NULL, UI_RGB(0xa95c72), app_music_open, NULL},
-    {"Photos", TWIN_SYM_IMAGE, NULL, UI_RGB(0xbb6e3e), app_photos_open, NULL},
-    {"Camera", TWIN_SYM_CAMERA, NULL, UI_RGB(0x6c7064), app_camera_open, NULL},
+    {"Photos", TWIN_SYM_IMAGE, NULL, UI_RGB(0xbb6e3e), app_photos_open, NULL,
+     NULL},
+    {"Camera", TWIN_SYM_CAMERA, NULL, UI_RGB(0x6c7064), app_camera_open, NULL,
+     NULL},
     {"Settings", TWIN_SYM_SETTINGS, NULL, UI_RGB(0x767b6c), app_settings_open,
-     NULL},
+     NULL, NULL},
     {"Call Log", TWIN_SYM_HISTORY, NULL, UI_RGB(0x7a6a96), app_calllog_open,
+     NULL, NULL},
+    {"Snake", NULL, glyph_snake, UI_RGB(0x4d8f86), app_snake_open, NULL, NULL},
+    {"Pong", NULL, glyph_pong, UI_RGB(0x646c9a), app_pong_open, NULL, NULL},
+    {"Tetris", NULL, glyph_tetris, UI_RGB(0xad5348), app_tetris_open, NULL,
      NULL},
-    {"Snake", NULL, glyph_snake, UI_RGB(0x4d8f86), app_snake_open, NULL},
-    {"Pong", NULL, glyph_pong, UI_RGB(0x646c9a), app_pong_open, NULL},
-    {"Tetris", NULL, glyph_tetris, UI_RGB(0xad5348), app_tetris_open, NULL},
 };
 
 #define N_APPS ((int) (sizeof(apps) / sizeof(apps[0])))
 
 /* Then every other app of the shared registry (apps.c), in registry order:
- * a mobile build compiles in only apps that run under it.  Listed at boot. */
+ * a mobile build compiles in only apps that run under it.  A registry app
+ * the phone also offers natively, in its theme, is listed once, as the
+ * native one.  Listed at boot. */
 static phone_app_t demos[16];
 static int n_demos;
+
+static bool _replaced(const apps_entry_t *e)
+{
+    for (int i = 0; i < N_APPS; i++)
+        if (apps[i].replaces && apps[i].replaces == e->start)
+            return true;
+    return false;
+}
 
 static void _list_demos(void)
 {
@@ -318,7 +336,7 @@ static void _list_demos(void)
     n_demos = 0;
     for (int i = 0; i < apps_count(); i++) {
         const apps_entry_t *e = apps_at(i);
-        if (e->boot)
+        if (e->boot || _replaced(e))
             continue;
         if (n_demos == (int) (sizeof(demos) / sizeof(demos[0])))
             break;

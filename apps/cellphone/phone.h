@@ -51,6 +51,8 @@
 #include <stdint.h>
 #include <twin.h>
 
+#include "apps.h"
+
 /*
  * Geometry: portrait QVGA
  */
@@ -684,7 +686,10 @@ typedef struct {
     void (*open)(void);
     /* An app from the shared registry (apps.h) that opens its own windows
      * rather than a view; NULL for the phone's apps */
-    const struct apps_entry *demo;
+    const apps_entry_t *demo;
+    /* The registry app this one is the phone-themed form of, so the
+     * launcher lists it once; NULL for none */
+    apps_start_fn *replaces;
 } phone_app_t;
 
 int phone_app_count(void);

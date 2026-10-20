@@ -538,11 +538,13 @@ config DEMO_CLOCK
 config DEMO_CALCULATOR
     bool "Build calculator demo"
     default y
-    depends on DEMO_APPLICATIONS && WIDGETS
+    depends on DEMO_APPLICATIONS
     help
-      Interactive calculator application.
-      Demonstrates button widgets and event handling.
-      Shows layout management and user input processing.
+      Four-function calculator with decimal fixed-point arithmetic.
+      One source serves the desktop window and, with the cellphone demo,
+      the phone's Calculator app in the current phone theme.
+      Demonstrates a window drawn with paths and text, and mouse, touch
+      and keyboard input.
 
 config DEMO_SPLINE
     bool "Build spline demo"

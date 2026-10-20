@@ -25,8 +25,8 @@ static const apps_entry_t apps[] = {
     {"Clock", TWIN_SYM_CLOCK, 10, 10, 200, 200, apps_clock_start, NULL, NULL},
 #endif
 #if defined(CONFIG_DEMO_CALCULATOR)
-    {"Calc", TWIN_SYM_CALCULATOR, 100, 100, 200, 200, apps_calc_start, NULL,
-     NULL},
+    {"Calculator", TWIN_SYM_CALCULATOR, 100, 100, 220, 300, apps_calc_start,
+     NULL, NULL},
 #endif
 #if defined(CONFIG_DEMO_SPLINE)
     {"Spline", TWIN_SYM_SHUFFLE, 20, 20, 400, 400, apps_spline_start, NULL,

@@ -22,32 +22,81 @@ static void _ui_draw(twin_window_t *window);
 static bool _ui_event(twin_window_t *window, twin_event_t *ev);
 static void _ui_destroy(twin_window_t *window);
 
-void phone_view_changed(void);
-
 /* Every live view, so ui_view_of() can tell kit windows from the others */
 static ui_view_t *g_views;
 
-static void *_ui_view_new(size_t size,
+/* Where views open, and who hears that the view stack changed */
+static twin_screen_t *g_screen;
+static void (*g_changed)(void);
+
+void ui_attach(twin_screen_t *screen, void (*changed)(void))
+{
+    g_screen = screen;
+    g_changed = changed;
+}
+
+static void _changed(void)
+{
+    if (g_changed)
+        g_changed();
+}
+
+bool ui_is_app_window(twin_window_t *w)
+{
+    return twin_window_is_mapped(w) &&
+           twin_window_style(w) == TwinWindowApplication;
+}
+
+twin_window_t *ui_top_window(void)
+{
+    twin_window_t *top = NULL;
+    if (!g_screen)
+        return NULL;
+    for (twin_window_t *w = twin_screen_first_window(g_screen); w;
+         w = twin_window_next(w))
+        if (ui_is_app_window(w))
+            top = w;
+    return top;
+}
+
+bool ui_view_covered(const ui_view_t *view)
+{
+#if defined(CONFIG_WM_MOBILE)
+    /* The mobile policy gives every app window the whole work area, and a
+     * fullscreen one (the lock screen) more: either above hides this one */
+    for (twin_window_t *w = twin_window_next(view->window); w;
+         w = twin_window_next(w))
+        if (ui_is_app_window(w) ||
+            (twin_window_is_mapped(w) &&
+             twin_window_style(w) == TwinWindowFullscreen))
+            return true;
+    return false;
+#else
+    /* Overlapping windows: a view below another still shows */
+    return !twin_window_is_mapped(view->window);
+#endif
+}
+
+/* A PHONE_W wide view of @h rows at @x,@y on @screen */
+static void *_ui_view_new(twin_screen_t *screen,
                           twin_window_style_t style,
+                          twin_coord_t x,
+                          twin_coord_t y,
+                          twin_coord_t h,
+                          size_t size,
                           const char *title,
                           ui_paint_t paint,
                           ui_handler_t event,
                           ui_destroy_t destroy)
 {
-    twin_screen_t *screen = phone_screen();
     if (!screen || size < sizeof(ui_view_t))
         return NULL;
     ui_view_t *v = calloc(1, size);
     if (!v)
         return NULL;
 
-    twin_window_t *w;
-    if (style == TwinWindowFullscreen)
-        w = twin_window_create(screen, PHONE_FORMAT, style, 0, 0, PHONE_W,
-                               PHONE_H);
-    else
-        w = twin_window_create(screen, PHONE_FORMAT, style, 0, PHONE_STATUS_H,
-                               PHONE_W, PHONE_CONTENT_H);
+    twin_window_t *w =
+        twin_window_create(screen, PHONE_FORMAT, style, x, y, PHONE_W, h);
     if (!w) {
         free(v);
         return NULL;
@@ -73,8 +122,21 @@ void *ui_view_new(size_t size,
                   ui_handler_t event,
                   ui_destroy_t destroy)
 {
-    return _ui_view_new(size, TwinWindowApplication, title, paint, event,
-                        destroy);
+    return _ui_view_new(g_screen, TwinWindowApplication, 0, PHONE_STATUS_H,
+                        PHONE_CONTENT_H, size, title, paint, event, destroy);
+}
+
+void *ui_view_new_at(twin_screen_t *screen,
+                     twin_coord_t x,
+                     twin_coord_t y,
+                     size_t size,
+                     const char *title,
+                     ui_paint_t paint,
+                     ui_handler_t event,
+                     ui_destroy_t destroy)
+{
+    return _ui_view_new(screen, TwinWindowApplication, x, y, PHONE_CONTENT_H,
+                        size, title, paint, event, destroy);
 }
 
 void *ui_view_new_fullscreen(size_t size,
@@ -83,8 +145,8 @@ void *ui_view_new_fullscreen(size_t size,
                              ui_handler_t event,
                              ui_destroy_t destroy)
 {
-    return _ui_view_new(size, TwinWindowFullscreen, title, paint, event,
-                        destroy);
+    return _ui_view_new(g_screen, TwinWindowFullscreen, 0, 0, PHONE_H, size,
+                        title, paint, event, destroy);
 }
 
 void ui_view_show(ui_view_t *view)
@@ -92,7 +154,7 @@ void ui_view_show(ui_view_t *view)
     /* Paint first so the slide-in shows real content */
     twin_window_draw(view->window);
     twin_window_show(view->window);
-    phone_view_changed();
+    _changed();
 }
 
 void ui_view_close(ui_view_t *view)
@@ -124,6 +186,12 @@ int ui_key_ascii(const ui_event_t *event)
 ui_rect_t ui_view_bounds(const ui_view_t *view)
 {
     return ui_rect(0, 0, ui_view_width(view), ui_view_height(view));
+}
+
+bool ui_view_titled(const ui_view_t *view)
+{
+    /* Decorations sit above the client: a title bar pushes it down */
+    return twin_window_client(view->window).top > 0;
 }
 
 twin_coord_t ui_view_width(const ui_view_t *view)
@@ -177,8 +245,15 @@ void ui_view_scroll(ui_view_t *view, ui_rect_t r, int dx, int dy)
 static void _ui_draw(twin_window_t *window)
 {
     ui_view_t *v = twin_window_client_data(window);
+    twin_pixmap_t *px = twin_window_pixmap(window);
+    /* Views are laid out PHONE_W wide: a policy that maximizes windows
+     * shows the theme background beside them */
+    twin_coord_t w = ui_view_width(v);
+    if (w > PHONE_W)
+        ui_fill(px, ui_rect(PHONE_W, 0, w - PHONE_W, ui_view_height(v)),
+                phone_theme()->bg);
     if (v->paint)
-        v->paint(v, twin_window_pixmap(window));
+        v->paint(v, px);
 }
 
 /* Deliver to the handler; never touch @v afterwards (it may be gone) */
@@ -255,7 +330,7 @@ static bool _ui_event(twin_window_t *window, twin_event_t *ev)
         _deliver(v, &e);
         /* A view revealed by a closing demo window: the stack changed */
         if (ev->kind == TwinEventActivate)
-            phone_view_changed();
+            _changed();
         return true;
     case TwinEventClose:
         return false; /* let the window close */
@@ -298,7 +373,7 @@ static void _ui_destroy(twin_window_t *window)
     if (v->destroy)
         v->destroy(v);
     free(v);
-    phone_view_changed();
+    _changed();
 }
 
 /*

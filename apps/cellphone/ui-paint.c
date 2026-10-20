@@ -73,6 +73,123 @@ static bool _text_culled(twin_pixmap_t *px, int size, twin_coord_t y)
 }
 
 /*
+ * Themes
+ */
+static const phone_theme_t themes[] = {
+    {
+        /* Sage: warm white pages, sage green groups, deep olive bars */
+        .name = "Sage",
+        .primary = UI_RGB(0x667a3e),
+        .primary_dk = UI_RGB(0x4f5f30),
+        .statusbar = UI_RGB(0x4e5540),
+        .statusbar_grad = UI_RGB(0x646b54),
+        .header = UI_RGB(0x7d8568),
+        .header_grad = UI_RGB(0x6a7257),
+        .on_bar = UI_RGB(0xf7f5ec),
+        .navbar = UI_RGB(0xd3d9c4),
+        .navbar_grad = UI_RGB(0xe0e5d3),
+        .bg = UI_RGB(0xf4f2e9),
+        .bg_grad = UI_RGB(0xedeadf),
+        .card = UI_RGB(0xfbfaf4),
+        .group = UI_RGB(0xe2e6d6),
+        .text = UI_RGB(0x26301f),
+        .text_sec = UI_RGB(0x5c6652),
+        .separator = UI_RGB(0xdadccc),
+        .call_green = UI_RGB(0x55873a),
+        .call_red = UI_RGB(0xb0473e),
+        .missed_red = UI_RGB(0xa63c34),
+        .sms_sent = UI_RGB(0xdde5c6),
+        .sms_recv = UI_RGB(0xfbfaf4),
+        .indicator = UI_RGB(0xbcc2ab),
+        .on_primary = UI_RGB(0xffffff),
+    },
+    {
+        .name = "Dark",
+        .primary = UI_RGB(0x8fb06a),
+        .primary_dk = UI_RGB(0x6f8f4c),
+        .statusbar = UI_RGB(0x000000),
+        .statusbar_grad = UI_RGB(0x0c0c0c),
+        .header = UI_RGB(0x262923),
+        .header_grad = UI_RGB(0x1e201c),
+        .on_bar = UI_RGB(0xe4e6df),
+        .navbar = UI_RGB(0x1a1b18),
+        .navbar_grad = UI_RGB(0x22241f),
+        .bg = UI_RGB(0x121311),
+        .bg_grad = UI_RGB(0x121311),
+        .card = UI_RGB(0x1c1d1a),
+        .group = UI_RGB(0x2a2c27),
+        .text = UI_RGB(0xe4e6df),
+        .text_sec = UI_RGB(0xa0a498),
+        .separator = UI_RGB(0x34372f),
+        .call_green = UI_RGB(0x6fbf5a),
+        .call_red = UI_RGB(0xe0574d),
+        .missed_red = UI_RGB(0xe0574d),
+        .sms_sent = UI_RGB(0x34452a),
+        .sms_recv = UI_RGB(0x2a2c27),
+        .indicator = UI_RGB(0x50544a),
+        .on_primary = UI_RGB(0x10140c),
+    },
+    {
+        .name = "Ocean",
+        .primary = UI_RGB(0x1e78b4),
+        .primary_dk = UI_RGB(0x165e8e),
+        .statusbar = UI_RGB(0x14496e),
+        .statusbar_grad = UI_RGB(0x1d5f8c),
+        .header = UI_RGB(0x2b78a8),
+        .header_grad = UI_RGB(0x226690),
+        .on_bar = UI_RGB(0xffffff),
+        .navbar = UI_RGB(0xcfe0ec),
+        .navbar_grad = UI_RGB(0xdeeaf3),
+        .bg = UI_RGB(0xf2f7fa),
+        .bg_grad = UI_RGB(0xe8f0f6),
+        .card = UI_RGB(0xffffff),
+        .group = UI_RGB(0xdde9f2),
+        .text = UI_RGB(0x1c2833),
+        .text_sec = UI_RGB(0x55687a),
+        .separator = UI_RGB(0xd5dee5),
+        .call_green = UI_RGB(0x2e9a58),
+        .call_red = UI_RGB(0xc8403f),
+        .missed_red = UI_RGB(0xc03030),
+        .sms_sent = UI_RGB(0xcfe5f6),
+        .sms_recv = UI_RGB(0xffffff),
+        .indicator = UI_RGB(0xa9c3d6),
+        .on_primary = UI_RGB(0xffffff),
+    },
+};
+
+#define N_THEMES ((int) (sizeof(themes) / sizeof(themes[0])))
+
+static int theme_idx;
+
+const phone_theme_t *phone_theme(void)
+{
+    return &themes[theme_idx];
+}
+
+int phone_theme_count(void)
+{
+    return N_THEMES;
+}
+
+int phone_theme_index(void)
+{
+    return theme_idx;
+}
+
+const phone_theme_t *phone_theme_at(int idx)
+{
+    return (idx >= 0 && idx < N_THEMES) ? &themes[idx] : NULL;
+}
+
+bool ui_theme_select(int idx)
+{
+    if (idx < 0 || idx >= N_THEMES)
+        return false;
+    theme_idx = idx;
+    return true;
+}
+
+/*
  * Typography
  */
 twin_coord_t ui_text_width(int size, const char *s)

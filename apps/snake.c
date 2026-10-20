@@ -8,7 +8,7 @@
 
 #include <string.h>
 
-#include "games-internal.h"
+#include "games.h"
 
 /*
  * Snake: steer by breadth-first search to the fruit, but only along moves
@@ -184,7 +184,44 @@ static void snake_paint(game_t *g, twin_pixmap_t *px, ui_rect_t clip)
     }
 }
 
-const game_ops_t game_snake_ops = {
-    "Snake", 130,         SN_COLS,    SN_ROWS,    SN_CELL,
+static const game_ops_t game_snake_ops = {
+    "Snake", 1,           130,        SN_COLS,    SN_ROWS,     SN_CELL,
     INNER_X, INNER_Y + 1, snake_init, snake_tick, snake_paint,
 };
+
+/* Launcher icon */
+void app_snake_glyph(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg)
+{
+    int u = ui_w(p) / 8;
+    twin_coord_t x = p.left + 2 * u, y = p.top + 2 * u;
+    twin_path_t *path = ui_path();
+    twin_path_move(path, twin_int_to_fixed(x), twin_int_to_fixed(y + 4 * u));
+    twin_path_draw(path, twin_int_to_fixed(x), twin_int_to_fixed(y));
+    twin_path_draw(path, twin_int_to_fixed(x + 4 * u), twin_int_to_fixed(y));
+    twin_path_draw(path, twin_int_to_fixed(x + 4 * u),
+                   twin_int_to_fixed(y + 2 * u));
+    twin_path_draw(path, twin_int_to_fixed(x + 2 * u),
+                   twin_int_to_fixed(y + 2 * u));
+    twin_path_draw(path, twin_int_to_fixed(x + 2 * u),
+                   twin_int_to_fixed(y + 4 * u));
+    twin_path_set_cap_style(path, TwinCapRound);
+    twin_paint_stroke(px, fg, path, twin_int_to_fixed(u + u / 2));
+    ui_path_done(path);
+    ui_circle(px, x + 4 * u, y + 4 * u, u / 2 + 1, ui_alpha(fg, 0xc0));
+}
+
+void app_snake_open(void)
+{
+    game_open(&game_snake_ops);
+}
+
+bool apps_snake_start(twin_screen_t *screen,
+                      const char *name,
+                      int x,
+                      int y,
+                      int w,
+                      int h)
+{
+    (void) w, (void) h; /* the board has a fixed size */
+    return game_start(&game_snake_ops, screen, name, x, y);
+}

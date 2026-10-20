@@ -173,20 +173,22 @@ libapps.a_files-$(CONFIG_DEMO_CALCULATOR) += apps/calc.c
 libapps.a_files-$(CONFIG_DEMO_SPLINE) += apps/spline.c
 libapps.a_files-$(CONFIG_DEMO_ANIMATION) += apps/animation.c
 libapps.a_files-$(CONFIG_DEMO_IMAGE) += apps/image.c
+libapps.a_files-$(CONFIG_DEMO_SNAKE) += apps/snake.c
+libapps.a_files-$(CONFIG_DEMO_PONG) += apps/pong.c
+libapps.a_files-$(CONFIG_DEMO_TETRIS) += apps/tetris.c
+libapps.a_files-$(CONFIG_DEMO_GAMES) += apps/games.c
 
-libapps.a_files-$(CONFIG_DEMO_CELLPHONE) += \
+libapps.a_files-$(CONFIG_DEMO_UIKIT) += \
 	apps/cellphone/ui.c \
 	apps/cellphone/ui-paint.c \
-	apps/cellphone/ui-input.c \
+	apps/cellphone/ui-input.c
+
+libapps.a_files-$(CONFIG_DEMO_CELLPHONE) += \
 	apps/cellphone/shell.c \
 	apps/cellphone/home.c \
 	apps/cellphone/lock.c \
 	apps/cellphone/data.c \
-	apps/cellphone/settings.c \
-	apps/cellphone/games.c \
-	apps/cellphone/snake.c \
-	apps/cellphone/pong.c \
-	apps/cellphone/tetris.c
+	apps/cellphone/settings.c
 libapps.a_files-$(CONFIG_DEMO_PHONE_DIALER) += apps/cellphone/dialer.c
 libapps.a_files-$(CONFIG_DEMO_PHONE_CALLLOG) += apps/cellphone/calllog.c
 libapps.a_files-$(CONFIG_DEMO_PHONE_MESSAGES) += apps/cellphone/sms.c

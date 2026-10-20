@@ -8,7 +8,7 @@
 
 #include <string.h>
 
-#include "games-internal.h"
+#include "games.h"
 
 /*
  * Pong: the ball moves in subpixels and speeds up on every hit; paddles
@@ -204,6 +204,34 @@ static void pong_paint(game_t *g, twin_pixmap_t *px, ui_rect_t clip)
 
 /* Pong steps faster: the ball moves continuously and a step damages only
  * two small strips and the ball */
-const game_ops_t game_pong_ops = {
-    "Pong", 50, 0, 0, 0, 0, 0, pong_init, pong_tick, pong_paint,
+static const game_ops_t game_pong_ops = {
+    "Pong", 2, 50, 0, 0, 0, 0, 0, pong_init, pong_tick, pong_paint,
 };
+
+/* Launcher icon */
+void app_pong_glyph(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg)
+{
+    int u = ui_w(p) / 8;
+    ui_rrect(px, ui_rect(p.left + u + u / 2, p.top + 2 * u, u, 3 * u), u / 2,
+             fg);
+    ui_rrect(px, ui_rect(p.right - 2 * u - u / 2, p.top + 3 * u, u, 3 * u),
+             u / 2, fg);
+    ui_circle(px, (p.left + p.right) / 2, p.top + 3 * u + u / 2, u * 2 / 3 + 1,
+              fg);
+}
+
+void app_pong_open(void)
+{
+    game_open(&game_pong_ops);
+}
+
+bool apps_pong_start(twin_screen_t *screen,
+                     const char *name,
+                     int x,
+                     int y,
+                     int w,
+                     int h)
+{
+    (void) w, (void) h; /* the board has a fixed size */
+    return game_start(&game_pong_ops, screen, name, x, y);
+}

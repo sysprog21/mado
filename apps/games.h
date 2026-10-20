@@ -9,9 +9,10 @@
  * per game (snake.c, pong.c, tetris.c).
  */
 
-#ifndef _GAMES_INTERNAL_H_
-#define _GAMES_INTERNAL_H_
+#ifndef _APPS_GAMES_H_
+#define _APPS_GAMES_H_
 
+#include "apps.h"
 #include "phone.h"
 
 /* Layout, client coordinates */
@@ -59,13 +60,6 @@
 #define TT_SIDE_X (TT_X + TT_COLS * TT_CELL)
 #define TT_PREV_CELL 9
 
-typedef enum {
-    GAME_SNAKE,
-    GAME_PONG,
-    GAME_TETRIS,
-    GAME_COUNT,
-} game_kind_t;
-
 typedef struct {
     uint8_t occ[SN_ROWS][SN_COLS]; /* 1 where the body is */
     uint8_t bx[SN_N], by[SN_N];    /* ring buffer, head at index head */
@@ -89,9 +83,11 @@ typedef struct {
     int target_x, target_rot;
 } tetris_t;
 
+typedef struct game_ops game_ops_t;
+
 typedef struct {
     ui_view_t view;
-    game_kind_t kind;
+    const game_ops_t *ops;
     uint32_t rng;
     bool paused;
     int score, best;
@@ -106,8 +102,9 @@ typedef struct {
     } u;
 } game_t;
 
-typedef struct {
+struct game_ops {
     const char *name;
+    uint32_t seed;      /* the PRNG's start, so every open replays alike */
     twin_time_t period; /* ms per step */
     /* Cell grid for mark_cell(); zero for games drawn in pixels */
     int cols, rows, cell;
@@ -115,14 +112,18 @@ typedef struct {
     void (*init)(game_t *g); /* new round; the caller repaints the board */
     void (*tick)(game_t *g); /* advance one step, mark() what changed */
     void (*paint)(game_t *g, twin_pixmap_t *px, ui_rect_t clip);
-} game_ops_t;
-
-/* Per-game tables, defined next to each game */
-extern const game_ops_t game_snake_ops;
-extern const game_ops_t game_pong_ops;
-extern const game_ops_t game_tetris_ops;
+};
 
 /* Helpers (games.c) */
+/* Open @ops as a phone view, pushed on the shell's stack */
+void game_open(const game_ops_t *ops);
+/* Open @ops paused in a window of its own on @screen at @x,@y (any window
+ * manager, no phone shell); false when it could not start */
+bool game_start(const game_ops_t *ops,
+                twin_screen_t *screen,
+                const char *name,
+                int x,
+                int y);
 uint32_t game_rnd(game_t *g);
 int game_rnd_below(game_t *g, int n);
 ui_rect_t game_panel_rect(void);
@@ -143,4 +144,4 @@ void game_set_score(game_t *g, int score);
 /* Start a new round and repaint the board */
 void game_restart(game_t *g);
 
-#endif /* _GAMES_INTERNAL_H_ */
+#endif /* _APPS_GAMES_H_ */

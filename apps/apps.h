@@ -48,6 +48,7 @@ const apps_entry_t *apps_at(int idx);
 #define ASSET_PATH "assets/"
 
 apps_start_fn apps_animation_start, apps_calc_start, apps_clock_start,
-    apps_image_start, apps_multi_start, apps_spline_start;
+    apps_image_start, apps_multi_start, apps_spline_start, apps_snake_start,
+    apps_pong_start, apps_tetris_start;
 
 #endif /* _APPS_H_ */

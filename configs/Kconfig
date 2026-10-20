@@ -597,6 +597,38 @@ config DEMO_CALCULATOR
       Demonstrates a window drawn with paths and text, and mouse, touch
       and keyboard input.
 
+config DEMO_SNAKE
+    bool "Build Snake demo"
+    default y
+    depends on DEMO_APPLICATIONS && FONT_MONTSERRAT && FONT_ICONS
+    help
+      Self-playing Snake.  Snake, Pong and Tetris share one arcade view
+      from the phone's UI kit: on the phone they are launcher apps in the
+      phone theme, under any other window manager each opens a window,
+      paused until tapped.
+
+config DEMO_PONG
+    bool "Build Pong demo"
+    default y
+    depends on DEMO_APPLICATIONS && FONT_MONTSERRAT && FONT_ICONS
+    help
+      Self-playing Pong, in the same arcade view as Snake.
+
+config DEMO_TETRIS
+    bool "Build Tetris demo"
+    default y
+    depends on DEMO_APPLICATIONS && FONT_MONTSERRAT && FONT_ICONS
+    help
+      Self-playing Tetris, in the same arcade view as Snake.
+
+# Built when any game is: the arcade view they share
+config DEMO_GAMES
+    def_bool DEMO_SNAKE || DEMO_PONG || DEMO_TETRIS
+
+# The UI kit the phone and the games draw with
+config DEMO_UIKIT
+    def_bool DEMO_CELLPHONE || DEMO_GAMES
+
 config DEMO_SPLINE
     bool "Build spline demo"
     default y

@@ -14,6 +14,8 @@
 
 #include "phone-test.h"
 
+#if defined(CONFIG_DEMO_GAMES)
+
 int app_games_test_steps(void);
 int app_games_test_score(void);
 int app_games_test_best(void);
@@ -99,34 +101,52 @@ static void play(const char *name, const char *shot)
           b.steps, a.score, b.score, a.events, b.events);
 }
 
+/* Each game is picked on its own in Kconfig */
+static bool built(const char *name)
+{
+    return phone_app_find(name) >= 0;
+}
+
 void test_games(void)
 {
-    play("Snake", "games-snake");
-    ph_wait(15000);
-    CHECK(app_games_test_events() > 0, "snake ate");
-    CHECK(app_games_test_best() > 0, "snake scored");
-    ph_home();
+    if (built("Snake")) {
+        play("Snake", "games-snake");
+        ph_wait(15000);
+        CHECK(app_games_test_events() > 0, "snake ate");
+        CHECK(app_games_test_best() > 0, "snake scored");
+        ph_home();
+    }
 
-    play("Pong", "games-pong");
-    ph_wait(5000);
-    CHECK(app_games_test_events() > 0, "pong paddles hit the ball");
-    ph_home();
+    if (built("Pong")) {
+        play("Pong", "games-pong");
+        ph_wait(5000);
+        CHECK(app_games_test_events() > 0, "pong paddles hit the ball");
+        ph_home();
+    }
 
+    if (!built("Tetris"))
+        return;
     play("Tetris", "games-tetris");
     ph_wait(30000);
     CHECK(app_games_test_events() > 10, "tetris placed pieces");
     CHECK(app_games_test_best() > 0, "tetris cleared lines");
     ph_shot("games-tetris-late");
 
-    /* A covering view freezes the game; revealing it repaints from state */
-    int steps = app_games_test_steps();
-    ph_open("Snake");
-    CHECK_EQ(phone_depth(), 2, "snake over tetris");
-    phone_back();
-    ph_wait(500);
-    CHECK_EQ(phone_depth(), 1, "back to tetris");
-    CHECK(app_games_test_steps() >= steps, "tetris state kept");
-    ph_shot("games-tetris-revealed");
+    if (built("Snake")) {
+        /* A covering view freezes the game; revealing it repaints from
+         * state */
+        int steps = app_games_test_steps();
+        ph_open("Snake");
+        CHECK_EQ(phone_depth(), 2, "snake over tetris");
+        phone_back();
+        ph_wait(500);
+        CHECK_EQ(phone_depth(), 1, "back to tetris");
+        CHECK(app_games_test_steps() >= steps, "tetris state kept");
+        ph_shot("games-tetris-revealed");
+    }
 
     ph_home();
 }
+#else
+void test_games(void) {}
+#endif

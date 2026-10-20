@@ -39,6 +39,16 @@ static const apps_entry_t apps[] = {
 #if defined(CONFIG_DEMO_IMAGE)
     {"Vectors", TWIN_SYM_GLOBE, 20, 20, 0, 0, apps_image_start, NULL, NULL},
 #endif
+/* Kit views in plain windows; the phone lists its own, themed rows */
+#if defined(CONFIG_DEMO_SNAKE)
+    {"Snake", TWIN_SYM_PLAY, 60, 40, 0, 0, apps_snake_start, NULL, NULL},
+#endif
+#if defined(CONFIG_DEMO_PONG)
+    {"Pong", TWIN_SYM_PLAY, 90, 60, 0, 0, apps_pong_start, NULL, NULL},
+#endif
+#if defined(CONFIG_DEMO_TETRIS)
+    {"Tetris", TWIN_SYM_PLAY, 120, 80, 0, 0, apps_tetris_start, NULL, NULL},
+#endif
     {0}, /* keeps the table valid when nothing is built */
 };
 

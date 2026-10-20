@@ -112,6 +112,8 @@ const phone_theme_t *phone_theme(void);
 int phone_theme_count(void);
 int phone_theme_index(void);
 const phone_theme_t *phone_theme_at(int idx);
+/* Make theme @idx current without repainting; false if out of range */
+bool ui_theme_select(int idx);
 /* Switch theme and repaint every view */
 void phone_theme_set(int idx);
 
@@ -329,6 +331,18 @@ void ui_vgrad(twin_pixmap_t *px,
 bool ui_init(void);
 void ui_fini(void);
 
+/* ui_view_new() opens views on @screen from now on; @changed (may be
+ * NULL) runs whenever the view stack changes.  The phone shell attaches
+ * itself. */
+void ui_attach(twin_screen_t *screen, void (*changed)(void));
+
+/* An app window, mapped and not a bar, so it takes part in the stack: the
+ * phone's views and the windows of registry apps alike */
+bool ui_is_app_window(twin_window_t *w);
+
+/* Topmost mapped app window on the attached screen, NULL if none */
+twin_window_t *ui_top_window(void);
+
 twin_path_t *ui_path(void);
 void ui_path_done(twin_path_t *path);
 
@@ -408,6 +422,17 @@ void *ui_view_new(size_t size,
                   ui_handler_t event,
                   ui_destroy_t destroy);
 
+/* Same, in a window of its own at @x,@y on @screen, for running kit views
+ * under any window manager without the phone shell */
+void *ui_view_new_at(twin_screen_t *screen,
+                     twin_coord_t x,
+                     twin_coord_t y,
+                     size_t size,
+                     const char *title,
+                     ui_paint_t paint,
+                     ui_handler_t event,
+                     ui_destroy_t destroy);
+
 /* Same, covering the whole screen above the bars (lock screen) */
 void *ui_view_new_fullscreen(size_t size,
                              const char *title,
@@ -421,6 +446,11 @@ void ui_view_show(ui_view_t *view);
 /* Close the view (slides out); state is freed immediately */
 void ui_view_close(ui_view_t *view);
 
+/* True while @view is hidden: below an app or fullscreen window under the
+ * mobile policy, unmapped under one that overlaps windows (there a view
+ * behind others still counts as shown) */
+bool ui_view_covered(const ui_view_t *view);
+
 /*
  * Geometry that depends on the view's size (scroll areas and the like) is
  * computed by @layout: now, and again whenever the view is resized.
@@ -431,6 +461,9 @@ void ui_view_set_layout(ui_view_t *view, ui_layout_t layout);
 int ui_key_ascii(const ui_event_t *event);
 
 ui_rect_t ui_view_bounds(const ui_view_t *view);
+/* True when the window manager draws a title bar for @view, so a header
+ * inside it need not name the view again */
+bool ui_view_titled(const ui_view_t *view);
 twin_coord_t ui_view_width(const ui_view_t *view);
 twin_coord_t ui_view_height(const ui_view_t *view);
 
@@ -714,6 +747,10 @@ void app_calllog_open(void);
 void app_snake_open(void);
 void app_pong_open(void);
 void app_tetris_open(void);
+/* Their launcher icons (phone_glyph_t) */
+void app_snake_glyph(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
+void app_pong_glyph(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
+void app_tetris_glyph(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
 
 /* Home and lock screens (shell.c) */
 ui_view_t *home_create(void);

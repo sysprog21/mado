@@ -8,7 +8,7 @@
 
 #include <string.h>
 
-#include "games-internal.h"
+#include "games.h"
 
 /*
  * Tetris: on spawn, score every rotation and column by the resting
@@ -273,7 +273,37 @@ static void tetris_paint(game_t *g, twin_pixmap_t *px, ui_rect_t clip)
     }
 }
 
-const game_ops_t game_tetris_ops = {
-    "Tetris", 110,  TT_COLS,     TT_ROWS,     TT_CELL,
+static const game_ops_t game_tetris_ops = {
+    "Tetris", 3,    110,         TT_COLS,     TT_ROWS,      TT_CELL,
     TT_X,     TT_Y, tetris_init, tetris_tick, tetris_paint,
 };
+
+/* Launcher icon */
+void app_tetris_glyph(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg)
+{
+    int u = ui_w(p) / 7;
+    twin_coord_t x = p.left + (ui_w(p) - 3 * u) / 2;
+    twin_coord_t y = p.top + (ui_h(p) - 2 * u) / 2;
+    static const int cells[4][2] = {{0, 0}, {1, 0}, {2, 0}, {1, 1}};
+    for (int i = 0; i < 4; i++)
+        ui_rrect(px,
+                 ui_rect(x + cells[i][0] * u + 1, y + cells[i][1] * u + 1,
+                         u - 2, u - 2),
+                 2, i == 3 ? ui_alpha(fg, 0xb0) : fg);
+}
+
+void app_tetris_open(void)
+{
+    game_open(&game_tetris_ops);
+}
+
+bool apps_tetris_start(twin_screen_t *screen,
+                       const char *name,
+                       int x,
+                       int y,
+                       int w,
+                       int h)
+{
+    (void) w, (void) h; /* the board has a fixed size */
+    return game_start(&game_tetris_ops, screen, name, x, y);
+}

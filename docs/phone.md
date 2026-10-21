@@ -2,7 +2,7 @@
 
 This document describes how Mado runs a phone user interface or a classic
 desktop from the same core, and why the core is shaped the way it is.  The
-cellphone demo under `apps/cellphone/` is the reference workload: a lock
+phone shell under `apps/cellphone/` is the reference workload: a lock
 screen, a home screen and twelve apps on a 240x320 display, drawn with
 anti-aliased vector graphics (plus JPEG photo fixtures in Photos) on a CPU
 without graphics acceleration.
@@ -44,7 +44,7 @@ geometry: `TwinWindowPlain` (placed exactly as requested, never decorated),
 `TwinWindowApplication` (a managed app window) and `TwinWindowFullscreen`
 (above everything, e.g. a lock screen).  The same app code therefore runs
 decorated on a desktop, stacked on a phone, or full screen with no window
-manager at all.  The demo apps are the proof.  `apps/apps.c` registers
+manager at all.  The applications are the proof.  `apps/apps.c` registers
 every app that is built, and which policies an app runs under is settled
 at build time too: ordinary apps run under all three, while the phone
 shell, which owns the screen, depends on `WM_MOBILE` in Kconfig and is
@@ -123,7 +123,7 @@ is repainted from application state when revealed.  An opaque full-screen
 window (the lock screen) likewise releases the app and the bars under it.
 Steady-state memory is one work-area surface plus the bars, independent of
 how many screens are stacked.  Phone screens can also render into RGB565
-surfaces (`DEMO_CELLPHONE_RGB16`) to halve that again.
+surfaces (`APP_CELLPHONE_RGB16`) to halve that again.
 
 Heap measured by the `test-cellphone` budget gate: everything allocated
 through `twin_malloc` except the bounded reuse pools (the 24 KiB coverage

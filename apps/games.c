@@ -9,11 +9,11 @@
  *
  * One view type (this file) serves all three games; everything game
  * specific sits in a const ops table (geometry, init, tick, paint) defined
- * by each game's own file, so adding a game is one file and one row below.  The
- * board lives in small fixed arrays in the view, and a tick damages only what
- * it changed: the snake's head and tail cells, the ball and paddle strips, the
- * falling piece's old and new cells. The whole board is repainted only on a
- * line clear or a restart.
+ * by each game's own file, which also opens it, so adding a game is one file
+ * and a launcher row.  The board lives in small fixed arrays in the view,
+ * and a tick damages only what it changed: the snake's head and tail cells,
+ * the ball and paddle strips, the falling piece's old and new cells.  The
+ * whole board is repainted only on a line clear or a restart.
  *
  * Window damage is a single bounding box, so two far-apart cells (snake head
  * and tail) would coalesce into a large rectangle.  game_mark() batches nearby
@@ -27,13 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "games-internal.h"
-
-static const game_ops_t *const ops[GAME_COUNT] = {
-    [GAME_SNAKE] = &game_snake_ops,
-    [GAME_PONG] = &game_pong_ops,
-    [GAME_TETRIS] = &game_tetris_ops,
-};
+#include "games.h"
 
 /*
  * Helpers
@@ -67,6 +61,13 @@ ui_rect_t game_inner_rect(void)
 static ui_rect_t score_rect(void)
 {
     return ui_rect(PHONE_W / 2 - 24, 0, PHONE_W / 2 + 24, HEADER_H - 1);
+}
+
+/* The hint under the panel */
+static ui_rect_t footer_rect(const ui_view_t *v)
+{
+    twin_coord_t top = game_panel_rect().bottom;
+    return ui_rect(0, top, PHONE_W, ui_view_height(v) - top);
 }
 
 static ui_rect_t overlay_rect(void)
@@ -114,14 +115,14 @@ void game_mark(game_t *g, ui_rect_t r)
 
 ui_rect_t game_cell_rect(const game_t *g, int c, int r)
 {
-    const game_ops_t *o = ops[g->kind];
+    const game_ops_t *o = g->ops;
     return ui_rect(o->ox + c * o->cell, o->oy + r * o->cell, o->cell, o->cell);
 }
 
 /* Cells-changed hook shared by the grid games */
 void game_mark_cell(game_t *g, int c, int r)
 {
-    const game_ops_t *o = ops[g->kind];
+    const game_ops_t *o = g->ops;
     if (c >= 0 && r >= 0 && c < o->cols && r < o->rows)
         game_mark(g, game_cell_rect(g, c, r));
 }
@@ -134,7 +135,7 @@ void game_cell_span(const game_t *g,
                     int *r0,
                     int *r1)
 {
-    const game_ops_t *o = ops[g->kind];
+    const game_ops_t *o = g->ops;
     int a = (clip.left - o->ox) / o->cell, b = (clip.right - o->ox - 1);
     int c = (clip.top - o->oy) / o->cell, d = (clip.bottom - o->oy - 1);
     b = b < 0 ? -1 : b / o->cell;
@@ -159,7 +160,7 @@ void game_set_score(game_t *g, int score)
 void game_restart(game_t *g)
 {
     game_set_score(g, 0);
-    ops[g->kind]->init(g);
+    g->ops->init(g);
     g->full++;
     game_mark(g, game_inner_rect());
 }
@@ -180,7 +181,7 @@ static void game_paint(ui_view_t *v, twin_pixmap_t *px)
         snprintf(buf, sizeof(buf), "Score %d \xc2\xb7 Best %d", g->score,
                  g->best);
         ui_header(px, ui_rect(0, 0, PHONE_W, HEADER_H), NULL,
-                  ops[g->kind]->name, buf);
+                  ui_view_titled(v) ? NULL : g->ops->name, buf);
     }
     /* Ticks damage cells inside the panel: fill just the clip there */
     if (ui_rect_contains(in, clip)) {
@@ -190,12 +191,11 @@ static void game_paint(ui_view_t *v, twin_pixmap_t *px)
                 th->bg);
         ui_rrect(px, panel, PANEL_R, C_PANEL);
         ui_rrect_stroke(px, panel, PANEL_R, 1, C_BORDER);
-        ui_text(px, FONT_SM, PHONE_W / 2,
-                ui_baseline(FONT_SM, panel.bottom,
-                            ui_view_height(v) - panel.bottom),
-                UI_CENTER, th->text_sec, "Auto-play \xc2\xb7 tap to pause");
+        ui_text_in(px, FONT_SM, footer_rect(v), UI_CENTER, th->text_sec,
+                   g->paused ? "Paused \xc2\xb7 tap to play"
+                             : "Auto-play \xc2\xb7 tap to pause");
     }
-    ops[g->kind]->paint(g, px, clip);
+    g->ops->paint(g, px, clip);
 
     ui_rect_t o = overlay_rect();
     if (g->paused && ui_intersects(clip, o)) {
@@ -210,9 +210,9 @@ static void game_paint(ui_view_t *v, twin_pixmap_t *px)
 static twin_time_t game_tick(ui_view_t *v)
 {
     game_t *g = (game_t *) v;
-    const game_ops_t *o = ops[g->kind];
-    /* Freeze while another view covers this one */
-    if (g->paused || phone_top() != v)
+    const game_ops_t *o = g->ops;
+    /* Freeze while another window covers this one */
+    if (g->paused || ui_view_covered(v))
         return o->period;
     o->tick(g);
     g->steps++;
@@ -226,11 +226,12 @@ static void set_paused(game_t *g, bool paused)
         return;
     g->paused = paused;
     ui_view_invalidate(&g->view, overlay_rect());
+    ui_view_invalidate(&g->view, footer_rect(&g->view));
     /* No timer while paused: nothing to wake up for */
     if (paused)
         ui_view_stop_timers(&g->view);
     else
-        ui_view_every(&g->view, ops[g->kind]->period, game_tick);
+        ui_view_every(&g->view, g->ops->period, game_tick);
 }
 
 static bool game_event(ui_view_t *v, const ui_event_t *e)
@@ -244,36 +245,44 @@ static bool game_event(ui_view_t *v, const ui_event_t *e)
     return false;
 }
 
-static void game_open(game_kind_t kind)
+/* Set up @g, a fresh view (NULL when its allocation failed), and show it;
+ * a @paused game waits for a tap before its first step */
+static bool game_show(game_t *g, const game_ops_t *ops, bool paused)
 {
-    game_t *g =
-        ui_view_new(sizeof(*g), ops[kind]->name, game_paint, game_event, NULL);
     if (!g)
-        return;
-    g->kind = kind;
-    g->rng = 0x2545f491u * (uint32_t) (kind + 1);
-    ops[kind]->init(g);
+        return false;
+    g->ops = ops;
+    g->rng = 0x2545f491u * ops->seed;
+    ops->init(g);
     g->pend = (ui_rect_t) {0, 0, 0, 0}; /* the first paint covers it all */
-    if (!ui_view_every(&g->view, ops[kind]->period, game_tick)) {
+    g->paused = paused;
+    if (!paused && !ui_view_every(&g->view, ops->period, game_tick)) {
         ui_view_close(&g->view);
-        return;
+        return false;
     }
     ui_view_show(&g->view);
+    return true;
 }
 
-void app_snake_open(void)
+void game_open(const game_ops_t *ops)
 {
-    game_open(GAME_SNAKE);
+    game_show(
+        ui_view_new(sizeof(game_t), ops->name, game_paint, game_event, NULL),
+        ops, false);
 }
 
-void app_pong_open(void)
+/* Opens paused: without the phone shell every registry app starts at boot,
+ * and three games playing unasked would only burn cycles */
+bool game_start(const game_ops_t *ops,
+                twin_screen_t *screen,
+                const char *name,
+                int x,
+                int y)
 {
-    game_open(GAME_PONG);
-}
-
-void app_tetris_open(void)
-{
-    game_open(GAME_TETRIS);
+    return ui_init() &&
+           game_show(ui_view_new_at(screen, x, y, sizeof(game_t), name,
+                                    game_paint, game_event, NULL),
+                     ops, true);
 }
 
 /*
@@ -281,7 +290,7 @@ void app_tetris_open(void)
  */
 static game_t *top_game(void)
 {
-    ui_view_t *v = phone_top();
+    ui_view_t *v = ui_view_of(ui_top_window());
     return v && v->paint == game_paint ? (game_t *) v : NULL;
 }
 

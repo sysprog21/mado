@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 #include <time.h>
 
@@ -37,6 +38,7 @@ static inline twin_pixmap_t *_apps_clock_pixmap(twin_custom_widget_t *clock)
 
 typedef struct {
     twin_timeout_t *timeout;
+    bool frozen; /* MADO_FROZEN_TIME=1: show a fixed time, for screenshots */
 } apps_clock_data_t;
 
 static void apps_clock_set_transform(twin_custom_widget_t *clock,
@@ -175,9 +177,14 @@ static void _apps_clock_paint(twin_custom_widget_t *clock)
     twin_angle_t second_angle, minute_angle, hour_angle;
     struct tm t;
 
-    gettimeofday(&tv, NULL);
-
-    localtime_r(&tv.tv_sec, &t);
+    const apps_clock_data_t *data = twin_custom_widget_data(clock);
+    if (data->frozen) {
+        tv = (struct timeval) {0};
+        gmtime_r(&tv.tv_sec, &t);
+    } else {
+        gettimeofday(&tv, NULL);
+        localtime_r(&tv.tv_sec, &t);
+    }
 
     _apps_clock_face(clock);
 
@@ -234,6 +241,8 @@ static twin_custom_widget_t *_apps_clock_init(twin_box_t *parent)
 
     apps_clock_data_t *data =
         (apps_clock_data_t *) twin_custom_widget_data(custom);
+    const char *frozen = getenv("MADO_FROZEN_TIME");
+    data->frozen = frozen && !strcmp(frozen, "1");
     data->timeout =
         twin_set_timeout(_apps_clock_timeout, _apps_clock_interval(), custom);
 

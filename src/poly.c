@@ -33,12 +33,18 @@ typedef struct _twin_edge {
 #define TWIN_POLY_CEIL(c) (((c) + (TWIN_POLY_STEP - 1)) & ~(TWIN_POLY_STEP - 1))
 #define TWIN_POLY_COL(x) (((x) >> TWIN_POLY_FIXED_SHIFT) & TWIN_POLY_MASK)
 
+/* By top, then by place in the edge array: qsort need not be stable, and
+ * the order of edges starting on one row decides coincident spans, so ties
+ * keep their original order as the insertion sort below does.  Without it
+ * glibc and BSD libc rasterize some glyphs differently. */
 static int _edge_compare_y(const void *a, const void *b)
 {
     const twin_edge_t *ae = *(twin_edge_t *const *) a;
     const twin_edge_t *be = *(twin_edge_t *const *) b;
 
-    return (int) (ae->top - be->top);
+    if (ae->top != be->top)
+        return ae->top < be->top ? -1 : 1;
+    return (ae > be) - (ae < be);
 }
 
 /* Order @order (pointers into the edge array) by top.  Outlines arrive in
@@ -323,6 +329,7 @@ static void _twin_edge_fill(twin_pixmap_t *pixmap,
                             twin_edge_t **order,
                             twin_edge_t **aet,
                             int nedges,
+                            bool even_odd,
                             _band_state_t *band)
 {
     twin_sfixed_t x0 = 0;
@@ -349,13 +356,14 @@ static void _twin_edge_fill(twin_pixmap_t *pixmap,
             by = y - twin_int_to_sfixed(band->top);
         }
 
-        /* walk this y value marking coverage */
+        /* walk this y value marking coverage: inside while the winding
+         * number is nonzero, or for even-odd while its parity is odd */
         int w = 0;
         for (int i = 0; i < na; i++) {
             twin_edge_t *a = aet[i];
             if (w == 0)
                 x0 = a->x;
-            w += a->winding;
+            w = even_odd ? w ^ 1 : w + a->winding;
             if (w == 0)
                 _span_fill(pixmap, by, x0, a->x);
         }
@@ -439,7 +447,8 @@ static void _twin_fill(twin_pixmap_t *pixmap,
     twin_edge_t **order = (twin_edge_t **) ((uint8_t *) edges + ptr_off);
     for (int i = 0; i < nedges; i++)
         order[i] = &edges[i];
-    _twin_edge_fill(pixmap, order, order + nalloc, nedges, band);
+    _twin_edge_fill(pixmap, order, order + nalloc, nedges,
+                    path->state.fill_rule == TwinFillEvenOdd, band);
     if (!from_scratch)
         twin_free(edges);
 }

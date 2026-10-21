@@ -15,28 +15,21 @@
          ? (((sz) + (alignment) - 1) & ~((alignment) - 1)) \
          : ((((sz) + (alignment) - 1) / (alignment)) * (alignment)))
 
-static bool twin_pixmap_alloc_size(twin_format_t format,
-                                   twin_coord_t width,
-                                   twin_coord_t height,
-                                   size_t *size_out)
+/* Bytes for a pixmap of @width x @height: false if it is empty, or a side
+ * or the stride overflows twin_coord_t.  Sides are uint32_t so callers can
+ * pass sizes before narrowing them; a negative twin_coord_t converts past
+ * INT16_MAX.  With every term that small, the size_t sums cannot wrap. */
+bool _twin_pixmap_alloc_size(twin_format_t format,
+                             uint32_t width,
+                             uint32_t height,
+                             size_t *size_out)
 {
-    if (width <= 0 || height <= 0)
+    if (!width || !height || width > INT16_MAX || height > INT16_MAX)
         return false;
-
-    size_t bpp = (size_t) twin_bytes_per_pixel(format);
-    if (bpp == 0 || (size_t) width > SIZE_MAX / bpp)
-        return false;
-    size_t stride = bpp * (size_t) width;
-    if (stride > SIZE_MAX - 3)
-        return false;
-    stride = ALIGN_UP(stride, 4);
-    /* Stride must fit in twin_coord_t (int16_t) for the pixmap struct. */
+    size_t stride = ALIGN_UP((size_t) twin_bytes_per_pixel(format) * width, 4);
     if (stride > INT16_MAX)
         return false;
-    if ((size_t) height > (SIZE_MAX - sizeof(twin_pixmap_t)) / stride)
-        return false;
-
-    *size_out = sizeof(twin_pixmap_t) + stride * (size_t) height;
+    *size_out = sizeof(twin_pixmap_t) + stride * height;
     return true;
 }
 
@@ -57,29 +50,41 @@ void _twin_pixmap_init(twin_pixmap_t *pixmap,
     pixmap->clip.bottom = height;
     pixmap->scan_height = height;
     pixmap->opacity = 0xff;
+#if defined(CONFIG_DROP_SHADOW)
+    /* The whole pixmap casts its shadow until told otherwise */
+    pixmap->shadow.cast[0] = (twin_rect_t) {0, width, 0, height};
+#endif
     /* RGB16 has no alpha channel, so every pixel is opaque. */
     if (format == TWIN_RGB16)
         pixmap->opaque_rect = (twin_rect_t) {0, width, 0, height};
     pixmap->p.v = pixels;
 }
 
-twin_pixmap_t *twin_pixmap_create(twin_format_t format,
-                                  twin_coord_t width,
-                                  twin_coord_t height)
+twin_pixmap_t *_twin_pixmap_create_sized(twin_format_t format,
+                                         uint32_t width,
+                                         uint32_t height)
 {
     size_t size;
-    if (!twin_pixmap_alloc_size(format, width, height, &size))
+    if (!_twin_pixmap_alloc_size(format, width, height, &size))
         return NULL;
 
-    twin_coord_t stride = (twin_coord_t) ALIGN_UP(
-        (size_t) twin_bytes_per_pixel(format) * width, 4);
+    twin_coord_t stride =
+        (twin_coord_t) ((size - sizeof(twin_pixmap_t)) / height);
 
     twin_pixmap_t *pixmap = twin_malloc(size);
     if (!pixmap)
         return NULL;
-    _twin_pixmap_init(pixmap, format, width, height, stride, pixmap + 1);
+    _twin_pixmap_init(pixmap, format, (twin_coord_t) width,
+                      (twin_coord_t) height, stride, pixmap + 1);
     memset(pixmap->p.v, 0, size - sizeof(twin_pixmap_t));
     return pixmap;
+}
+
+twin_pixmap_t *twin_pixmap_create(twin_format_t format,
+                                  twin_coord_t width,
+                                  twin_coord_t height)
+{
+    return _twin_pixmap_create_sized(format, width, height);
 }
 
 twin_pixmap_t *_twin_pixmap_create_stub(twin_format_t format,
@@ -257,6 +262,18 @@ void twin_pixmap_set_opacity(twin_pixmap_t *pixmap, twin_a8_t opacity)
     _twin_pixmap_damage_extents(pixmap);
 }
 
+#if defined(CONFIG_DROP_SHADOW)
+/* Change @pixmap's shadow to @s, damaging where it was and where it goes */
+static void _shadow_assign(twin_pixmap_t *pixmap, const twin_shadow_t *s)
+{
+    if (!memcmp(s, &pixmap->shadow, sizeof(*s)))
+        return;
+    _twin_pixmap_damage_extents(pixmap);
+    pixmap->shadow = *s;
+    _twin_pixmap_damage_extents(pixmap);
+}
+#endif
+
 void twin_pixmap_set_shadow(twin_pixmap_t *pixmap,
                             twin_coord_t dx,
                             twin_coord_t dy,
@@ -267,18 +284,28 @@ void twin_pixmap_set_shadow(twin_pixmap_t *pixmap,
     /* Built without shadow support */
     (void) pixmap, (void) dx, (void) dy, (void) blur, (void) alpha;
 #else
-    twin_shadow_t s = {0};
+    twin_shadow_t s = pixmap->shadow;
+    s.dx = s.dy = s.blur = s.alpha = 0;
     if (blur > 0 && alpha) {
         s.dx = (int8_t) (dx > 127 ? 127 : dx < -127 ? -127 : dx);
         s.dy = (int8_t) (dy > 127 ? 127 : dy < -127 ? -127 : dy);
         s.blur = (uint8_t) (blur > 63 ? 63 : blur);
         s.alpha = alpha;
     }
-    if (!memcmp(&s, &pixmap->shadow, sizeof(s)))
+    _shadow_assign(pixmap, &s);
+#endif
+}
+
+void twin_pixmap_set_shadow_cast(twin_pixmap_t *pixmap, int k, twin_rect_t r)
+{
+#if !defined(CONFIG_DROP_SHADOW)
+    (void) pixmap, (void) k, (void) r;
+#else
+    if (k < 0 || k >= TWIN_SHADOW_CASTS)
         return;
-    _twin_pixmap_damage_extents(pixmap);
-    pixmap->shadow = s;
-    _twin_pixmap_damage_extents(pixmap);
+    twin_shadow_t s = pixmap->shadow;
+    s.cast[k] = r;
+    _shadow_assign(pixmap, &s);
 #endif
 }
 

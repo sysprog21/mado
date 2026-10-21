@@ -22,115 +22,6 @@
 #include "phone.h"
 
 /*
- * Themes
- */
-static const phone_theme_t themes[] = {
-    {
-        /* Sage: warm white pages, sage green groups, deep olive bars */
-        .name = "Sage",
-        .primary = UI_RGB(0x667a3e),
-        .primary_dk = UI_RGB(0x4f5f30),
-        .statusbar = UI_RGB(0x4e5540),
-        .statusbar_grad = UI_RGB(0x646b54),
-        .header = UI_RGB(0x7d8568),
-        .header_grad = UI_RGB(0x6a7257),
-        .on_bar = UI_RGB(0xf7f5ec),
-        .navbar = UI_RGB(0xd3d9c4),
-        .navbar_grad = UI_RGB(0xe0e5d3),
-        .bg = UI_RGB(0xf4f2e9),
-        .bg_grad = UI_RGB(0xedeadf),
-        .card = UI_RGB(0xfbfaf4),
-        .group = UI_RGB(0xe2e6d6),
-        .text = UI_RGB(0x26301f),
-        .text_sec = UI_RGB(0x5c6652),
-        .separator = UI_RGB(0xdadccc),
-        .call_green = UI_RGB(0x55873a),
-        .call_red = UI_RGB(0xb0473e),
-        .missed_red = UI_RGB(0xa63c34),
-        .sms_sent = UI_RGB(0xdde5c6),
-        .sms_recv = UI_RGB(0xfbfaf4),
-        .indicator = UI_RGB(0xbcc2ab),
-        .on_primary = UI_RGB(0xffffff),
-    },
-    {
-        .name = "Dark",
-        .primary = UI_RGB(0x8fb06a),
-        .primary_dk = UI_RGB(0x6f8f4c),
-        .statusbar = UI_RGB(0x000000),
-        .statusbar_grad = UI_RGB(0x0c0c0c),
-        .header = UI_RGB(0x262923),
-        .header_grad = UI_RGB(0x1e201c),
-        .on_bar = UI_RGB(0xe4e6df),
-        .navbar = UI_RGB(0x1a1b18),
-        .navbar_grad = UI_RGB(0x22241f),
-        .bg = UI_RGB(0x121311),
-        .bg_grad = UI_RGB(0x121311),
-        .card = UI_RGB(0x1c1d1a),
-        .group = UI_RGB(0x2a2c27),
-        .text = UI_RGB(0xe4e6df),
-        .text_sec = UI_RGB(0xa0a498),
-        .separator = UI_RGB(0x34372f),
-        .call_green = UI_RGB(0x6fbf5a),
-        .call_red = UI_RGB(0xe0574d),
-        .missed_red = UI_RGB(0xe0574d),
-        .sms_sent = UI_RGB(0x34452a),
-        .sms_recv = UI_RGB(0x2a2c27),
-        .indicator = UI_RGB(0x50544a),
-        .on_primary = UI_RGB(0x10140c),
-    },
-    {
-        .name = "Ocean",
-        .primary = UI_RGB(0x1e78b4),
-        .primary_dk = UI_RGB(0x165e8e),
-        .statusbar = UI_RGB(0x14496e),
-        .statusbar_grad = UI_RGB(0x1d5f8c),
-        .header = UI_RGB(0x2b78a8),
-        .header_grad = UI_RGB(0x226690),
-        .on_bar = UI_RGB(0xffffff),
-        .navbar = UI_RGB(0xcfe0ec),
-        .navbar_grad = UI_RGB(0xdeeaf3),
-        .bg = UI_RGB(0xf2f7fa),
-        .bg_grad = UI_RGB(0xe8f0f6),
-        .card = UI_RGB(0xffffff),
-        .group = UI_RGB(0xdde9f2),
-        .text = UI_RGB(0x1c2833),
-        .text_sec = UI_RGB(0x55687a),
-        .separator = UI_RGB(0xd5dee5),
-        .call_green = UI_RGB(0x2e9a58),
-        .call_red = UI_RGB(0xc8403f),
-        .missed_red = UI_RGB(0xc03030),
-        .sms_sent = UI_RGB(0xcfe5f6),
-        .sms_recv = UI_RGB(0xffffff),
-        .indicator = UI_RGB(0xa9c3d6),
-        .on_primary = UI_RGB(0xffffff),
-    },
-};
-
-#define N_THEMES ((int) (sizeof(themes) / sizeof(themes[0])))
-
-static int theme_idx;
-
-const phone_theme_t *phone_theme(void)
-{
-    return &themes[theme_idx];
-}
-
-int phone_theme_count(void)
-{
-    return N_THEMES;
-}
-
-int phone_theme_index(void)
-{
-    return theme_idx;
-}
-
-const phone_theme_t *phone_theme_at(int idx)
-{
-    return (idx >= 0 && idx < N_THEMES) ? &themes[idx] : NULL;
-}
-
-/*
  * Shell state
  */
 static twin_screen_t *g_screen;
@@ -160,7 +51,7 @@ static void _repaint_window(twin_window_t *w)
 static int nav_state(void);
 
 /* The view stack changed: repaint the nav bar if its tabs look different */
-void phone_view_changed(void)
+static void phone_view_changed(void)
 {
     if (nav_state() != g_nav_drawn)
         _repaint_window(g_nav);
@@ -168,9 +59,8 @@ void phone_view_changed(void)
 
 void phone_theme_set(int idx)
 {
-    if (idx < 0 || idx >= N_THEMES || !g_screen)
+    if (!g_screen || !ui_theme_select(idx))
         return;
-    theme_idx = idx;
     for (twin_window_t *w = twin_screen_first_window(g_screen); w;
          w = twin_window_next(w))
         _repaint_window(w);
@@ -279,35 +169,73 @@ void phone_format_date(char *buf, size_t len)
 /*
  * App registry and icons
  */
-static void glyph_snake(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
-static void glyph_pong(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
-static void glyph_tetris(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg);
 
+/* The apps picked in Kconfig, in launcher order */
 static const phone_app_t apps[] = {
-    {"Phone", TWIN_SYM_PHONE, NULL, UI_RGB(0x5b8c45), app_dialer_open, NULL},
+#if defined(CONFIG_APP_PHONE_DIALER)
+    {"Phone", TWIN_SYM_PHONE, NULL, UI_RGB(0x5b8c45), app_dialer_open, NULL,
+     NULL},
+#endif
+#if defined(CONFIG_APP_PHONE_CONTACTS)
     {"Contacts", TWIN_SYM_CONTACTS, NULL, UI_RGB(0x5a7896), app_contacts_open,
+     NULL, NULL},
+#endif
+#if defined(CONFIG_APP_PHONE_MESSAGES)
+    {"Messages", TWIN_SYM_MESSAGE, NULL, UI_RGB(0x4f8c7c), app_sms_open, NULL,
      NULL},
-    {"Messages", TWIN_SYM_MESSAGE, NULL, UI_RGB(0x4f8c7c), app_sms_open, NULL},
+#endif
+#if defined(CONFIG_APP_CALCULATOR) /* the shared calculator, phone themed */
     {"Calculator", TWIN_SYM_CALCULATOR, NULL, UI_RGB(0xc08a3e), app_calc_open,
+     NULL, apps_calc_start},
+#endif
+#if defined(CONFIG_APP_PHONE_MUSIC)
+    {"Music", TWIN_SYM_MUSIC, NULL, UI_RGB(0xa95c72), app_music_open, NULL,
      NULL},
-    {"Music", TWIN_SYM_MUSIC, NULL, UI_RGB(0xa95c72), app_music_open, NULL},
-    {"Photos", TWIN_SYM_IMAGE, NULL, UI_RGB(0xbb6e3e), app_photos_open, NULL},
-    {"Camera", TWIN_SYM_CAMERA, NULL, UI_RGB(0x6c7064), app_camera_open, NULL},
+#endif
+#if defined(CONFIG_APP_PHONE_PHOTOS)
+    {"Photos", TWIN_SYM_IMAGE, NULL, UI_RGB(0xbb6e3e), app_photos_open, NULL,
+     NULL},
+#endif
+#if defined(CONFIG_APP_PHONE_CAMERA)
+    {"Camera", TWIN_SYM_CAMERA, NULL, UI_RGB(0x6c7064), app_camera_open, NULL,
+     NULL},
+#endif
     {"Settings", TWIN_SYM_SETTINGS, NULL, UI_RGB(0x767b6c), app_settings_open,
-     NULL},
+     NULL, NULL},
+#if defined(CONFIG_APP_PHONE_CALLLOG)
     {"Call Log", TWIN_SYM_HISTORY, NULL, UI_RGB(0x7a6a96), app_calllog_open,
-     NULL},
-    {"Snake", NULL, glyph_snake, UI_RGB(0x4d8f86), app_snake_open, NULL},
-    {"Pong", NULL, glyph_pong, UI_RGB(0x646c9a), app_pong_open, NULL},
-    {"Tetris", NULL, glyph_tetris, UI_RGB(0xad5348), app_tetris_open, NULL},
+     NULL, NULL},
+#endif
+#if defined(CONFIG_APP_SNAKE)
+    {"Snake", NULL, app_snake_glyph, UI_RGB(0x4d8f86), app_snake_open, NULL,
+     apps_snake_start},
+#endif
+#if defined(CONFIG_APP_PONG)
+    {"Pong", NULL, app_pong_glyph, UI_RGB(0x646c9a), app_pong_open, NULL,
+     apps_pong_start},
+#endif
+#if defined(CONFIG_APP_TETRIS)
+    {"Tetris", NULL, app_tetris_glyph, UI_RGB(0xad5348), app_tetris_open, NULL,
+     apps_tetris_start},
+#endif
 };
 
 #define N_APPS ((int) (sizeof(apps) / sizeof(apps[0])))
 
 /* Then every other app of the shared registry (apps.c), in registry order:
- * a mobile build compiles in only apps that run under it.  Listed at boot. */
+ * a mobile build compiles in only apps that run under it.  A registry app
+ * the phone also offers natively, in its theme, is listed once, as the
+ * native one.  Listed at boot. */
 static phone_app_t demos[16];
 static int n_demos;
+
+static bool _replaced(const apps_entry_t *e)
+{
+    for (int i = 0; i < N_APPS; i++)
+        if (apps[i].replaces && apps[i].replaces == e->start)
+            return true;
+    return false;
+}
 
 static void _list_demos(void)
 {
@@ -318,7 +246,7 @@ static void _list_demos(void)
     n_demos = 0;
     for (int i = 0; i < apps_count(); i++) {
         const apps_entry_t *e = apps_at(i);
-        if (e->boot)
+        if (e->boot || _replaced(e))
             continue;
         if (n_demos == (int) (sizeof(demos) / sizeof(demos[0])))
             break;
@@ -351,50 +279,6 @@ int phone_app_find(const char *name)
         if (!strcmp(phone_app_at(i)->name, name))
             return i;
     return -1;
-}
-
-static void glyph_snake(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg)
-{
-    int u = ui_w(p) / 8;
-    twin_coord_t x = p.left + 2 * u, y = p.top + 2 * u;
-    twin_path_t *path = ui_path();
-    twin_path_move(path, twin_int_to_fixed(x), twin_int_to_fixed(y + 4 * u));
-    twin_path_draw(path, twin_int_to_fixed(x), twin_int_to_fixed(y));
-    twin_path_draw(path, twin_int_to_fixed(x + 4 * u), twin_int_to_fixed(y));
-    twin_path_draw(path, twin_int_to_fixed(x + 4 * u),
-                   twin_int_to_fixed(y + 2 * u));
-    twin_path_draw(path, twin_int_to_fixed(x + 2 * u),
-                   twin_int_to_fixed(y + 2 * u));
-    twin_path_draw(path, twin_int_to_fixed(x + 2 * u),
-                   twin_int_to_fixed(y + 4 * u));
-    twin_path_set_cap_style(path, TwinCapRound);
-    twin_paint_stroke(px, fg, path, twin_int_to_fixed(u + u / 2));
-    ui_path_done(path);
-    ui_circle(px, x + 4 * u, y + 4 * u, u / 2 + 1, ui_alpha(fg, 0xc0));
-}
-
-static void glyph_pong(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg)
-{
-    int u = ui_w(p) / 8;
-    ui_rrect(px, ui_rect(p.left + u + u / 2, p.top + 2 * u, u, 3 * u), u / 2,
-             fg);
-    ui_rrect(px, ui_rect(p.right - 2 * u - u / 2, p.top + 3 * u, u, 3 * u),
-             u / 2, fg);
-    ui_circle(px, (p.left + p.right) / 2, p.top + 3 * u + u / 2, u * 2 / 3 + 1,
-              fg);
-}
-
-static void glyph_tetris(twin_pixmap_t *px, ui_rect_t p, twin_argb32_t fg)
-{
-    int u = ui_w(p) / 7;
-    twin_coord_t x = p.left + (ui_w(p) - 3 * u) / 2;
-    twin_coord_t y = p.top + (ui_h(p) - 2 * u) / 2;
-    static const int cells[4][2] = {{0, 0}, {1, 0}, {2, 0}, {1, 1}};
-    for (int i = 0; i < 4; i++)
-        ui_rrect(px,
-                 ui_rect(x + cells[i][0] * u + 1, y + cells[i][1] * u + 1,
-                         u - 2, u - 2),
-                 2, i == 3 ? ui_alpha(fg, 0xb0) : fg);
 }
 
 void phone_app_icon(twin_pixmap_t *px, int app, ui_rect_t plate, bool pressed)
@@ -467,9 +351,12 @@ static twin_time_t status_tick(twin_time_t now, void *closure)
 static int nav_active(void)
 {
     ui_view_t *top = phone_top();
-    if (top && top->app == phone_app_find("Phone"))
+    /* An app left out of the build finds no slot (-1), which views opened
+     * outside the launcher carry too: only a real slot may match */
+    int app = top ? top->app : -1;
+    if (app >= 0 && app == phone_app_find("Phone"))
         return 0;
-    if (top && top->app == phone_app_find("Contacts"))
+    if (app >= 0 && app == phone_app_find("Contacts"))
         return 2;
     return phone_depth() > 0 ? -1 : 1;
 }
@@ -526,13 +413,6 @@ static int nav_hit(twin_coord_t x, twin_coord_t y)
     return -1;
 }
 
-/* The stack holds phone views and the windows of registry apps alike */
-static bool is_app_window(twin_window_t *w)
-{
-    return twin_window_is_mapped(w) &&
-           twin_window_style(w) == TwinWindowApplication;
-}
-
 static bool is_home(twin_window_t *w)
 {
     return g_home && w == g_home->window;
@@ -543,7 +423,7 @@ static void _drop_apps(twin_window_t *keep)
 {
     for (twin_window_t *w = twin_screen_first_window(g_screen); w;) {
         twin_window_t *next = twin_window_next(w);
-        if (w != keep && is_app_window(w) && !is_home(w))
+        if (w != keep && ui_is_app_window(w) && !is_home(w))
             twin_window_destroy(w);
         w = next;
     }
@@ -553,8 +433,8 @@ static void nav_go_root(const char *name)
 {
     int app = phone_app_find(name);
     ui_view_t *top = phone_top();
-    if (top && top->app == app)
-        return;
+    if (app < 0 || (top && top->app == app))
+        return; /* not built, or already there */
     /* Tabs are destinations, not history: reset to home, then open */
     _drop_apps(NULL);
     phone_open(app);
@@ -592,22 +472,9 @@ static bool nav_event(twin_window_t *w, twin_event_t *ev)
 /*
  * Navigation
  */
-static twin_window_t *_top_app(void)
-{
-    twin_window_t *top = NULL;
-    if (!g_screen)
-        return NULL;
-    for (twin_window_t *w = twin_screen_first_window(g_screen); w;
-         w = twin_window_next(w))
-        if (is_app_window(w))
-            top = w;
-    return top;
-}
-
 ui_view_t *phone_top(void)
 {
-    twin_window_t *w = _top_app();
-    return w ? ui_view_of(w) : NULL;
+    return ui_view_of(ui_top_window());
 }
 
 int phone_depth(void)
@@ -617,7 +484,7 @@ int phone_depth(void)
         return 0;
     for (twin_window_t *w = twin_screen_first_window(g_screen); w;
          w = twin_window_next(w))
-        if (is_app_window(w) && !is_home(w))
+        if (ui_is_app_window(w) && !is_home(w))
             n++;
     return n;
 }
@@ -646,14 +513,14 @@ void phone_open(int app)
 
 void phone_back(void)
 {
-    twin_window_t *top = _top_app();
+    twin_window_t *top = ui_top_window();
     if (top && !is_home(top))
         twin_window_back(top);
 }
 
 void phone_home(void)
 {
-    twin_window_t *top = _top_app();
+    twin_window_t *top = ui_top_window();
     if (!top || is_home(top))
         return;
     /* Hidden screens go first (no animation), then the visible one pops */
@@ -731,6 +598,7 @@ bool phone_boot(twin_screen_t *screen)
     if (!ui_init())
         return false;
     g_screen = screen;
+    ui_attach(screen, phone_view_changed);
     _list_demos();
 
     g_status = bar_create(0, PHONE_STATUS_H, status_draw, NULL);
@@ -778,9 +646,10 @@ void phone_shutdown(void)
     g_status = g_nav = NULL;
     g_home = NULL;
     g_screen = NULL;
+    ui_attach(NULL, NULL);
     g_status_minute = -1;
     g_nav_pressed = -1;
-    theme_idx = 0;
+    ui_theme_select(0);
     g_wallpaper = 0;
     ui_fini();
 }

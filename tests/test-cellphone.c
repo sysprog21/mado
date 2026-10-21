@@ -29,6 +29,7 @@ static void fixed_clock(phone_clock_t *c)
 }
 
 const char *app_calc_eval(const char *typed);
+bool app_home_icon_rect(int app, ui_rect_t *out);
 
 th_t *phone_th;
 static th_t *t;
@@ -138,11 +139,16 @@ static void test_wrap(void)
           "overlong word still terminates");
 }
 
+#if defined(CONFIG_APP_CALCULATOR)
 static void test_calculator(void)
 {
-    /* Calculator is the fourth icon: row 1, column 0 */
-    th_tap(t, 40, PHONE_STATUS_H + 6 + 74 + 28);
-    th_settle(t, 2000);
+    /* Opened from its icon, wherever the apps built put it */
+    ui_rect_t r;
+    bool shown = app_home_icon_rect(phone_app_find("Calculator"), &r);
+    CHECK(shown, "calculator icon on the first page");
+    if (!shown)
+        return;
+    ph_tap((r.left + r.right) / 2, (r.top + r.bottom) / 2);
     CHECK_EQ(phone_depth(), 1, "calculator opened");
     ph_shot("calculator");
 
@@ -150,6 +156,12 @@ static void test_calculator(void)
     CHECK_STR(app_calc_eval("C1.5x4="), "6", "1.5x4");
     CHECK_STR(app_calc_eval("C7/0="), "Error", "divide by zero");
     CHECK_STR(app_calc_eval("C10/4="), "2.5", "10/4");
+    CHECK_STR(app_calc_eval("C12.5\b\b+1="), "13", "erase digits and dot");
+    CHECK_STR(app_calc_eval("C7\b"), "0", "erase the last digit");
+    CHECK_STR(app_calc_eval("C5-\b"), "5", "nothing typed after the operator");
+    CHECK_STR(app_calc_eval("C3+4=\b"), "7", "a result is not erased");
+    CHECK_STR(app_calc_eval("C0~3"), "-3", "sign typed before the digits");
+    CHECK_STR(app_calc_eval("C5.~3"), "-5.3", "sign keeps a trailing dot");
     /* Ten 12-digit terms overflow the 64-bit fixed-point accumulator */
     char big[160];
     for (int sign = 0; sign < 2; sign++) {
@@ -175,6 +187,9 @@ static void test_calculator(void)
     th_settle(t, 2000);
     CHECK_EQ(phone_depth(), 0, "back to home");
 }
+#else
+static void test_calculator(void) {}
+#endif
 
 /*
  * Budgets for the whole phone: memory returns to baseline after visiting
@@ -252,6 +267,13 @@ int main(void)
     t = phone_th = th_create(PHONE_W, PHONE_H);
     phone_boot(t->screen);
     th_settle(t, 2000);
+    /* The frames show whichever apps the launcher lists */
+    char apps[512] = "";
+    for (int i = 0; i < phone_app_count(); i++) {
+        size_t n = strlen(apps);
+        snprintf(apps + n, sizeof(apps) - n, "%s,", phone_app_at(i)->name);
+    }
+    th_golden_salt(apps);
 
     test_boot_and_unlock();
     test_wrap();

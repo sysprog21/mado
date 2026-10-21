@@ -243,6 +243,14 @@ typedef enum _twin_cap {
     TwinCapProjecting /**< Square line endings extending beyond path */,
 } twin_cap_t;
 
+/** Which points a filled path covers */
+typedef enum _twin_fill_rule {
+    /** Where the outline winds around a nonzero number of times (default) */
+    TwinFillNonZero,
+    /** Where a ray crosses the outline an odd number of times */
+    TwinFillEvenOdd,
+} twin_fill_rule_t;
+
 /**
  * Graphics state for drawing operations
  *
@@ -250,11 +258,12 @@ typedef enum _twin_cap {
  * saved and restored during drawing operations.
  */
 typedef struct _twin_state {
-    twin_matrix_t matrix;    /**< Current transformation */
-    twin_font_t *font;       /**< Font (NULL selects the default) */
-    twin_fixed_t font_size;  /**< Font size */
-    twin_style_t font_style; /**< Font style */
-    twin_cap_t cap_style;    /**< Line cap style */
+    twin_matrix_t matrix;       /**< Current transformation */
+    twin_font_t *font;          /**< Font (NULL selects the default) */
+    twin_fixed_t font_size;     /**< Font size */
+    twin_style_t font_style;    /**< Font style */
+    twin_cap_t cap_style;       /**< Line cap style */
+    twin_fill_rule_t fill_rule; /**< Fill rule (strokes always fill nonzero) */
 } twin_state_t;
 
 /**
@@ -553,8 +562,8 @@ twin_pixmap_t *twin_pixmap_from_file(const char *path);
 
 /*
  * Frame-based animations, as loaded from an animated GIF.  The animation
- * belongs to its pixmap (pixmap->animation): twin_pixmap_destroy() frees it
- * along with every frame.
+ * belongs to its pixmap (pixmap->animation) and redraws that pixmap in place:
+ * the current frame is the pixmap itself.  twin_pixmap_destroy() frees it.
  */
 
 /* Get the number of milliseconds the current frame should be displayed. */
@@ -679,6 +688,9 @@ void twin_path_set_font_size(twin_path_t *path, twin_fixed_t font_size);
 void twin_path_set_font_style(twin_path_t *path, twin_style_t font_style);
 
 void twin_path_set_cap_style(twin_path_t *path, twin_cap_t cap_style);
+
+/** Fill rule for painting @path; strokes are always filled nonzero */
+void twin_path_set_fill_rule(twin_path_t *path, twin_fill_rule_t rule);
 
 twin_state_t twin_path_save(twin_path_t *path);
 
@@ -826,6 +838,19 @@ void twin_widget_set_shape(twin_widget_t *widget, twin_shape_t shape);
 
 /** Make @widget request the same preferred size as @source */
 void twin_widget_match_size(twin_widget_t *widget, twin_widget_t *source);
+
+/**
+ * How much of its box's spare room @widget takes in each direction
+ *
+ * A box divides the room by the sum of its children's stretches, so 0 keeps
+ * @widget at its preferred size (widgets start at 1).  The last widget in a
+ * box also takes what rounding leaves, and all of the room when no sibling
+ * stretches.  On a box, this replaces the stretch it adds up from its
+ * children.
+ */
+void twin_widget_set_stretch(twin_widget_t *widget,
+                             twin_stretch_t width,
+                             twin_stretch_t height);
 
 /*
  * Custom widget support - allows creating widgets without accessing internals
@@ -1219,10 +1244,12 @@ twin_time_t twin_now(void);
 /**
  * Render a TinyVG file (CONFIG_LOADER_TVG)
  * @filepath : File to load
- * @w, @h    : Pixmap size, the drawing scaled to fit; 0: the document's own
+ * @w, @h    : Largest pixmap size, the drawing scaled to fit; 0: the
+ *             document's own
  *
- * The pixmap shrinks further, keeping its aspect, to fit
- * CONFIG_TVG_MEMORY_BUDGET when that is set.
+ * The pixmap takes the drawing's aspect, so one side may come out shorter
+ * than asked, and shrinks further to fit CONFIG_TVG_MEMORY_BUDGET when that
+ * is set: read its size rather than assume @w x @h.
  */
 twin_pixmap_t *twin_tvg_to_pixmap(const char *filepath,
                                   twin_coord_t w,

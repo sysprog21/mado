@@ -11,43 +11,20 @@
 
 #include "twin_private.h"
 
-/* libpng hands out straight alpha; twin composites premultiplied ARGB. */
-static twin_argb32_t _twin_apply_alpha(twin_argb32_t v)
-{
-    uint16_t t1, t2, t3;
-#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    twin_a8_t alpha = twin_get_8(v, 0);
-#else
-    twin_a8_t alpha = twin_get_8(v, 24);
-#endif
-
-    /* clear RGB data if alpha is zero */
-    if (!alpha)
-        return 0;
-
-#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return (uint32_t) alpha << 24 |
-           twin_int_mult(twin_get_8(v, 24), alpha, t1) << 16 |
-           twin_int_mult(twin_get_8(v, 16), alpha, t2) << 8 |
-           twin_int_mult(twin_get_8(v, 8), alpha, t3) << 0;
-#else
-    return (uint32_t) alpha << 24 |
-           twin_int_mult(twin_get_8(v, 0), alpha, t1) << 16 |
-           twin_int_mult(twin_get_8(v, 8), alpha, t2) << 8 |
-           twin_int_mult(twin_get_8(v, 16), alpha, t3) << 0;
-#endif
-}
-
+/* libpng hands out straight alpha; twin composites premultiplied ARGB.
+ * Pixels arrive in native ARGB order, so only the channels are scaled. */
 static void twin_premultiply_alpha(twin_pixmap_t *px)
 {
-    if (px->format != TWIN_ARGB32)
-        return;
-
     for (twin_coord_t y = 0; y < px->height; y++) {
-        twin_pointer_t p = {.b = px->p.b + y * px->stride};
+        twin_argb32_t *p = twin_pixmap_pointer(px, 0, y).argb32;
 
-        for (twin_coord_t x = 0; x < px->width; x++)
-            p.argb32[x] = _twin_apply_alpha(p.argb32[x]);
+        for (twin_coord_t x = 0; x < px->width; x++) {
+            twin_argb32_t v = p[x];
+            twin_a8_t alpha = v >> 24;
+            uint16_t t1, t2, t3;
+            p[x] = (uint32_t) alpha << 24 | twin_in(v, 16, alpha, t1) |
+                   twin_in(v, 8, alpha, t2) | twin_in(v, 0, alpha, t3);
+        }
     }
 }
 
@@ -63,25 +40,6 @@ static void _twin_png_read(png_structp png, png_bytep data, png_size_t size)
         png_error(png, "end of file !\n");
 }
 
-/* FIXME: Utilize pixman or similar accelerated routine to convert */
-#if defined(__APPLE__)
-static void _convertBGRtoARGB(uint8_t *data, int width, int height)
-{
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            int index = (y * width + x) * 4;
-            uint8_t b = data[index];
-            uint8_t g = data[index + 1];
-            uint8_t r = data[index + 2];
-            data[index] = 255; /* Alpha */
-            data[index + 1] = r;
-            data[index + 2] = g;
-            data[index + 3] = b;
-        }
-    }
-}
-#endif
-
 twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
 {
     uint8_t signature[8];
@@ -90,7 +48,7 @@ twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
     /* Assigned after setjmp(): volatile so the error path sees them */
     twin_pixmap_t *volatile pix = NULL;
     png_bytep *volatile rowp = NULL;
-    int depth, ctype, interlace;
+    int depth, ctype;
 
     int fd = open(filepath, O_RDONLY);
     if (fd < 0)
@@ -124,48 +82,51 @@ twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
 
     png_read_info(png, info);
     png_uint_32 width, height;
-    png_get_IHDR(png, info, &width, &height, &depth, &ctype, &interlace, NULL,
-                 NULL);
-    if (!width || !height || width > INT16_MAX || height > INT16_MAX)
-        goto bail_free;
+    png_get_IHDR(png, info, &width, &height, &depth, &ctype, NULL, NULL, NULL);
 
     if (depth == 16)
         png_set_strip_16(png);
-    if (ctype == PNG_COLOR_TYPE_PALETTE)
-        png_set_palette_to_rgb(png);
     if (ctype == PNG_COLOR_TYPE_GRAY && depth < 8)
         png_set_expand_gray_1_2_4_to_8(png);
-    if (png_get_valid(png, info, PNG_INFO_tRNS))
-        png_set_tRNS_to_alpha(png);
-
-    png_get_IHDR(png, info, &width, &height, &depth, &ctype, &interlace, NULL,
-                 NULL);
 
     switch (fmt) {
     case TWIN_A8:
-        if (ctype != PNG_COLOR_TYPE_GRAY || depth != 8)
+        if (ctype != PNG_COLOR_TYPE_GRAY)
             goto bail_free;
         break;
     case TWIN_RGB16:
         /* unsupported for now */
         goto bail_free;
     case TWIN_ARGB32:
-        png_set_filler(png, 0xff, PNG_FILLER_AFTER);
+        if (ctype == PNG_COLOR_TYPE_PALETTE)
+            png_set_palette_to_rgb(png);
+        if (png_get_valid(png, info, PNG_INFO_tRNS))
+            png_set_tRNS_to_alpha(png);
         if (ctype == PNG_COLOR_TYPE_GRAY || ctype == PNG_COLOR_TYPE_GRAY_ALPHA)
             png_set_gray_to_rgb(png);
-
-        png_get_IHDR(png, info, &width, &height, &depth, &ctype, &interlace,
-                     NULL, NULL);
-
-        if (depth != 8)
-            goto bail_free;
+        /* Native twin_argb32_t: bytes B, G, R, A on little endian,
+         * A, R, G, B on big endian */
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        png_set_swap_alpha(png);
+        png_set_filler(png, 0xff, PNG_FILLER_BEFORE);
+#else
+        png_set_bgr(png);
+        png_set_filler(png, 0xff, PNG_FILLER_AFTER);
+#endif
         break;
     }
+    png_set_interlace_handling(png);
+
+    /* IHDR keeps the file's layout until the transforms are applied; check
+     * what libpng will actually write against the pixmap's row size */
+    png_read_update_info(png, info);
+    if (png_get_rowbytes(png, info) != width * twin_bytes_per_pixel(fmt))
+        goto bail_free;
 
     rowp = twin_malloc((size_t) height * sizeof(png_bytep));
     if (!rowp)
         goto bail_free;
-    pix = twin_pixmap_create(fmt, (twin_coord_t) width, (twin_coord_t) height);
+    pix = _twin_pixmap_create_sized(fmt, width, height);
     if (!pix)
         goto bail_free;
     /* libpng writes width * twin_bytes_per_pixel(fmt) bytes per row; rows
@@ -177,13 +138,10 @@ twin_pixmap_t *_twin_png_to_pixmap(const char *filepath, twin_format_t fmt)
 
     png_read_end(png, NULL);
 
-    if (fmt == TWIN_ARGB32) {
-        /* Convert from BGR to ARGB if necessary */
-#if defined(__APPLE__)
-        _convertBGRtoARGB(pix->p.b, width, height);
-#endif
+    /* Opaque images (filler, not alpha) are final as read */
+    if (fmt == TWIN_ARGB32 &&
+        (png_get_color_type(png, info) & PNG_COLOR_MASK_ALPHA))
         twin_premultiply_alpha(pix);
-    }
     goto bail_free;
 
 bail_free:

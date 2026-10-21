@@ -10,6 +10,8 @@
 
 #include "phone-test.h"
 
+#if defined(CONFIG_APP_PHONE_DIALER)
+
 const char *app_dialer_test_number(void);
 const char *app_dialer_test_name(void);
 int app_dialer_test_seconds(void);
@@ -137,6 +139,7 @@ void test_dialer(void)
     ph_home();
 }
 
+#if defined(CONFIG_APP_PHONE_CALLLOG)
 void test_calllog(void)
 {
     ph_open("Call Log");
@@ -177,3 +180,10 @@ void test_calllog(void)
     CHECK_EQ(phone_depth(), 1, "hung up");
     ph_home();
 }
+#else
+void test_calllog(void) {}
+#endif
+#else
+void test_dialer(void) {}
+void test_calllog(void) {}
+#endif

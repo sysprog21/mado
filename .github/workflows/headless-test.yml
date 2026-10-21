@@ -21,7 +21,7 @@ jobs:
           BACKEND_HEADLESS=y \
           TOOLS=y \
           TOOL_HEADLESS_CTL=y \
-          DEMO_MULTI=y
+          APP_MULTI=y
 
     - name: Build with headless backend
       run: |
@@ -80,6 +80,8 @@ jobs:
         echo "Screenshot verification passed"
 
     - name: Test deterministic rendering
+      env:
+        MADO_FROZEN_TIME: "1"
       run: |
         # Run twice and compare outputs for determinism
         echo "First run..."
@@ -106,7 +108,7 @@ jobs:
           fi
         done
 
-        # Compare images (allowing minor differences)
+        # Compare images exactly
         # compare writes the metric to stderr, stdout gets the diff image
         DIFF=$(compare -metric AE run1.png run2.png null: 2>&1) || true
         # Extract just the numeric value (AE metric is an integer)
@@ -117,8 +119,8 @@ jobs:
         fi
         echo "Pixel difference: $DIFF"
 
-        if [ "$DIFF" -gt "100" ]; then
-          echo "ERROR: Renderings differ by more than 100 pixels"
+        if [ "$DIFF" -ne "0" ]; then
+          echo "ERROR: Renderings differ"
           exit 1
         fi
         echo "Deterministic rendering test passed"

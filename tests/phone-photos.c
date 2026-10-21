@@ -5,9 +5,9 @@
  */
 
 /*
- * Photos and Camera scenarios.  Both apps behave the same with or without
- * a JPEG loader (procedural art stands in for missing pictures), so these
- * checks hold in every build configuration.
+ * Photos and Camera scenarios, each run when its app is built.  Both apps
+ * behave the same with or without a JPEG loader (procedural art stands in
+ * for missing pictures), so the checks hold with any loader set.
  */
 
 #include "phone-test.h"
@@ -23,6 +23,7 @@ int app_camera_test_flash(void);
 #define THUMB_X(i) (5 + ((i) % 3) * 78 + 37)
 #define THUMB_Y(i) (56 + ((i) / 3) * 78 + 30)
 
+#if defined(CONFIG_APP_PHONE_PHOTOS)
 void test_photos(void)
 {
     ph_open("Photos");
@@ -112,7 +113,11 @@ void test_photos(void)
     CHECK(th_heap_net(phone_th) <= heap0, "photos freed everything (%zu > %zu)",
           th_heap_net(phone_th), heap0);
 }
+#else
+void test_photos(void) {}
+#endif
 
+#if defined(CONFIG_APP_PHONE_CAMERA)
 void test_camera(void)
 {
     ph_open("Camera");
@@ -165,3 +170,6 @@ void test_camera(void)
     CHECK(th_heap_net(phone_th) <= heap0, "camera freed everything (%zu > %zu)",
           th_heap_net(phone_th), heap0);
 }
+#else
+void test_camera(void) {}
+#endif

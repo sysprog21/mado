@@ -81,6 +81,10 @@ static void _twin_window_update_opaque(twin_window_t *window)
         pixmap->opaque_rect = window->client;
     else
         pixmap->opaque_rect = (twin_rect_t) {0, 0, 0, 0};
+    /* A solid client casts the shadow; a see-through one casts none and,
+     * masked by its alpha, shows what is behind instead */
+    twin_pixmap_set_shadow_cast(
+        pixmap, 0, window->opaque ? window->client : (twin_rect_t) {0});
 }
 
 /* Clip to @r (pixmap coordinates) and put the origin at the client corner */

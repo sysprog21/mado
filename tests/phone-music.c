@@ -14,6 +14,8 @@
 #include "data.h"
 #include "phone-test.h"
 
+#if defined(CONFIG_APP_PHONE_MUSIC)
+
 int app_music_test_elapsed(void);
 int app_music_test_track(void);
 bool app_music_test_playing(void);
@@ -186,3 +188,6 @@ void test_music(void)
     CHECK(!app_music_test_playing(), "paused before leaving");
     ph_home();
 }
+#else
+void test_music(void) {}
+#endif

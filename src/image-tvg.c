@@ -22,32 +22,7 @@
     (((uint32_t) (a) << 24) | ((uint32_t) (r) << 16) | ((uint32_t) (g) << 8) | \
      (b))
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
-#define ALIGN_UP(sz, alignment)                            \
-    (((alignment) & ((alignment) - 1)) == 0                \
-         ? (((sz) + (alignment) - 1) & ~((alignment) - 1)) \
-         : ((((sz) + (alignment) - 1) / (alignment)) * (alignment)))
-
-static bool tvg_pixmap_alloc_size(twin_format_t fmt,
-                                  uint32_t width,
-                                  uint32_t height,
-                                  size_t *size_out)
-{
-    if (width == 0 || height == 0)
-        return false;
-
-    size_t bpp = (size_t) twin_bytes_per_pixel(fmt);
-    if (bpp == 0 || (size_t) width > SIZE_MAX / bpp)
-        return false;
-    size_t stride = bpp * (size_t) width;
-    if (stride > SIZE_MAX - 3)
-        return false;
-    stride = ALIGN_UP(stride, 4);
-    if ((size_t) height > (SIZE_MAX - sizeof(twin_pixmap_t)) / stride)
-        return false;
-
-    *size_out = sizeof(twin_pixmap_t) + stride * (size_t) height;
-    return true;
-}
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
 
 enum {
     /* end of document This command determines the end of file. */
@@ -432,11 +407,16 @@ static tvg_result_t tvg_read_varuint(tvg_context_t *ctx, uint32_t *out_value)
     size_t read = 0;
     while (true) {
         READ_VALUE(read, &byte, 1);
+        /* The fifth group holds bits 28 to 31 only */
+        if (count == 4 && (byte & 0x70))
+            return TVG_E_INVALID_FORMAT;
         const uint32_t val = ((uint32_t) (byte & 0x7F)) << (7 * count);
         result |= val;
         if ((byte & 0x80) == 0)
             break;
-        ++count;
+        /* 32 bits take at most 5 groups of 7 */
+        if (++count > 4)
+            return TVG_E_INVALID_FORMAT;
     }
     *out_value = result;
     return TVG_SUCCESS;
@@ -494,10 +474,10 @@ static tvg_result_t tvg_parse_header(tvg_context_t *ctx, int dim_only)
     uint32_t color_count;
     res = tvg_read_varuint(ctx, &color_count);
     __return_val_if_fail(res, "Failed to read varuint");
-    if (color_count == 0) {
+    if (!color_count) {
         return TVG_E_INVALID_FORMAT;
     }
-    ctx->colors = twin_malloc(color_count * sizeof(twin_argb32_t));
+    ctx->colors = twin_calloc(color_count, sizeof(twin_argb32_t));
     if (!ctx->colors) {
         return TVG_E_OUT_OF_MEMORY;
     }
@@ -513,6 +493,18 @@ static tvg_result_t tvg_parse_header(tvg_context_t *ctx, int dim_only)
     return TVG_SUCCESS;
 }
 
+/* A palette index, checked against the color table it indexes */
+static tvg_result_t tvg_read_color_index(tvg_context_t *ctx, uint32_t *out)
+{
+    tvg_result_t res = tvg_read_varuint(ctx, out);
+    __return_val_if_fail(res, "Failed to read varuint");
+    if (*out >= ctx->colors_size) {
+        log_error("Invalid color index");
+        return TVG_E_INVALID_FORMAT;
+    }
+    return TVG_SUCCESS;
+}
+
 static tvg_result_t tvg_parse_gradient(tvg_context_t *ctx,
                                        tvg_gradient_t *out_gradient)
 {
@@ -524,19 +516,11 @@ static tvg_result_t tvg_parse_gradient(tvg_context_t *ctx,
     res = tvg_read_point(ctx, &pt);
     __return_val_if_fail(res, "Failed to read point");
     out_gradient->point1 = pt;
-    res = tvg_read_varuint(ctx, &u32);
-    __return_val_if_fail(res, "Failed to read varuint");
+    res = tvg_read_color_index(ctx, &u32);
+    __return_val_if_fail(res, "Failed to read color index");
     out_gradient->color0 = u32;
-    if (u32 > ctx->colors_size) {
-        log_error("Invalid color index");
-        return TVG_E_INVALID_FORMAT;
-    }
-    res = tvg_read_varuint(ctx, &u32);
-    __return_val_if_fail(res, "Failed to read varuint");
-    if (u32 > ctx->colors_size) {
-        log_error("Invalid color index");
-        return TVG_E_INVALID_FORMAT;
-    }
+    res = tvg_read_color_index(ctx, &u32);
+    __return_val_if_fail(res, "Failed to read color index");
     out_gradient->color1 = u32;
     return TVG_SUCCESS;
 }
@@ -551,8 +535,8 @@ static tvg_result_t tvg_parse_style(tvg_context_t *ctx,
     out_style->kind = kind;
     switch (kind) {
     case TVG_STYLE_FLAT:
-        res = tvg_read_varuint(ctx, &flat);
-        __return_val_if_fail(res, "Failed to read varuint");
+        res = tvg_read_color_index(ctx, &flat);
+        __return_val_if_fail(res, "Failed to read color index");
         out_style->flat = flat;
         break;
     case TVG_STYLE_LINEAR:
@@ -842,12 +826,11 @@ static tvg_result_t tvg_parse_line_fill_rectangles(
     return TVG_SUCCESS;
 }
 
-static tvg_result_t tvg_parse_fill_paths(tvg_context_t *ctx,
-                                         size_t size,
-                                         const tvg_style_t *style)
+/* Read @size path lengths, then that many paths into ctx->path */
+static tvg_result_t tvg_parse_paths(tvg_context_t *ctx, size_t size)
 {
     tvg_result_t res = TVG_SUCCESS;
-    uint32_t *sizes = twin_malloc(size * sizeof(uint32_t));
+    uint32_t *sizes = twin_calloc(size, sizeof(uint32_t));
     if (!sizes) {
         return TVG_E_OUT_OF_MEMORY;
     }
@@ -856,17 +839,24 @@ static tvg_result_t tvg_parse_fill_paths(tvg_context_t *ctx,
         ++sizes[i];
         __goto_if_fail(res, error, "Failed to read varuint");
     }
-    twin_path_t *path = ctx->path;
-    /* parse path */
     for (size_t i = 0; i < size; ++i) {
         res = tvg_parse_path(ctx, sizes[i]);
         __goto_if_fail(res, error, "Failed to parse path");
     }
-    _fill_path_with_style(ctx, style);
-    twin_path_empty(path);
 error:
     twin_free(sizes);
     return res;
+}
+
+static tvg_result_t tvg_parse_fill_paths(tvg_context_t *ctx,
+                                         size_t size,
+                                         const tvg_style_t *style)
+{
+    tvg_result_t res = tvg_parse_paths(ctx, size);
+    __return_val_if_fail(res, "Failed to parse paths");
+    _fill_path_with_style(ctx, style);
+    twin_path_empty(ctx->path);
+    return TVG_SUCCESS;
 }
 
 static tvg_result_t tvg_parse_line_paths(tvg_context_t *ctx,
@@ -874,30 +864,14 @@ static tvg_result_t tvg_parse_line_paths(tvg_context_t *ctx,
                                          const tvg_style_t *line_style,
                                          twin_fixed_t line_width)
 {
-    tvg_result_t res = TVG_SUCCESS;
-    uint32_t *sizes = twin_malloc(size * sizeof(uint32_t));
-    if (!sizes) {
-        return TVG_E_OUT_OF_MEMORY;
-    }
-    twin_path_t *path = ctx->path;
-    for (size_t i = 0; i < size; ++i) {
-        res = tvg_read_varuint(ctx, &sizes[i]);
-        ++sizes[i];
-        __goto_if_fail(res, error, "Failed to read varuint");
-    }
-    /* parse path */
-    for (size_t i = 0; i < size; ++i) {
-        res = tvg_parse_path(ctx, sizes[i]);
-        __goto_if_fail(res, error, "Failed to parse path");
-    }
+    tvg_result_t res = tvg_parse_paths(ctx, size);
+    __return_val_if_fail(res, "Failed to parse paths");
     if (line_width == 0) {
         line_width = TVG_HAIRLINE;
     }
     _stroke_path_with_style(ctx, line_style, line_width);
-    twin_path_empty(path);
-error:
-    twin_free(sizes);
-    return res;
+    twin_path_empty(ctx->path);
+    return TVG_SUCCESS;
 }
 
 static tvg_result_t tvg_parse_line_fill_paths(tvg_context_t *ctx,
@@ -906,32 +880,15 @@ static tvg_result_t tvg_parse_line_fill_paths(tvg_context_t *ctx,
                                               const tvg_style_t *line_style,
                                               twin_fixed_t line_width)
 {
-    tvg_result_t res = TVG_SUCCESS;
-    uint32_t *sizes = twin_malloc(size * sizeof(uint32_t));
-    if (!sizes) {
-        return TVG_E_OUT_OF_MEMORY;
-    }
-    for (size_t i = 0; i < size; ++i) {
-        res = tvg_read_varuint(ctx, &sizes[i]);
-        ++sizes[i];
-        __goto_if_fail(res, error, "Failed to read varuint");
-    }
-    twin_path_t *path = ctx->path;
-
-    /* parse path */
-    for (size_t i = 0; i < size; ++i) {
-        res = tvg_parse_path(ctx, sizes[i]);
-        __goto_if_fail(res, error, "Failed to parse path");
-    }
+    tvg_result_t res = tvg_parse_paths(ctx, size);
+    __return_val_if_fail(res, "Failed to parse paths");
     if (line_width == 0) {
         line_width = TVG_THIN_LINE;
     }
     _fill_path_with_style(ctx, fill_style);
     _stroke_path_with_style(ctx, line_style, line_width);
-    twin_path_empty(path);
-error:
-    twin_free(sizes);
-    return res;
+    twin_path_empty(ctx->path);
+    return TVG_SUCCESS;
 }
 
 static tvg_result_t tvg_parse_fill_polygon(tvg_context_t *ctx,
@@ -1137,14 +1094,12 @@ static tvg_result_t tvg_document_dimensions(tvg_input_func_t in,
                                             uint32_t *out_height)
 {
     /* initialize the context */
-    tvg_context_t ctx;
+    tvg_context_t ctx = {0};
     if (!in) {
         return TVG_E_INVALID_ARG;
     }
     ctx.in = in;
     ctx.in_state = in_state;
-    ctx.colors = NULL;
-    ctx.colors_size = 0;
     /* parse the header, early outing before the color table */
     tvg_result_t res = tvg_parse_header(&ctx, 1);
     __return_val_if_fail(res, "Failed to parse header");
@@ -1160,15 +1115,13 @@ static tvg_result_t tvg_render_document(tvg_input_func_t in,
                                         twin_fixed_t height_scale)
 {
     /* initialize the context */
-    tvg_context_t ctx;
+    tvg_context_t ctx = {0}; /* the error path frees what was set up */
     if (!in) {
         return TVG_E_INVALID_ARG;
     }
     ctx.in = in;
     ctx.in_state = in_state;
     ctx.pixmap = pix;
-    ctx.colors = NULL;
-    ctx.colors_size = 0;
     /* parse the header */
     tvg_result_t res = tvg_parse_header(&ctx, 0);
     __goto_if_fail(res, error, "Failed to parse header");
@@ -1178,6 +1131,10 @@ static tvg_result_t tvg_render_document(tvg_input_func_t in,
         goto error;
     }
     twin_path_scale(ctx.path, width_scale, height_scale);
+    /* TinyVG fills by the even-odd rule: drawings converted from SVG, such
+     * as comic.tvg and tiger.tvg, cut their holes with nested outlines
+     * wound the same way, which nonzero would fill in */
+    twin_path_set_fill_rule(ctx.path, TwinFillEvenOdd);
     res = tvg_parse_commands(&ctx);
     __goto_if_fail(res, error, "Failed to parse commands");
 error:
@@ -1207,7 +1164,7 @@ static bool tvg_fit_budget(twin_format_t fmt,
                            size_t budget)
 {
     size_t size;
-    if (tvg_pixmap_alloc_size(fmt, *w, *h, &size) && size <= budget)
+    if (_twin_pixmap_alloc_size(fmt, *w, *h, &size) && size <= budget)
         return true;
     uint32_t lo = 1, hi = *h, best_w = 0, best_h = 0;
     while (lo <= hi) {
@@ -1215,7 +1172,8 @@ static bool tvg_fit_budget(twin_format_t fmt,
         uint32_t mid_w = (uint32_t) (((uint64_t) *w * mid_h) / *h);
         if (mid_w < 1)
             mid_w = 1;
-        if (tvg_pixmap_alloc_size(fmt, mid_w, mid_h, &size) && size <= budget) {
+        if (_twin_pixmap_alloc_size(fmt, mid_w, mid_h, &size) &&
+            size <= budget) {
             best_w = mid_w;
             best_h = mid_h;
             lo = mid_h + 1;
@@ -1228,8 +1186,9 @@ static bool tvg_fit_budget(twin_format_t fmt,
     return best_w && best_h;
 }
 
-/* Render @filepath into a @w x @h pixmap, the drawing scaled to fit (0 x 0:
- * the document's own size), shrunk further to CONFIG_TVG_MEMORY_BUDGET */
+/* Render @filepath scaled to fit @w x @h (0 x 0: the document's own size)
+ * into a pixmap of the drawing's aspect, shrunk further to
+ * CONFIG_TVG_MEMORY_BUDGET */
 static twin_pixmap_t *tvg_load(const char *filepath,
                                twin_format_t fmt,
                                uint32_t w,
@@ -1258,6 +1217,11 @@ static twin_pixmap_t *tvg_load(const char *filepath,
     /* Pixmaps are indexed with twin_coord_t */
     w = MIN(w, INT16_MAX);
     h = MIN(h, INT16_MAX);
+    /* Take the drawing's aspect, so no margin is stored around it */
+    if ((uint64_t) w * height <= (uint64_t) h * width)
+        h = MAX((uint32_t) ((uint64_t) height * w / width), 1);
+    else
+        w = MAX((uint32_t) ((uint64_t) width * h / height), 1);
 #if defined(CONFIG_TVG_MEMORY_BUDGET) && CONFIG_TVG_MEMORY_BUDGET > 0
     if (!tvg_fit_budget(fmt, &w, &h, (size_t) CONFIG_TVG_MEMORY_BUDGET * 1024))
         goto bail;

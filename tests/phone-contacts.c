@@ -14,6 +14,8 @@
 #include "data.h"
 #include "phone-test.h"
 
+#if defined(CONFIG_APP_PHONE_CONTACTS)
+
 int app_contacts_test_offset(void);
 const char *app_contacts_test_detail(void);
 const char *app_contacts_test_form_error(void);
@@ -204,3 +206,6 @@ void test_contacts(void)
     ph_home();
     phone_data_reset();
 }
+#else
+void test_contacts(void) {}
+#endif

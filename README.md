@@ -125,7 +125,7 @@ $ ./demo-sdl
 ```
 
 The default build uses the desktop window manager: overlapping, decorated
-windows running the demo apps.  The window manager is a build-time
+windows running the applications.  The window manager is a build-time
 choice, and the desktop and mobile policies are mutually exclusive.  Build
 the phone instead, a lock screen (drag the knob to unlock), a home screen
 and a dozen apps with vector-drawn interfaces (Photos shows JPEG
@@ -142,7 +142,7 @@ $ ./demo-sdl                      # phone; drag from the left edge to go back
 
 `WM_NONE=y` builds with no window manager at all, showing a single app.
 The window manager is fixed for the life of the build: nothing switches
-or checks it at run time.  The demo apps in `apps/apps.c` run under all
+or checks it at run time.  The applications in `apps/apps.c` run under all
 three; the phone shell depends on `WM_MOBILE` and is built only there.  See [docs/phone.md](docs/phone.md) for the design of
 the window manager, compositor and caches.
 

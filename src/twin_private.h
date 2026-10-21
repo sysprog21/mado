@@ -60,45 +60,39 @@ typedef union _twin_pointer {
 } twin_pointer_t;
 
 /**
- * Animation iterator for frame-by-frame playback
+ * Animation that redraws its pixmap in place
  *
- * Iterator state for stepping through animation frames.
- * Maintains current position and timing information.
- */
-typedef struct _twin_animation_iter {
-    twin_animation_t *anim;       /**< Animation being iterated */
-    twin_count_t current_index;   /**< Current frame index */
-    twin_pixmap_t *current_frame; /**< Current frame pixmap */
-    twin_time_t current_delay;    /**< Current frame delay time */
-} twin_animation_iter_t;
-
-/**
- * Animation structure for frame-based animations
- *
- * Contains all data needed for frame-based animations including
- * timing, frame data, and playback state.
+ * The decoder embeds this as its first member: @advance draws the next frame
+ * into @pixmap and sets @delay, @close frees the decoder (not the pixmap,
+ * which owns the animation).
  */
 struct _twin_animation {
-    twin_pixmap_t **frames;      /**< Array of frame pixmaps */
-    twin_count_t n_frames;       /**< Number of frames */
-    twin_time_t *frame_delays;   /**< Per-frame timing in milliseconds */
-    bool loop;                   /**< Loop animation flag */
-    twin_animation_iter_t *iter; /**< Playback iterator */
-    twin_coord_t width, height;  /**< Animation dimensions in pixels */
+    twin_pixmap_t *pixmap; /**< Pixmap showing the current frame */
+    twin_time_t delay;     /**< Current frame's display time in ms */
+    bool (*advance)(twin_animation_t *anim); /* false: nothing changed */
+    void (*close)(twin_animation_t *anim);
 };
+
+/* Rectangles that can cast one pixmap's shadow */
+#define TWIN_SHADOW_CASTS 2
 
 /**
  * Procedural drop shadow attached to a pixmap
  *
  * The compositor synthesizes the shadow while scanning out: each edge fades
  * along a smoothstep ramp 2 * blur + 1 pixels wide, a close match to a
- * blurred rectangle.  No pixels are stored: a shadow costs four bytes per
- * pixmap and no blur pass.
+ * Gaussian-blurred rectangle.  No pixels are stored and there is no blur
+ * pass.  Rectangles cast it: the whole pixmap by default; for a window, its
+ * client while solid (kept by the window) and its title tab (set by the
+ * window manager).  The pixmap's alpha masks it, so it only shows outside.
+ * It costs 20 bytes per pixmap: 4 for the shadow, 8 for each rectangle.
  */
 typedef struct _twin_shadow {
-    int8_t dx, dy;   /**< Offset of the shadow rectangle */
+    int8_t dx, dy;   /**< Offset of the shadow */
     uint8_t blur;    /**< Blur radius in pixels (0 disables the shadow) */
     twin_a8_t alpha; /**< Peak shadow opacity */
+    twin_rect_t cast[TWIN_SHADOW_CASTS]; /**< Pixmap coordinates; an empty
+                                              rectangle casts nothing */
 } twin_shadow_t;
 
 /* The pixmap casts a shadow (only with CONFIG_DROP_SHADOW) */
@@ -366,8 +360,9 @@ struct _twin_widget {
     twin_widget_t *copy_geom;   /**< Geometry source widget (optional) */
 
     /* Widget state */
-    bool paint;  /**< Needs painting */
-    bool layout; /**< Needs layout */
+    bool paint;         /**< Needs painting */
+    bool layout;        /**< Needs layout */
+    bool fixed_stretch; /**< Stretch set explicitly: a box keeps it */
 
     /* Widget appearance */
     twin_argb32_t background;       /**< Background color */
@@ -1320,6 +1315,18 @@ void _twin_pixmap_unlink(twin_pixmap_t *pixmap);
 /* Drop the screen's focus and pointer references to @pixmap */
 void _twin_screen_forget(twin_screen_t *screen, const twin_pixmap_t *pixmap);
 
+/* Bytes a @width x @height pixmap of @format needs; false if it cannot exist */
+bool _twin_pixmap_alloc_size(twin_format_t format,
+                             uint32_t width,
+                             uint32_t height,
+                             size_t *size_out);
+
+/* twin_pixmap_create() for sizes read from a file: anything that does not
+ * fit a pixmap, negative or past INT16_MAX, is refused, never narrowed */
+twin_pixmap_t *_twin_pixmap_create_sized(twin_format_t format,
+                                         uint32_t width,
+                                         uint32_t height);
+
 /* Pixmap header with no pixel storage; every drawing operation clips out */
 twin_pixmap_t *_twin_pixmap_create_stub(twin_format_t format,
                                         twin_coord_t width,
@@ -1544,7 +1551,6 @@ static inline int twin_ucs_char_in_page(uint32_t ucs4)
 
 /* Animations belong to their pixmap: twin_pixmap_destroy() frees them */
 void _twin_animation_destroy(twin_animation_t *anim);
-twin_animation_iter_t *_twin_animation_iter_init(twin_animation_t *anim);
 
 /* Title-bar icons of the desktop policy (built with CONFIG_WM_DESKTOP) */
 typedef enum _twin_icon {
@@ -1975,6 +1981,14 @@ void twin_pixmap_set_shadow(twin_pixmap_t *pixmap,
                             twin_coord_t dy,
                             twin_coord_t blur,
                             twin_a8_t alpha);
+
+/**
+ * Set one rectangle casting a pixmap's shadow
+ * @pixmap : Pixmap casting the shadow
+ * @k      : Which one, below TWIN_SHADOW_CASTS; 0 starts as the whole pixmap
+ * @r      : Pixmap coordinates; empty casts nothing
+ */
+void twin_pixmap_set_shadow_cast(twin_pixmap_t *pixmap, int k, twin_rect_t r);
 
 void twin_pixmap_enable_update(twin_pixmap_t *pixmap);
 

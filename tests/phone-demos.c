@@ -70,15 +70,7 @@ void test_demos(void)
         th_release(phone_th, r.left + 3, CY(r.bottom + 40));
         ph_wait(300);
     }
-    /* The page lists whichever apps are built: the golden frame holds the
-     * default set */
-#if defined(CONFIG_DEMO_CLOCK) && defined(CONFIG_DEMO_CALCULATOR) && \
-    defined(CONFIG_DEMO_SPLINE) && defined(CONFIG_DEMO_ANIMATION) && \
-    defined(CONFIG_DEMO_IMAGE) && defined(CONFIG_DEMO_MULTI)
     ph_shot("home-demos");
-#else
-    ph_check("home-demos");
-#endif
 
     size_t base = 0;
     for (int pass = 0; pass < 2; pass++) {

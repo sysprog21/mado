@@ -29,6 +29,65 @@ static twin_pixmap_t *solid(twin_format_t fmt,
     return p;
 }
 
+#if defined(CONFIG_DROP_SHADOW)
+/* The shadow shows only outside its window: the shape picks what casts it,
+ * the window's alpha masks it (opacity included, RGB16 too), and narrow
+ * damage leaves pieces wholly beside the window that must stay in bounds */
+static void test_shadow_mask(void)
+{
+    th_t *t = th_create(W, H);
+    t->screen->background_color = 0xffffffff;
+    twin_screen_damage(t->screen, 0, 0, W, H);
+
+    /* Left half solid, right half clear; only the solid half casts */
+    twin_pixmap_t *glass = solid(TWIN_ARGB32, 40, 40, 0x00000000);
+    twin_fill(glass, 0xff000080, TWIN_SOURCE, 0, 0, 20, 40);
+    twin_pixmap_move(glass, 40, 40);
+    twin_pixmap_set_shadow(glass, 0, 4, 6, 0xc0);
+    twin_pixmap_set_shadow_cast(glass, 0, (twin_rect_t) {0, 20, 0, 40});
+    twin_pixmap_show(glass, t->screen, NULL);
+    th_frame(t);
+    CHECK_EQ(th_pixel(t, 50, 60), 0xff000080, "no shadow over the window");
+    CHECK((th_pixel(t, 62, 60) & 0xff) < 0xff,
+          "shadow shows through the clear half beside the caster");
+    CHECK_EQ(th_pixel(t, 75, 60), 0xffffffff,
+             "clear half past the blur: no shadow from the bounding box");
+
+    /* Faded RGB16 is not opaque: part of its own shadow shows through */
+    twin_pixmap_t *rgb = solid(TWIN_RGB16, 30, 30, 0xff808080);
+    twin_pixmap_move(rgb, 120, 40);
+    twin_pixmap_set_opacity(rgb, 0x80);
+    twin_pixmap_show(rgb, t->screen, NULL);
+    th_frame(t);
+    twin_argb32_t plain = th_pixel(t, 135, 55);
+    twin_pixmap_set_shadow(rgb, 0, 0, 6, 0xc0);
+    th_frame(t);
+    CHECK((th_pixel(t, 135, 55) & 0xff) < (plain & 0xff),
+          "half-faded RGB16 lets its shadow through: %08x vs %08x",
+          th_pixel(t, 135, 55), plain);
+
+    /* An A8 pixmap masks by its bytes */
+    twin_pixmap_t *a8 = solid(TWIN_A8, 8, 8, 0x80000000);
+    twin_pixmap_move(a8, 60, 110);
+    twin_pixmap_set_shadow(a8, 2, 2, 4, 0xc0);
+    twin_pixmap_show(a8, t->screen, NULL);
+    th_frame(t);
+    CHECK_EQ(th_damage_check(t), 0, "A8 shadow consistent");
+
+    /* Narrow strips: pieces left or right of a pixmap, never past them */
+    for (twin_coord_t x = 0; x < W; x += 3) {
+        twin_screen_damage(t->screen, x, 0, x + 2, H);
+        th_frame(t);
+    }
+    CHECK_EQ(th_damage_check(t), 0, "strip damage matches a full repaint");
+
+    twin_pixmap_destroy(a8);
+    twin_pixmap_destroy(rgb);
+    twin_pixmap_destroy(glass);
+    th_destroy(t);
+}
+#endif
+
 static void test_damage_merge(void)
 {
     th_t *t = th_create(W, H);
@@ -1132,11 +1191,25 @@ static void on_draw(twin_window_t *window)
 
 static void test_accessors(void)
 {
+    /* The fill rule is drawing state: restore brings back the saved one */
+    twin_path_t *fp = twin_path_create();
+    twin_path_set_fill_rule(fp, TwinFillEvenOdd);
+    twin_state_t saved = twin_path_save(fp);
+    twin_path_set_fill_rule(fp, TwinFillNonZero);
+    twin_path_restore(fp, &saved);
+    CHECK(twin_path_save(fp).fill_rule == TwinFillEvenOdd,
+          "restoring a path's state restores its fill rule");
+    twin_path_destroy(fp);
+
     th_t *t = th_create(W, H);
     CHECK(
         twin_screen_width(t->screen) == W && twin_screen_height(t->screen) == H,
         "screen size");
     CHECK(twin_screen_stats(t->screen) == &t->screen->stats, "screen stats");
+
+    CHECK(!twin_pixmap_create(TWIN_ARGB32, 1, -1) &&
+              !twin_pixmap_create(TWIN_ARGB32, -1, 1),
+          "negative pixmap sizes rejected");
 
     twin_pixmap_t *p = twin_pixmap_create(TWIN_RGB16, 7, 5);
     twin_coord_t stride = 0;
@@ -1274,6 +1347,44 @@ static void test_toplevel_background(void)
 /* Boxes paint their own background in the gaps their children leave, a
  * background or shape change repaints everything over it, and a shaped
  * root leaves the rest of the window transparent */
+/* A stretch set on a box outlasts the next layout: a nested box held at
+ * stretch 0 keeps its children's height while a flexible sibling takes the
+ * rest of the window */
+static void test_box_stretch(void)
+{
+    th_t *t = th_create(W, H);
+    twin_toplevel_t *top = twin_toplevel_create(t->screen, 0, 0, W, H, "t");
+    twin_box_t *row = twin_box_create(twin_toplevel_box(top), TwinBoxHorz);
+    twin_custom_widget_t *cell =
+        twin_custom_widget_create(row, 0, 0, 10, NULL, 0);
+    twin_custom_widget_t *rest =
+        twin_custom_widget_create(twin_toplevel_box(top), 0, 0, 0, NULL, 0);
+    twin_widget_set_stretch(twin_box_widget(row), 1, 0);
+    twin_toplevel_show(top);
+    th_frame(t);
+    CHECK_EQ(twin_custom_widget_height(cell), 10,
+             "a box held at stretch 0 keeps its height");
+    CHECK(twin_custom_widget_height(rest) > 10,
+          "the flexible sibling takes the room (%d)",
+          twin_custom_widget_height(rest));
+    twin_toplevel_destroy(top);
+
+    /* Inside a box, its children share the room by their own stretches,
+     * whatever stretch the box shows its parent */
+    top = twin_toplevel_create(t->screen, 0, 0, W, H, "t");
+    twin_box_t *col = twin_box_create(twin_toplevel_box(top), TwinBoxVert);
+    twin_custom_widget_t *a = twin_custom_widget_create(col, 0, 0, 0, NULL, 0);
+    twin_custom_widget_t *b = twin_custom_widget_create(col, 0, 0, 0, NULL, 0);
+    twin_widget_set_stretch(twin_box_widget(col), 1, 1);
+    twin_toplevel_show(top);
+    th_frame(t);
+    int ha = twin_custom_widget_height(a), hb = twin_custom_widget_height(b);
+    CHECK(ha > 0 && hb > 0 && ha - hb <= 1 && hb - ha <= 1,
+          "two equal children split a stretched box evenly (%d, %d)", ha, hb);
+    twin_toplevel_destroy(top);
+    th_destroy(t);
+}
+
 static void test_box_background(void)
 {
     th_t *t = th_create(W, H);
@@ -1333,7 +1444,8 @@ static void test_box_background(void)
 }
 #endif
 
-#if defined(CONFIG_LOADER_GIF) || defined(CONFIG_LOADER_TVG)
+#if defined(CONFIG_LOADER_GIF) || defined(CONFIG_LOADER_TVG) || \
+    defined(CONFIG_LOADER_PNG)
 /* Write @len bytes to a temporary file named in @path ("...XXXXXX"); a
  * fixture that cannot be written fails the run rather than passing as a
  * loader's rejection */
@@ -1382,18 +1494,262 @@ static void test_tvg_hairline(void)
           inked);
     twin_pixmap_destroy(p);
 }
+
+/* A palette index past the color table is rejected, not read out of
+ * bounds; so is one equal to the table size */
+static void test_tvg_color_index(void)
+{
+    uint8_t doc[] = {
+        0x72, 0x56, 1,  0x44, 2,    2, 1, 0, 0, 0, 255, /* as above */
+        0x04, 0,    1,  0,                              /* color 1 of 1 */
+        2,    16,   30, 16,   0x00,
+    };
+    char path[] = "/tmp/mado-tvg-XXXXXX";
+    if (!write_fixture(path, doc, sizeof(doc)))
+        return;
+    twin_pixmap_t *p = twin_tvg_to_pixmap(path, 20, 20);
+    unlink(path);
+    CHECK(!p, "TVG color index past the table rejected");
+    if (p)
+        twin_pixmap_destroy(p);
+
+    /* A varuint's fifth byte carries bits 28 to 31 only: a color count of
+     * 1 + 2^32 must not alias to one color */
+    uint8_t wide[] = {
+        0x72, 0x56, 1,    0x44, 2,    2, /* header, 2x2 */
+        0x81, 0x80, 0x80, 0x80, 0x10,    /* 1 + 2^32 colors */
+        0,    0,    0,    255,  0x00,    /* one color, end */
+    };
+    char wide_path[] = "/tmp/mado-tvg-XXXXXX";
+    if (!write_fixture(wide_path, wide, sizeof(wide)))
+        return;
+    p = twin_tvg_to_pixmap(wide_path, 20, 20);
+    unlink(wide_path);
+    CHECK(!p, "TVG varuint past 32 bits rejected");
+    if (p)
+        twin_pixmap_destroy(p);
+}
+
+/* TinyVG fills by the even-odd rule: an inner square wound like the outer
+ * one cuts a hole */
+static void test_tvg_even_odd(void)
+{
+    /* clang-format off */
+    const uint8_t doc[] = {
+        0x72, 0x56, 1, 0x44, 2, 2, 1, 0, 0, 0, 255, /* 2x2, one color */
+        0x03, 1, 0, 3, 3, /* fill path: two segments, color 0, 4 cmds each */
+        2, 2, 0, 30, 2, 0, 30, 30, 0, 2, 30, 6,      /* outer, closed */
+        10, 10, 0, 22, 10, 0, 22, 22, 0, 10, 22, 6,  /* inner, same way */
+        0x00,
+    };
+    /* clang-format on */
+    char path[] = "/tmp/mado-tvg-XXXXXX";
+    if (!write_fixture(path, doc, sizeof(doc)))
+        return;
+    twin_pixmap_t *p = twin_tvg_to_pixmap(path, 32, 32);
+    unlink(path);
+    CHECK(p != NULL, "nested TVG squares load");
+    if (!p)
+        return;
+    CHECK((*twin_pixmap_pointer(p, 5, 16).argb32 >> 24) == 0xff,
+          "the ring between the squares is filled");
+    CHECK_EQ(*twin_pixmap_pointer(p, 16, 16).argb32, 0,
+             "the inner square is a hole");
+    twin_pixmap_destroy(p);
+
+    /* The pixmap takes the drawing's aspect: a square asked for 64x32
+     * comes back 32x32, with no margin stored beside it */
+    char wide_path[] = "/tmp/mado-tvg-XXXXXX";
+    if (!write_fixture(wide_path, doc, sizeof(doc)))
+        return;
+    p = twin_tvg_to_pixmap(wide_path, 64, 32);
+    unlink(wide_path);
+    CHECK(p && twin_pixmap_width(p) == 32 && twin_pixmap_height(p) == 32,
+          "TVG pixmap keeps the drawing's aspect");
+    if (p)
+        twin_pixmap_destroy(p);
+}
 #endif
 
-#if defined(CONFIG_LOADER_GIF)
-/* Load @len bytes as a file; NULL is the only acceptable answer here */
+#if defined(CONFIG_LOADER_GIF) || defined(CONFIG_LOADER_PNG)
+/* Load @len bytes as a file */
 static twin_pixmap_t *load_bytes(const uint8_t *bytes, size_t len)
 {
-    char path[] = "/tmp/mado-gif-XXXXXX";
+    char path[] = "/tmp/mado-img-XXXXXX";
     if (!write_fixture(path, bytes, len))
         return NULL;
     twin_pixmap_t *p = twin_pixmap_from_file(path);
     unlink(path);
     return p;
+}
+
+static twin_argb32_t pixel_at(twin_pixmap_t *p, int x, int y)
+{
+    return *twin_pixmap_pointer(p, x, y).argb32;
+}
+#endif
+
+#if defined(CONFIG_LOADER_PNG)
+/* 16-bit RGB decodes (it was rejected before the transforms were checked),
+ * in ARGB order on every host */
+static void test_png_16bit(void)
+{
+    /* 2x1, 16 bits per channel: (253, 161, 6) and (200, 200, 200) */
+    const uint8_t png[] = {
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00,
+        0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00,
+        0x00, 0x01, 0x10, 0x02, 0x00, 0x00, 0x00, 0x2b, 0xd0, 0x34, 0x9e,
+        0x00, 0x00, 0x00, 0x12, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63,
+        0xf8, 0xfb, 0x77, 0xe1, 0x42, 0x36, 0xb6, 0x13, 0x60, 0x00, 0x00,
+        0x33, 0x7d, 0x07, 0xf9, 0x12, 0xbf, 0xb4, 0x11, 0x00, 0x00, 0x00,
+        0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+    };
+    twin_pixmap_t *p = load_bytes(png, sizeof(png));
+    CHECK(p != NULL, "16-bit PNG loads");
+    if (!p)
+        return;
+    CHECK_EQ(pixel_at(p, 0, 0), 0xfffda106, "16-bit PNG pixel 0");
+    CHECK_EQ(pixel_at(p, 1, 0), 0xffc8c8c8, "16-bit PNG pixel 1");
+    twin_pixmap_destroy(p);
+}
+#endif
+
+#if defined(CONFIG_LOADER_GIF)
+/* Frames draw into the pixmap itself: transparent pixels stay clear, a
+ * two-row interlaced frame lands on its own rows, and looping restarts
+ * from a clear canvas */
+static void test_gif_frames(void)
+{
+    /* 1x2, palette black/white, every frame transparent on index 0 */
+    const uint8_t gif[] = {
+        'G',  'I',  'F',  '8',  '9',  'a',  1, 0, 2, 0,
+        0x80, 0,    0,                                     /* screen */
+        0,    0,    0,    0xff, 0xff, 0xff,                /* GCT */
+        '!',  0xf9, 4,    0x01, 1,    0,    0, 0,          /* GCE */
+        ',',  0,    0,    0,    0,    1,    0, 2, 0, 0x40, /* interlaced 1x2 */
+        2,    2,    0x44, 0x0a, 0,                         /* rows: 0, 1 */
+        '!',  0xf9, 4,    0x01, 1,    0,    0, 0,          /* GCE */
+        ',',  0,    0,    0,    0,    1,    0, 2, 0, 0,    /* 1x2 */
+        2,    2,    0x4c, 0x0a, 0,                         /* rows: 1, 1 */
+        ';',
+    };
+    twin_pixmap_t *p = load_bytes(gif, sizeof(gif));
+    CHECK(p != NULL, "animated GIF loads");
+    if (!p)
+        return;
+    twin_animation_t *a = twin_pixmap_animation(p);
+    CHECK(a && twin_animation_get_current_frame(a) == p,
+          "the pixmap shows the current frame");
+    CHECK_EQ(pixel_at(p, 0, 0), 0, "transparent index left clear");
+    CHECK_EQ(pixel_at(p, 0, 1), 0xffffffff, "interlaced row 1 in place");
+    CHECK_EQ(twin_animation_get_current_delay(a), 100,
+             "1/100 s plays at 100 ms, as browsers do");
+    twin_animation_advance_frame(a);
+    CHECK_EQ(pixel_at(p, 0, 0), 0xffffffff, "second frame drawn over");
+    twin_animation_advance_frame(a);
+    CHECK_EQ(pixel_at(p, 0, 0), 0, "loop restarts from a clear canvas");
+    twin_pixmap_destroy(p);
+
+    /* A restore-to-previous first frame with a bad code size: rejected,
+     * and the saved canvas it allocated is freed with the decoder */
+    uint8_t bad[sizeof(gif)];
+    memcpy(bad, gif, sizeof(gif));
+    bad[22] = 0x0c; /* GCE: disposal 3 */
+    bad[37] = 0;    /* LZW minimum code size 0 */
+    size_t before = th_heap_raw();
+    p = load_bytes(bad, sizeof(bad));
+    CHECK(!p, "undecodable restore-to-previous frame rejected");
+    CHECK_EQ(th_heap_raw(), before, "failed GIF open frees its decoder");
+    if (p)
+        twin_pixmap_destroy(p);
+
+    /* NETSCAPE count 1: one repeat after the first play, as browsers
+     * count, then the last frame stays */
+    uint8_t twice[sizeof(gif) + 19];
+    memcpy(twice, gif, 19); /* screen and global color table */
+    memcpy(twice + 19,
+           (const uint8_t[]) {'!', 0xff, 11, 'N', 'E', 'T', 'S', 'C', 'A', 'P',
+                              'E', '2', '.', '0', 3, 1, 1, 0, 0},
+           19);
+    memcpy(twice + 38, gif + 19, sizeof(gif) - 19);
+    p = load_bytes(twice, sizeof(twice));
+    CHECK(p != NULL, "counted GIF loads");
+    if (p) {
+        a = twin_pixmap_animation(p);
+        twin_argb32_t seen[6];
+        for (int i = 0; i < 6; i++) {
+            seen[i] = pixel_at(p, 0, 0);
+            twin_animation_advance_frame(a);
+        }
+        CHECK(!seen[0] && seen[1] && !seen[2] && seen[3] && seen[4] && seen[5],
+              "count 1 plays twice, then holds the last frame");
+
+        /* Played out, it draws nothing more, so a shown canvas is not
+         * repainted on every tick */
+        th_t *t = th_create(16, 16);
+        twin_pixmap_show(p, t->screen, NULL);
+        th_frame(t);
+        twin_animation_advance_frame(a);
+        CHECK(!twin_screen_damaged(t->screen),
+              "a finished animation damages nothing");
+        twin_pixmap_destroy(p);
+        th_destroy(t);
+    }
+
+    /* 8x1, four colors, an encoder that clears every two codes, right at
+     * the code-size bump: the clear cancels the bump */
+    const uint8_t early[] = {
+        0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x08, 0x00, 0x01, 0x00, 0x81,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
+        0x00, 0x00, 0xff, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x01,
+        0x00, 0x00, 0x02, 0x05, 0x44, 0xa8, 0x71, 0x62, 0x50, 0x00, 0x3b,
+    };
+    p = load_bytes(early, sizeof(early));
+    CHECK(p != NULL, "early-clear GIF loads");
+    if (p) {
+        static const twin_argb32_t row[] = {
+            0xff000000, 0xffffffff, 0xffff0000, 0xff0000ff,
+            0xff0000ff, 0xffff0000, 0xffffffff, 0xff000000,
+        };
+        bool same = true;
+        for (int x = 0; x < 8; x++)
+            same &= pixel_at(p, x, 0) == row[x];
+        CHECK(same, "codes after an early clear keep their size");
+        twin_pixmap_destroy(p);
+    }
+
+    /* Play once; frame 2 asks for disposal 2 but sits at x=100, off the
+     * canvas: it draws nothing, disposes of nothing (its rectangle once
+     * made the next frame write outside the canvas), and its data is
+     * skipped so frame 3 still decodes */
+    /* clang-format off */
+    const uint8_t once[] = {
+        'G', 'I', 'F', '8', '9', 'a', 1, 0, 2, 0, 0x80, 0, 0, /* screen */
+        0, 0, 0, 0xff, 0xff, 0xff,                            /* GCT */
+        '!', 0xff, 11, 'N', 'E', 'T', 'S', 'C', 'A', 'P', 'E', '2', '.', '0',
+        3, 1, 1, 0, 0,                                 /* loop count 1 */
+        '!', 0xf9, 4, 0x01, 1, 0, 0, 0,                /* GCE */
+        ',', 0, 0, 0, 0, 1, 0, 2, 0, 0x40,             /* frame 1 */
+        2, 2, 0x44, 0x0a, 0,
+        '!', 0xf9, 4, 0x08, 1, 0, 0, 0,                /* GCE: disposal 2 */
+        ',', 100, 0, 0, 0, 1, 0, 2, 0, 0,              /* x=100: off canvas */
+        2, 2, 0x4c, 0x0a, 0,
+        ',', 0, 0, 0, 0, 1, 0, 2, 0, 0,                /* frame 3 */
+        2, 2, 0x4c, 0x0a, 0,
+        ';',
+    };
+    /* clang-format on */
+    p = load_bytes(once, sizeof(once));
+    CHECK(p != NULL, "play-once GIF loads");
+    if (!p)
+        return;
+    a = twin_pixmap_animation(p);
+    twin_animation_advance_frame(a); /* the off-canvas frame */
+    CHECK(pixel_at(p, 0, 0) == 0 && pixel_at(p, 0, 1) == 0xffffffff,
+          "off-canvas frame leaves the canvas alone");
+    twin_animation_advance_frame(a);
+    CHECK_EQ(pixel_at(p, 0, 0), 0xffffffff, "frame after it drawn");
+    twin_pixmap_destroy(p);
 }
 
 /* Malformed GIFs fail to load instead of hanging or writing out of
@@ -1439,6 +1795,7 @@ int main(void)
     test_row_fallback();
 #if defined(CONFIG_DROP_SHADOW)
     test_shadow();
+    test_shadow_mask();
 #endif
     test_rgb16_and_opacity();
     test_stub();
@@ -1462,12 +1819,19 @@ int main(void)
     test_widget_teardown();
     test_toplevel_background();
     test_box_background();
+    test_box_stretch();
 #endif
 #if defined(CONFIG_LOADER_GIF)
     test_gif_malformed();
+    test_gif_frames();
 #endif
 #if defined(CONFIG_LOADER_TVG)
     test_tvg_hairline();
+    test_tvg_color_index();
+    test_tvg_even_odd();
+#endif
+#if defined(CONFIG_LOADER_PNG)
+    test_png_16bit();
 #endif
     test_leaks();
     twin_cache_flush();

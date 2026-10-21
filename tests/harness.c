@@ -344,6 +344,13 @@ size_t th_heap_net(const th_t *t)
  * when it does not match.  Options that must not change pixels, such as the
  * coverage cache, are deliberately left out: those builds have to match.
  */
+static uint32_t golden_salt;
+
+void th_golden_salt(const char *salt)
+{
+    golden_salt = th_crc_bytes(salt, strlen(salt));
+}
+
 static uint32_t config_fingerprint(void)
 {
     char buf[256];
@@ -355,9 +362,11 @@ static uint32_t config_fingerprint(void)
 #else
              0,
 #endif
-#if defined(CONFIG_DROP_SHADOW)
+#if defined(CONFIG_SHADOW_BLUR) /* the desktop's shadow geometry */
              CONFIG_HORIZONTAL_OFFSET, CONFIG_VERTICAL_OFFSET,
              CONFIG_SHADOW_BLUR,
+#elif defined(CONFIG_DROP_SHADOW) /* fixed geometry, as mobile slides */
+             -1, -1, -1,
 #else
              0, 0, 0,
 #endif
@@ -371,7 +380,7 @@ static uint32_t config_fingerprint(void)
 #else
              0,
 #endif
-#if defined(CONFIG_DEMO_CELLPHONE_RGB16)
+#if defined(CONFIG_APP_CELLPHONE_RGB16)
              1,
 #else
              0,
@@ -389,7 +398,7 @@ static uint32_t config_fingerprint(void)
              0
 #endif
     );
-    return th_crc_bytes(buf, strlen(buf));
+    return th_crc_bytes(buf, strlen(buf)) ^ golden_salt;
 }
 
 #define MAX_GOLDEN 256
@@ -514,8 +523,8 @@ int th_report(const char *suite)
     }
     if (golden_skipped)
         printf(
-            "%s: %d golden comparisons skipped (build options differ "
-            "from the recorded configuration)\n",
+            "%s: %d golden comparisons skipped (build options or the "
+            "suite's salt differ from the recorded configuration)\n",
             suite, golden_skipped);
     printf("%s: %d checks, %d failed\n", suite, th_checks, th_failures);
     return th_failures ? 1 : 0;

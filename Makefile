@@ -33,7 +33,7 @@ target.o-y :=
 TARGET_LIBS :=
 
 target.a-y :=
-target.a-$(CONFIG_DEMO_APPLICATIONS) += libapps.a
+target.a-$(CONFIG_APPS) += libapps.a
 target.a-y += libtwin.a
 
 # All translation units must share the arithmetic policy and target ABI.
@@ -166,35 +166,36 @@ endif
 # Applications
 
 libapps.a_files-y := apps/dummy.c
-libapps.a_files-$(CONFIG_DEMO_APPLICATIONS) += apps/apps.c
-libapps.a_files-$(CONFIG_DEMO_MULTI) += apps/multi.c
-libapps.a_files-$(CONFIG_DEMO_CLOCK) += apps/clock.c
-libapps.a_files-$(CONFIG_DEMO_CALCULATOR) += apps/calc.c
-libapps.a_files-$(CONFIG_DEMO_SPLINE) += apps/spline.c
-libapps.a_files-$(CONFIG_DEMO_ANIMATION) += apps/animation.c
-libapps.a_files-$(CONFIG_DEMO_IMAGE) += apps/image.c
+libapps.a_files-$(CONFIG_APPS) += apps/apps.c
+libapps.a_files-$(CONFIG_APP_MULTI) += apps/multi.c
+libapps.a_files-$(CONFIG_APP_CLOCK) += apps/clock.c
+libapps.a_files-$(CONFIG_APP_CALCULATOR) += apps/calc.c
+libapps.a_files-$(CONFIG_APP_SPLINE) += apps/spline.c
+libapps.a_files-$(CONFIG_APP_ANIMATION) += apps/animation.c
+libapps.a_files-$(CONFIG_APP_IMAGE) += apps/image.c
+libapps.a_files-$(CONFIG_APP_SNAKE) += apps/snake.c
+libapps.a_files-$(CONFIG_APP_PONG) += apps/pong.c
+libapps.a_files-$(CONFIG_APP_TETRIS) += apps/tetris.c
+libapps.a_files-$(CONFIG_APP_GAMES) += apps/games.c
 
-libapps.a_files-$(CONFIG_DEMO_CELLPHONE) += \
+libapps.a_files-$(CONFIG_APP_UIKIT) += \
 	apps/cellphone/ui.c \
 	apps/cellphone/ui-paint.c \
-	apps/cellphone/ui-input.c \
+	apps/cellphone/ui-input.c
+
+libapps.a_files-$(CONFIG_APP_CELLPHONE) += \
 	apps/cellphone/shell.c \
 	apps/cellphone/home.c \
 	apps/cellphone/lock.c \
 	apps/cellphone/data.c \
-	apps/cellphone/calc.c \
-	apps/cellphone/dialer.c \
-	apps/cellphone/contacts.c \
-	apps/cellphone/sms.c \
-	apps/cellphone/music.c \
-	apps/cellphone/photos.c \
-	apps/cellphone/camera.c \
-	apps/cellphone/settings.c \
-	apps/cellphone/calllog.c \
-	apps/cellphone/games.c \
-	apps/cellphone/snake.c \
-	apps/cellphone/pong.c \
-	apps/cellphone/tetris.c
+	apps/cellphone/settings.c
+libapps.a_files-$(CONFIG_APP_PHONE_DIALER) += apps/cellphone/dialer.c
+libapps.a_files-$(CONFIG_APP_PHONE_CALLLOG) += apps/cellphone/calllog.c
+libapps.a_files-$(CONFIG_APP_PHONE_MESSAGES) += apps/cellphone/sms.c
+libapps.a_files-$(CONFIG_APP_PHONE_CONTACTS) += apps/cellphone/contacts.c
+libapps.a_files-$(CONFIG_APP_PHONE_MUSIC) += apps/cellphone/music.c
+libapps.a_files-$(CONFIG_APP_PHONE_PHOTOS) += apps/cellphone/photos.c
+libapps.a_files-$(CONFIG_APP_PHONE_CAMERA) += apps/cellphone/camera.c
 
 libapps.a_includes-y := include apps apps/cellphone
 # Emscripten size optimization
@@ -259,7 +260,7 @@ endif
 
 # Standalone application
 
-ifeq ($(CONFIG_DEMO_APPLICATIONS), y)
+ifeq ($(CONFIG_APPS), y)
 target-y += demo-$(BACKEND)
 demo-$(BACKEND)_depends-y += $(target.a-y)
 demo-$(BACKEND)_files-y = apps/main.c
@@ -300,7 +301,7 @@ demo-$(BACKEND)_ldflags-y += \
 	-flto
 endif
 endif
-endif  # CONFIG_DEMO_APPLICATIONS
+endif  # CONFIG_APPS
 
 # Font editor tool
 # Tools should not be built for WebAssembly
@@ -332,10 +333,10 @@ endif
 # Headless tests: built only for 'make check' / 'make check-update'
 # (and listed for 'make clean' so their binaries are removed)
 TESTS := test-core test-wm test-lifetime
-ifeq ($(CONFIG_DEMO_APPLICATIONS), y)
+ifeq ($(CONFIG_APPS), y)
 TESTS += test-demos
 endif
-ifeq ($(CONFIG_DEMO_CELLPHONE), y)
+ifeq ($(CONFIG_APP_CELLPHONE), y)
 TESTS += test-cellphone
 endif
 

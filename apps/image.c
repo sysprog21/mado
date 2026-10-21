@@ -16,16 +16,14 @@ static inline twin_pixmap_t *_apps_image_pixmap(twin_custom_widget_t *image)
 }
 
 #define D(x) twin_double_to_fixed(x)
+/* The desktop window; a mobile policy gives it the whole work area */
 #define APP_WIDTH 400
 #define APP_HEIGHT 400
 
-static twin_pixmap_t *load_tvg(const char *path)
-{
-    return twin_tvg_to_pixmap(path, APP_WIDTH, APP_HEIGHT);
-}
-
 typedef struct {
     twin_pixmap_t *current_pix; /* only the visible image is kept */
+    twin_coord_t fit_w, fit_h;  /* the widget size it was rendered for */
+    bool tried;                 /* rendered, or failed, at that size */
     int image_idx;
 } apps_image_data_t;
 
@@ -48,16 +46,38 @@ static void _apps_image_paint(twin_custom_widget_t *custom)
 {
     apps_image_data_t *img =
         (apps_image_data_t *) twin_custom_widget_data(custom);
+    twin_coord_t w = twin_custom_widget_width(custom);
+    twin_coord_t h = twin_custom_widget_height(custom);
+    if (w <= 0 || h <= 0)
+        return;
+
+    /* Render the image to fit the widget, again whenever its size changes
+     * (a phone's work area, a resized window) */
+    if (img->fit_w != w || img->fit_h != h) {
+        if (img->current_pix)
+            twin_pixmap_destroy(img->current_pix);
+        img->current_pix = NULL;
+        img->tried = false;
+    }
+    /* A file that fails to render is not tried again on every repaint */
+    if (!img->tried) {
+        img->current_pix = twin_tvg_to_pixmap(tvg_files[img->image_idx], w, h);
+        img->fit_w = w;
+        img->fit_h = h;
+        img->tried = true;
+    }
     if (!img->current_pix)
         return;
+
+    /* It keeps the drawing's aspect: center it in the widget */
+    twin_coord_t pw = twin_pixmap_width(img->current_pix);
+    twin_coord_t ph = twin_pixmap_height(img->current_pix);
     twin_operand_t srcop = {
         .source_kind = TWIN_PIXMAP,
         .u.pixmap = img->current_pix,
     };
-
-    twin_composite(_apps_image_pixmap(custom), 0, 0, &srcop, 0, 0, NULL, 0, 0,
-                   TWIN_OVER, twin_pixmap_width(img->current_pix),
-                   twin_pixmap_height(img->current_pix));
+    twin_composite(_apps_image_pixmap(custom), (w - pw) / 2, (h - ph) / 2,
+                   &srcop, 0, 0, NULL, 0, 0, TWIN_OVER, pw, ph);
 }
 
 static twin_dispatch_result_t _apps_image_dispatch(twin_custom_widget_t *custom,
@@ -97,30 +117,23 @@ static twin_dispatch_result_t _apps_image_button_clicked(twin_widget_t *widget,
     const int n = sizeof(tvg_files) / sizeof(tvg_files[0]);
     img->image_idx = img->image_idx == n - 1 ? 0 : img->image_idx + 1;
 
-    /* Evict the old pixmap before loading the new one */
+    /* Free the old image; the repaint renders the new one */
     if (img->current_pix) {
         twin_pixmap_destroy(img->current_pix);
         img->current_pix = NULL;
     }
-    img->current_pix = load_tvg(tvg_files[img->image_idx]);
-    if (!img->current_pix)
-        return TwinDispatchContinue;
+    img->tried = false;
     twin_custom_widget_queue_paint(custom);
     return TwinDispatchDone;
 }
 
-static twin_custom_widget_t *_apps_image_init(twin_box_t *parent,
-                                              twin_coord_t height)
+/* The image takes all the room the button leaves, whatever the window */
+static twin_custom_widget_t *_apps_image_init(twin_box_t *parent)
 {
     twin_custom_widget_t *custom = twin_custom_widget_create(
-        parent, 0, 0, height, _apps_image_dispatch, sizeof(apps_image_data_t));
+        parent, 0, 0, 0, _apps_image_dispatch, sizeof(apps_image_data_t));
     if (!custom)
         return NULL;
-
-    apps_image_data_t *img =
-        (apps_image_data_t *) twin_custom_widget_data(custom);
-    img->image_idx = 0;
-    img->current_pix = load_tvg(tvg_files[0]);
 
     twin_button_t *button =
         twin_button_create(parent, "Next Image", 0xFF482722, D(10),
@@ -131,17 +144,17 @@ static twin_custom_widget_t *_apps_image_init(twin_box_t *parent,
     twin_widget_set(bw, 0xFFFEE4CE);
     twin_widget_set_callback(bw, _apps_image_button_clicked, custom);
     twin_widget_set_shape(bw, TwinShapeRectangle);
+    twin_widget_set_stretch(bw, 1, 0); /* as tall as its label, no taller */
 
     return custom;
 }
 
-static twin_custom_widget_t *apps_image_create(twin_box_t *parent,
-                                               twin_coord_t height)
+static twin_custom_widget_t *apps_image_create(twin_box_t *parent)
 {
-    return _apps_image_init(parent, height);
+    return _apps_image_init(parent);
 }
 
-/* Fixed size: @w and @h are ignored */
+/* APP_WIDTH x APP_HEIGHT on a desktop: @w and @h are ignored */
 bool apps_image_start(twin_screen_t *screen,
                       const char *name,
                       int x,
@@ -154,8 +167,7 @@ bool apps_image_start(twin_screen_t *screen,
         twin_toplevel_create(screen, x, y, APP_WIDTH, APP_HEIGHT, name);
     if (!toplevel)
         return false;
-    if (!apps_image_create(twin_toplevel_box(toplevel),
-                           twin_screen_height(screen) * 3 / 4)) {
+    if (!apps_image_create(twin_toplevel_box(toplevel))) {
         twin_toplevel_destroy(toplevel);
         return false;
     }

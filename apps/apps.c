@@ -6,38 +6,48 @@
 
 #include "apps.h"
 
-#if defined(CONFIG_DEMO_CELLPHONE)
+#if defined(CONFIG_APP_CELLPHONE)
 #include "phone.h"
 #endif
 
 /* Every app below the phone runs under all three window managers */
 static const apps_entry_t apps[] = {
-#if defined(CONFIG_DEMO_CELLPHONE) && defined(CONFIG_WM_MOBILE)
+#if defined(CONFIG_APP_CELLPHONE) && defined(CONFIG_WM_MOBILE)
     /* Mobile only: the phone shell lists the other apps on its home
      * screen */
     {"Phone", TWIN_SYM_MOBILE, 0, 0, PHONE_W, PHONE_H, NULL, phone_boot,
      phone_shutdown},
 #endif
-#if defined(CONFIG_DEMO_MULTI)
+#if defined(CONFIG_APP_MULTI)
     {"Demo", TWIN_SYM_LIST, 100, 100, 400, 400, apps_multi_start, NULL, NULL},
 #endif
-#if defined(CONFIG_DEMO_CLOCK)
+#if defined(CONFIG_APP_CLOCK)
     {"Clock", TWIN_SYM_CLOCK, 10, 10, 200, 200, apps_clock_start, NULL, NULL},
 #endif
-#if defined(CONFIG_DEMO_CALCULATOR)
-    {"Calc", TWIN_SYM_CALCULATOR, 100, 100, 200, 200, apps_calc_start, NULL,
-     NULL},
+#if defined(CONFIG_APP_CALCULATOR)
+    {"Calculator", TWIN_SYM_CALCULATOR, 100, 100, 220, 300, apps_calc_start,
+     NULL, NULL},
 #endif
-#if defined(CONFIG_DEMO_SPLINE)
+#if defined(CONFIG_APP_SPLINE)
     {"Spline", TWIN_SYM_SHUFFLE, 20, 20, 400, 400, apps_spline_start, NULL,
      NULL},
 #endif
-#if defined(CONFIG_DEMO_ANIMATION)
+#if defined(CONFIG_APP_ANIMATION)
     {"Animation", TWIN_SYM_PLAY, 20, 20, 0, 0, apps_animation_start, NULL,
      NULL},
 #endif
-#if defined(CONFIG_DEMO_IMAGE)
+#if defined(CONFIG_APP_IMAGE)
     {"Vectors", TWIN_SYM_GLOBE, 20, 20, 0, 0, apps_image_start, NULL, NULL},
+#endif
+/* Kit views in plain windows; the phone lists its own, themed rows */
+#if defined(CONFIG_APP_SNAKE)
+    {"Snake", TWIN_SYM_PLAY, 60, 40, 0, 0, apps_snake_start, NULL, NULL},
+#endif
+#if defined(CONFIG_APP_PONG)
+    {"Pong", TWIN_SYM_PLAY, 90, 60, 0, 0, apps_pong_start, NULL, NULL},
+#endif
+#if defined(CONFIG_APP_TETRIS)
+    {"Tetris", TWIN_SYM_PLAY, 120, 80, 0, 0, apps_tetris_start, NULL, NULL},
 #endif
     {0}, /* keeps the table valid when nothing is built */
 };

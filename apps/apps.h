@@ -5,13 +5,13 @@
  */
 
 /*
- * Registry of the demo applications that are built.  The demo launcher
- * (main.c), the phone's home screen and the tests all read it, so a new app
- * is listed everywhere by adding one entry.
+ * Registry of the applications that are built.  The launcher (main.c), the
+ * phone's home screen and the tests all read it, so a new app is listed
+ * everywhere by adding one entry.
  *
  * Which window managers an app runs under is settled at build time, like
  * the window manager itself: an app runs under all of them unless its
- * Kconfig option depends on one (DEMO_CELLPHONE depends on WM_MOBILE), and
+ * Kconfig option depends on one (APP_CELLPHONE depends on WM_MOBILE), and
  * its entry is compiled in only when it can run.
  */
 
@@ -48,6 +48,7 @@ const apps_entry_t *apps_at(int idx);
 #define ASSET_PATH "assets/"
 
 apps_start_fn apps_animation_start, apps_calc_start, apps_clock_start,
-    apps_image_start, apps_multi_start, apps_spline_start;
+    apps_image_start, apps_multi_start, apps_spline_start, apps_snake_start,
+    apps_pong_start, apps_tetris_start;
 
 #endif /* _APPS_H_ */
